@@ -102,11 +102,14 @@ export class HookServer {
    * Agrega (o actualiza) nuestros hooks en el settings.json de la cuenta, sin tocar los hooks
    * que el usuario ya tenga.
    */
-  installInto(configDir: string): void {
+  installInto(configDir: string, base?: Record<string, unknown>): void {
     mkdirSync(configDir, { recursive: true })
     const file = join(configDir, 'settings.json')
     let settings: Record<string, unknown> = {}
-    if (existsSync(file)) {
+    if (base) {
+      // Copia profunda: no queremos mutar el settings.json del usuario en memoria.
+      settings = structuredClone(base)
+    } else if (existsSync(file)) {
       try {
         settings = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
       } catch {

@@ -19,16 +19,35 @@ export function TerminalView({ id, generation, onError }: Props): React.JSX.Elem
     if (!el) return
     let disposed = false
     const term = new Terminal({
-      fontFamily: '"Cascadia Code", "Cascadia Mono", Consolas, monospace',
+      fontFamily: '"JetBrains Mono Variable", "Cascadia Code", Consolas, monospace',
       fontSize: 13,
+      lineHeight: 1.15,
       cursorBlink: true,
+      cursorStyle: 'bar',
       scrollback: 10000,
       allowProposedApi: true,
       theme: {
-        background: '#0b0d11',
-        foreground: '#d6dae3',
-        cursor: '#7aa2ff',
-        selectionBackground: '#2a3550'
+        background: '#12141a',
+        foreground: '#e3ebf0',
+        cursor: '#9feaf9',
+        cursorAccent: '#12141a',
+        selectionBackground: '#2c4a52',
+        black: '#2f3444',
+        red: '#f87171',
+        green: '#4ade80',
+        yellow: '#fbbf24',
+        blue: '#60a5fa',
+        magenta: '#c084fc',
+        cyan: '#9feaf9',
+        white: '#cbd5e1',
+        brightBlack: '#6b7385',
+        brightRed: '#fca5a5',
+        brightGreen: '#86efac',
+        brightYellow: '#fde68a',
+        brightBlue: '#93c5fd',
+        brightMagenta: '#d8b4fe',
+        brightCyan: '#67e8f9',
+        brightWhite: '#f8fafc'
       }
     })
     const fit = new FitAddon()

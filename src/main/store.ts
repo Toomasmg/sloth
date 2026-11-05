@@ -67,6 +67,20 @@ export class Store {
     this.state.accounts.push(account)
     this.save()
   }
+  updateAccount(id: string, patch: Partial<Omit<Account, 'id' | 'configDir'>>): Account | undefined {
+    const acc = this.account(id)
+    if (!acc) return undefined
+    Object.assign(acc, patch)
+    this.save()
+    return acc
+  }
+  updateWorkspace(id: string, patch: Partial<Omit<Workspace, 'id'>>): Workspace | undefined {
+    const ws = this.workspace(id)
+    if (!ws) return undefined
+    Object.assign(ws, patch)
+    this.save()
+    return ws
+  }
   removeAccount(id: string): void {
     this.state.accounts = this.state.accounts.filter((a) => a.id !== id)
     this.save()

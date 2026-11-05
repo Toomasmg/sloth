@@ -1,44 +1,49 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  ArrowClockwise,
+  ArrowsIn,
+  ArrowsOut,
+  EyeSlash,
+  Plus,
+  SignIn,
+  Terminal as TerminalIcon,
+  Ticket,
+  Trash,
+  WarningCircle,
+  X
+} from '@phosphor-icons/react'
+import {
   accountIdFromLoginPane,
   isLoginPane,
   loginPaneId,
   type Account,
   type AccountStatus,
+  type AccountUsage,
   type AgentStatus,
   type Workspace
 } from '../../shared/types'
 import { api } from './api'
 import { TerminalView } from './TerminalView'
-
-const STATE_LABEL: Record<AgentStatus['state'], string> = {
-  idle: 'Listo',
-  working: 'Trabajando',
-  waiting: 'Te necesita',
-  done: 'Terminó',
-  exited: 'Cerrado'
-}
-
-function cleanError(e: unknown): string {
-  const msg = e instanceof Error ? e.message : String(e)
-  return msg.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
-}
+import { NewWorkspaceDialog } from './NewWorkspaceDialog'
+import { LogoMark, Wordmark } from './Logo'
+import { StateIcon, StatePill } from './StateIcon'
+import { accountColor, cleanError, fmtTok, shortPath, STATE_LABEL, totalTok, usageTitle } from './format'
 
 export function App(): React.JSX.Element {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [statuses, setStatuses] = useState<Record<string, AccountStatus>>({})
+  const [usage, setUsage] = useState<Record<string, AccountUsage>>({})
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [openPanes, setOpenPanesState] = useState<string[]>([])
   const [agents, setAgents] = useState<Record<string, AgentStatus>>({})
   const [generations, setGenerations] = useState<Record<string, number>>({})
   const [focused, setFocused] = useState<string | null>(null)
+  const [maximized, setMaximized] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [showNewWs, setShowNewWs] = useState(false)
+  const [newWsMode, setNewWsMode] = useState<null | 'normal' | 'ticket'>(null)
   const [loaded, setLoaded] = useState(false)
 
-  const refreshStatuses = useCallback(() => {
-    void api.accountStatuses().then(setStatuses)
-  }, [])
+  const refreshStatuses = useCallback(() => void api.accountStatuses().then(setStatuses), [])
 
   useEffect(() => {
     void api.getState().then((s) => {
@@ -58,6 +63,13 @@ export function App(): React.JSX.Element {
     }
   }, [refreshStatuses])
 
+  useEffect(() => {
+    const tick = (): void => void api.accountUsage().then(setUsage).catch(() => undefined)
+    tick()
+    const t = setInterval(tick, 30_000)
+    return () => clearInterval(t)
+  }, [accounts.length])
+
   const setOpenPanes = useCallback((updater: (prev: string[]) => string[]) => {
     setOpenPanesState((prev) => {
       const next = updater(prev)
@@ -69,15 +81,21 @@ export function App(): React.JSX.Element {
   const openPane = (id: string): void => {
     setOpenPanes((p) => (p.includes(id) ? p : [...p, id]))
     setFocused(id)
+    if (maximized && maximized !== id) setMaximized(id)
   }
-  const closePane = (id: string): void => setOpenPanes((p) => p.filter((x) => x !== id))
+  const closePane = (id: string): void => {
+    setOpenPanes((p) => p.filter((x) => x !== id))
+    if (maximized === id) setMaximized(null)
+  }
   const restartPane = async (id: string): Promise<void> => {
     await api.ptyKill(id)
     setGenerations((g) => ({ ...g, [id]: (g[id] ?? 0) + 1 }))
   }
 
+  const accountIndex = useMemo(() => new Map(accounts.map((a, i) => [a.id, i])), [accounts])
   const accountById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
   const wsById = useMemo(() => new Map(workspaces.map((w) => [w.id, w])), [workspaces])
+  const colorOf = (accountId?: string): string => accountColor(accountId ? (accountIndex.get(accountId) ?? 0) : 0)
 
   const addAccount = async (label: string): Promise<void> => {
     try {
@@ -100,6 +118,16 @@ export function App(): React.JSX.Element {
     }
   }
 
+  const toggleShare = async (acc: Account): Promise<void> => {
+    const next = acc.shareSetup === false
+    try {
+      await api.setShareSetup(acc.id, next)
+      setAccounts((list) => list.map((a) => (a.id === acc.id ? { ...a, shareSetup: next } : a)))
+    } catch (e) {
+      setError(cleanError(e))
+    }
+  }
+
   const removeWorkspace = async (ws: Workspace): Promise<void> => {
     const extra = ws.branch ? `\n\nEl worktree en ${ws.cwd} queda en disco.` : ''
     if (!window.confirm(`¿Quitar el espacio «${ws.name}»? Se cierra su terminal.${extra}`)) return
@@ -110,153 +138,261 @@ export function App(): React.JSX.Element {
 
   const onTermError = useCallback((m: string) => setError(m), [])
 
-  const cols = openPanes.length <= 1 ? 1 : openPanes.length <= 4 ? 2 : 3
+  const visiblePanes = maximized ? openPanes.filter((p) => p === maximized) : openPanes
+  const cols = visiblePanes.length <= 1 ? 1 : visiblePanes.length <= 4 ? 2 : 3
+  const countBy = (s: AgentStatus['state']): number => workspaces.filter((w) => agents[w.id]?.state === s).length
+  const needsYou = countBy('waiting')
+  const working = countBy('working')
+  const done = countBy('done')
 
   return (
-    <div className="app">
-      <aside className="sidebar">
-        <div className="brand">
-          AntiRea <span className="muted">multi-cuenta</span>
+    <div className="shell">
+      <header className="titlebar">
+        <div className="titlebar-brand">
+          <Wordmark />
         </div>
-
-        <section>
-          <h2>Cuentas de Claude</h2>
+        <div className="titlebar-status" role="status" aria-live="polite">
+          {working > 0 && (
+            <span className="tb-chip tb-working">
+              <StateIcon state="working" size={12} /> {working} trabajando
+            </span>
+          )}
+          {needsYou > 0 && (
+            <span className="tb-chip tb-waiting">
+              <StateIcon state="waiting" size={12} /> {needsYou} te {needsYou === 1 ? 'necesita' : 'necesitan'}
+            </span>
+          )}
+          {done > 0 && (
+            <span className="tb-chip tb-done">
+              <StateIcon state="done" size={12} /> {done} {done === 1 ? 'terminó' : 'terminaron'}
+            </span>
+          )}
+        </div>
+      </header>
+    <div className="app">
+      <aside className="sidebar" aria-label="Cuentas y espacios">
+        <section className="section" aria-labelledby="h-accounts">
+          <h2 id="h-accounts" className="section-title">
+            Cuentas de Claude <span className="count">{accounts.length}</span>
+          </h2>
           {accounts.length === 0 && <p className="hint">Agregá una cuenta para empezar.</p>}
-          {accounts.map((acc) => {
-            const st = statuses[acc.id]
-            return (
-              <div key={acc.id} className="row">
-                <span className={`dot ${st?.loggedIn ? 'ok' : 'off'}`} title={st?.loggedIn ? 'Sesión iniciada' : 'Sin sesión'} />
-                <div className="row-main">
-                  <div className="row-title">{acc.label}</div>
-                  <div className="row-sub">{st?.email ?? (st?.loggedIn ? 'Sesión iniciada' : 'Sin sesión')}</div>
-                </div>
-                <button className="ghost" onClick={() => openPane(loginPaneId(acc.id))} title="Abrir Claude con esta cuenta para iniciar sesión">
-                  {st?.loggedIn ? 'Terminal' : 'Iniciar sesión'}
-                </button>
-                <button className="ghost danger" onClick={() => void removeAccount(acc)} title="Quitar cuenta">
-                  ×
-                </button>
-              </div>
-            )
-          })}
+          <ul className="list">
+            {accounts.map((acc) => {
+              const st = statuses[acc.id]
+              const u = usage[acc.id]
+              return (
+                <li key={acc.id} className="account" style={{ '--acc': colorOf(acc.id) } as React.CSSProperties}>
+                  <div className="account-top">
+                    <span className="acc-chip" aria-hidden="true">
+                      {acc.label.slice(0, 1).toUpperCase()}
+                    </span>
+                    <div className="grow-min">
+                      <div className="item-title">{acc.label}</div>
+                      <div className={`item-sub ${st?.loggedIn ? '' : 'warn'}`}>
+                        {st?.loggedIn ? st.email ?? 'Sesión iniciada' : 'Sin sesión'}
+                      </div>
+                    </div>
+                    <button
+                      className="icon-btn"
+                      onClick={() => openPane(loginPaneId(acc.id))}
+                      aria-label={st?.loggedIn ? `Abrir terminal de ${acc.label}` : `Iniciar sesión en ${acc.label}`}
+                      title={st?.loggedIn ? 'Terminal de la cuenta' : 'Iniciar sesión'}
+                    >
+                      {st?.loggedIn ? <TerminalIcon size={16} aria-hidden="true" /> : <SignIn size={16} aria-hidden="true" />}
+                    </button>
+                    <button className="icon-btn danger" onClick={() => void removeAccount(acc)} aria-label={`Quitar cuenta ${acc.label}`} title="Quitar cuenta">
+                      <Trash size={15} aria-hidden="true" />
+                    </button>
+                  </div>
+                  {u && (
+                    <dl className="usage" title={usageTitle(u)}>
+                      <div>
+                        <dt>5 h</dt>
+                        <dd>{fmtTok(totalTok(u.last5h))}</dd>
+                      </div>
+                      <div>
+                        <dt>Hoy</dt>
+                        <dd>{fmtTok(totalTok(u.today))}</dd>
+                      </div>
+                      <div>
+                        <dt>7 días</dt>
+                        <dd>{fmtTok(totalTok(u.last7d))}</dd>
+                      </div>
+                    </dl>
+                  )}
+                  <label className="switch" title="Enlaza tus skills, agents, hooks, plugins, settings y MCP de ~/.claude">
+                    <input type="checkbox" role="switch" checked={acc.shareSetup !== false} onChange={() => void toggleShare(acc)} />
+                    <span className="switch-track" aria-hidden="true" />
+                    Usar mi setup de ~/.claude
+                  </label>
+                </li>
+              )
+            })}
+          </ul>
           <AddAccount onAdd={addAccount} />
         </section>
 
-        <section className="grow">
-          <div className="section-head">
-            <h2>Espacios</h2>
-            <button className="primary small" disabled={accounts.length === 0} onClick={() => setShowNewWs(true)}>
-              + Nuevo
-            </button>
+        <section className="section grow" aria-labelledby="h-ws">
+          <div className="section-row">
+            <h2 id="h-ws" className="section-title">
+              Espacios <span className="count">{workspaces.length}</span>
+            </h2>
+            <div className="btn-group">
+              <button className="btn sm" disabled={accounts.length === 0} onClick={() => setNewWsMode('ticket')} title="Abre Claude con /ticket TCK-…">
+                <Ticket size={14} aria-hidden="true" /> Ticket
+              </button>
+              <button className="btn sm primary" disabled={accounts.length === 0} onClick={() => setNewWsMode('normal')}>
+                <Plus size={14} weight="bold" aria-hidden="true" /> Nuevo
+              </button>
+            </div>
           </div>
           {workspaces.length === 0 && <p className="hint">Un espacio = un repo + una cuenta + una PowerShell.</p>}
-          {workspaces.map((ws) => {
-            const ag = agents[ws.id]
-            const acc = accountById.get(ws.accountId)
-            const open = openPanes.includes(ws.id)
-            return (
-              <div key={ws.id} className={`row clickable ${open ? 'active' : ''}`} onClick={() => openPane(ws.id)}>
-                <span className={`dot state-${ag?.state ?? 'none'}`} title={ag ? STATE_LABEL[ag.state] : 'Sin abrir'} />
-                <div className="row-main">
-                  <div className="row-title">{ws.name}</div>
-                  <div className="row-sub">
-                    {acc?.label ?? 'cuenta borrada'} · {ws.branch ?? shortPath(ws.cwd)}
-                  </div>
-                </div>
-                <button
-                  className="ghost danger"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    void removeWorkspace(ws)
-                  }}
-                  title="Quitar espacio"
-                >
-                  ×
-                </button>
-              </div>
-            )
-          })}
+          <ul className="list">
+            {workspaces.map((ws) => {
+              const ag = agents[ws.id]
+              const acc = accountById.get(ws.accountId)
+              const open = openPanes.includes(ws.id)
+              return (
+                <li key={ws.id} className="ws-li" style={{ '--acc': colorOf(ws.accountId) } as React.CSSProperties}>
+                  <button
+                    className={`ws ${open ? 'open' : ''} ${focused === ws.id ? 'focused' : ''} ${ag?.state === 'waiting' ? 'waiting' : ''}`}
+                    onClick={() => openPane(ws.id)}
+                    aria-label={`${ws.name}, ${acc?.label ?? 'cuenta borrada'}, ${ag ? STATE_LABEL[ag.state] : 'sin abrir'}`}
+                  >
+                    <StateIcon state={ag?.state} />
+                    <span className="grow-min">
+                      <span className="item-title">
+                        {ws.name}
+                        {ws.ticket && <span className="tag">{ws.ticket}</span>}
+                      </span>
+                      <span className="item-sub">
+                        <span className="acc-dot" aria-hidden="true" />
+                        {acc?.label ?? 'cuenta borrada'} · <span className="mono">{ws.branch ?? shortPath(ws.cwd)}</span>
+                      </span>
+                    </span>
+                  </button>
+                  <button className="icon-btn danger ws-del" onClick={() => void removeWorkspace(ws)} aria-label={`Quitar espacio ${ws.name}`} title="Quitar espacio">
+                    <Trash size={14} aria-hidden="true" />
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
         </section>
       </aside>
 
       <main className="panes" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-        {loaded && openPanes.length === 0 && (
-          <div className="empty">
-            <h1>AntiRea</h1>
-            <p>
-              1. Agregá una cuenta y se abre Claude para que inicies sesión.
-              <br />
-              2. Creá un espacio con un repo y esa cuenta.
-              <br />
-              3. Abrí varios espacios: cada uno en su PowerShell, su repo y su cuenta.
-            </p>
-          </div>
-        )}
+        {loaded && openPanes.length === 0 && <EmptyState hasAccounts={accounts.length > 0} hasWs={workspaces.length > 0} />}
         {openPanes.map((paneId) => {
           const login = isLoginPane(paneId)
           const ws = login ? undefined : wsById.get(paneId)
-          const acc = login ? accountById.get(accountIdFromLoginPane(paneId)) : ws && accountById.get(ws.accountId)
+          const accId = login ? accountIdFromLoginPane(paneId) : ws?.accountId
+          const acc = accId ? accountById.get(accId) : undefined
           const ag = ws ? agents[ws.id] : undefined
           const email = acc ? statuses[acc.id]?.email : undefined
+          const hidden = maximized !== null && maximized !== paneId
           return (
-            <div
+            <section
               key={paneId}
-              className={`pane ${focused === paneId ? 'focused' : ''} ${ag ? `pane-${ag.state}` : ''}`}
+              className={`pane ${focused === paneId ? 'focused' : ''} ${ag ? `pane-${ag.state}` : ''} ${hidden ? 'hidden' : ''}`}
+              style={{ '--acc': colorOf(accId) } as React.CSSProperties}
               onMouseDown={() => setFocused(paneId)}
+              aria-label={login ? `Terminal de la cuenta ${acc?.label}` : `${ws?.name} con ${acc?.label}`}
             >
-              <div className="pane-head">
-                <span className="account-badge" title={email}>
+              <header className="pane-head">
+                <span className="acc-badge" title={email}>
                   {acc?.label ?? '?'}
                 </span>
-                <span className="pane-title">{login ? 'Login / terminal de cuenta' : ws?.name}</span>
-                {!login && ws && <span className="pane-path" title={ws.cwd}>{shortPath(ws.cwd)}</span>}
-                {ag && (
-                  <span className={`state-badge state-${ag.state}`} title={ag.detail}>
-                    {STATE_LABEL[ag.state]}
-                    {ag.state === 'working' && ag.detail ? ` · ${ag.detail}` : ''}
+                <span className="pane-title">{login ? 'Terminal de cuenta' : ws?.name}</span>
+                {ws?.ticket && <span className="tag">{ws.ticket}</span>}
+                {!login && ws && (
+                  <span className="pane-path mono" title={ws.cwd}>
+                    {shortPath(ws.cwd)}
                   </span>
                 )}
+                {ag && <StatePill state={ag.state} detail={ag.detail} />}
                 <span className="spacer" />
-                <button className="ghost small" onClick={() => void restartPane(paneId)} title="Cerrar el proceso y abrir otra terminal">
-                  Reiniciar
+                <button
+                  className="icon-btn"
+                  onClick={() => setMaximized(maximized === paneId ? null : paneId)}
+                  aria-label={maximized === paneId ? 'Volver a la grilla' : 'Maximizar'}
+                  title={maximized === paneId ? 'Volver a la grilla' : 'Maximizar'}
+                >
+                  {maximized === paneId ? <ArrowsIn size={15} aria-hidden="true" /> : <ArrowsOut size={15} aria-hidden="true" />}
                 </button>
-                <button className="ghost small" onClick={() => closePane(paneId)} title="Ocultar (la terminal sigue corriendo)">
-                  Ocultar
+                <button className="icon-btn" onClick={() => void restartPane(paneId)} aria-label="Reiniciar terminal" title="Cerrar el proceso y abrir otra terminal">
+                  <ArrowClockwise size={15} aria-hidden="true" />
                 </button>
-              </div>
+                <button className="icon-btn" onClick={() => closePane(paneId)} aria-label="Ocultar panel" title="Ocultar (la terminal sigue corriendo)">
+                  <EyeSlash size={15} aria-hidden="true" />
+                </button>
+              </header>
               <TerminalView id={paneId} generation={generations[paneId] ?? 0} onError={onTermError} />
-            </div>
+            </section>
           )
         })}
       </main>
 
-      {showNewWs && (
+      {newWsMode && (
         <NewWorkspaceDialog
+          mode={newWsMode}
           accounts={accounts}
           statuses={statuses}
-          onClose={() => setShowNewWs(false)}
+          usage={usage}
+          defaultRepo={workspaces[workspaces.length - 1]?.repoPath ?? ''}
+          onClose={() => setNewWsMode(null)}
           onCreated={(ws) => {
             setWorkspaces((w) => [...w, ws])
-            setShowNewWs(false)
+            setNewWsMode(null)
             openPane(ws.id)
           }}
         />
       )}
 
       {error && (
-        <div className="toast" onClick={() => setError(null)}>
-          {error}
-          <span className="muted"> (clic para cerrar)</span>
+        <div className="toast" role="alert">
+          <WarningCircle size={18} weight="fill" aria-hidden="true" />
+          <span className="grow-min">{error}</span>
+          <button className="icon-btn" onClick={() => setError(null)} aria-label="Cerrar aviso">
+            <X size={14} aria-hidden="true" />
+          </button>
         </div>
       )}
+    </div>
     </div>
   )
 }
 
-function shortPath(p: string): string {
-  const parts = p.split(/[\\/]/).filter(Boolean)
-  return parts.length <= 2 ? p : `…\\${parts.slice(-2).join('\\')}`
+function EmptyState({ hasAccounts, hasWs }: { hasAccounts: boolean; hasWs: boolean }): React.JSX.Element {
+  const steps = [
+    { done: hasAccounts, title: 'Agregá tus cuentas', text: 'Cada una se abre en su propia carpeta para iniciar sesión.' },
+    { done: hasWs, title: 'Creá un espacio', text: 'Un repo y una cuenta, o directo desde un ticket.' },
+    { done: false, title: 'Abrí varios en paralelo', text: 'Cada uno en su PowerShell, con su estado en vivo.' }
+  ]
+  return (
+    <div className="empty">
+      <div className="empty-logo">
+        <LogoMark size={72} />
+      </div>
+      <h1>
+        Anti<span>Rea</span>
+      </h1>
+      <p className="empty-lead">Varias cuentas de Claude, cada una en su terminal y su repo.</p>
+      <ol className="steps">
+        {steps.map((s, i) => (
+          <li key={s.title} className={s.done ? 'done' : ''}>
+            <span className="step-n" aria-hidden="true">
+              {i + 1}
+            </span>
+            <div>
+              <strong>{s.title}</strong>
+              <p>{s.text}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
 }
 
 function AddAccount({ onAdd }: { onAdd: (label: string) => Promise<void> }): React.JSX.Element {
@@ -270,114 +406,13 @@ function AddAccount({ onAdd }: { onAdd: (label: string) => Promise<void> }): Rea
         void onAdd(label).then(() => setLabel(''))
       }}
     >
-      <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nombre (ej: Personal, Trabajo)" />
-      <button className="primary small" type="submit" disabled={!label.trim()}>
-        Agregar
+      <label htmlFor="new-acc" className="sr-only">
+        Nombre de la cuenta nueva
+      </label>
+      <input id="new-acc" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nueva cuenta: Personal, Trabajo…" />
+      <button className="btn sm primary" type="submit" disabled={!label.trim()} aria-label="Agregar cuenta">
+        <Plus size={14} weight="bold" aria-hidden="true" />
       </button>
     </form>
-  )
-}
-
-function NewWorkspaceDialog(props: {
-  accounts: Account[]
-  statuses: Record<string, AccountStatus>
-  onClose: () => void
-  onCreated: (ws: Workspace) => void
-}): React.JSX.Element {
-  const { accounts, statuses } = props
-  const [name, setName] = useState('')
-  const [repoPath, setRepoPath] = useState('')
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? '')
-  const [useWorktree, setUseWorktree] = useState(false)
-  const [branch, setBranch] = useState('')
-  const [autoStartClaude, setAutoStart] = useState(true)
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
-
-  const pick = async (): Promise<void> => {
-    const p = await api.pickFolder()
-    if (p) {
-      setRepoPath(p)
-      if (!name) setName(p.split(/[\\/]/).filter(Boolean).pop() ?? '')
-    }
-  }
-
-  const submit = async (e: React.FormEvent): Promise<void> => {
-    e.preventDefault()
-    setBusy(true)
-    setErr(null)
-    try {
-      const ws = await api.addWorkspace({
-        name,
-        repoPath,
-        accountId,
-        branch: useWorktree ? branch : undefined,
-        autoStartClaude
-      })
-      props.onCreated(ws)
-    } catch (e2) {
-      setErr(cleanError(e2))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="modal-backdrop" onMouseDown={props.onClose}>
-      <form className="modal" onMouseDown={(e) => e.stopPropagation()} onSubmit={(e) => void submit(e)}>
-        <h2>Nuevo espacio</h2>
-        <label>
-          Repo
-          <div className="input-row">
-            <input value={repoPath} onChange={(e) => setRepoPath(e.target.value)} placeholder="C:\ruta\al\repo" />
-            <button type="button" className="ghost" onClick={() => void pick()}>
-              Elegir…
-            </button>
-          </div>
-        </label>
-        <label>
-          Nombre
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: backend - cuenta trabajo" />
-        </label>
-        <label>
-          Cuenta de Claude
-          <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.label}
-                {statuses[a.id]?.email ? ` (${statuses[a.id]!.email})` : statuses[a.id]?.loggedIn ? '' : ' (sin sesión)'}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="check">
-          <input type="checkbox" checked={useWorktree} onChange={(e) => setUseWorktree(e.target.checked)} />
-          Trabajar en un worktree aparte (rama propia, no toca tu copia del repo)
-        </label>
-        {useWorktree && (
-          <label>
-            Rama
-            <input value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="feature/mi-cambio" />
-          </label>
-        )}
-        <label className="check">
-          <input type="checkbox" checked={autoStartClaude} onChange={(e) => setAutoStart(e.target.checked)} />
-          Abrir Claude automáticamente en la PowerShell
-        </label>
-        {err && <div className="form-error">{err}</div>}
-        <div className="modal-actions">
-          <button type="button" className="ghost" onClick={props.onClose}>
-            Cancelar
-          </button>
-          <button
-            className="primary"
-            type="submit"
-            disabled={busy || !name.trim() || !repoPath.trim() || !accountId || (useWorktree && !branch.trim())}
-          >
-            {busy ? 'Creando…' : 'Crear espacio'}
-          </button>
-        </div>
-      </form>
-    </div>
   )
 }

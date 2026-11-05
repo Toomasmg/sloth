@@ -4,12 +4,38 @@ export interface Account {
   label: string
   configDir: string
   createdAt: number
+  /** Usar el setup de ~/.claude (skills, agents, hooks, plugins, settings, MCP). Por defecto sí. */
+  shareSetup?: boolean
 }
 
 export interface AccountStatus {
   loggedIn: boolean
   email?: string
   configDirExists: boolean
+}
+
+export interface UsageTotals {
+  input: number
+  output: number
+  cacheWrite: number
+  cacheRead: number
+  messages: number
+}
+
+export interface AccountUsage {
+  last5h: UsageTotals
+  today: UsageTotals
+  last7d: UsageTotals
+  /** Hora del primer mensaje dentro de las últimas 5 h (aprox. inicio de la ventana de límite). */
+  windowStart?: number
+  scannedAt: number
+}
+
+export interface SetupSyncReport {
+  linked: string[]
+  copied: string[]
+  mcpServers: string[]
+  skipped: string[]
 }
 
 /** Un espacio de trabajo: un repo (o worktree), una cuenta y una PowerShell. */
@@ -23,6 +49,13 @@ export interface Workspace {
   accountId: string
   autoStartClaude: boolean
   createdAt: number
+  /** Prompt con el que arranca Claude la primera vez (ej: `/ticket TCK-1234`). */
+  initialPrompt?: string
+  /** Ya se usó el prompt inicial: las próximas veces se retoma la conversación. */
+  initialPromptUsed?: boolean
+  /** Al reabrir, retomar la última conversación de esa carpeta (`claude --continue`). */
+  resume?: boolean
+  ticket?: string
 }
 
 export interface NewWorkspaceInput {
@@ -32,6 +65,9 @@ export interface NewWorkspaceInput {
   /** Si viene, se crea un git worktree en esa rama. */
   branch?: string
   autoStartClaude: boolean
+  initialPrompt?: string
+  resume?: boolean
+  ticket?: string
 }
 
 export type AgentState = 'idle' | 'working' | 'waiting' | 'done' | 'exited'
@@ -70,6 +106,8 @@ export interface AntiReaApi {
   addAccount(label: string): Promise<Account>
   removeAccount(id: string): Promise<void>
   accountStatuses(): Promise<Record<string, AccountStatus>>
+  accountUsage(): Promise<Record<string, AccountUsage>>
+  setShareSetup(id: string, share: boolean): Promise<SetupSyncReport | null>
   addWorkspace(input: NewWorkspaceInput): Promise<Workspace>
   removeWorkspace(id: string): Promise<void>
   setOpenPanes(ids: string[]): Promise<void>
