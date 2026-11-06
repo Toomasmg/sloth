@@ -9,6 +9,10 @@ import templates from './templates'
 import updater from './updater'
 import exportImport from './export-import'
 import gruv from './gruv'
+import settings from './settings'
+import onboarding from './onboarding'
+import teamConfig from './team-config'
+import team from './team'
 
 /** Todas las funciones de la interfaz, en el orden en que aparecen en cada lugar. */
-export const FEATURE_UIS: FeatureUi[] = [rotation, history, git, worktrees, palette, broadcast, templates, updater, exportImport, gruv]
+export const FEATURE_UIS: FeatureUi[] = [rotation, history, git, worktrees, palette, broadcast, templates, updater, exportImport, gruv, settings, onboarding, teamConfig, team]
