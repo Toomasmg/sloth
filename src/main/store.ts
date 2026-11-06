@@ -12,20 +12,63 @@ interface PersistedState {
 
 const EMPTY: PersistedState = { version: 1, accounts: [], workspaces: [], openPanes: [] }
 
+/**
+ * La app antes se llamaba AntiRea: si existe %APPDATA%\AntiRea y todavía no hay %APPDATA%\Sloth,
+ * se mueve la carpeta entera (logins de las cuentas incluidos).
+ */
+function migrateFromAntiRea(): void {
+  const oldDir = join(app.getPath('appData'), 'AntiRea')
+  const newDir = app.getPath('userData')
+  if (!existsSync(oldDir) || existsSync(join(newDir, 'sloth-state.json')) || existsSync(join(newDir, 'accounts'))) return
+  try {
+    if (!existsSync(newDir)) {
+      renameSync(oldDir, newDir)
+    } else {
+      // Chromium ya creó la carpeta nueva (cachés): movemos solo lo nuestro.
+      for (const name of ['accounts', 'antirea-state.json']) {
+        const from = join(oldDir, name)
+        if (existsSync(from)) renameSync(from, join(newDir, name))
+      }
+    }
+  } catch (e) {
+    console.warn('[migración] no se pudo mover %APPDATA%\\AntiRea:', (e as Error).message)
+  }
+}
+
 export class Store {
   private state: PersistedState
   private readonly file: string
 
   constructor() {
+    migrateFromAntiRea()
     mkdirSync(app.getPath('userData'), { recursive: true })
-    this.file = join(app.getPath('userData'), 'antirea-state.json')
+    this.file = join(app.getPath('userData'), 'sloth-state.json')
+    const legacy = join(app.getPath('userData'), 'antirea-state.json')
+    if (!existsSync(this.file) && existsSync(legacy)) renameSync(legacy, this.file)
     this.state = this.load()
+    this.fixLegacyPaths()
+  }
+
+  /** Las cuentas guardan rutas absolutas: si venían de %APPDATA%\AntiRea, apuntarlas a la carpeta nueva. */
+  private fixLegacyPaths(): void {
+    const oldRoot = join(app.getPath('appData'), 'AntiRea')
+    const newRoot = app.getPath('userData')
+    let changed = false
+    for (const acc of this.state.accounts) {
+      if (acc.configDir.toLowerCase().startsWith(oldRoot.toLowerCase() + '\\')) {
+        acc.configDir = newRoot + acc.configDir.slice(oldRoot.length)
+        changed = true
+      }
+    }
+    if (changed) this.save()
   }
 
   private load(): PersistedState {
     if (!existsSync(this.file)) return structuredClone(EMPTY)
     try {
-      const parsed = JSON.parse(readFileSync(this.file, 'utf8')) as Partial<PersistedState>
+      // Sin BOM: si el archivo se editó con el Bloc de notas o PowerShell 5.1, igual se lee.
+      const raw = readFileSync(this.file, 'utf8').replace(/^\uFEFF/, '')
+      const parsed = JSON.parse(raw) as Partial<PersistedState>
       return {
         version: 1,
         accounts: Array.isArray(parsed.accounts) ? parsed.accounts : [],

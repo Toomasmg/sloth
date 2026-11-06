@@ -1,12 +1,12 @@
-import type { AntiReaApi, PtyChunk } from '../../shared/types'
+import type { SlothApi, PtyChunk } from '../../shared/types'
 
 declare global {
   interface Window {
-    antirea: AntiReaApi
+    sloth: SlothApi
   }
 }
 
-export const api = window.antirea
+export const api = window.sloth
 
 type DataListener = (chunk: PtyChunk) => void
 type ExitListener = (code: number) => void

@@ -101,7 +101,28 @@ export const loginPaneId = (accountId: string): string => `login:${accountId}`
 export const isLoginPane = (paneId: string): boolean => paneId.startsWith('login:')
 export const accountIdFromLoginPane = (paneId: string): string => paneId.slice('login:'.length)
 
-export interface AntiReaApi {
+/** Claude pide permiso para usar una herramienta (vía hook PermissionRequest). */
+export interface PermissionPrompt {
+  id: string
+  workspaceId: string
+  tool: string
+  input: Record<string, unknown>
+  suggestions?: unknown[]
+  at: number
+  expiresAt: number
+}
+export type PermissionAnswer = 'allow' | 'allowAlways' | 'deny' | 'terminal'
+
+/** Dónde viven las PowerShell: un daemon aparte (sobreviven al cerrar la app) o dentro de main. */
+export interface DaemonInfo {
+  mode: 'daemon' | 'inprocess'
+  pid?: number
+  version?: string
+  sessions: number
+  reason?: string
+}
+
+export interface SlothApi {
   getState(): Promise<AppState>
   addAccount(label: string): Promise<Account>
   removeAccount(id: string): Promise<void>
@@ -121,4 +142,10 @@ export interface AntiReaApi {
   onPtyData(cb: (id: string, chunk: PtyChunk) => void): () => void
   onPtyExit(cb: (id: string, code: number) => void): () => void
   onAgentStatus(cb: (workspaceId: string, status: AgentStatus) => void): () => void
+  pendingPermissions(): Promise<PermissionPrompt[]>
+  answerPermission(id: string, answer: PermissionAnswer, message?: string): Promise<void>
+  onPermission(cb: (p: PermissionPrompt) => void): () => void
+  onPermissionResolved(cb: (id: string) => void): () => void
+  daemonInfo(): Promise<DaemonInfo>
+  shutdownTerminals(): Promise<void>
 }

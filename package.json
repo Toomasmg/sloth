@@ -1,16 +1,17 @@
 {
-  "name": "antirea",
-  "productName": "AntiRea",
-  "version": "0.2.0",
-  "description": "Varias cuentas de Claude Code, cada una en su PowerShell y su repo.",
+  "name": "sloth",
+  "productName": "Sloth",
+  "version": "0.3.0",
+  "description": "Sloth: varias cuentas de Claude Code, cada una en su PowerShell y su repo. Liviano a propósito.",
   "private": true,
   "main": "./out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "dev": "npm run build:daemon && electron-vite dev",
+    "build": "electron-vite build && npm run build:daemon",
+    "build:daemon": "node scripts/build-daemon.mjs",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "dist": "electron-vite build && electron-builder --win"
+    "dist": "npm run build && electron-builder --win"
   },
   "dependencies": {
     "node-pty": "^1.1.0"
@@ -29,18 +30,23 @@
     "electron-vite": "^6.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "rolldown": "^1.2.16",
     "typescript": "^5.9.0",
     "vite": "^8.0.0"
   },
   "build": {
-    "appId": "com.tomy.antirea",
-    "productName": "AntiRea",
+    "appId": "com.tomy.sloth",
+    "productName": "Sloth",
     "directories": {
       "output": "dist"
     },
     "files": [
       "out/**",
-      "package.json"
+      "!out/daemon/**",
+      "package.json",
+      "!**/node_modules/node-pty/{src,deps,third_party,scripts,typings,build}/**",
+      "!**/node_modules/node-pty/prebuilds/{darwin-arm64,darwin-x64,win32-arm64,linux-x64,linux-arm64}/**",
+      "!**/node_modules/node-pty/**/*.{pdb,md,ts,map}"
     ],
     "asar": true,
     "asarUnpack": [
@@ -51,6 +57,10 @@
       {
         "from": "build/icon.png",
         "to": "icon.png"
+      },
+      {
+        "from": "out/daemon/sloth-daemon.cjs",
+        "to": "daemon/sloth-daemon.cjs"
       }
     ],
     "win": {
@@ -69,7 +79,7 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "shortcutName": "AntiRea",
+      "shortcutName": "Sloth",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico"
     },
@@ -82,7 +92,12 @@
       "onlyLoadAppFromAsar": true,
       "loadBrowserProcessSpecificV8Snapshot": false,
       "grantFileProtocolExtraPrivileges": false
-    }
+    },
+    "electronLanguages": [
+      "es",
+      "es-419",
+      "en-US"
+    ]
   },
   "author": "Tomy"
 }

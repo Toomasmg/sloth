@@ -27,7 +27,7 @@ const COPIED_FILES = ['CLAUDE.md', 'statusline-command.sh', 'statusline.py']
 
 function readJsonObject(path: string): Record<string, unknown> | undefined {
   try {
-    const v = JSON.parse(readFileSync(path, 'utf8')) as unknown
+    const v = JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, '')) as unknown
     return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined
   } catch {
     return undefined
@@ -35,7 +35,7 @@ function readJsonObject(path: string): Record<string, unknown> | undefined {
 }
 
 function writeJsonAtomic(path: string, value: unknown): void {
-  const tmp = `${path}.antirea-tmp`
+  const tmp = `${path}.sloth-tmp`
   writeFileSync(tmp, JSON.stringify(value, null, 2), 'utf8')
   renameSync(tmp, path)
 }
@@ -132,7 +132,7 @@ function isBrokenLink(path: string): boolean {
   }
 }
 
-/** Deshace lo que comparte AntiRea: quita los junctions hacia ~/.claude. Los MCP agregados quedan. */
+/** Deshace lo que comparte Sloth: quita los junctions hacia ~/.claude. Los MCP agregados quedan. */
 export function unshareSetup(account: Account): void {
   const src = userClaudeDir()
   for (const name of SHARED_DIRS) {

@@ -2,13 +2,14 @@ import { app, BrowserWindow, clipboard, dialog, ipcMain, net, Notification, prot
 import { pathToFileURL } from 'node:url'
 import { normalize, sep } from 'node:path'
 import { existsSync, readdirSync, statSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { homedir, totalmem } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { Store } from './store'
 import { accountStatus, createAccount } from './accounts'
-import { HookServer, stateForEvent } from './hooks'
-import { baseEnv, PtyManager, type PtySpec } from './ptys'
+import { installInto, stateForEvent, writeHookScript, type HookEventPayload } from './hooks'
+import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
+import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
 import { createWorktree } from './git'
 import { baseSettingsFor, syncSharedSetup, unshareSetup } from './setup'
 import { UsageScanner } from './usage'
@@ -18,7 +19,10 @@ import {
   loginPaneId,
   type Account,
   type AgentStatus,
+  type DaemonInfo,
   type NewWorkspaceInput,
+  type PermissionAnswer,
+  type PermissionPrompt,
   type Workspace
 } from '../shared/types'
 
@@ -34,8 +38,22 @@ function setAgent(wsId: string, status: AgentStatus): void {
   send('agent:status', wsId, status)
 }
 
-app.setName('AntiRea')
+app.setName('Sloth')
 if (!app.requestSingleInstanceLock()) app.quit()
+
+// Bajo consumo: apagamos lo que Chromium trae y Sloth no usa (renderer de repuesto precargado,
+// media, traducción, autocompletado). Menos procesos y menos RAM en PCs modestas.
+app.commandLine.appendSwitch(
+  'disable-features',
+  'SpareRendererForSitePerProcess,MediaRouter,HardwareMediaKeyHandling,GlobalMediaControls,Translate,AutofillServerCommunication'
+)
+app.commandLine.appendSwitch('disable-background-networking')
+
+// Modo liviano: en PCs con ≤ 8 GB de RAM se apaga la GPU (el proceso GPU solo usa ~90 MB más que
+// el render por software, y para terminales de texto no hace falta). SLOTH_GPU=1/0 lo fuerza.
+const gpuPref = process.env.SLOTH_GPU
+const lowMemory = totalmem() <= 8.5 * 1024 ** 3
+if (gpuPref === '0' || (gpuPref !== '1' && lowMemory)) app.disableHardwareAcceleration()
 
 // La UI se sirve por app:// y no por file://: así la fuse GrantFileProtocolExtraPrivileges puede
 // quedar apagada, y el renderer no puede leer nada fuera de su carpeta.
@@ -57,28 +75,91 @@ app.whenReady().then(async () => {
   serveRenderer()
   const store = new Store()
 
-  const hooks = new HookServer((p) => {
+  writeHookScript()
+  const usage = new UsageScanner()
+
+  /** Evento de hook de Claude → estado del espacio (+ aviso de Windows si la ventana no está enfocada). */
+  function onHook(p: HookEventPayload): void {
     const ws = store.workspace(p.ws)
     if (!ws) return
     const { state, detail } = stateForEvent(p)
-    setAgent(ws.id, { state, detail, at: Date.now() })
+    setAgent(ws.id, { state, detail, at: p.at ?? Date.now() })
     if ((state === 'done' || state === 'waiting') && win && !win.isFocused() && Notification.isSupported()) {
       new Notification({
-        title: `${ws.name}`,
+        title: ws.name,
         body: state === 'done' ? 'Claude terminó.' : detail || 'Claude necesita tu atención.'
       }).show()
     }
-  })
-  await hooks.start()
-  const usage = new UsageScanner()
+  }
 
-  const ptys = new PtyManager(
-    (id, chunk) => send('pty:data', id, chunk),
-    (id, code) => {
-      send('pty:exit', id, code)
-      if (store.workspace(id)) setAgent(id, { state: 'exited', at: Date.now() })
+  const toPrompt = (r: PendingPermission): PermissionPrompt => ({
+    id: r.id,
+    workspaceId: r.ws,
+    tool: r.tool,
+    input: r.input,
+    suggestions: r.suggestions,
+    at: r.at,
+    expiresAt: r.expiresAt
+  })
+
+  /** Pedido de permiso → tarjeta en la UI. Si el espacio no existe, Claude pregunta en la terminal. */
+  function onPermission(r: PendingPermission): void {
+    const ws = store.workspace(r.ws)
+    if (!ws) {
+      term?.answerPermission(r.id, null)
+      return
     }
-  )
+    send('permission:new', toPrompt(r))
+    if (win && !win.isFocused() && Notification.isSupported()) {
+      new Notification({ title: ws.name, body: `Claude pide permiso para usar ${r.tool}.` }).show()
+    }
+  }
+
+  // Las terminales viven en el daemon (sobreviven al cierre) o, si no hay node, dentro de la app.
+  let term: TerminalBackend | undefined
+  let termPromise: Promise<TerminalBackend> | undefined
+  function backend(): Promise<TerminalBackend> {
+    if (!termPromise) {
+      termPromise = createTerminalBackend({
+        userDataDir: app.getPath('userData'),
+        appVersion: app.getVersion(),
+        resourcesDir: app.isPackaged ? process.resourcesPath : undefined,
+        projectRoot: app.isPackaged ? undefined : app.getAppPath(),
+        log: (...a: unknown[]) => console.log('[terminales]', ...a)
+      }).then(async (b) => {
+        term = b
+        b.on('data', (id: string, chunks: unknown[]) => send('pty:data', id, chunks))
+        b.on('exit', (id: string, code: number) => {
+          send('pty:exit', id, code)
+          if (store.workspace(id)) setAgent(id, { state: 'exited', at: Date.now() })
+        })
+        b.on('hook', onHook)
+        b.on('permission', onPermission)
+        b.on('permission-resolved', (id: string) => send('permission:resolved', id))
+        b.on('disconnect', () => {
+          // Se perdió el daemon y no se pudo relanzar: el próximo pedido crea otro backend.
+          console.warn('[terminales] desconectado del daemon')
+          if (term === b) {
+            term = undefined
+            termPromise = undefined
+          }
+        })
+        // Rehidratar: estado de los agentes que siguieron trabajando con la app cerrada.
+        const sessions = await b.list().catch(() => [])
+        const running = new Set(sessions.filter((x) => x.running).map((x) => x.id))
+        for (const [wsId, ev] of Object.entries(b.lastHookEvents())) {
+          if (!store.workspace(wsId) || !running.has(wsId)) continue
+          const { state, detail } = stateForEvent(ev)
+          setAgent(wsId, { state, detail, at: ev.at ?? Date.now() })
+        }
+        for (const id of running) if (store.workspace(id) && !agents.has(id)) setAgent(id, { state: 'idle', at: Date.now() })
+        for (const r of b.pendingPermissions()) onPermission(r)
+        return b
+      })
+    }
+    return termPromise
+  }
+  void backend()
 
   /** Nunca arrancamos una terminal con una cuenta que no sea la elegida. */
   function requireAccount(accountId: string): Account {
@@ -89,18 +170,20 @@ app.whenReady().then(async () => {
   }
 
   function accountEnv(acc: Account): Record<string, string> {
-    return { ...baseEnv(), CLAUDE_CONFIG_DIR: acc.configDir, ANTIREA_ACCOUNT: acc.label }
+    return { ...baseEnv(), CLAUDE_CONFIG_DIR: acc.configDir, SLOTH_ACCOUNT: acc.label }
   }
 
   /** Si hay alguna terminal abierta con esta cuenta (Claude puede estar escribiendo su .claude.json). */
   function accountBusy(accountId: string): boolean {
-    if (ptys.isRunning(loginPaneId(accountId))) return true
-    return store.workspaces.some((w) => w.accountId === accountId && ptys.isRunning(w.id))
+    const b = term
+    if (!b) return false
+    if (b.isRunning(loginPaneId(accountId))) return true
+    return store.workspaces.some((w) => w.accountId === accountId && b.isRunning(w.id))
   }
 
   /** Deja la cuenta lista antes de abrir Claude: settings + hooks y tu setup compartido. */
   function prepareAccount(acc: Account): void {
-    hooks.installInto(acc.configDir, baseSettingsFor(acc))
+    installInto(acc.configDir, baseSettingsFor(acc))
     const report = syncSharedSetup(acc, !accountBusy(acc.id))
     if (report.skipped.length) console.warn(`[setup] ${acc.label}:`, report.skipped.join('; '))
   }
@@ -127,7 +210,7 @@ app.whenReady().then(async () => {
     return 'claude'
   }
 
-  function specFor(paneId: string): PtySpec {
+  function specFor(paneId: string, b: TerminalBackend): PtySpec {
     if (isLoginPane(paneId)) {
       const acc = requireAccount(accountIdFromLoginPane(paneId))
       prepareAccount(acc)
@@ -141,9 +224,9 @@ app.whenReady().then(async () => {
     prepareAccount(acc)
     const env = {
       ...accountEnv(acc),
-      ANTIREA_WS: ws.id,
-      ANTIREA_HOOK_URL: hooks.url,
-      ANTIREA_TOKEN: hooks.token
+      SLOTH_WS: ws.id,
+      SLOTH_HOOK_URL: b.hookUrl,
+      SLOTH_TOKEN: b.hookToken
     }
     const args = ['-NoLogo']
     const cmd = claudeCommand(ws, acc)
@@ -160,6 +243,55 @@ app.whenReady().then(async () => {
     agents: Object.fromEntries(agents)
   }))
 
+  ipcMain.handle('permission:pending', () =>
+    (term?.pendingPermissions() ?? []).filter((r) => store.workspace(r.ws)).map(toPrompt)
+  )
+
+  ipcMain.handle('permission:answer', async (_e, id: string, answer: PermissionAnswer, message?: string) => {
+    const b = await backend()
+    const req = b.pendingPermissions().find((r) => r.id === id)
+    if (!req) throw new Error('Ese permiso ya no está pendiente (venció o se respondió en la terminal).')
+    let decision: object | null
+    switch (answer) {
+      case 'allow':
+        decision = { behavior: 'allow' }
+        break
+      case 'allowAlways':
+        // Aplica las reglas que sugirió Claude (ej. permitir siempre `npm test`).
+        decision = req.suggestions?.length ? { behavior: 'allow', updatedPermissions: req.suggestions } : { behavior: 'allow' }
+        break
+      case 'deny':
+        decision = { behavior: 'deny', message: String(message ?? '').trim() || 'Rechazado desde Sloth.' }
+        break
+      case 'terminal':
+        decision = null
+        break
+      default:
+        throw new Error('Respuesta inválida.')
+    }
+    b.answerPermission(id, decision)
+  })
+
+  ipcMain.handle('daemon:info', async (): Promise<DaemonInfo> => {
+    const b = await backend()
+    const sessions = await b.list().catch(() => [])
+    return { ...b.info(), sessions: sessions.filter((x) => x.running).length }
+  })
+
+  ipcMain.handle('daemon:shutdown', async () => {
+    const b = await backend()
+    const sessions = await b.list().catch(() => [])
+    await b.shutdown()
+    b.dispose()
+    term = undefined
+    termPromise = undefined
+    for (const x of sessions) {
+      if (!x.running) continue
+      send('pty:exit', x.id, -1)
+      if (store.workspace(x.id)) setAgent(x.id, { state: 'exited', at: Date.now() })
+    }
+  })
+
   ipcMain.handle('accounts:add', (_e, label: string) => {
     const acc = { ...createAccount(String(label ?? '')), shareSetup: true }
     store.addAccount(acc)
@@ -174,17 +306,17 @@ app.whenReady().then(async () => {
     if (!acc) throw new Error('Esa cuenta ya no existe.')
     if (!acc.shareSetup) {
       unshareSetup(acc)
-      hooks.installInto(acc.configDir, {})
+      installInto(acc.configDir, {})
       return null
     }
-    hooks.installInto(acc.configDir, baseSettingsFor(acc))
+    installInto(acc.configDir, baseSettingsFor(acc))
     return syncSharedSetup(acc, !accountBusy(acc.id))
   })
 
-  ipcMain.handle('accounts:remove', (_e, id: string) => {
+  ipcMain.handle('accounts:remove', async (_e, id: string) => {
     const used = store.workspaces.filter((w) => w.accountId === id)
     if (used.length) throw new Error(`La usan ${used.length} espacio(s): ${used.map((w) => w.name).join(', ')}`)
-    ptys.kill(`login:${id}`)
+    await (await backend()).kill(loginPaneId(id))
     store.removeAccount(id)
   })
 
@@ -222,9 +354,9 @@ app.whenReady().then(async () => {
     return ws
   })
 
-  ipcMain.handle('workspaces:remove', (_e, id: string) => {
+  ipcMain.handle('workspaces:remove', async (_e, id: string) => {
     // El worktree queda en disco a propósito: puede tener trabajo sin commitear.
-    ptys.kill(id)
+    await (await backend()).kill(id)
     agents.delete(id)
     store.removeWorkspace(id)
   })
@@ -238,25 +370,28 @@ app.whenReady().then(async () => {
     return r.canceled ? null : (r.filePaths[0] ?? null)
   })
 
-  ipcMain.handle('pty:start', (_e, id: string, cols: number, rows: number) => {
-    const result = ptys.start(id, () => specFor(id), cols, rows)
+  ipcMain.handle('pty:start', async (_e, id: string, cols: number, rows: number) => {
+    const b = await backend()
+    // Si ya corre (siguió viva en el daemon), solo se reconecta: no se rearma la cuenta ni el comando.
+    const spawn = b.isRunning(id)
+      ? toSpawnSpec({ cwd: homedir(), env: {}, args: [] }, cols, rows)
+      : toSpawnSpec(specFor(id, b), cols, rows)
+    const result = await b.start(id, spawn)
     if (store.workspace(id) && !agents.has(id)) setAgent(id, { state: 'idle', at: Date.now() })
     return result
   })
-  ipcMain.on('pty:write', (_e, id: string, data: string) => ptys.write(id, data))
-  ipcMain.on('pty:resize', (_e, id: string, cols: number, rows: number) => ptys.resize(id, cols, rows))
-  ipcMain.handle('pty:kill', (_e, id: string) => {
-    ptys.kill(id)
+  ipcMain.on('pty:write', (_e, id: string, data: string) => term?.write(id, String(data)))
+  ipcMain.on('pty:resize', (_e, id: string, cols: number, rows: number) => term?.resize(id, cols, rows))
+  ipcMain.handle('pty:kill', async (_e, id: string) => {
+    await (await backend()).kill(id)
     if (store.workspace(id)) setAgent(id, { state: 'exited', at: Date.now() })
   })
 
   ipcMain.handle('clipboard:read', () => clipboard.readText())
   ipcMain.on('clipboard:write', (_e, text: string) => clipboard.writeText(String(text)))
 
-  app.on('before-quit', () => {
-    ptys.killAll()
-    hooks.stop()
-  })
+  // Al salir solo soltamos la conexión: en modo daemon las terminales siguen trabajando.
+  app.on('before-quit', () => term?.dispose())
 
   createWindow()
 })
@@ -272,7 +407,7 @@ function createWindow(): void {
     minWidth: 900,
     minHeight: 560,
     backgroundColor: '#16181f',
-    title: 'AntiRea',
+    title: 'Sloth',
     icon: iconPath,
     autoHideMenuBar: true,
     // Barra de título propia con la marca; Windows dibuja solo los botones de ventana.
@@ -283,7 +418,10 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      webSecurity: true
+      webSecurity: true,
+      spellcheck: false,
+      // Con la ventana minimizada u oculta, Chromium baja timers y dibujo.
+      backgroundThrottling: true
     }
   })
 

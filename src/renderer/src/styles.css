@@ -1,4 +1,4 @@
-/* AntiRea — Dark Mode (OLED), paleta slate + verde "run". Denso, tipo herramienta de dev. */
+/* Sloth — Dark Mode (OLED), paleta slate + verde "run". Denso, tipo herramienta de dev. */
 :root {
   /* Paleta carbón + cian: base gris carbón, cian claro y verde azulado. */
   --bg: #16181f;
@@ -950,4 +950,272 @@ input[aria-invalid='true'] {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* ---------- Permisos de Claude ---------- */
+.tb-perm {
+  color: var(--warn);
+  background: rgba(245, 176, 65, 0.16);
+  border: 1px solid rgba(245, 176, 65, 0.45);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+}
+.tb-perm:hover {
+  background: rgba(245, 176, 65, 0.24);
+}
+.perm-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--warn);
+  background: rgba(245, 176, 65, 0.14);
+  border: 1px solid rgba(245, 176, 65, 0.4);
+  border-radius: 4px;
+  padding: 0 5px;
+}
+.pane.pane-perm {
+  border-color: var(--warn);
+  border-top-color: var(--warn);
+}
+.perm-card {
+  flex: none;
+  /* Nunca tapa la terminal: como mucho la mitad del panel, con scroll interno. */
+  max-height: 55%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 6px 6px 0;
+  padding: 10px 12px;
+  background: linear-gradient(180deg, rgba(245, 176, 65, 0.09), rgba(245, 176, 65, 0.04)), var(--surface);
+  border: 1px solid rgba(245, 176, 65, 0.5);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--r-md);
+  animation: perm-in 180ms var(--ease);
+}
+@keyframes perm-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.perm-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.perm-icon {
+  color: var(--warn);
+  flex: none;
+}
+.perm-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.perm-title code {
+  color: var(--brand-1);
+  background: rgba(159, 234, 249, 0.1);
+  border-radius: 4px;
+  padding: 0 5px;
+}
+.perm-queue {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-2);
+  background: var(--muted);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.perm-timer {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-muted);
+}
+.perm-timer.urgent {
+  color: var(--warn);
+  font-weight: 700;
+}
+.perm-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.perm-desc {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: 12px;
+}
+.perm-code {
+  margin: 0;
+  max-height: 120px;
+  overflow: auto;
+  padding: 6px 9px;
+  background: var(--term-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--fg);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.perm-link {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  color: var(--brand-1);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.perm-actions,
+.perm-deny {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.perm-deny input {
+  flex: 1 1 200px;
+  width: auto;
+  min-height: 28px;
+  padding: 4px 9px;
+  font-size: 12px;
+}
+.btn.danger {
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(248, 113, 113, 0.08);
+}
+.btn.danger:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.16);
+}
+.btn.ghost {
+  color: var(--fg-2);
+}
+.btn.ghost:hover:not(:disabled) {
+  background: var(--muted);
+}
+.perm-error {
+  margin: 0;
+  padding: 6px 9px;
+  border-radius: var(--r-sm);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  font-size: 12px;
+}
+
+/* ---------- Estado de las terminales (daemon) ---------- */
+.titlebar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+.daemon {
+  position: relative;
+}
+.tb-daemon {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tb-daemon:hover,
+.tb-daemon[aria-expanded='true'] {
+  color: var(--fg-2);
+  background: var(--card);
+}
+.tb-daemon:not(.simple) svg:first-child {
+  color: var(--brand-1);
+}
+.daemon-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 280px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  user-select: text;
+  animation: fade var(--t-fast) var(--ease);
+}
+.daemon-lead {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: 12px;
+}
+.daemon-reason {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--warn);
+}
+.daemon-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 0;
+}
+.daemon-info div {
+  background: var(--card);
+  border-radius: var(--r-sm);
+  padding: 3px 8px;
+}
+.daemon-info dt {
+  font-size: 10px;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.daemon-info dd {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.daemon-off {
+  justify-content: center;
+}
+
+/* Sin animaciones infinitas con la ventana oculta. */
+.doc-hidden .spin,
+.doc-hidden .ring {
+  animation-play-state: paused;
+}
+.ws-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

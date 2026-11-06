@@ -18,7 +18,7 @@ export function createAccount(label: string): Account {
 
 function readJson(path: string): unknown {
   try {
-    return JSON.parse(readFileSync(path, 'utf8'))
+    return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''))
   } catch {
     return undefined
   }

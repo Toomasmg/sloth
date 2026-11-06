@@ -5,6 +5,7 @@ import {
   ArrowsOut,
   EyeSlash,
   Plus,
+  ShieldWarning,
   SignIn,
   Terminal as TerminalIcon,
   Ticket,
@@ -20,6 +21,8 @@ import {
   type AccountStatus,
   type AccountUsage,
   type AgentStatus,
+  type PermissionAnswer,
+  type PermissionPrompt,
   type Workspace
 } from '../../shared/types'
 import { api } from './api'
@@ -27,6 +30,9 @@ import { TerminalView } from './TerminalView'
 import { NewWorkspaceDialog } from './NewWorkspaceDialog'
 import { LogoMark, Wordmark } from './Logo'
 import { StateIcon, StatePill } from './StateIcon'
+import { PermissionCard, toolLabel } from './PermissionCard'
+import { DaemonStatus } from './DaemonStatus'
+import { useDocumentVisible, useVisiblePolling } from './visibility'
 import { accountColor, cleanError, fmtTok, shortPath, STATE_LABEL, totalTok, usageTitle } from './format'
 
 export function App(): React.JSX.Element {
@@ -42,6 +48,10 @@ export function App(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [newWsMode, setNewWsMode] = useState<null | 'normal' | 'ticket'>(null)
   const [loaded, setLoaded] = useState(false)
+  const [perms, setPerms] = useState<PermissionPrompt[]>([])
+  const [now, setNow] = useState(() => Date.now())
+  const [announceId, setAnnounceId] = useState<string | null>(null)
+  const docVisible = useDocumentVisible()
 
   const refreshStatuses = useCallback(() => void api.accountStatuses().then(setStatuses), [])
 
@@ -54,21 +64,55 @@ export function App(): React.JSX.Element {
       setAgents(s.agents)
       setLoaded(true)
     })
-    refreshStatuses()
-    const t = setInterval(refreshStatuses, 4000)
     const off = api.onAgentStatus((id, st) => setAgents((a) => ({ ...a, [id]: st })))
-    return () => {
-      clearInterval(t)
-      off()
-    }
-  }, [refreshStatuses])
+    return off
+  }, [])
 
+  // Polling liviano y solo con la ventana visible (al volver se refresca una vez).
+  useVisiblePolling(refreshStatuses, 15_000)
+  useVisiblePolling(() => void api.accountUsage().then(setUsage).catch(() => undefined), 60_000, [accounts.length])
+
+  // Permisos: lo que ya estaba pendiente + los que llegan; se descartan los vencidos.
   useEffect(() => {
-    const tick = (): void => void api.accountUsage().then(setUsage).catch(() => undefined)
-    tick()
-    const t = setInterval(tick, 30_000)
+    let alive = true
+    const add = (list: PermissionPrompt[]): void =>
+      setPerms((prev) => {
+        const t = Date.now()
+        const seen = new Set(prev.map((p) => p.id))
+        const fresh = list.filter((p) => !seen.has(p.id) && p.expiresAt > t)
+        return fresh.length ? [...prev, ...fresh].sort((a, b) => a.at - b.at) : prev
+      })
+    const offNew = api.onPermission((p) => {
+      add([p])
+      setNow(Date.now())
+      setAnnounceId(p.id)
+    })
+    const offRes = api.onPermissionResolved((id) => setPerms((prev) => prev.filter((p) => p.id !== id)))
+    void api
+      .pendingPermissions()
+      .then((list) => {
+        if (alive) add(list)
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+      offNew()
+      offRes()
+    }
+  }, [])
+
+  // Un solo reloj de 1 s para todas las cuentas regresivas, solo mientras haya permisos.
+  const hasPerms = perms.length > 0
+  useEffect(() => {
+    if (!hasPerms) return
+    setNow(Date.now())
+    const t = setInterval(() => {
+      const n = Date.now()
+      setNow(n)
+      setPerms((prev) => (prev.some((p) => p.expiresAt <= n) ? prev.filter((p) => p.expiresAt > n) : prev))
+    }, 1000)
     return () => clearInterval(t)
-  }, [accounts.length])
+  }, [hasPerms])
 
   const setOpenPanes = useCallback((updater: (prev: string[]) => string[]) => {
     setOpenPanesState((prev) => {
@@ -95,6 +139,30 @@ export function App(): React.JSX.Element {
   const accountIndex = useMemo(() => new Map(accounts.map((a, i) => [a.id, i])), [accounts])
   const accountById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
   const wsById = useMemo(() => new Map(workspaces.map((w) => [w.id, w])), [workspaces])
+  const livePerms = useMemo(() => perms.filter((p) => wsById.has(p.workspaceId) && p.expiresAt > now), [perms, wsById, now])
+  const permsByWs = useMemo(() => {
+    const m = new Map<string, PermissionPrompt[]>()
+    for (const p of livePerms) {
+      const list = m.get(p.workspaceId)
+      if (list) list.push(p)
+      else m.set(p.workspaceId, [p])
+    }
+    return m
+  }, [livePerms])
+  const announced = announceId ? livePerms.find((p) => p.id === announceId) : undefined
+
+  const answerPermission = async (p: PermissionPrompt, answer: PermissionAnswer, message?: string): Promise<void> => {
+    await api.answerPermission(p.id, answer, message)
+    setPerms((prev) => prev.filter((x) => x.id !== p.id))
+    // El botón que tenía el foco desaparece: pasarlo al próximo permiso del panel o a la terminal.
+    requestAnimationFrame(() => {
+      const pane = document.querySelector(`[data-pane-id="${CSS.escape(p.workspaceId)}"]`)
+      const next = pane?.querySelector<HTMLElement>('[data-perm-primary]')
+      const term = pane?.querySelector<HTMLElement>('.xterm-helper-textarea')
+      ;(next ?? term)?.focus()
+    })
+  }
+
   const colorOf = (accountId?: string): string => accountColor(accountId ? (accountIndex.get(accountId) ?? 0) : 0)
 
   const addAccount = async (label: string): Promise<void> => {
@@ -108,7 +176,7 @@ export function App(): React.JSX.Element {
   }
 
   const removeAccount = async (acc: Account): Promise<void> => {
-    if (!window.confirm(`¿Quitar la cuenta «${acc.label}» de AntiRea?`)) return
+    if (!window.confirm(`¿Quitar la cuenta «${acc.label}» de Sloth?`)) return
     try {
       await api.removeAccount(acc.id)
       setAccounts((a) => a.filter((x) => x.id !== acc.id))
@@ -146,7 +214,7 @@ export function App(): React.JSX.Element {
   const done = countBy('done')
 
   return (
-    <div className="shell">
+    <div className={`shell ${docVisible ? '' : 'doc-hidden'}`}>
       <header className="titlebar">
         <div className="titlebar-brand">
           <Wordmark />
@@ -162,11 +230,30 @@ export function App(): React.JSX.Element {
               <StateIcon state="waiting" size={12} /> {needsYou} te {needsYou === 1 ? 'necesita' : 'necesitan'}
             </span>
           )}
+          {livePerms.length > 0 && (
+            <button
+              type="button"
+              className="tb-chip tb-perm"
+              onClick={() => openPane(livePerms[0].workspaceId)}
+              title={`Ir a «${wsById.get(livePerms[0].workspaceId)?.name ?? ''}»`}
+            >
+              <ShieldWarning size={12} weight="fill" aria-hidden="true" />
+              {livePerms.length} {livePerms.length === 1 ? 'permiso' : 'permisos'}
+            </button>
+          )}
           {done > 0 && (
             <span className="tb-chip tb-done">
               <StateIcon state="done" size={12} /> {done} {done === 1 ? 'terminó' : 'terminaron'}
             </span>
           )}
+        </div>
+        <div className="titlebar-right">
+          <DaemonStatus />
+        </div>
+        <div className="sr-only" role="alert">
+          {announced
+            ? `${wsById.get(announced.workspaceId)?.name ?? 'Un espacio'}: Claude quiere usar ${toolLabel(announced.tool)}. Respondé en su panel.`
+            : ''}
         </div>
       </header>
     <div className="app">
@@ -252,18 +339,25 @@ export function App(): React.JSX.Element {
               const ag = agents[ws.id]
               const acc = accountById.get(ws.accountId)
               const open = openPanes.includes(ws.id)
+              const nPerm = permsByWs.get(ws.id)?.length ?? 0
               return (
                 <li key={ws.id} className="ws-li" style={{ '--acc': colorOf(ws.accountId) } as React.CSSProperties}>
                   <button
-                    className={`ws ${open ? 'open' : ''} ${focused === ws.id ? 'focused' : ''} ${ag?.state === 'waiting' ? 'waiting' : ''}`}
+                    className={`ws ${open ? 'open' : ''} ${focused === ws.id ? 'focused' : ''} ${ag?.state === 'waiting' || nPerm ? 'waiting' : ''}`}
                     onClick={() => openPane(ws.id)}
-                    aria-label={`${ws.name}, ${acc?.label ?? 'cuenta borrada'}, ${ag ? STATE_LABEL[ag.state] : 'sin abrir'}`}
+                    aria-label={`${ws.name}, ${acc?.label ?? 'cuenta borrada'}, ${ag ? STATE_LABEL[ag.state] : 'sin abrir'}${nPerm ? `, ${nPerm === 1 ? 'permiso pendiente' : `${nPerm} permisos pendientes`}` : ''}`}
                   >
                     <StateIcon state={ag?.state} />
                     <span className="grow-min">
                       <span className="item-title">
-                        {ws.name}
+                        <span className="ws-name">{ws.name}</span>
                         {ws.ticket && <span className="tag">{ws.ticket}</span>}
+                        {nPerm > 0 && (
+                          <span className="perm-tag">
+                            <ShieldWarning size={11} weight="fill" aria-hidden="true" />
+                            Permiso{nPerm > 1 ? ` ×${nPerm}` : ''}
+                          </span>
+                        )}
                       </span>
                       <span className="item-sub">
                         <span className="acc-dot" aria-hidden="true" />
@@ -291,10 +385,13 @@ export function App(): React.JSX.Element {
           const ag = ws ? agents[ws.id] : undefined
           const email = acc ? statuses[acc.id]?.email : undefined
           const hidden = maximized !== null && maximized !== paneId
+          const paneQueue = ws ? permsByWs.get(ws.id) : undefined
+          const perm = paneQueue?.[0]
           return (
             <section
               key={paneId}
-              className={`pane ${focused === paneId ? 'focused' : ''} ${ag ? `pane-${ag.state}` : ''} ${hidden ? 'hidden' : ''}`}
+              data-pane-id={paneId}
+              className={`pane ${focused === paneId ? 'focused' : ''} ${ag ? `pane-${ag.state}` : ''} ${perm ? 'pane-perm' : ''} ${hidden ? 'hidden' : ''}`}
               style={{ '--acc': colorOf(accId) } as React.CSSProperties}
               onMouseDown={() => setFocused(paneId)}
               aria-label={login ? `Terminal de la cuenta ${acc?.label}` : `${ws?.name} con ${acc?.label}`}
@@ -327,6 +424,15 @@ export function App(): React.JSX.Element {
                   <EyeSlash size={15} aria-hidden="true" />
                 </button>
               </header>
+              {perm && (
+                <PermissionCard
+                  key={perm.id}
+                  prompt={perm}
+                  queued={(paneQueue?.length ?? 1) - 1}
+                  now={now}
+                  onAnswer={(answer, message) => answerPermission(perm, answer, message)}
+                />
+              )}
               <TerminalView id={paneId} generation={generations[paneId] ?? 0} onError={onTermError} />
             </section>
           )
@@ -375,7 +481,7 @@ function EmptyState({ hasAccounts, hasWs }: { hasAccounts: boolean; hasWs: boole
         <LogoMark size={72} />
       </div>
       <h1>
-        Anti<span>Rea</span>
+        <span>Sloth</span>
       </h1>
       <p className="empty-lead">Varias cuentas de Claude, cada una en su terminal y su repo.</p>
       <ol className="steps">

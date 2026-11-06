@@ -5,6 +5,7 @@ import type { Account, AccountUsage, UsageTotals } from '../shared/types'
 const DAY = 24 * 60 * 60 * 1000
 const WINDOW_5H = 5 * 60 * 60 * 1000
 const MAX_DEPTH = 4
+const READ_BLOCK = 1024 * 1024
 
 interface Entry {
   id: string
@@ -89,6 +90,9 @@ export class UsageScanner {
 
   /** Escanea todas las cuentas; si ya hay un escaneo en curso, devuelve ese. */
   scan(accounts: Account[]): Promise<Record<string, AccountUsage>> {
+    const fresh = Object.values(this.last)[0]?.scannedAt
+    const sameAccounts = accounts.every((a) => a.id in this.last)
+    if (!this.running && fresh && sameAccounts && Date.now() - fresh < 20_000) return Promise.resolve(this.last)
     if (!this.running) {
       this.running = this.doScan(accounts).finally(() => (this.running = undefined))
     }
@@ -113,22 +117,33 @@ export class UsageScanner {
     if (!c) c = { offset: 0, mtimeMs: 0, entries: new Map() }
     if (c.mtimeMs === st.mtimeMs && c.offset === st.size) return c
 
+    // Lectura por bloques: memoria acotada aunque el transcript pese cientos de MB.
     const fh = await open(file, 'r')
     try {
-      const len = st.size - c.offset
-      if (len > 0) {
-        const buf = Buffer.alloc(len)
-        await fh.read(buf, 0, len, c.offset)
-        const lastNl = buf.lastIndexOf(0x0a)
-        if (lastNl >= 0) {
-          const text = buf.subarray(0, lastNl).toString('utf8')
-          for (const line of text.split('\n')) {
-            const e = parseLine(line)
-            if (e) c.entries.set(e.id, e)
-          }
-          c.offset += lastNl + 1
+      const buf = Buffer.allocUnsafe(READ_BLOCK)
+      // Se corta siempre en '\n' (byte 0x0a, nunca parte de un carácter UTF-8 multibyte).
+      let carry: Buffer = Buffer.alloc(0)
+      let pos = c.offset
+      while (pos < st.size) {
+        const { bytesRead } = await fh.read(buf, 0, Math.min(READ_BLOCK, st.size - pos), pos)
+        if (bytesRead <= 0) break
+        pos += bytesRead
+        const chunk = carry.length ? Buffer.concat([carry, buf.subarray(0, bytesRead)]) : buf.subarray(0, bytesRead)
+        const lastNl = chunk.lastIndexOf(0x0a)
+        if (lastNl < 0) {
+          carry = Buffer.from(chunk)
+          continue
         }
+        for (const line of chunk.toString('utf8', 0, lastNl).split('\n')) {
+          const e = parseLine(line)
+          if (e) c.entries.set(e.id, e)
+        }
+        carry = Buffer.from(chunk.subarray(lastNl + 1))
+        // Ceder el event loop entre bloques para no trabar la app.
+        await new Promise<void>((r) => setImmediate(r))
       }
+      // Lo que quedó sin salto de línea se relee la próxima vez.
+      c.offset = pos - carry.length
       c.mtimeMs = st.mtimeMs
     } finally {
       await fh.close()

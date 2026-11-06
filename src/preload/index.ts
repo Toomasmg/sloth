@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import type { AgentStatus, AntiReaApi, PtyChunk } from '../shared/types'
+import type { AgentStatus, SlothApi, PermissionPrompt, PtyChunk } from '../shared/types'
 
 function listen<A extends unknown[]>(channel: string, cb: (...args: A) => void): () => void {
   const handler = (_e: IpcRendererEvent, ...args: unknown[]): void => cb(...(args as A))
@@ -7,7 +7,7 @@ function listen<A extends unknown[]>(channel: string, cb: (...args: A) => void):
   return () => ipcRenderer.removeListener(channel, handler)
 }
 
-const api: AntiReaApi = {
+const api: SlothApi = {
   getState: () => ipcRenderer.invoke('state:get'),
   addAccount: (label) => ipcRenderer.invoke('accounts:add', label),
   removeAccount: (id) => ipcRenderer.invoke('accounts:remove', id),
@@ -24,9 +24,20 @@ const api: AntiReaApi = {
   ptyKill: (id) => ipcRenderer.invoke('pty:kill', id),
   clipboardRead: () => ipcRenderer.invoke('clipboard:read'),
   clipboardWrite: (text) => ipcRenderer.send('clipboard:write', text),
-  onPtyData: (cb) => listen<[string, PtyChunk]>('pty:data', cb),
+  // main puede agrupar varios chunks en un solo mensaje IPC (menos overhead); acepta también uno suelto.
+  onPtyData: (cb) =>
+    listen<[string, PtyChunk | PtyChunk[]]>('pty:data', (id, chunks) => {
+      if (Array.isArray(chunks)) for (const c of chunks) cb(id, c)
+      else cb(id, chunks)
+    }),
   onPtyExit: (cb) => listen<[string, number]>('pty:exit', cb),
-  onAgentStatus: (cb) => listen<[string, AgentStatus]>('agent:status', cb)
+  onAgentStatus: (cb) => listen<[string, AgentStatus]>('agent:status', cb),
+  pendingPermissions: () => ipcRenderer.invoke('permission:pending'),
+  answerPermission: (id, answer, message) => ipcRenderer.invoke('permission:answer', id, answer, message),
+  onPermission: (cb) => listen<[PermissionPrompt]>('permission:new', cb),
+  onPermissionResolved: (cb) => listen<[string]>('permission:resolved', cb),
+  daemonInfo: () => ipcRenderer.invoke('daemon:info'),
+  shutdownTerminals: () => ipcRenderer.invoke('daemon:shutdown')
 }
 
-contextBridge.exposeInMainWorld('antirea', api)
+contextBridge.exposeInMainWorld('sloth', api)

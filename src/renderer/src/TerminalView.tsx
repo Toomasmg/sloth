@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import type { PtyChunk } from '../../shared/types'
@@ -11,8 +11,12 @@ interface Props {
   onError: (message: string) => void
 }
 
-export function TerminalView({ id, generation, onError }: Props): React.JSX.Element {
+/** Memo: los cambios de estado de agentes o permisos en App no re-renderizan las terminales. */
+export const TerminalView = memo(function TerminalView({ id, generation, onError }: Props): React.JSX.Element {
   const host = useRef<HTMLDivElement>(null)
+  // onError por ref: la terminal solo se recrea si cambian id o generation.
+  const onErrorRef = useRef(onError)
+  onErrorRef.current = onError
 
   useEffect(() => {
     const el = host.current
@@ -22,9 +26,9 @@ export function TerminalView({ id, generation, onError }: Props): React.JSX.Elem
       fontFamily: '"JetBrains Mono Variable", "Cascadia Code", Consolas, monospace',
       fontSize: 13,
       lineHeight: 1.15,
-      cursorBlink: true,
+      cursorBlink: document.visibilityState === 'visible',
       cursorStyle: 'bar',
-      scrollback: 10000,
+      scrollback: 3000,
       allowProposedApi: true,
       theme: {
         background: '#12141a',
@@ -85,7 +89,7 @@ export function TerminalView({ id, generation, onError }: Props): React.JSX.Elem
         upTo = Number.MAX_SAFE_INTEGER
         const msg = e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
         term.write(`\x1b[31m${msg}\x1b[0m\r\n`)
-        onError(msg)
+        onErrorRef.current(msg)
       })
 
     term.onData((d) => api.ptyWrite(id, d))
@@ -116,24 +120,39 @@ export function TerminalView({ id, generation, onError }: Props): React.JSX.Elem
     }
     el.addEventListener('contextmenu', onContext)
 
+    // Fit agrupado en un frame y nunca con el panel oculto (display:none mide 0 y rompería cols/rows).
+    let raf = 0
     const ro = new ResizeObserver(() => {
-      try {
-        fit.fit()
-      } catch {
-        /* sin tamaño todavía */
-      }
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        if (disposed || el.offsetParent === null || el.clientWidth === 0 || el.clientHeight === 0) return
+        try {
+          fit.fit()
+        } catch {
+          /* sin tamaño todavía */
+        }
+      })
     })
     ro.observe(el)
 
+    // Sin parpadeo de cursor (timer por terminal) mientras la ventana no se ve.
+    const onVis = (): void => {
+      term.options.cursorBlink = document.visibilityState === 'visible'
+    }
+    document.addEventListener('visibilitychange', onVis)
+
     return () => {
       disposed = true
+      if (raf) cancelAnimationFrame(raf)
       ro.disconnect()
+      document.removeEventListener('visibilitychange', onVis)
       el.removeEventListener('contextmenu', onContext)
       offData()
       offExit()
       term.dispose()
     }
-  }, [id, generation, onError])
+  }, [id, generation])
 
   return <div className="terminal-host" ref={host} />
-}
+})

@@ -1,6 +1,6 @@
 import { useId } from 'react'
 
-/** Marca de AntiRea: dos órbitas (tus cuentas) alrededor de un núcleo con el prompt. */
+/** Marca de Sloth: dos órbitas (tus cuentas) alrededor de un núcleo con el prompt. */
 export function LogoMark({ size = 28 }: { size?: number }): React.JSX.Element {
   const gid = useId()
   return (
@@ -28,9 +28,9 @@ export function Wordmark(): React.JSX.Element {
       <LogoMark />
       <div>
         <div className="wordmark-name">
-          Anti<span>Rea</span>
+          <span>Sloth</span>
         </div>
-        <div className="wordmark-tag">multi-cuenta · v0.2</div>
+        <div className="wordmark-tag">multi-cuenta · v0.3</div>
       </div>
     </div>
   )
