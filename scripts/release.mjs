@@ -5,7 +5,9 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 
-const run = (cmd, args) => execFileSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32' })
+// npm/npx son .cmd en Windows y necesitan shell; gh es un .exe y va sin shell (si no, parte los textos con espacios).
+const run = (cmd, args) =>
+  execFileSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32' && (cmd === 'npm' || cmd === 'npx') })
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'))
 const tag = `v${version}`
 const files = [`dist/Sloth-Setup-${version}.exe`, `dist/Sloth-Setup-${version}.exe.blockmap`, 'dist/latest.yml']
