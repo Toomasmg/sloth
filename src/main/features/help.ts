@@ -34,6 +34,11 @@ const feature: Feature = {
     ctx.handle('whatsnew', () => {
       const current = app.getVersion()
       const lastSeen = readLastSeen()
+      if (lastSeen === null && (ctx.store.accounts.length > 0 || ctx.store.workspaces.length > 0)) {
+        // Sin help.json pero con cuentas o espacios: viene de la 0.4 (antes no existía este archivo).
+        // Se le muestran las novedades desde la 0.4.0 una vez.
+        return whatsNewFor(CHANGELOG, '0.4.0', current)
+      }
       if (lastSeen === null) {
         // Primera instalación: se marca la versión actual y no se muestran novedades.
         try {

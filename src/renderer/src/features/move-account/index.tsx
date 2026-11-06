@@ -139,9 +139,11 @@ function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
   const explain =
     hasConv === null
       ? null
-      : hasConv
-        ? 'Se cierra la terminal y Claude retoma esta conversación con la cuenta elegida.'
-        : 'Se cierra la terminal y el espacio pasa a usar la cuenta elegida.'
+      : !hasConv
+        ? 'Se cierra la terminal y el espacio pasa a usar la cuenta elegida.'
+        : ws.autoStartClaude
+          ? 'Se cierra la terminal y Claude retoma esta conversación con la cuenta elegida.'
+          : 'Se cierra la terminal y la conversación se copia a la cuenta elegida. Este espacio no arranca Claude solo: para seguirla, escribí «claude --continue» en la terminal.'
 
   return (
     <div className="modal-backdrop" onMouseDown={() => !busyRef.current && closeMove()}>

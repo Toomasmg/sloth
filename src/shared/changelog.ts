@@ -11,18 +11,20 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.5.0',
     date: '2026-11-06',
-    title: 'Paneles, estilo nuevo y tema claro',
+    title: 'Estilo nuevo, paneles y chat del equipo',
     items: [
-      'Paneles en grilla o en pestañas (Ctrl+Tab). Reordenalos arrastrando el encabezado o con Ctrl+Alt+←/→.',
-      'Redimensioná los paneles arrastrando los separadores.',
-      'Estilo nuevo, más denso, con tema claro. Lo cambiás en Configuración.',
-      'Configuración con Ctrl+, : apariencia, terminal, colores de cuenta y atajos.',
-      'Chat del equipo (en configuración).',
-      'Ícono por espacio, y renombrar con doble clic.',
-      'Soltá una carpeta en la ventana para crear un espacio.',
-      'Abrí un espacio en VS Code o en su carpeta desde el encabezado.',
-      'Sonidos opcionales para avisos (desactivados por defecto).',
-      'Reportá un problema desde el menú de ayuda (?), sin datos personales.'
+      'Estilo Minimal, más denso y limpio, con tema claro. Se elige en Configuración.',
+      'Configuración (Ctrl+,): apariencia, terminal, colores de cuenta, comportamiento y atajos.',
+      'Paneles en grilla o en pestañas (Ctrl+Tab): reordenalos arrastrando el encabezado o con Ctrl+Alt+flechas, y cambiales el tamaño arrastrando los separadores.',
+      'Bienvenida nueva para arrancar, y configuración de equipo compartida en el repo (.sloth/team.json).',
+      'Vista Equipo: en qué anda cada uno, con sus PR y tickets.',
+      'Chat del equipo con mensajes directos, fotos de equipo e invitaciones. Usa un Supabase propio del equipo: hay que configurarlo antes (Configuración → Equipo y datos).',
+      'Ayuda (?): atajos, novedades e invitar a alguien a Sloth.',
+      'Reportá un problema desde la ayuda: el borrador sale sin datos personales y lo revisás antes de enviarlo.',
+      'Renombrá un espacio con doble clic, ponele un ícono, abrilo en VS Code o en su carpeta, o soltá una carpeta en la ventana para crear uno.',
+      'Mové un espacio a otra cuenta: la conversación se copia y Claude la retoma.',
+      'Sonidos opcionales para los avisos (vienen apagados).',
+      'Se sacó la rotación automática de cuentas: ahora elegís vos a qué cuenta mover cada espacio.'
     ]
   },
   {

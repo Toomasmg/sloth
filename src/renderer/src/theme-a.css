@@ -38,7 +38,31 @@
 
 /* ---------- Layout ---------- */
 .app {
-  grid-template-columns: var(--side-w) 1fr;
+  grid-template-columns: var(--side-w) minmax(0, 1fr);
+}
+/* La barra de título no puede ensanchar la grilla: si no entra, se achica (y no empuja los paneles). */
+.shell {
+  grid-template-columns: minmax(0, 1fr);
+}
+.titlebar {
+  min-width: 0;
+}
+/* Los chips de estado ceden lugar (se recortan) antes que los botones de la derecha. */
+.titlebar-status {
+  flex: 0 1 auto;
+  overflow: hidden;
+}
+.titlebar-right {
+  flex: none;
+}
+@media (max-width: 1500px) {
+  .f-palette-tb-label,
+  .tb-daemon-label {
+    display: none;
+  }
+  .titlebar .f-palette-tb {
+    min-width: 0;
+  }
 }
 .titlebar {
   background: var(--bg);

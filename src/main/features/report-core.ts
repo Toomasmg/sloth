@@ -37,7 +37,11 @@ const TOKEN_RES: RegExp[] = [
   /(?<![A-Za-z0-9])gh[pousr]_[A-Za-z0-9_]{20,}/g,
   /(?<![A-Za-z0-9])github_pat_[A-Za-z0-9_]+/g,
   /(?<![A-Za-z0-9])sk-ant-[A-Za-z0-9_-]+/g,
-  /(?<![A-Za-z0-9])sk-[A-Za-z0-9]{20,}/g,
+  /(?<![A-Za-z0-9])sk-[A-Za-z0-9_-]{20,}/g,
+  /(?<![A-Za-z0-9])glpat-[A-Za-z0-9_-]{20,}/g,
+  /(?<![A-Za-z0-9])npm_[A-Za-z0-9]{30,}/g,
+  /(?<![A-Za-z0-9])AIza[A-Za-z0-9_-]{30,}/g,
+  /(?<![A-Za-z0-9])(?:AKIA|ASIA)[A-Z0-9]{16}(?![A-Za-z0-9])/g,
   /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*/g,
   /(?<![A-Za-z0-9])sb_(?:secret|publishable)_[A-Za-z0-9_-]+/g,
   /(?<![A-Za-z0-9])xox[abprs]-[A-Za-z0-9_-]+/g
@@ -75,12 +79,16 @@ export function sanitize(text: string, ctx: SanitizeContext): string {
 
   s = s.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '<id>')
   s = s.replace(/(?<![A-Za-z0-9])[0-9a-f]{32,}(?![A-Za-z0-9])/gi, '<hex>')
-  s = s.replace(/(?<![A-Za-z0-9+])[A-Za-z0-9+]{40,}={0,2}(?![A-Za-z0-9+=])/g, (m) =>
-    /\d/.test(m) && /[A-Za-z]/.test(m) ? '<clave>' : m
+  // Con «/» (base64 estándar, p. ej. claves de AWS) se exige mayúscula, minúscula y dígito, así no
+  // se come rutas largas.
+  s = s.replace(/(?<![A-Za-z0-9+/])[A-Za-z0-9+/]{40,}={0,2}(?![A-Za-z0-9+/=])/g, (m) =>
+    /\d/.test(m) && /[A-Za-z]/.test(m) && (!m.includes('/') || (/[a-z]/.test(m) && /[A-Z]/.test(m))) ? '<clave>' : m
   )
 
-  if (ctx.username.length >= 3) s = s.replace(new RegExp(escapeRe(ctx.username), 'gi'), '<usuario>')
-  if (ctx.hostname.length >= 2) s = s.replace(new RegExp(escapeRe(ctx.hostname), 'gi'), '<pc>')
+  // Como palabra suelta: «PC» no tiene que comerse «PCB», ni «ana» la palabra «ventana».
+  const word = (w: string): RegExp => new RegExp(String.raw`(?<![\p{L}\p{N}])${escapeRe(w)}(?![\p{L}\p{N}])`, 'giu')
+  if (ctx.username.length >= 3) s = s.replace(word(ctx.username), '<usuario>')
+  if (ctx.hostname.length >= 2) s = s.replace(word(ctx.hostname), '<pc>')
 
   s = s.replace(/(?<![\d.])(?!127\.0\.0\.1(?![\d.]))(?:\d{1,3}\.){3}\d{1,3}(?![\d.])/g, '<ip>')
   return s

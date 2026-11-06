@@ -70,10 +70,11 @@ export function DaemonStatus(): React.JSX.Element | null {
         }}
         aria-expanded={open}
         aria-haspopup="dialog"
+        aria-label={daemon ? 'Terminales persistentes' : 'Modo simple'}
         title={daemon ? 'Las terminales siguen corriendo aunque cierres Sloth' : info.reason ?? 'Las terminales viven dentro de la app'}
       >
         {daemon ? <HardDrives size={12} aria-hidden="true" /> : <TerminalWindow size={12} aria-hidden="true" />}
-        {daemon ? 'Terminales persistentes' : 'Modo simple'}
+        <span className="tb-daemon-label">{daemon ? 'Terminales persistentes' : 'Modo simple'}</span>
         <CaretDown size={10} weight="bold" aria-hidden="true" />
       </button>
       {open && (
