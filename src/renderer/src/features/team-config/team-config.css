@@ -1,0 +1,227 @@
+/* Función «team-config»: sección «Equipo» compacta y sus diálogos. */
+.f-team-config .section-title svg {
+  color: var(--brand-2);
+}
+.f-team-config-name {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  color: var(--fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.f-team-config-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 var(--s-1);
+}
+.f-team-config-block + .f-team-config-block {
+  margin-top: var(--s-2);
+}
+.f-team-config-chip-row,
+.f-team-config-sugg {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-width: 0;
+}
+.f-team-config-chip {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--h-xs);
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: 999px;
+  background: var(--info-soft);
+  color: var(--info);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background var(--t-fast) var(--ease);
+}
+.f-team-config-chip:hover {
+  background: rgba(103, 216, 239, 0.2);
+}
+.f-team-config-chip .count {
+  margin-left: auto;
+  background: rgba(103, 216, 239, 0.18);
+  color: var(--info);
+}
+.f-team-config-chip:focus-visible,
+.f-team-config-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+.f-team-config-chip-row .icon-btn,
+.f-team-config-sugg .icon-btn {
+  width: var(--h-xs);
+  height: var(--h-xs);
+  flex: none;
+}
+.f-team-config-sugg {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.f-team-config-sugg > svg {
+  flex: none;
+  color: var(--fg-muted);
+}
+.f-team-config-sugg .grow-min {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.f-team-config-sugg .btn.sm {
+  height: var(--h-xs);
+  padding: 0 var(--s-2);
+}
+.f-team-config-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.f-team-config-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--hover);
+  color: var(--fg-2);
+  font: inherit;
+  font-size: var(--fs-xs);
+  cursor: pointer;
+}
+.f-team-config-link:hover {
+  background: var(--press);
+  color: var(--fg);
+}
+.f-team-config-link svg {
+  color: var(--fg-muted);
+}
+.f-team-config-invalid {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--warn);
+  line-height: 1.4;
+}
+.f-team-config-invalid svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* Diálogos */
+.f-team-config-modal.wide {
+  width: min(620px, calc(100vw - 32px));
+}
+.f-team-config-icon {
+  color: var(--brand-1);
+}
+.f-team-config-plan {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.f-team-config-plan li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: 6px var(--s-2);
+  border-radius: var(--r-sm);
+  background: var(--card);
+}
+.f-team-config-plan li > svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--info);
+}
+.f-team-config-plan li.is-same > svg {
+  color: var(--success);
+}
+.f-team-config-plan li.is-error > svg {
+  color: var(--warn);
+}
+.f-team-config-plan .item-sub {
+  display: block;
+  white-space: normal;
+}
+.f-team-config-act {
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  margin-top: 2px;
+}
+.f-team-config-plan li:not(.is-same):not(.is-error) .f-team-config-act {
+  color: var(--info);
+}
+.f-team-config-ok {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--success);
+  font-size: var(--fs-sm);
+  flex-wrap: wrap;
+}
+.f-team-config-pre-wrap {
+  white-space: pre-wrap;
+}
+.f-team-config-pre {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--term-bg);
+  font-size: var(--fs-xs);
+  line-height: 1.55;
+  color: var(--fg-2);
+  white-space: pre;
+}
+.f-team-config-pre:focus-visible {
+  outline: 2px solid var(--ring);
+}
+.f-team-config-warn {
+  color: var(--warn);
+  vertical-align: -2px;
+}
+.f-team-config-fs {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.f-team-config-fs legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.f-team-config-link-row {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  gap: var(--s-2);
+  align-items: center;
+}
+.f-team-config-add {
+  align-self: flex-start;
+}

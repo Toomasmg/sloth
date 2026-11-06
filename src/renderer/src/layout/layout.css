@@ -1,0 +1,433 @@
+/* ---------- Layout de paneles: barra, separadores, arrastre y pestañas ---------- */
+
+/* Cada panel se ubica por fracciones (--x --y --w --h) dentro del área; 4px de margen por lado
+   + 4px de padding del área = 8px entre paneles y contra los bordes, como antes. */
+.panes-area > .pane {
+  position: absolute;
+  left: calc(var(--x, 0) * 100% + 4px);
+  top: calc(var(--y, 0) * 100% + 4px);
+  width: calc(var(--w, 1) * 100% - 8px);
+  height: calc(var(--h, 1) * 100% - 8px);
+}
+.panes-area > .pane.dragging {
+  opacity: 0.45;
+}
+
+/* El header se agarra para mover el panel (los botones siguen siendo botones). */
+.pane-head.draggable {
+  cursor: grab;
+}
+.pane-head.draggable :is(button, a, input, [role='status']) {
+  cursor: pointer;
+}
+body.is-reordering,
+body.is-reordering * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+body.is-resizing-col,
+body.is-resizing-col * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+body.is-resizing-row,
+body.is-resizing-row * {
+  cursor: row-resize !important;
+  user-select: none !important;
+}
+
+/* ---------- Barra encima de los paneles ---------- */
+.panes-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 30px;
+  flex: none;
+  padding: 2px 4px 0;
+  min-width: 0;
+}
+.panes-bar-info {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.panes-bar-count {
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.panes-bar-hint {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.85;
+}
+.panes-bar-hint kbd,
+.drag-ghost kbd {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  padding: 0 4px;
+  border-radius: var(--r-xs);
+  background: var(--hover);
+}
+.panes-bar-max {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.panes-bar-max strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg);
+  font-weight: 600;
+}
+.panes-bar-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  margin-left: auto;
+}
+.panes-bar-tools .icon-btn {
+  width: var(--h-xs);
+  height: var(--h-xs);
+}
+.panes-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+.panes-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+.panes-seg-btn:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+.panes-seg-btn[aria-pressed='true'] {
+  color: var(--fg);
+  background: var(--card);
+}
+.panes-seg-btn:focus-visible {
+  outline-offset: 0;
+}
+.panes-bar-link {
+  border: none;
+  background: none;
+  padding: 0 4px;
+  color: var(--accent);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--r-xs);
+}
+.panes-bar-link:hover {
+  text-decoration: underline;
+}
+@media (max-width: 1100px) {
+  .panes-bar-hint,
+  .panes-seg-btn span {
+    display: none;
+  }
+}
+
+/* ---------- Pestañas ---------- */
+.pane-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.pane-tabs::-webkit-scrollbar {
+  display: none;
+}
+.pane-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 84px;
+  max-width: 220px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+.pane-tab:hover {
+  color: var(--fg);
+  background: var(--hover);
+}
+.pane-tab.active {
+  color: var(--fg);
+  background: var(--card);
+}
+.pane-tab:focus-visible {
+  outline-offset: -2px;
+}
+.pane-tab .acc-dot {
+  width: 7px;
+  height: 7px;
+}
+.pane-tab-title {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+.pane-tab-perm {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--warn);
+}
+/* Te necesita / permiso: lo marca el ícono ámbar (campana o escudo) y el texto más claro, sin relleno. */
+.pane-tab.waiting:not(.active),
+.pane-tab.perm:not(.active) {
+  color: var(--fg-2);
+}
+.pane-tab.dragging {
+  opacity: 0.45;
+}
+/* Dónde cae la pestaña: una barra a la izquierda o a la derecha. */
+.pane-tab.drop-before::before,
+.pane-tab.drop-after::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+.pane-tab.drop-before::before {
+  left: -2px;
+}
+.pane-tab.drop-after::before {
+  right: -2px;
+}
+
+/* ---------- Separadores ---------- */
+.pane-sep {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+}
+.pane-sep.col {
+  left: calc(var(--at) * 100% - 4px);
+  top: calc(var(--y) * 100% + 4px);
+  width: 8px;
+  height: calc(var(--h) * 100% - 8px);
+  cursor: col-resize;
+}
+.pane-sep.row {
+  top: calc(var(--at) * 100% - 4px);
+  left: 4px;
+  right: 4px;
+  height: 8px;
+  cursor: row-resize;
+}
+.pane-sep-line {
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease);
+}
+.pane-sep.col .pane-sep-line {
+  width: 2px;
+  height: min(48px, 40%);
+}
+.pane-sep.row .pane-sep-line {
+  height: 2px;
+  width: min(48px, 40%);
+}
+.pane-sep:hover .pane-sep-line {
+  opacity: 0.55;
+}
+.pane-sep:focus-visible {
+  outline: none;
+}
+.pane-sep:focus-visible .pane-sep-line,
+.pane-sep.active .pane-sep-line {
+  opacity: 1;
+}
+.pane-sep:focus-visible .pane-sep-line {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 35%, transparent);
+}
+
+/* Guía mientras se arrastra un separador: el tamaño real se aplica al soltar. */
+.pane-guide {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  background: var(--accent);
+  border-radius: 1px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.pane-guide[hidden] {
+  display: none;
+}
+.pane-guide.col {
+  left: calc(var(--at) * 100% - 1px);
+  top: calc(var(--y, 0) * 100% + 4px);
+  width: 2px;
+  height: calc(var(--h, 1) * 100% - 8px);
+}
+.pane-guide.row {
+  top: calc(var(--at) * 100% - 1px);
+  left: 4px;
+  right: 4px;
+  height: 2px;
+}
+.pane-guide::after {
+  content: attr(data-label);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--fg);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-shadow: var(--shadow-float, 0 6px 18px rgba(0, 0, 0, 0.35)), inset 0 0 0 1px var(--line);
+}
+
+/* ---------- Indicador de dónde cae un panel ---------- */
+.pane-drop {
+  position: absolute;
+  z-index: 5;
+  left: calc(var(--x) * 100% + 4px);
+  top: calc(var(--y) * 100% + 4px);
+  width: calc(var(--w) * 100% - 8px);
+  height: calc(var(--h) * 100% - 8px);
+  pointer-events: none;
+  border-radius: var(--r-md);
+  animation: pane-drop-in var(--t-fast) var(--ease);
+}
+.pane-drop.swap {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.pane-drop.before,
+.pane-drop.after {
+  background: linear-gradient(to var(--side), color-mix(in srgb, var(--accent) 9%, transparent), transparent 24%);
+}
+.pane-drop.before {
+  --side: right;
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.pane-drop.after {
+  --side: left;
+  box-shadow: inset -2px 0 0 var(--accent);
+}
+.pane-drop-label {
+  position: absolute;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: var(--shadow-float, 0 6px 18px rgba(0, 0, 0, 0.35)), inset 0 0 0 1px var(--line);
+  transform: translateY(-50%);
+}
+.pane-drop.swap .pane-drop-label {
+  top: 30%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.pane-drop.before .pane-drop-label {
+  left: 14px;
+}
+.pane-drop.after .pane-drop-label {
+  right: 14px;
+}
+.pane-drop-label svg {
+  color: var(--accent);
+}
+@keyframes pane-drop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Etiqueta que sigue al puntero mientras se arrastra. */
+.drag-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 4px 10px 4px 8px;
+  border-radius: var(--r-sm);
+  background: var(--card);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--shadow-float, 0 6px 18px rgba(0, 0, 0, 0.35)), inset 0 0 0 1px var(--line);
+  will-change: transform;
+}
+.drag-ghost[hidden] {
+  display: none;
+}
+.drag-ghost .acc-dot {
+  width: 7px;
+  height: 7px;
+}
+.drag-ghost span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pane-actions .icon-btn[hidden] {
+  display: none;
+}

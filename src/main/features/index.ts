@@ -1,5 +1,4 @@
 import type { Feature } from './context'
-import rotation from './rotation'
 import history from './history'
 import git from './git'
 import worktrees from './worktrees'
@@ -15,4 +14,4 @@ import teamConfig from './team-config'
 import team from './team'
 
 /** Todas las funciones del lado main. Para sumar una: crear su archivo y agregarla acá. */
-export const FEATURES: Feature[] = [rotation, history, git, worktrees, broadcast, templates, tray, updater, exportImport, gruv, settings, onboarding, teamConfig, team]
+export const FEATURES: Feature[] = [history, git, worktrees, broadcast, templates, tray, updater, exportImport, gruv, settings, onboarding, teamConfig, team]

@@ -2,11 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowClockwise,
   ArrowsIn,
+  ArrowsLeftRight,
   ArrowsOut,
+  DotsSixVertical,
+  Equals,
+  GridFour,
   EyeSlash,
   Plus,
   ShieldWarning,
   SignIn,
+  Tabs as TabsIcon,
   Terminal as TerminalIcon,
   Ticket,
   Trash,
@@ -35,6 +40,27 @@ import { StateIcon, StatePill } from './StateIcon'
 import { PermissionCard, toolLabel } from './PermissionCard'
 import { DaemonStatus } from './DaemonStatus'
 import { useDocumentVisible, useVisiblePolling } from './visibility'
+import {
+  cellRects,
+  cycle,
+  defaultSizes,
+  gridShape,
+  loadSizes,
+  movePane,
+  sameOrder,
+  saveSizes,
+  shapeKey,
+  shiftPane,
+  sizesAreEqual,
+  type DropMode,
+  type Rect,
+  type Sizes
+} from './layout/logic'
+import { onEqualize, safeStorage, setViewMode, useViewMode } from './layout/store'
+import { useReorderDrag } from './layout/useReorderDrag'
+import { Separators } from './layout/Separators'
+import { TabBar, type TabInfo } from './layout/TabBar'
+import './layout/layout.css'
 import { accountColor, cleanError, fmtTok, shortPath, STATE_LABEL, totalTok, usageTitle } from './format'
 
 export function App(): React.JSX.Element {
@@ -231,8 +257,145 @@ export function App(): React.JSX.Element {
 
   const onTermError = useCallback((m: string) => setError(m), [])
 
-  const visiblePanes = maximized ? openPanes.filter((p) => p === maximized) : openPanes
-  const cols = visiblePanes.length <= 1 ? 1 : visiblePanes.length <= 4 ? 2 : 3
+  // ---------- Layout de paneles: vista (grilla/pestañas), proporciones y orden ----------
+  const viewMode = useViewMode()
+  const areaRef = useRef<HTMLDivElement>(null)
+  const tabsRef = useRef<HTMLDivElement>(null)
+  const ghostRef = useRef<HTMLDivElement>(null)
+  const [layoutMsg, setLayoutMsg] = useState('')
+  const maxId = maximized && openPanes.includes(maximized) ? maximized : null
+  const activeTab = focused && openPanes.includes(focused) ? focused : (openPanes[0] ?? null)
+  // En pestañas se ve una sola (la maximizada o la activa); las demás quedan montadas con display:none.
+  const shownTab = viewMode === 'tabs' ? (maxId ?? activeTab) : null
+  const visiblePanes = viewMode === 'tabs' ? (shownTab ? [shownTab] : []) : maxId ? [maxId] : openPanes
+  const nVisible = visiblePanes.length
+  const shape = useMemo(() => gridShape(nVisible), [nVisible])
+  const shapeK = shapeKey(shape)
+  const [sizeOverrides, setSizeOverrides] = useState<Record<string, Sizes>>({})
+  const sizes = useMemo(() => sizeOverrides[shapeK] ?? loadSizes(safeStorage(), shape), [sizeOverrides, shapeK, shape])
+  const rects = useMemo(() => cellRects(shape, sizes), [shape, sizes])
+  const rectOf = new Map(visiblePanes.map((id, i) => [id, rects[i]]))
+  const commitSizes = useCallback(
+    (next: Sizes) => {
+      setSizeOverrides((o) => ({ ...o, [shapeK]: next }))
+      saveSizes(safeStorage(), shape, next)
+    },
+    [shapeK, shape]
+  )
+  const equalizeRef = useRef(() => {})
+  equalizeRef.current = () => commitSizes(defaultSizes(shape))
+  useEffect(() => onEqualize(() => equalizeRef.current()), [])
+
+  const paneName = (id: string): string =>
+    isLoginPane(id) ? `Terminal de ${accountById.get(accountIdFromLoginPane(id))?.label ?? 'cuenta'}` : (wsById.get(id)?.name ?? 'Panel')
+
+  /** Elige un panel: lo enfoca y, si había uno maximizado (o en pestañas), pasa a mostrar ese. */
+  const selectPane = (id: string, focusTerm: boolean): void => {
+    setFocused(id)
+    if (maxId && maxId !== id) setMaximized(id)
+    if (focusTerm) focusTerminal(id)
+  }
+
+  const announceOrder = (id: string, list: string[]): void => {
+    setLayoutMsg(`«${paneName(id)}» quedó en la posición ${list.indexOf(id) + 1} de ${list.length}.`)
+  }
+
+  const dropPane = (id: string, target: string, mode: DropMode): void => {
+    const next = movePane(openPanes, id, target, mode)
+    if (sameOrder(next, openPanes)) return
+    setOpenPanes(() => next)
+    setFocused(id)
+    if (mode === 'swap') setLayoutMsg(`«${paneName(id)}» intercambiado con «${paneName(target)}».`)
+    else announceOrder(id, next)
+  }
+
+  const paneDrag = useReorderDrag({
+    kind: 'pane',
+    attr: 'data-pane-id',
+    scope: areaRef,
+    ghost: ghostRef,
+    ignore: 'button, a, input, textarea, select, [role="button"]',
+    onDrop: dropPane
+  })
+  const tabDrag = useReorderDrag({ kind: 'tab', attr: 'data-tab-id', scope: tabsRef, ghost: ghostRef, onDrop: dropPane })
+  const dragging = paneDrag.drag ?? tabDrag.drag
+  const canDragPanes = viewMode === 'grid' && nVisible > 1
+
+  const hideTab = (id: string): void => {
+    const i = openPanes.indexOf(id)
+    const neighbor = openPanes[i + 1] ?? openPanes[i - 1]
+    closePane(id)
+    if (id === shownTab && neighbor) setFocused(neighbor)
+  }
+
+  // Atajos: Ctrl+Tab / Ctrl+Shift+Tab cambian de panel; Ctrl+Alt+← / → mueven el panel enfocado.
+  const kbRef = useRef({ count: 0, cycleBy: (_d: 1 | -1): void => {}, shiftBy: (_id: string, _d: number, _tab: boolean): void => {} })
+  kbRef.current = {
+    count: openPanes.length,
+    cycleBy: (d) => {
+      const cur = viewMode === 'tabs' ? shownTab : (maxId ?? (focused && openPanes.includes(focused) ? focused : null))
+      const next = cycle(openPanes, cur, d)
+      if (!next) return
+      selectPane(next, true)
+      setLayoutMsg(`${paneName(next)}, ${openPanes.indexOf(next) + 1} de ${openPanes.length}.`)
+    },
+    shiftBy: (id, d, fromTab) => {
+      const next = shiftPane(openPanes, id, d)
+      if (sameOrder(next, openPanes)) {
+        setLayoutMsg(`«${paneName(id)}» ya está ${d < 0 ? 'primero' : 'último'}.`)
+        return
+      }
+      setOpenPanes(() => next)
+      announceOrder(id, next)
+      // React movió el nodo en el DOM: devolverle el foco a donde estaba.
+      requestAnimationFrame(() => {
+        if (fromTab) tabsRef.current?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(id)}"]`)?.focus()
+        else focusTerminal(id)
+      })
+    }
+  }
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.metaKey) return
+      const k = kbRef.current
+      const ae = document.activeElement
+      if (e.ctrlKey && !e.altKey && e.key === 'Tab') {
+        // Solo desde los paneles (o sin foco): no pisar el Tab de modales y paletas.
+        if (ae && ae !== document.body && !ae.closest('.panes')) return
+        if (k.count < 2) return
+        e.preventDefault()
+        e.stopPropagation()
+        k.cycleBy(e.shiftKey ? -1 : 1)
+        return
+      }
+      if (e.ctrlKey && e.altKey && !e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        const host = ae?.closest<HTMLElement>('[data-pane-id], [data-tab-id]')
+        const id = host?.getAttribute('data-pane-id') ?? host?.getAttribute('data-tab-id')
+        if (!host || !id) return
+        e.preventDefault()
+        e.stopPropagation()
+        k.shiftBy(id, e.key === 'ArrowLeft' ? -1 : 1, host.hasAttribute('data-tab-id'))
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
+  const tabs: TabInfo[] =
+    viewMode === 'tabs'
+      ? openPanes.map((id) => {
+          const login = isLoginPane(id)
+          const accId = login ? accountIdFromLoginPane(id) : wsById.get(id)?.accountId
+          return {
+            id,
+            title: login ? 'Terminal de cuenta' : (wsById.get(id)?.name ?? 'Panel'),
+            account: (accId && accountById.get(accId)?.label) || 'cuenta borrada',
+            color: colorOf(accId),
+            state: login ? undefined : agents[id]?.state,
+            perms: permsByWs.get(id)?.length ?? 0
+          }
+        })
+      : []
   const countBy = (s: AgentStatus['state']): number => workspaces.filter((w) => agents[w.id]?.state === s).length
   const needsYou = countBy('waiting')
   const working = countBy('working')
@@ -427,8 +590,82 @@ export function App(): React.JSX.Element {
         <SidebarSlot />
       </aside>
 
-      <main className="panes" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+      <main className={`panes view-${viewMode} ${openPanes.length === 0 ? 'is-empty' : ''}`} aria-label="Paneles">
         {loaded && openPanes.length === 0 && <EmptyState hasAccounts={accounts.length > 0} hasWs={workspaces.length > 0} />}
+        {openPanes.length > 0 && (
+          <div className="panes-bar">
+            {viewMode === 'tabs' ? (
+              <TabBar
+                tabs={tabs}
+                active={shownTab}
+                drag={tabDrag.drag}
+                scope={tabsRef}
+                onSelect={selectPane}
+                onHide={hideTab}
+                onPointerDown={tabDrag.onPointerDown}
+              />
+            ) : maxId ? (
+              <div className="panes-bar-info">
+                <span className="panes-bar-max">
+                  <ArrowsOut size={13} aria-hidden="true" /> Maximizado: <strong>{paneName(maxId)}</strong>
+                </span>
+                <button type="button" className="panes-bar-link" onClick={() => setMaximized(null)}>
+                  Volver a la grilla
+                </button>
+              </div>
+            ) : (
+              <div className="panes-bar-info">
+                <span className="panes-bar-count">
+                  {openPanes.length} {openPanes.length === 1 ? 'panel' : 'paneles'}
+                </span>
+                {openPanes.length > 1 && (
+                  <span className="panes-bar-hint">
+                    Arrastrá un panel por su barra para moverlo · <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> · <kbd>Ctrl</kbd>+<kbd>Tab</kbd> cambia
+                  </span>
+                )}
+              </div>
+            )}
+            <div className="panes-bar-tools">
+              {viewMode === 'grid' && nVisible > 1 && !sizesAreEqual(sizes) && (
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => {
+                    commitSizes(defaultSizes(shape))
+                    setLayoutMsg('Paneles repartidos por igual.')
+                  }}
+                  aria-label="Repartir los paneles por igual"
+                  title="Repartir por igual (o doble clic en un separador)"
+                >
+                  <Equals size={14} aria-hidden="true" />
+                </button>
+              )}
+              <div className="panes-seg" role="group" aria-label="Vista de los paneles">
+                <button
+                  type="button"
+                  className="panes-seg-btn"
+                  aria-pressed={viewMode === 'grid'}
+                  onClick={() => setViewMode('grid')}
+                  title="Grilla: todas las terminales a la vista"
+                >
+                  <GridFour size={13} aria-hidden="true" />
+                  <span>Grilla</span>
+                </button>
+                <button
+                  type="button"
+                  className="panes-seg-btn"
+                  aria-pressed={viewMode === 'tabs'}
+                  onClick={() => setViewMode('tabs')}
+                  title="Pestañas: una terminal a la vez (Ctrl+Tab cambia, clic del medio oculta)"
+                >
+                  <TabsIcon size={13} aria-hidden="true" />
+                  <span>Pestañas</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <div ref={areaRef} className="panes-area">
         {openPanes.map((paneId) => {
           const login = isLoginPane(paneId)
           const ws = login ? undefined : wsById.get(paneId)
@@ -436,19 +673,25 @@ export function App(): React.JSX.Element {
           const acc = accId ? accountById.get(accId) : undefined
           const ag = ws ? agents[ws.id] : undefined
           const email = acc ? statuses[acc.id]?.email : undefined
-          const hidden = maximized !== null && maximized !== paneId
+          const rect = rectOf.get(paneId)
+          const hidden = !rect
           const paneQueue = ws ? permsByWs.get(ws.id) : undefined
           const perm = paneQueue?.[0]
           return (
             <section
               key={paneId}
               data-pane-id={paneId}
-              className={`pane ${focused === paneId ? 'focused' : ''} ${ag ? `pane-${ag.state}` : ''} ${perm ? 'pane-perm' : ''} ${hidden ? 'hidden' : ''}`}
-              style={{ '--acc': colorOf(accId) } as React.CSSProperties}
+              className={`pane ${focused === paneId ? 'focused' : ''} ${ag ? `pane-${ag.state}` : ''} ${perm ? 'pane-perm' : ''} ${hidden ? 'hidden' : ''} ${paneDrag.drag?.id === paneId ? 'dragging' : ''}`}
+              style={{ '--acc': colorOf(accId), ...rectVars(rect) } as React.CSSProperties}
               onMouseDown={() => setFocused(paneId)}
+              onFocus={() => setFocused(paneId)}
+              aria-describedby={canDragPanes ? 'pane-move-hint' : undefined}
               aria-label={login ? `Terminal de la cuenta ${acc?.label}` : `${ws?.name} con ${acc?.label}`}
             >
-              <header className="pane-head">
+              <header
+                className={`pane-head ${canDragPanes ? 'draggable' : ''}`}
+                onPointerDown={canDragPanes ? (e) => paneDrag.onPointerDown(e, paneId) : undefined}
+              >
                 <span className="pane-id">
                   <span className="acc-dot pane-dot" aria-hidden="true" />
                   <span className="pane-title" title={login ? undefined : ws?.name}>
@@ -472,6 +715,7 @@ export function App(): React.JSX.Element {
                 <button
                   className="icon-btn"
                   onClick={() => setMaximized(maximized === paneId ? null : paneId)}
+                  hidden={viewMode === 'tabs'}
                   aria-label={maximized === paneId ? 'Volver a la grilla' : 'Maximizar'}
                   title={maximized === paneId ? 'Volver a la grilla' : 'Maximizar'}
                 >
@@ -499,7 +743,34 @@ export function App(): React.JSX.Element {
             </section>
           )
         })}
+          {viewMode === 'grid' && nVisible > 1 && (
+            <Separators shape={shape} sizes={sizes} names={visiblePanes.map(paneName)} area={areaRef} onCommit={commitSizes} />
+          )}
+          {paneDrag.drag?.target && paneDrag.drag.mode && rectOf.has(paneDrag.drag.target) && (
+            <div
+              className={`pane-drop ${paneDrag.drag.mode}`}
+              style={rectVars(rectOf.get(paneDrag.drag.target)) as React.CSSProperties}
+              aria-hidden="true"
+            >
+              <span className="pane-drop-label">
+                <ArrowsLeftRight size={14} aria-hidden="true" />
+                {paneDrag.drag.mode === 'swap' ? 'Intercambiar' : paneDrag.drag.mode === 'before' ? 'Mover antes' : 'Mover después'}
+              </span>
+            </div>
+          )}
+        </div>
+        <div ref={ghostRef} className="drag-ghost" hidden={!dragging} aria-hidden="true">
+          <DotsSixVertical size={14} aria-hidden="true" />
+          {dragging && <span>{paneName(dragging.id)}</span>}
+        </div>
+        <span id="pane-move-hint" className="sr-only">
+          Ctrl+Alt+flecha izquierda o derecha mueve este panel. Ctrl+Tab pasa al siguiente.
+        </span>
+        <div className="sr-only" role="status" aria-live="polite">
+          {layoutMsg}
+        </div>
       </main>
+
 
       <GlobalSlot />
 
@@ -532,6 +803,18 @@ export function App(): React.JSX.Element {
     </div>
     </UiContext.Provider>
   )
+}
+
+/** Fracciones del rectángulo como variables CSS (las usa layout/layout.css). */
+function rectVars(r: Rect | undefined): Record<string, number> {
+  return r ? { '--x': r.x, '--y': r.y, '--w': r.w, '--h': r.h } : {}
+}
+
+/** Enfoca la terminal de un panel; si recién se muestra, reintenta un par de cuadros. */
+function focusTerminal(id: string, tries = 8): void {
+  const ta = document.querySelector<HTMLElement>(`[data-pane-id="${CSS.escape(id)}"] .xterm-helper-textarea`)
+  if (ta && ta.closest<HTMLElement>('.pane')?.offsetParent !== null) ta.focus()
+  else if (tries > 0) requestAnimationFrame(() => focusTerminal(id, tries - 1))
 }
 
 function EmptyState({ hasAccounts, hasWs }: { hasAccounts: boolean; hasWs: boolean }): React.JSX.Element {

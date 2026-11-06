@@ -1,0 +1,368 @@
+/* Sloth — temas y densidad (función «settings»).
+   Se carga después de styles.css. Los atributos los pone features/settings/store.ts en <html>:
+   data-theme="dark|light", data-density="compact|comfortable" y --ui-font-size.
+   Sin atributos, todo queda como en styles.css (oscuro y compacto). */
+
+/* ---------- Tokens nuevos (propuestos al núcleo para reemplazar colores fijos) ---------- */
+:root {
+  --danger-fg: #fca5a5;
+  --danger-fg-strong: #fecaca;
+  --placeholder: #7a8294;
+  --backdrop: rgba(10, 11, 15, 0.78);
+  --backdrop-soft: rgba(10, 11, 15, 0.6);
+  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --toast-bg: #2a1618;
+  --toast-border: rgba(248, 113, 113, 0.35);
+  --open-bg: rgba(255, 255, 255, 0.03);
+  --warn-ring: rgba(245, 176, 65, 0.4);
+  --warn-tint: rgba(245, 176, 65, 0.06);
+  --warn-line: rgba(245, 176, 65, 0.22);
+  --accent-soft: rgba(159, 234, 249, 0.1);
+  --selection: rgba(159, 234, 249, 0.3);
+  --brand-text: linear-gradient(90deg, #9feaf9, #5fb6c6);
+  --diff-add: rgba(74, 222, 128, 0.09);
+  --diff-del: rgba(248, 113, 113, 0.1);
+  --mark: rgba(245, 176, 65, 0.28);
+}
+
+/* ---------- Tamaño de letra de la interfaz (12–15 px) ---------- */
+html[data-theme] {
+  --fs-xs: calc(var(--ui-font-size, 13px) - 2px);
+  --fs-sm: calc(var(--ui-font-size, 13px) - 1px);
+  --fs-md: var(--ui-font-size, 13px);
+  --fs-lg: calc(var(--ui-font-size, 13px) + 2px);
+  --fs-xl: calc(var(--ui-font-size, 13px) + 5px);
+}
+
+/* ---------- Densidad «cómoda»: más aire y controles más altos ---------- */
+html[data-density='comfortable'] {
+  --s-1: 5px;
+  --s-2: 10px;
+  --s-3: 14px;
+  --s-4: 18px;
+  --s-5: 26px;
+  --s-6: 36px;
+  --h-xs: 26px;
+  --h-sm: 30px;
+  --h-md: 36px;
+  /* Propias de la densidad (el núcleo las puede usar en vez de alturas fijas). */
+  --pane-head-h: 42px;
+  --row-min-h: 54px;
+  line-height: 1.5;
+}
+html[data-density='compact'] {
+  --pane-head-h: 36px;
+  --row-min-h: 48px;
+}
+/* Alturas que styles.css tiene fijas: se ajustan acá hasta que usen --pane-head-h / --row-min-h. */
+html[data-density='comfortable'] .pane-head {
+  height: var(--pane-head-h);
+}
+html[data-density='comfortable'] .ws {
+  min-height: var(--row-min-h);
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+html[data-density='comfortable'] .list {
+  gap: 6px;
+}
+
+/* ---------- Tema claro (dirección A «Minimal», de v5-diseno/themes/a-light.css) ----------
+   Redefine TODOS los tokens de :root. a-light.css usaba :root y selectores sueltos (se cargaba
+   encima de a.css); acá todo va bajo html[data-theme='light'], que gana en especificidad a :root
+   y a las reglas de a.css/styles.css sin depender del orden de carga.
+   Acento de texto y botones en teal oscuro #3b7681 (5:1 con blanco); el cian claro queda para el logo. */
+html[data-theme='light'] {
+  --bg: #f1f2f5;
+  --surface: #f8f9fb;
+  --card: #e9ecf1;
+  --card-hover: #e2e6ec;
+  --muted: #d9dee6;
+  --border: #d5dae2;
+  --border-strong: #b9c0cc;
+  --fg: #12151c;
+  --fg-2: #3a414e;
+  --fg-muted: #5c6474;
+  --accent: #3b7681;
+  --on-accent: #ffffff;
+  --brand-1: #2f6f7a;
+  --brand-2: #3b7681;
+  --brand-grad: #3b7681;
+  --brand-glow: 0 0 0 3px rgba(59, 118, 129, 0.18);
+  --info: #0b6a83;
+  --warn: #a34a06;
+  --danger: #b91c1c;
+  --success: #13733a;
+  --ring: #3b7681;
+  --term-bg: #ffffff;
+  --acc: #3b7681;
+
+  --line: rgba(16, 22, 34, 0.07);
+  --line-2: rgba(16, 22, 34, 0.11);
+  --hover: rgba(16, 22, 34, 0.045);
+  --press: rgba(16, 22, 34, 0.07);
+  --warn-soft: rgba(217, 119, 6, 0.1);
+  --danger-soft: rgba(220, 38, 38, 0.08);
+  --info-soft: rgba(14, 116, 144, 0.09);
+  --success-soft: rgba(21, 128, 61, 0.08);
+
+  /* Tokens nuevos, versión clara. */
+  --danger-fg: #b91c1c;
+  --danger-fg-strong: #7f1d1d;
+  --placeholder: #6b7280;
+  --backdrop: rgba(18, 22, 32, 0.28);
+  --backdrop-soft: rgba(18, 22, 32, 0.22);
+  --shadow-lg: 0 0 0 1px rgba(16, 22, 34, 0.08), 0 24px 64px rgba(16, 22, 34, 0.18);
+  --shadow-md: 0 0 0 1px rgba(16, 22, 34, 0.08), 0 16px 40px rgba(16, 22, 34, 0.14);
+  --toast-bg: #fdf0f0;
+  --toast-border: rgba(185, 28, 28, 0.25);
+  --open-bg: rgba(16, 22, 34, 0.03);
+  --warn-ring: rgba(180, 83, 9, 0.4);
+  --warn-tint: #fbf7ef;
+  --warn-line: rgba(180, 83, 9, 0.16);
+  --accent-soft: #e9ecf1;
+  --selection: rgba(59, 118, 129, 0.2);
+  --brand-text: linear-gradient(90deg, #3b7681, #2f6f7a);
+  --diff-add: rgba(21, 128, 61, 0.1);
+  --diff-del: rgba(220, 38, 38, 0.08);
+  --mark: rgba(217, 119, 6, 0.22);
+
+  color-scheme: light;
+}
+
+/* ---------- Valores fijos del tema claro (de a-light.css + colores fijos del núcleo y funciones) ----------
+   Están en el informe como «pedido al núcleo»: cuando styles.css y las funciones usen los tokens,
+   las reglas que solo cambian un color se pueden borrar. */
+html[data-theme='light'] ::selection {
+  background: var(--selection);
+}
+html[data-theme='light'] .wordmark-name span,
+html[data-theme='light'] .empty h1 span {
+  background: var(--brand-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+html[data-theme='light'] .pane {
+  box-shadow: 0 0 0 1px var(--line-2), 0 1px 2px rgba(16, 22, 34, 0.04);
+}
+html[data-theme='light'] .pane.focused {
+  box-shadow: 0 0 0 1px rgba(59, 118, 129, 0.45), 0 1px 3px rgba(16, 22, 34, 0.06);
+}
+html[data-theme='light'] .btn {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line-2), 0 1px 1px rgba(16, 22, 34, 0.04);
+}
+html[data-theme='light'] .btn:hover:not(:disabled) {
+  background: var(--surface);
+}
+html[data-theme='light'] .btn.primary {
+  background: var(--accent);
+  box-shadow: none;
+  color: #fff;
+}
+html[data-theme='light'] .btn.primary:hover:not(:disabled) {
+  background: #2f6672;
+  filter: none;
+}
+html[data-theme='light'] .btn.ghost {
+  background: transparent;
+  box-shadow: none;
+}
+html[data-theme='light'] .btn.ghost:hover:not(:disabled) {
+  background: var(--hover);
+}
+html[data-theme='light'] .btn.danger,
+html[data-theme='light'] .field-error,
+html[data-theme='light'] .form-error,
+html[data-theme='light'] .perm-error {
+  color: var(--danger-fg);
+}
+html[data-theme='light'] .btn.danger {
+  background: var(--danger-soft);
+  box-shadow: none;
+}
+html[data-theme='light'] .btn.danger:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.14);
+}
+html[data-theme='light'] .switch-track::after,
+html[data-theme='light'] .switch input:checked + .switch-track::after {
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(16, 22, 34, 0.25);
+}
+html[data-theme='light'] input,
+html[data-theme='light'] select {
+  background: #fff;
+}
+html[data-theme='light'] .inline-form input {
+  background: transparent;
+}
+html[data-theme='light'] input::placeholder {
+  color: var(--placeholder);
+}
+html[data-theme='light'] .ws.open {
+  background: var(--open-bg);
+}
+html[data-theme='light'] .ws.open:hover {
+  background: var(--hover);
+}
+html[data-theme='light'] .ws.focused,
+html[data-theme='light'] .ws.focused:hover {
+  background: var(--card);
+}
+html[data-theme='light'] .steps li.done {
+  box-shadow: inset 0 0 0 1px rgba(59, 118, 129, 0.35);
+}
+html[data-theme='light'] .empty-logo,
+html[data-theme='light'] .steps li {
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--line-2), 0 1px 3px rgba(16, 22, 34, 0.05);
+}
+html[data-theme='light'] .steps li.done .step-n {
+  color: #fff;
+}
+html[data-theme='light'] .modal-backdrop {
+  background: var(--backdrop);
+}
+html[data-theme='light'] .modal {
+  background: #fff;
+  box-shadow: var(--shadow-lg);
+}
+html[data-theme='light'] .toast {
+  background: var(--toast-bg);
+  border-color: var(--toast-border);
+  color: var(--danger-fg-strong);
+  box-shadow: var(--shadow-md);
+}
+html[data-theme='light'] .toast .icon-btn {
+  color: var(--danger-fg-strong);
+}
+html[data-theme='light'] .tb-perm {
+  box-shadow: inset 0 0 0 1px var(--warn-ring);
+}
+html[data-theme='light'] .tb-perm:hover {
+  background: rgba(217, 119, 6, 0.18);
+}
+html[data-theme='light'] .perm-card {
+  background: var(--warn-tint);
+  border-bottom-color: var(--warn-line);
+}
+html[data-theme='light'] .perm-code {
+  background: #f6f7f9;
+}
+html[data-theme='light'] .perm-title code {
+  background: var(--accent-soft);
+}
+html[data-theme='light'] .daemon-pop {
+  background: #fff;
+  box-shadow: var(--shadow-md);
+}
+html[data-theme='light'] ::-webkit-scrollbar-thumb {
+  background: rgba(16, 22, 34, 0.14);
+  background-clip: padding-box;
+}
+
+/* Colores de cuenta: los tonos automáticos son pastel (pensados para oscuro). En claro el texto va
+   oscuro y los puntos y marcas se oscurecen para tener 3:1 sobre el fondo. */
+html[data-theme='light'] .acc-chip {
+  color: #12151c;
+  background: color-mix(in srgb, var(--acc) 34%, transparent);
+}
+html[data-theme='light'] .acc-badge {
+  color: color-mix(in srgb, var(--acc) 35%, var(--fg));
+}
+html[data-theme='light'] .acc-dot,
+html[data-theme='light'] .pane-dot {
+  filter: saturate(1.8) brightness(0.72);
+}
+html[data-theme='light'] .ws.focused::before {
+  background: color-mix(in srgb, var(--acc) 55%, #12151c);
+}
+
+/* Funciones (colores fijos en sus .css). */
+html[data-theme='light'] .f-ei-errors li,
+html[data-theme='light'] .f-updater-status.error,
+html[data-theme='light'] .f-wt-force,
+html[data-theme='light'] .f-wt-results li.bad {
+  color: var(--danger-fg);
+}
+html[data-theme='light'] .f-wt-danger {
+  color: var(--danger-fg-strong);
+}
+html[data-theme='light'] .f-git-backdrop,
+html[data-theme='light'] .f-palette-backdrop {
+  background: var(--backdrop-soft);
+}
+html[data-theme='light'] .f-git-sub-backdrop {
+  background: var(--backdrop);
+}
+html[data-theme='light'] .f-git-drawer {
+  box-shadow: -16px 0 48px rgba(16, 22, 34, 0.16);
+}
+html[data-theme='light'] .f-gruv-board {
+  box-shadow: var(--shadow-lg);
+}
+html[data-theme='light'] .f-git-ln {
+  color: var(--fg-muted);
+}
+html[data-theme='light'] .f-git-l-add {
+  background: var(--diff-add);
+}
+html[data-theme='light'] .f-git-l-del {
+  background: var(--diff-del);
+}
+html[data-theme='light'] .f-history-snip mark {
+  background: var(--mark);
+}
+html[data-theme='light'] .f-palette {
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 0 0 1px rgba(16, 22, 34, 0.08), 0 32px 80px rgba(16, 22, 34, 0.2);
+}
+html[data-theme='light'] .f-palette-item.active {
+  background: rgba(16, 22, 34, 0.05);
+}
+html[data-theme='light'] .f-palette-hl {
+  color: var(--accent);
+  text-decoration-color: rgba(59, 118, 129, 0.4);
+}
+html[data-theme='light'] .f-palette-foot {
+  background: var(--surface);
+}
+html[data-theme='light'] .f-palette-tb {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+html[data-theme='light'] .f-updater-chip:hover {
+  background: rgba(14, 116, 144, 0.16);
+}
+html[data-theme='light'] .f-updater-chip.ready:hover {
+  filter: brightness(1.06);
+}
+/* Texto atenuado (SGR 2) de xterm: con opacidad 0,5 queda ilegible sobre blanco. */
+html[data-theme='light'] .xterm .xterm-dim {
+  opacity: 0.72;
+}
+/* La terminal clara la pinta xterm con su propio tema (features/settings/store.ts): a-light.css la
+   forzaba con !important sobre .xterm-fg-*; acá no hace falta. */
+
+/* Configuración en claro: tarjetas blancas sobre el modal blanco necesitan contorno. */
+html[data-theme='light'] .f-settings-nav {
+  background: var(--surface);
+}
+html[data-theme='light'] .f-settings-tab.on,
+html[data-theme='light'] .f-settings-acc,
+html[data-theme='light'] .f-settings-action {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+html[data-theme='light'] .f-settings-tab.on {
+  background: #fff;
+}
+
+/* Cambio de tema suave, salvo con «reducir movimiento». */
+@media (prefers-reduced-motion: no-preference) {
+  html.f-settings-switching,
+  html.f-settings-switching * {
+    transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease !important;
+  }
+}

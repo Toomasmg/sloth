@@ -1,0 +1,575 @@
+/* Función «onboarding»: asistente de bienvenida a pantalla completa (debajo de la barra de título). */
+.f-onboarding {
+  position: fixed;
+  inset: 40px 0 0 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  padding: var(--s-5);
+  background:
+    radial-gradient(ellipse 60% 50% at 30% 20%, rgba(159, 234, 249, 0.06), transparent 70%),
+    radial-gradient(ellipse 50% 50% at 80% 90%, rgba(71, 132, 143, 0.08), transparent 70%),
+    var(--bg);
+  animation: fade var(--t-med) var(--ease);
+  overflow: auto;
+}
+.f-onboarding-card {
+  width: min(940px, 100%);
+  min-height: min(600px, calc(100vh - 100px));
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1px var(--line), 0 24px 64px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  animation: rise var(--t-med) var(--ease);
+}
+.f-onboarding-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  padding: var(--s-5) var(--s-4);
+  background: var(--bg);
+  box-shadow: inset -1px 0 0 var(--line);
+}
+.f-onboarding-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.f-onboarding-brand strong {
+  display: block;
+  font-size: var(--fs-lg);
+  letter-spacing: -0.01em;
+}
+.f-onboarding-brand span {
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+}
+.f-onboarding-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.f-onboarding-steps button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2);
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--fg-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease);
+}
+.f-onboarding-steps button:hover {
+  background: var(--hover);
+}
+.f-onboarding-steps button.on {
+  background: var(--card);
+  color: var(--fg);
+}
+.f-onboarding-steps button:focus-visible,
+.f-onboarding-repo:focus-visible,
+.f-onboarding-seg button:focus-visible,
+.f-onboarding h1:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+.f-onboarding h1:focus:not(:focus-visible) {
+  outline: none;
+}
+.f-onboarding-n {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  background: var(--card);
+  color: var(--fg-2);
+}
+.f-onboarding-steps button.on .f-onboarding-n {
+  background: var(--brand-grad);
+  color: var(--on-accent);
+}
+.f-onboarding-steps button.done:not(.on) .f-onboarding-n {
+  background: rgba(74, 222, 128, 0.14);
+  color: var(--success);
+}
+.f-onboarding-steps .item-sub {
+  display: block;
+}
+.f-onboarding-skipall {
+  margin-top: auto;
+  align-self: flex-start;
+  color: var(--fg-muted);
+}
+
+.f-onboarding-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.f-onboarding-head {
+  padding: 0 var(--s-5);
+}
+.f-onboarding-progress {
+  height: 3px;
+  margin: 0 calc(var(--s-5) * -1);
+  background: var(--line);
+}
+.f-onboarding-progress span {
+  display: block;
+  height: 100%;
+  background: var(--brand-grad);
+  transition: width var(--t-med) var(--ease);
+}
+.f-onboarding-titlerow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: var(--s-5) 0 var(--s-3);
+}
+.f-onboarding-kicker {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-1);
+}
+.f-onboarding h1 {
+  margin: 4px 0 0;
+  font-size: 22px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.f-onboarding-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: 0 var(--s-5) var(--s-4);
+  overflow-y: auto;
+  max-height: calc(100vh - 260px);
+}
+.f-onboarding-body > * {
+  max-width: 100%;
+}
+.f-onboarding-body > ul,
+.f-onboarding-body > ol,
+.f-onboarding-body > form,
+.f-onboarding-body > .input-row,
+.f-onboarding-body > .field,
+.f-onboarding-body > div {
+  align-self: stretch;
+}
+.f-onboarding-lead {
+  margin: 0 0 var(--s-1);
+  color: var(--fg-2);
+  font-size: var(--fs-md);
+  line-height: 1.55;
+}
+.f-onboarding-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-5);
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+/* Paso 1 */
+.f-onboarding-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.f-onboarding-checks li {
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+.f-onboarding-check-top {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.f-onboarding-check-top .item-sub {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.f-onboarding-loading {
+  color: var(--fg-muted);
+}
+.f-onboarding-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.f-onboarding-badge.ok {
+  color: var(--success);
+}
+.f-onboarding-badge.warn {
+  color: var(--warn);
+}
+.f-onboarding-badge.missing {
+  color: var(--danger);
+}
+.f-onboarding-fix {
+  margin-top: var(--s-2);
+  padding-top: var(--s-2);
+  box-shadow: inset 0 1px 0 var(--line);
+}
+.f-onboarding-fix p {
+  margin: 0 0 6px;
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+}
+.f-onboarding-fix-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  flex-wrap: wrap;
+}
+.f-onboarding-fix-row code {
+  padding: 2px var(--s-2);
+  border-radius: var(--r-xs);
+  background: var(--term-bg);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+}
+.f-onboarding-fix-row .btn.sm {
+  margin-left: auto;
+}
+
+/* Paso 2 */
+.f-onboarding-accs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.f-onboarding-accs li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+.f-onboarding-accs .item-sub {
+  display: block;
+}
+.f-onboarding-add {
+  display: flex;
+  gap: var(--s-2);
+}
+.f-onboarding-add input {
+  flex: 1;
+}
+.f-onboarding-note {
+  display: flex;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--info-soft);
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+}
+.f-onboarding-note svg {
+  flex: none;
+  color: var(--info);
+  margin-top: 2px;
+}
+.f-onboarding-note p {
+  margin: 0;
+}
+.f-onboarding-note strong {
+  color: var(--fg);
+}
+
+/* Tarjeta mientras se inicia sesión */
+.f-onboarding-dock {
+  position: fixed;
+  right: var(--s-4);
+  bottom: var(--s-4);
+  z-index: 9;
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line-2), 0 16px 40px rgba(0, 0, 0, 0.5);
+  animation: rise var(--t-med) var(--ease);
+}
+.f-onboarding-dock-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.f-onboarding-dock-steps {
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  line-height: 1.55;
+}
+.f-onboarding-dock-ok {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--success);
+}
+.f-onboarding-dock-ok svg {
+  flex: none;
+  margin-top: 1px;
+}
+.f-onboarding-dock-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--s-2);
+}
+.f-onboarding-wait {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+}
+.f-onboarding-pulse {
+  color: var(--warn);
+  animation: f-onboarding-pulse 1.4s ease-in-out infinite;
+}
+@keyframes f-onboarding-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Paso 3 */
+.f-onboarding-repos {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.f-onboarding-repo {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  border: 0;
+  border-radius: var(--r-md);
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.f-onboarding-repo:hover {
+  background: var(--card-hover);
+}
+.f-onboarding-repo > svg {
+  flex: none;
+  color: var(--fg-muted);
+}
+.f-onboarding-repo.on {
+  box-shadow: inset 0 0 0 1px rgba(159, 234, 249, 0.45);
+}
+.f-onboarding-repo.on > svg {
+  color: var(--brand-1);
+}
+.f-onboarding-repo .item-sub {
+  display: block;
+}
+.f-onboarding-body > .input-row input {
+  flex: 1;
+}
+.f-onboarding-warn {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--warn);
+}
+.f-onboarding-warn svg {
+  flex: none;
+  margin-top: 2px;
+}
+.f-onboarding-team {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: linear-gradient(135deg, rgba(159, 234, 249, 0.07), rgba(71, 132, 143, 0.05));
+  box-shadow: inset 0 0 0 1px rgba(159, 234, 249, 0.18);
+}
+.f-onboarding-team-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  align-self: stretch;
+}
+.f-onboarding-team-head svg {
+  color: var(--brand-1);
+  flex: none;
+}
+.f-onboarding-team-head .item-sub {
+  display: block;
+}
+.f-onboarding-team-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px var(--s-3);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.f-onboarding-team-list svg {
+  vertical-align: -1px;
+  color: var(--fg-muted);
+}
+.f-onboarding-okline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--success);
+}
+.f-onboarding-pre {
+  white-space: pre-wrap;
+}
+
+/* Paso 4 */
+.f-onboarding-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-md);
+  background: var(--bg);
+  align-self: flex-start !important;
+}
+.f-onboarding-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--h-sm);
+  padding: 0 var(--s-3);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--fg-muted);
+  font: inherit;
+  cursor: pointer;
+}
+.f-onboarding-seg button.on {
+  background: var(--card);
+  color: var(--fg);
+}
+.f-onboarding-grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-3);
+}
+.f-onboarding-tips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.f-onboarding-tips li {
+  display: flex;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+.f-onboarding-tips strong {
+  display: block;
+  margin-bottom: 2px;
+}
+.f-onboarding-tips li > span:last-child > span {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  line-height: 1.5;
+}
+.f-onboarding-tip-ic {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(159, 234, 249, 0.1);
+  color: var(--brand-1);
+}
+
+@media (max-width: 1000px) {
+  .f-onboarding-card {
+    grid-template-columns: 1fr;
+  }
+  .f-onboarding-rail {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    box-shadow: inset 0 -1px 0 var(--line);
+  }
+  .f-onboarding-steps {
+    flex-direction: row;
+    flex: 1;
+  }
+  .f-onboarding-steps .item-sub {
+    display: none;
+  }
+  .f-onboarding-skipall {
+    margin-top: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f-onboarding,
+  .f-onboarding-card,
+  .f-onboarding-dock {
+    animation: none;
+  }
+  .f-onboarding-pulse {
+    animation: none;
+  }
+  .f-onboarding-progress span {
+    transition: none;
+  }
+}

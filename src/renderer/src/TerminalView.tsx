@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import type { PtyChunk } from '../../shared/types'
 import { api, onPtyData, onPtyExit } from './api'
+import { subscribeSettings, termOptions } from './features/settings/store'
 
 interface Props {
   id: string
@@ -22,37 +23,13 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
     const el = host.current
     if (!el) return
     let disposed = false
+    // Fuente, tamaño, cursor y tema salen de la Configuración (features/settings).
+    const opts = termOptions()
     const term = new Terminal({
-      fontFamily: '"JetBrains Mono Variable", "Cascadia Code", Consolas, monospace',
-      fontSize: 13,
-      lineHeight: 1.15,
-      cursorBlink: document.visibilityState === 'visible',
-      cursorStyle: 'bar',
+      ...opts,
+      cursorBlink: opts.cursorBlink && document.visibilityState === 'visible',
       scrollback: 3000,
-      allowProposedApi: true,
-      theme: {
-        background: '#12141a',
-        foreground: '#e3ebf0',
-        cursor: '#9feaf9',
-        cursorAccent: '#12141a',
-        selectionBackground: '#2c4a52',
-        black: '#2f3444',
-        red: '#f87171',
-        green: '#4ade80',
-        yellow: '#fbbf24',
-        blue: '#60a5fa',
-        magenta: '#c084fc',
-        cyan: '#9feaf9',
-        white: '#cbd5e1',
-        brightBlack: '#6b7385',
-        brightRed: '#fca5a5',
-        brightGreen: '#86efac',
-        brightYellow: '#fde68a',
-        brightBlue: '#93c5fd',
-        brightMagenta: '#d8b4fe',
-        brightCyan: '#67e8f9',
-        brightWhite: '#f8fafc'
-      }
+      allowProposedApi: true
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
@@ -138,15 +115,37 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
 
     // Sin parpadeo de cursor (timer por terminal) mientras la ventana no se ve.
     const onVis = (): void => {
-      term.options.cursorBlink = document.visibilityState === 'visible'
+      term.options.cursorBlink = termOptions().cursorBlink && document.visibilityState === 'visible'
     }
     document.addEventListener('visibilitychange', onVis)
+
+    // Cambios de Configuración en vivo: se actualizan las opciones (sin recrear la terminal) y se reajusta.
+    let last = opts
+    const offSettings = subscribeSettings(() => {
+      const o = termOptions()
+      if (o.fontFamily !== last.fontFamily) term.options.fontFamily = o.fontFamily
+      if (o.fontSize !== last.fontSize) term.options.fontSize = o.fontSize
+      if (o.lineHeight !== last.lineHeight) term.options.lineHeight = o.lineHeight
+      if (o.cursorStyle !== last.cursorStyle) term.options.cursorStyle = o.cursorStyle
+      if (o.theme !== last.theme) term.options.theme = o.theme
+      if (o.minimumContrastRatio !== last.minimumContrastRatio) term.options.minimumContrastRatio = o.minimumContrastRatio
+      if (o.cursorBlink !== last.cursorBlink) onVis()
+      const metrics = o.fontFamily !== last.fontFamily || o.fontSize !== last.fontSize || o.lineHeight !== last.lineHeight
+      last = o
+      if (!metrics || disposed || el.offsetParent === null || el.clientWidth === 0) return
+      try {
+        fit.fit()
+      } catch {
+        /* sin tamaño todavía */
+      }
+    })
 
     return () => {
       disposed = true
       if (raf) cancelAnimationFrame(raf)
       ro.disconnect()
       document.removeEventListener('visibilitychange', onVis)
+      offSettings()
       el.removeEventListener('contextmenu', onContext)
       offData()
       offExit()

@@ -25,19 +25,16 @@ function readJson(path: string): unknown {
 }
 
 /**
- * Estado de login. En Windows Claude Code guarda las credenciales en
- * `<CLAUDE_CONFIG_DIR>/.credentials.json` y los datos de la cuenta en `.claude.json`.
+ * Estado de login, leído SOLO de `.claude.json` (datos públicos de la cuenta: email).
+ * Sloth nunca abre `.credentials.json` ni toca tokens: el login lo maneja Claude Code.
  */
 export function accountStatus(account: Account): AccountStatus {
   const configDirExists = existsSync(account.configDir)
   if (!configDirExists) return { loggedIn: false, configDirExists }
-  const creds = readJson(join(account.configDir, '.credentials.json')) as
-    | { claudeAiOauth?: { accessToken?: string } }
-    | undefined
   const meta = readJson(join(account.configDir, '.claude.json')) as
-    | { oauthAccount?: { emailAddress?: string } }
+    | { oauthAccount?: { emailAddress?: string; accountUuid?: string } }
     | undefined
   const email = meta?.oauthAccount?.emailAddress
-  const loggedIn = Boolean(creds?.claudeAiOauth?.accessToken) || Boolean(email)
+  const loggedIn = Boolean(email || meta?.oauthAccount?.accountUuid)
   return { loggedIn, email, configDirExists }
 }
