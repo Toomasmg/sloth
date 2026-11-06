@@ -1,0 +1,7 @@
+/* Función «sound»: solo el botón «Probar» de Comportamiento. Clases con prefijo f-sound-. */
+.f-sound-test {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 0 6px;
+}

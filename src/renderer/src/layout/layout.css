@@ -431,3 +431,67 @@ body.is-resizing-row * {
 .pane-actions .icon-btn[hidden] {
   display: none;
 }
+
+/* ---------- Header angosto: el título tiene prioridad; lo secundario pasa a «Más» ---------- */
+/* Ancho: se mide el panel (.pane es contenedor inline-size). En anchos, «Más» no existe y los botones
+   van en línea, como siempre. El nombre del espacio se achica al último: la meta (cuenta y ruta) se
+   achica antes. */
+.pane-more-wrap,
+.pane-more {
+  display: contents;
+}
+.pane-more-trigger {
+  display: none;
+}
+.pane-meta {
+  flex: 0 100 auto;
+}
+.pane-title {
+  min-width: 6ch;
+}
+@container (max-width: 560px) {
+  .pane-actions {
+    position: relative;
+  }
+  /* El ticket (TCK-…) es lo primero que se va: el nombre del espacio pesa más. */
+  .pane-id .tag {
+    display: none;
+  }
+  .pane-more-trigger {
+    display: inline-grid;
+  }
+  .pane-more {
+    display: none;
+  }
+  .pane-more.open {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 30;
+    min-width: 200px;
+    padding: 6px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-md);
+  }
+  .pane-more.open .icon-btn {
+    width: auto;
+    grid-auto-flow: column;
+    justify-content: start;
+    gap: 8px;
+    padding: 0 8px;
+    opacity: 1;
+    font-size: var(--fs-sm);
+  }
+  /* En el menú, cada botón de ícono muestra su nombre (su aria-label), así se lee sin adivinar. */
+  .pane-more.open .icon-btn::after {
+    content: attr(aria-label);
+    color: var(--fg);
+    white-space: nowrap;
+  }
+}

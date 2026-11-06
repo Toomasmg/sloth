@@ -1,0 +1,287 @@
+/* Chat · equipos (T10): diálogos de equipo, foto con recorte, invitaciones, miembros. Solo tokens (claro y oscuro). */
+
+.f-chat-team-modal {
+  width: min(520px, calc(100vw - 32px));
+}
+.f-chat-team-modal-icon {
+  display: grid;
+  place-items: center;
+  color: var(--brand-1);
+  flex: none;
+}
+.f-chat-team-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  margin: 0;
+}
+/* El sistema de diseño no define textarea: se iguala a los inputs (fondo, borde, foco, fuente). */
+.f-chat-team-form textarea {
+  width: 100%;
+  min-height: 72px;
+  padding: 8px 10px;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-size: var(--fs-md);
+  line-height: 1.45;
+  outline: none;
+  resize: vertical;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.f-chat-team-form textarea::placeholder {
+  color: var(--placeholder);
+}
+.f-chat-team-form textarea:hover {
+  border-color: var(--border-strong);
+}
+.f-chat-team-form textarea:focus {
+  border-color: var(--brand-2);
+  box-shadow: var(--brand-glow);
+}
+.f-chat-team-form textarea:disabled {
+  opacity: 0.6;
+}
+.f-chat-team-count {
+  align-self: flex-end;
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.f-chat-team-count.over {
+  color: var(--danger-fg);
+}
+.f-chat-team-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.f-chat-team-item > .f-chat-team-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+.f-chat-team-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--line);
+}
+.f-chat-team-footer .field-help {
+  margin: 0;
+}
+.f-chat-team-leave {
+  color: var(--danger-fg);
+}
+.f-chat-team-status {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--success);
+}
+
+/* Foto del equipo */
+.f-chat-team-photo-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.f-chat-team-photo-block h3 {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.f-chat-team-photo {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+.f-chat-team-photo-empty {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  margin: 0;
+  border-radius: var(--r-md);
+  background: var(--card);
+  color: var(--fg-muted);
+}
+.f-chat-team-crop-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  max-width: 256px;
+}
+.f-chat-team-crop {
+  display: block;
+  width: 100%;
+  max-width: 256px;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--r-md);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  cursor: grab;
+  touch-action: none;
+}
+.f-chat-team-crop:active {
+  cursor: grabbing;
+}
+.f-chat-team-crop:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.f-chat-team-crop-wrap .field {
+  gap: 4px;
+}
+
+/* Avatares */
+.f-chat-team-avatar {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--card);
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+/* Listas (invitaciones, miembros) */
+.f-chat-team-invites {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--line);
+}
+.f-chat-team-invites h3 {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.f-chat-team-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.f-chat-team-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-height: var(--row-min-h);
+  padding: var(--s-2);
+  border-radius: var(--r-sm);
+}
+.f-chat-team-item:hover {
+  background: var(--hover);
+}
+.f-chat-team-item > .f-chat-team-avatar,
+.f-chat-team-item > .f-chat-team-role,
+.f-chat-team-item > .f-chat-team-actions {
+  flex: none;
+}
+.f-chat-team-item-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.f-chat-team-item-main strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.f-chat-team-item-main .field-help {
+  margin: 0;
+}
+.f-chat-team-you {
+  font-weight: 400;
+  color: var(--fg-muted);
+}
+.f-chat-team-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--fg-muted);
+  background: var(--card);
+}
+.f-chat-team-role.r-owner {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+.f-chat-team-role.r-admin {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Código de invitación */
+.f-chat-team-code-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.f-chat-team-code-block h3 {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.f-chat-team-code-block .field-help {
+  margin: 0;
+}
+.f-chat-team-code-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--s-2);
+}
+.f-chat-team-code {
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  background: var(--card);
+  color: var(--fg);
+  font-size: var(--fs-md);
+  letter-spacing: 0.04em;
+  user-select: all;
+}
+
+/* Confirmación en línea */
+.f-chat-team-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--danger-soft);
+  box-shadow: inset 2px 0 0 var(--danger);
+}
+.f-chat-team-confirm p {
+  margin: 0;
+  font-size: var(--fs-md);
+  color: var(--fg);
+}
+.f-chat-team-confirm .f-chat-team-actions {
+  justify-content: flex-end;
+}

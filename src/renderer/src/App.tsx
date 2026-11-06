@@ -54,11 +54,13 @@ import {
   defaultSizes,
   gridShape,
   loadSizes,
+  locatePane,
   movePane,
   sameOrder,
   saveSizes,
   shapeKey,
   shiftPane,
+  shiftPaneRow,
   sizesAreEqual,
   type DropMode,
   type Rect,
@@ -67,6 +69,7 @@ import {
 import { onEqualize, safeStorage, setViewMode, useViewMode } from './layout/store'
 import { useReorderDrag } from './layout/useReorderDrag'
 import { Separators } from './layout/Separators'
+import { PaneMore } from './layout/PaneMore'
 import { TabBar, type TabInfo } from './layout/TabBar'
 import './layout/layout.css'
 import { WorkspaceIconPicker } from './WorkspaceIconPicker'
@@ -408,8 +411,29 @@ export function App(): React.JSX.Element {
   }
 
   // Atajos: Ctrl+Tab / Ctrl+Shift+Tab cambian de panel; Ctrl+Alt+← / → mueven el panel enfocado.
-  const kbRef = useRef({ count: 0, cycleBy: (_d: 1 | -1): void => {}, shiftBy: (_id: string, _d: number, _tab: boolean): void => {} })
+  const kbRef = useRef({
+    count: 0,
+    cycleBy: (_d: 1 | -1): void => {},
+    shiftBy: (_id: string, _d: number, _tab: boolean): void => {},
+    shiftRowBy: (_id: string, _d: -1 | 1): void => {}
+  })
   kbRef.current = {
+    shiftRowBy: (id, d) => {
+      if (viewMode !== 'grid' || maxId) {
+        setLayoutMsg('Cambiar de fila funciona con los paneles en grilla, sin maximizar.')
+        return
+      }
+      const shape = gridShape(openPanes.length)
+      const next = shiftPaneRow(openPanes, id, d, shape)
+      if (sameOrder(next, openPanes)) {
+        setLayoutMsg(`«${paneName(id)}» no tiene fila ${d < 0 ? 'arriba' : 'abajo'} a donde moverse.`)
+        return
+      }
+      setOpenPanes(() => next)
+      const at = locatePane(next, id, shape)
+      setLayoutMsg(at ? `«${paneName(id)}» quedó en la fila ${at.row + 1}, columna ${at.col + 1}.` : `«${paneName(id)}» cambió de fila.`)
+      requestAnimationFrame(() => focusTerminal(id))
+    },
     count: openPanes.length,
     cycleBy: (d) => {
       const cur = viewMode === 'tabs' ? shownTab : (maxId ?? (focused && openPanes.includes(focused) ? focused : null))
@@ -447,13 +471,14 @@ export function App(): React.JSX.Element {
         k.cycleBy(e.shiftKey ? -1 : 1)
         return
       }
-      if (e.ctrlKey && e.altKey && !e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      if (e.ctrlKey && e.altKey && !e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
         const host = ae?.closest<HTMLElement>('[data-pane-id], [data-tab-id]')
         const id = host?.getAttribute('data-pane-id') ?? host?.getAttribute('data-tab-id')
         if (!host || !id) return
         e.preventDefault()
         e.stopPropagation()
-        k.shiftBy(id, e.key === 'ArrowLeft' ? -1 : 1, host.hasAttribute('data-tab-id'))
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') k.shiftRowBy(id, e.key === 'ArrowUp' ? -1 : 1)
+        else k.shiftBy(id, e.key === 'ArrowLeft' ? -1 : 1, host.hasAttribute('data-tab-id'))
       }
     }
     window.addEventListener('keydown', onKey, true)
@@ -739,7 +764,7 @@ export function App(): React.JSX.Element {
                 </span>
                 {openPanes.length > 1 && (
                   <span className="panes-bar-hint">
-                    Arrastrá un panel por su barra para moverlo · <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> · <kbd>Ctrl</kbd>+<kbd>Tab</kbd> cambia
+                    Arrastrá un panel por su barra para moverlo · <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> columna · <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> fila · <kbd>Ctrl</kbd>+<kbd>Tab</kbd> cambia
                   </span>
                 )}
               </div>
@@ -859,17 +884,20 @@ export function App(): React.JSX.Element {
                 </span>
                 {ag && <StatePill state={ag.state} detail={ag.detail} />}
                 <span className="pane-actions">
-                {ws && (
-                  <>
+                {/* Secundarios (VS Code, carpeta y los de las funciones): en paneles angostos van a «Más». */}
+                {ws ? (
+                  <PaneMore>
                     <button type="button" className="icon-btn" onClick={() => void revealWs(ws, 'vscode')} aria-label="Abrir en VS Code" title="Abrir en VS Code">
                       <Code size={15} aria-hidden="true" />
                     </button>
                     <button type="button" className="icon-btn" onClick={() => void revealWs(ws, 'folder')} aria-label="Abrir carpeta" title="Abrir carpeta">
                       <FolderOpen size={15} aria-hidden="true" />
                     </button>
-                  </>
+                    <PaneHeaderSlot paneId={paneId} />
+                  </PaneMore>
+                ) : (
+                  <PaneHeaderSlot paneId={paneId} />
                 )}
-                <PaneHeaderSlot paneId={paneId} />
                 <button
                   className="icon-btn"
                   onClick={() => setMaximized(maximized === paneId ? null : paneId)}
@@ -922,7 +950,7 @@ export function App(): React.JSX.Element {
           {dragging && <span>{paneName(dragging.id)}</span>}
         </div>
         <span id="pane-move-hint" className="sr-only">
-          Ctrl+Alt+flecha izquierda o derecha mueve este panel. Ctrl+Tab pasa al siguiente.
+          Ctrl+Alt+flecha izquierda o derecha mueve este panel de lugar. Ctrl+Alt+flecha arriba o abajo lo pasa a otra fila. Ctrl+Tab pasa al siguiente.
         </span>
         <div className="sr-only" role="status" aria-live="polite">
           {layoutMsg}

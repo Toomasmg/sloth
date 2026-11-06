@@ -161,6 +161,54 @@ export function shiftPane(list: string[], id: string, delta: number): string[] {
   return out
 }
 
+/**
+ * Mueve `id` a la fila de arriba (dRow = -1) o de abajo (dRow = 1) de la grilla, en la misma
+ * columna. Si ahí hay un panel, se intercambian. Si la fila destino es más corta, `id` queda al
+ * final de esa fila. `order` está en orden de lectura y `shape` es la forma de la grilla
+ * (`gridShape`). Si no hay fila destino, devuelve la misma lista.
+ */
+export function shiftPaneRow(order: string[], id: string, dRow: -1 | 1, shape: number[]): string[] {
+  const i = order.indexOf(id)
+  if (i < 0 || (dRow !== 1 && dRow !== -1) || shape.reduce((a, b) => a + b, 0) !== order.length) return order
+  let row = 0
+  let start = 0
+  while (row < shape.length && i >= start + shape[row]) {
+    start += shape[row]
+    row++
+  }
+  const t = row + dRow
+  if (t < 0 || t >= shape.length) return order
+  const col = i - start
+  // Inicio de la fila destino.
+  let tStart = 0
+  for (let r = 0; r < t; r++) tStart += shape[r]
+  const tLen = shape[t]
+  const out = order.slice()
+  if (col < tLen) {
+    const j = tStart + col
+    out[i] = order[j]
+    out[j] = id
+    return out
+  }
+  // La fila destino es más corta: `id` va al final de esa fila.
+  const endOrig = tStart + tLen - 1
+  out.splice(i, 1)
+  out.splice(i < endOrig ? endOrig : endOrig + 1, 0, id)
+  return sameOrder(out, order) ? order : out
+}
+
+/** Fila y columna (base 0) de `id` en la grilla de forma `shape`, o null si no está. */
+export function locatePane(order: string[], id: string, shape: number[]): { row: number; col: number } | null {
+  const i = order.indexOf(id)
+  if (i < 0) return null
+  let start = 0
+  for (let row = 0; row < shape.length; row++) {
+    if (i < start + shape[row]) return { row, col: i - start }
+    start += shape[row]
+  }
+  return null
+}
+
 export function sameOrder(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((x, i) => x === b[i])
 }

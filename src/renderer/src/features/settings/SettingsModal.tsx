@@ -24,6 +24,7 @@ import { openAbout } from '../updater/bus'
 import { request as requestExportImport } from '../export-import/bus'
 import { openHelp } from '../help/bus'
 import { openReport } from '../report/bus'
+import { SoundTest } from '../sound/SoundTest'
 import {
   ACCOUNT_PALETTE,
   CURSORS,
@@ -443,6 +444,13 @@ function Behavior(): React.JSX.Element {
           disabled={!loginItemSupported}
           onChange={(openAtLogin) => save({ openAtLogin })}
         />
+        <Switch
+          label="Sonido suave al terminar o pedir permiso"
+          sub="Apagado por defecto. Suena aunque la ventana esté en segundo plano."
+          checked={s.sounds}
+          onChange={(sounds) => save({ sounds })}
+        />
+        <SoundTest disabled={!s.sounds} />
         <Switch
           label="Confirmar al cerrar paneles con agentes trabajando"
           sub="Pregunta antes de ocultar o reiniciar un panel mientras Claude está trabajando."

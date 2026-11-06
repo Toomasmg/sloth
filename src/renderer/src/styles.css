@@ -90,7 +90,8 @@ body,
 }
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
   color: inherit;
 }
@@ -745,7 +746,8 @@ select {
 
 /* ---------- Inputs ---------- */
 input,
-select {
+select,
+textarea {
   width: 100%;
   height: var(--h-md);
   background: var(--bg);
@@ -756,14 +758,17 @@ select {
   transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
 input:hover,
-select:hover {
+select:hover,
+textarea:hover {
   border-color: var(--border-strong);
 }
-input::placeholder {
+input::placeholder,
+textarea::placeholder {
   color: var(--placeholder);
 }
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: var(--brand-2);
   box-shadow: var(--brand-glow);
 }

@@ -1,0 +1,98 @@
+/* «Mover a otra cuenta» (v0.5). Clases con prefijo f-move-. */
+
+.f-move-modal {
+  width: min(440px, calc(100vw - 32px));
+}
+
+.f-move-head-icon {
+  color: var(--brand-2);
+  flex: none;
+}
+
+.f-move-now {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+
+.f-move-list {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.f-move-list legend {
+  padding: 0;
+  margin-bottom: var(--s-1);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--fg-2);
+}
+
+.f-move-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--fg);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
+}
+
+.f-move-opt:hover {
+  background: var(--hover);
+}
+
+.f-move-opt.on {
+  border-color: var(--brand-2);
+  background: var(--accent-soft);
+}
+
+.f-move-opt input {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  flex: none;
+  accent-color: var(--brand-2);
+}
+
+.f-move-opt:focus-within {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.f-move-opt-title {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.f-move-opt-sub {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+}
+
+.f-move-explain {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f-move-opt {
+    transition: none;
+  }
+}

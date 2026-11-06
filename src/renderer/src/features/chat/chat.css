@@ -1,0 +1,434 @@
+/* Chat del equipo (v0.5). Prefijo f-chat-. Usa los tokens de styles.css / theme-a.css / themes.css,
+   así que el tema claro sale solo. */
+
+/* ---------- Barra de título ---------- */
+.f-chat-chip {
+  gap: 6px;
+}
+.f-chat-chip svg {
+  color: var(--fg-muted);
+}
+.f-chat-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent, #111318);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.f-chat-badge-top {
+  margin-left: 2px;
+}
+
+/* ---------- Drawer ---------- */
+/* Arranca debajo de la barra de título (overlay de 40 px) para no tapar los controles de ventana. */
+.f-chat-scrim {
+  position: fixed;
+  inset: 0;
+  top: 40px;
+  background: var(--backdrop-soft);
+  z-index: 40;
+}
+.f-chat-drawer {
+  position: fixed;
+  top: 40px;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 100vw);
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--line-2);
+  box-shadow: var(--shadow-lg);
+  color: var(--fg);
+  outline: none;
+  animation: f-chat-in var(--t-fast, 140ms) var(--ease, ease-out);
+}
+.f-chat-drawer :focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+@keyframes f-chat-in {
+  from {
+    transform: translateX(12px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.f-chat-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 10px 14px;
+  border-bottom: 1px solid var(--line);
+  min-height: 52px;
+}
+.f-chat-title {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.f-chat-subbar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.f-chat-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.f-chat-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 4px 0;
+}
+.f-chat-block p {
+  margin: 0;
+  color: var(--fg-2);
+  line-height: 1.5;
+}
+.f-chat-err {
+  color: var(--danger-fg, var(--danger));
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+.f-chat-ok {
+  color: var(--success);
+  margin: 0;
+}
+
+/* ---------- Listas ---------- */
+.f-chat-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.f-chat-section h4 {
+  margin: 0;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.f-chat-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.f-chat-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--r-md, 8px);
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.f-chat-row:hover {
+  background: var(--hover);
+}
+.f-chat-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.f-chat-row-main strong {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.f-chat-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.f-chat-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
+.f-chat-conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+}
+.f-chat-conn.live svg {
+  color: var(--success);
+}
+.f-chat-conn.connecting svg,
+.f-chat-conn.retrying svg {
+  color: var(--warn);
+}
+.f-chat-conn.off svg {
+  color: var(--danger);
+}
+
+/* ---------- Avatares ---------- */
+.f-chat-av {
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--card);
+}
+.f-chat-av-init {
+  display: inline-grid;
+  place-items: center;
+  color: var(--fg-2);
+  font-weight: 600;
+  user-select: none;
+}
+
+/* ---------- Conversación ---------- */
+.f-chat-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 14px 6px;
+}
+.f-chat-scroll:focus-visible {
+  outline-offset: -2px;
+}
+.f-chat-more {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.f-chat-empty {
+  text-align: center;
+  padding: 24px 0;
+}
+.f-chat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.f-chat-day {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--fg-muted);
+  font-size: var(--fs-xs);
+  margin: 4px 0 -4px;
+}
+.f-chat-day::before,
+.f-chat-day::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line-2);
+}
+.f-chat-msg {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.f-chat-msg-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.f-chat-msg-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.f-chat-msg-head strong {
+  font-weight: 600;
+  font-size: var(--fs-sm);
+}
+.f-chat-msg.mine .f-chat-msg-head strong {
+  color: var(--accent);
+}
+.f-chat-msg-head time {
+  color: var(--fg-muted);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+.f-chat-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+  color: var(--fg-2);
+}
+.f-chat-msg.failed .f-chat-text {
+  color: var(--fg-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--danger);
+}
+.f-chat-text a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.f-chat-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+}
+.f-chat-state.err {
+  color: var(--danger-fg, var(--danger));
+}
+.f-chat-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.f-chat-errline {
+  font-size: var(--fs-xs);
+}
+.f-chat-spin {
+  animation: f-chat-spin 1s linear infinite;
+}
+@keyframes f-chat-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Caja de escribir ---------- */
+.f-chat-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+.f-chat-composer textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 44px;
+  max-height: 220px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md, 8px);
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+.f-chat-composer textarea:focus {
+  outline: none;
+  border-color: var(--ring);
+  box-shadow: var(--brand-glow);
+}
+.f-chat-composer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.f-chat-count {
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.f-chat-count.over {
+  color: var(--danger-fg, var(--danger));
+  font-weight: 600;
+}
+
+/* ---------- Configuración ---------- */
+.f-chat-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.f-chat-cfg-title {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.f-chat-cfg-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.f-chat-cfg-actions,
+.f-chat-session {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.f-chat-offer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-md, 8px);
+  background: var(--info-soft, var(--card));
+}
+.f-chat-offer p {
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f-chat-drawer {
+    animation: none;
+  }
+  .f-chat-spin {
+    animation: none;
+  }
+}
