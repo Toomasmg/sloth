@@ -14,6 +14,9 @@ import { createWorktree } from './git'
 import { baseSettingsFor, syncSharedSetup, unshareSetup } from './setup'
 import { UsageScanner } from './usage'
 import { FEATURES } from './features'
+import { initialChrome } from './features/settings'
+import { validateWorkspacePatch } from './workspace-patch'
+import { loadWindowState, trackWindowState } from './window-state'
 import type { FeatureContext } from './features/context'
 import type { UiCommand } from '../shared/features'
 import {
@@ -27,6 +30,7 @@ import {
   type PermissionAnswer,
   type PermissionPrompt,
   type PtyChunk,
+  type RevealTarget,
   type Workspace
 } from '../shared/types'
 
@@ -390,6 +394,34 @@ app.whenReady().then(async () => {
     store.removeWorkspace(id)
   })
 
+  // v0.5: renombrar / ícono. Responde con el espacio actualizado (la UI lo reemplaza en su lista).
+  ipcMain.handle('workspaces:update', (_e, id: unknown, patch: unknown) => {
+    if (typeof id !== 'string' || !store.workspace(id)) throw new Error('Ese espacio ya no existe.')
+    const p = validateWorkspacePatch(patch)
+    const next: Partial<Workspace> = {}
+    if (p.name !== undefined) next.name = p.name
+    if (p.icon !== undefined) next.icon = p.icon ?? undefined
+    const ws = store.updateWorkspace(id, next)!
+    if (p.icon === null) delete ws.icon
+    return ws
+  })
+
+  // v0.5: abrir la carpeta del espacio. VS Code por su protocolo vscode:// (sin lanzar procesos ni shell).
+  ipcMain.handle('workspaces:reveal', async (_e, id: unknown, target: unknown) => {
+    const ws = typeof id === 'string' ? store.workspace(id) : undefined
+    if (!ws) throw new Error('Ese espacio ya no existe.')
+    if (!existsSync(ws.cwd) || !statSync(ws.cwd).isDirectory()) throw new Error(`No existe la carpeta ${ws.cwd}`)
+    const t = target as RevealTarget
+    if (t === 'folder') {
+      const err = await shell.openPath(ws.cwd)
+      if (err) throw new Error(err)
+    } else if (t === 'vscode') {
+      // Cada tramo codificado (rutas con #, ?, espacios o acentos); la letra de unidad queda como está.
+      const parts = ws.cwd.split(/[\\/]/).filter(Boolean).map((seg, k) => (k === 0 && /^[A-Za-z]:$/.test(seg) ? seg : encodeURIComponent(seg)))
+      await shell.openExternal(`vscode://file/${parts.join('/')}/`)
+    } else throw new Error('Destino inválido.')
+  })
+
   ipcMain.handle('ui:openPanes', (_e, ids: string[]) => {
     if (Array.isArray(ids)) store.setOpenPanes(ids.filter((x) => typeof x === 'string'))
   })
@@ -477,18 +509,24 @@ function createWindow(): void {
   const iconPath = [join(process.resourcesPath, 'icon.png'), join(__dirname, '../../build/icon.png')].find((p) =>
     existsSync(p)
   )
+  // Tema guardado ANTES de crear la ventana (sin destello) y tamaño/posición de la última vez.
+  const chrome = initialChrome()
+  const saved = loadWindowState()
   win = new BrowserWindow({
-    width: 1500,
-    height: 920,
+    width: saved.bounds?.width ?? 1500,
+    height: saved.bounds?.height ?? 920,
+    x: saved.bounds?.x,
+    y: saved.bounds?.y,
     minWidth: 900,
     minHeight: 560,
-    backgroundColor: '#16181f',
+    backgroundColor: chrome.bg,
+    show: false,
     title: 'Sloth',
     icon: iconPath,
     autoHideMenuBar: true,
     // Barra de título propia con la marca; Windows dibuja solo los botones de ventana.
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#16181f', symbolColor: '#9aa3b5', height: 40 },
+    titleBarOverlay: { color: chrome.bg, symbolColor: chrome.symbol, height: 40 },
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -510,6 +548,14 @@ function createWindow(): void {
 
   if (process.env.ELECTRON_RENDERER_URL) void win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else void win.loadURL('app://ui/index.html')
+
+  // Se muestra cuando ya pintó (la pantalla de carga de index.html), maximizada si quedó así.
+  win.once('ready-to-show', () => {
+    if (!win) return
+    if (saved.maximized) win.maximize()
+    win.show()
+  })
+  trackWindowState(win)
 
   win.on('closed', () => (win = null))
   for (const cb of windowListeners) {

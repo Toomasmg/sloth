@@ -24,6 +24,10 @@
   --diff-add: rgba(74, 222, 128, 0.09);
   --diff-del: rgba(248, 113, 113, 0.1);
   --mark: rgba(245, 176, 65, 0.28);
+  /* Terminal (v0.5): settings/store.ts arma el tema de xterm leyendo estos tokens. */
+  --term-fg: #e3ebf0;
+  --term-cursor: #9feaf9;
+  --term-selection: #2c4a52;
 }
 
 /* ---------- Tamaño de letra de la interfaz (12–15 px) ---------- */
@@ -74,6 +78,9 @@ html[data-density='comfortable'] .list {
    y a las reglas de a.css/styles.css sin depender del orden de carga.
    Acento de texto y botones en teal oscuro #3b7681 (5:1 con blanco); el cian claro queda para el logo. */
 html[data-theme='light'] {
+  --term-fg: #1f2430;
+  --term-cursor: #3b7681;
+  --term-selection: #cfe3e7;
   --bg: #f1f2f5;
   --surface: #f8f9fb;
   --card: #e9ecf1;

@@ -1,10 +1,9 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { GearSix } from '@phosphor-icons/react'
 import type { FeatureUi } from '../host'
 import { useUi } from '../host'
-import { loginPaneId } from '../../../../shared/types'
 import { onOpenSettings, openSettings, type SettingsTab } from './bus'
-import { getSettings, updateSettings, useSettings } from './store'
+import { getSettings, updateSettings } from './store'
 import { SettingsModal } from './SettingsModal'
 import './settings.css'
 
@@ -17,67 +16,29 @@ function GearButton(): React.JSX.Element {
   )
 }
 
-/** Texto seguro dentro de un selector de atributo entre comillas. */
-const cssStr = (s: string): string => s.replace(/[\\"]/g, '\\$&').replace(/[\n\r\f]/g, ' ')
-
 /**
- * Colores de cuenta elegidos: el núcleo pone --acc en línea; una regla con !important gana.
- * Paneles por data-pane-id; en el sidebar, data-account-id (pedido al núcleo) y mientras tanto
- * los botones de «Quitar …» que ya llevan el nombre en su aria-label.
- */
-function AccountColors(): React.JSX.Element | null {
-  const ui = useUi()
-  const { settings } = useSettings()
-  const css = useMemo(() => {
-    const rules: string[] = []
-    for (const acc of ui.accounts) {
-      const color = settings.accountColors[acc.id]
-      if (!color) continue
-      const sel = [
-        `[data-account-id="${cssStr(acc.id)}"]`,
-        `[data-pane-id="${cssStr(loginPaneId(acc.id))}"]`,
-        `.account:has(button[aria-label="${cssStr(`Quitar cuenta ${acc.label}`)}"])`
-      ]
-      for (const ws of ui.workspaces) {
-        if (ws.accountId !== acc.id) continue
-        sel.push(`[data-pane-id="${cssStr(ws.id)}"]`, `.ws-li:has(> button[aria-label="${cssStr(`Quitar espacio ${ws.name}`)}"])`)
-      }
-      rules.push(`${sel.join(',\n')} { --acc: ${color} !important; }`)
-    }
-    return rules.join('\n')
-  }, [ui.accounts, ui.workspaces, settings.accountColors])
-  return css ? <style data-f-settings="account-colors">{css}</style> : null
-}
-
-/**
- * «Confirmar al cerrar paneles con agentes trabajando»: intercepta en captura los botones de
- * ocultar y reiniciar del header del panel (antes de que llegue a React).
+ * «Confirmar al cerrar paneles con agentes trabajando»: guarda del núcleo (UiCtx.onBeforeClosePane),
+ * se consulta antes de ocultar o reiniciar desde el header o la pestaña.
  */
 function useCloseGuard(): void {
   const ui = useUi()
   const ref = useRef(ui)
   ref.current = ui
-  useEffect(() => {
-    const onClick = (e: MouseEvent): void => {
-      if (!getSettings().settings.confirmClosePanes) return
-      const btn = (e.target as Element | null)?.closest?.('button')
-      const label = btn?.getAttribute('aria-label')
-      if (label !== 'Ocultar panel' && label !== 'Reiniciar terminal') return
-      const id = btn!.closest('[data-pane-id]')?.getAttribute('data-pane-id')
-      if (!id || ref.current.agents[id]?.state !== 'working') return
-      const name = ref.current.workspaces.find((w) => w.id === id)?.name ?? 'Este espacio'
-      const msg =
-        label === 'Reiniciar terminal'
-          ? `«${name}» tiene a Claude trabajando. Reiniciar corta lo que está haciendo.\n\n¿Reiniciar igual?`
-          : `«${name}» tiene a Claude trabajando. El panel se oculta y la terminal sigue corriendo.\n\n¿Ocultarlo?`
-      if (!window.confirm(msg)) {
-        e.preventDefault()
-        e.stopImmediatePropagation()
-      }
-    }
-    document.addEventListener('click', onClick, true)
-    return () => document.removeEventListener('click', onClick, true)
-  }, [])
+  const { onBeforeClosePane } = ui
+  useEffect(
+    () =>
+      onBeforeClosePane((id, action) => {
+        if (!getSettings().settings.confirmClosePanes) return true
+        if (ref.current.agents[id]?.state !== 'working') return true
+        const name = ref.current.workspaces.find((w) => w.id === id)?.name ?? 'Este espacio'
+        return window.confirm(
+          action === 'restart'
+            ? `«${name}» tiene a Claude trabajando. Reiniciar corta lo que está haciendo.\n\n¿Reiniciar igual?`
+            : `«${name}» tiene a Claude trabajando. El panel se oculta y la terminal sigue corriendo.\n\n¿Ocultarlo?`
+        )
+      }),
+    [onBeforeClosePane]
+  )
 }
 
 function Global(): React.JSX.Element {
@@ -117,7 +78,6 @@ function Global(): React.JSX.Element {
 
   return (
     <>
-      <AccountColors />
       {tab && <SettingsModal initialTab={tab} onClose={() => setTab(null)} />}
     </>
   )

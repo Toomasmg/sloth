@@ -25,13 +25,28 @@ export interface UiCtx {
   restartPane(id: string): Promise<void>
   /** Vuelve a leer cuentas y espacios de main (después de crear o editar desde una función). */
   reload(): Promise<void>
-  openNewWorkspace(mode: 'normal' | 'ticket'): void
+  /** Abre «Nuevo espacio». `preset.repoPath` precarga la carpeta (p. ej. al soltar una carpeta en la ventana). */
+  openNewWorkspace(mode: 'normal' | 'ticket', preset?: NewWorkspacePreset): void
+  /**
+   * Registra una guarda que se consulta ANTES de que el usuario oculte o reinicie un panel desde su
+   * header o su pestaña (no se consulta en `closePane`/`restartPane` programáticos). Si alguna devuelve
+   * false (o una promesa de false), la acción se cancela. Devuelve la función para quitarla.
+   */
+  onBeforeClosePane(guard: PaneGuard): () => void
   notifyError(message: string): void
   /** `invoke('feat:<función>:<op>', ...)` hacia main. */
   invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T>
   /** Escucha `feat:<función>:<evento>` desde main. Devuelve la función para dejar de escuchar. */
   on(channel: string, cb: (...args: any[]) => void): () => void
 }
+
+export interface NewWorkspacePreset {
+  repoPath?: string
+  name?: string
+}
+
+/** `action`: qué intenta hacer el usuario con el panel. */
+export type PaneGuard = (paneId: string, action: 'hide' | 'restart') => boolean | Promise<boolean>
 
 export const UiContext = createContext<UiCtx | null>(null)
 
@@ -50,6 +65,8 @@ export interface Command {
   keywords?: string
   /** Texto del atajo, solo para mostrar (p. ej. "Ctrl+Shift+F"). */
   shortcut?: string
+  /** Ícono opcional para la paleta (p. ej. `<GearSix size={16} />` de Phosphor, con aria-hidden). */
+  icon?: React.ReactNode
   run(): void | Promise<void>
 }
 

@@ -3,6 +3,7 @@ import { FolderOpen, Ticket, X } from '@phosphor-icons/react'
 import type { Account, AccountStatus, AccountUsage, Workspace } from '../../shared/types'
 import { api } from './api'
 import { cleanError, emptyTotals, fmtTok, totalTok } from './format'
+import type { NewWorkspacePreset } from './features/host'
 
 interface Props {
   mode: 'normal' | 'ticket'
@@ -10,6 +11,8 @@ interface Props {
   statuses: Record<string, AccountStatus>
   usage: Record<string, AccountUsage>
   defaultRepo: string
+  /** Valores iniciales (p. ej. carpeta soltada sobre la ventana). */
+  preset?: NewWorkspacePreset
   onClose: () => void
   onCreated: (ws: Workspace) => void
 }
@@ -29,8 +32,8 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
   }, [accounts, statuses, usage])
 
   const [ticket, setTicket] = useState('')
-  const [name, setName] = useState('')
-  const [repoPath, setRepoPath] = useState(ticketMode ? props.defaultRepo : '')
+  const [name, setName] = useState(props.preset?.name ?? '')
+  const [repoPath, setRepoPath] = useState(props.preset?.repoPath ?? (ticketMode ? props.defaultRepo : ''))
   const [accountId, setAccountId] = useState(suggested)
   const [useWorktree, setUseWorktree] = useState(false)
   const [branch, setBranch] = useState('')

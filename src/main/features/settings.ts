@@ -37,8 +37,20 @@ function read(): SlothSettings {
 
 /** Colores de la barra de título que dibuja Windows (los botones de ventana), por tema. */
 const CHROME = {
-  dark: { bg: '#16181f', symbol: '#9aa3b5' },
+  // Igual a --bg del estilo A (theme-a.css) y del claro (themes.css).
+  dark: { bg: '#111318', symbol: '#8b93a3' },
   light: { bg: '#f1f2f5', symbol: '#5c6474' }
+}
+
+/**
+ * Colores de la ventana ANTES de crearla (los usa src/main/index.ts en new BrowserWindow): así no
+ * hay un destello oscuro al abrir con tema claro. Sincrónico, nunca tira.
+ */
+export function initialChrome(): { bg: string; symbol: string; dark: boolean } {
+  const s = read()
+  nativeTheme.themeSource = themeSource(s.theme)
+  const dark = resolveDark(s.theme, nativeTheme.shouldUseDarkColors)
+  return { ...(dark ? CHROME.dark : CHROME.light), dark }
 }
 
 const themeSource = (t: ThemeChoice): 'dark' | 'light' | 'system' => (t === 'oscuro' ? 'dark' : t === 'claro' ? 'light' : 'system')

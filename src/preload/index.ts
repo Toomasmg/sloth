@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron'
 import type { AgentStatus, SlothApi, PermissionPrompt, PtyChunk } from '../shared/types'
 import { isFeatChannel, type UiCommand } from '../shared/features'
 
@@ -17,6 +17,16 @@ const api: SlothApi = {
   setShareSetup: (id, share) => ipcRenderer.invoke('accounts:setShareSetup', id, share),
   addWorkspace: (input) => ipcRenderer.invoke('workspaces:add', input),
   removeWorkspace: (id) => ipcRenderer.invoke('workspaces:remove', id),
+  updateWorkspace: (id, patch) => ipcRenderer.invoke('workspaces:update', id, patch),
+  revealWorkspace: (id, target) => ipcRenderer.invoke('workspaces:reveal', id, target),
+  // Electron ≥ 32 ya no expone File.path: la ruta de lo que se suelta sale de webUtils.
+  pathForFile: (file) => {
+    try {
+      return webUtils.getPathForFile(file)
+    } catch {
+      return ''
+    }
+  },
   setOpenPanes: (ids) => ipcRenderer.invoke('ui:openPanes', ids),
   pickFolder: () => ipcRenderer.invoke('dialog:pickFolder'),
   ptyStart: (id, cols, rows) => ipcRenderer.invoke('pty:start', id, cols, rows),

@@ -3,7 +3,8 @@ import { Broadcast as BroadcastIcon, CheckCircle, PaperPlaneTilt, X } from '@pho
 import { isLoginPane } from '../../../../shared/types'
 import { useUi, type FeatureUi, type UiCtx } from '../host'
 import { StateIcon } from '../../StateIcon'
-import { STATE_LABEL, accountColor, cleanError } from '../../format'
+import { STATE_LABEL, cleanError } from '../../format'
+import { resolveAccountColor } from '../settings/store'
 import { buildPayload, MAX_PROMPT } from './payload'
 import './broadcast.css'
 
@@ -32,6 +33,7 @@ interface Target {
   id: string
   name: string
   accountLabel: string
+  accountId: string
   accIndex: number
   state?: keyof typeof STATE_LABEL
   hidden: boolean
@@ -53,6 +55,7 @@ function targetsOf(ctx: UiCtx): Target[] {
       id: ws.id,
       name: ws.name,
       accountLabel: accLabel.get(ws.accountId) ?? 'cuenta borrada',
+      accountId: ws.accountId,
       accIndex: accIdx.get(ws.accountId) ?? 0,
       state: ag?.state,
       hidden: !isOpenPane,
@@ -173,7 +176,7 @@ function BroadcastDialog({ onClose, onSent }: { onClose: () => void; onSent: (n:
               const dead = t.state === 'exited'
               return (
                 <li key={t.id}>
-                  <label className={`f-broadcast-row ${dead ? 'dead' : ''}`} style={{ '--acc': accountColor(t.accIndex) } as React.CSSProperties}>
+                  <label className={`f-broadcast-row ${dead ? 'dead' : ''}`} style={{ '--acc': resolveAccountColor(t.accountId, t.accIndex) } as React.CSSProperties}>
                     <input type="checkbox" checked={!dead && sel.has(t.id)} disabled={dead} onChange={() => toggle(t.id)} />
                     <span className="f-broadcast-name">
                       {t.name}

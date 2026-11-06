@@ -15,7 +15,8 @@ import {
 import { useUi } from '../host'
 import { api } from '../../api'
 import { StatePill } from '../../StateIcon'
-import { accountColor, cleanError, fmtTok, shortPath, totalTok } from '../../format'
+import { cleanError, fmtTok, shortPath, totalTok } from '../../format'
+import { resolveAccountColor } from '../settings/store'
 import type { Workspace } from '../../../../shared/types'
 import {
   columnFor,
@@ -350,7 +351,7 @@ export function Board(): React.JSX.Element {
                               <span className="pill">Sin abrir</span>
                             )}
                             <span className="f-gruv-acc" title={`Cuenta del espacio · ${fmtTok(usage5h(c.ws.accountId))} tokens en 5 h`}>
-                              <span className="f-gruv-dot" style={{ background: accountColor(accIndex.get(c.ws.accountId) ?? 0) }} aria-hidden="true" />
+                              <span className="f-gruv-dot" style={{ background: resolveAccountColor(c.ws.accountId, accIndex.get(c.ws.accountId) ?? 0) }} aria-hidden="true" />
                               {accLabel(c.ws.accountId)}
                             </span>
                             <button type="button" className="btn sm ghost f-gruv-go" onClick={() => void start(c)}>

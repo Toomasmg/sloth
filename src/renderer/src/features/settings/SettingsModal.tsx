@@ -31,6 +31,8 @@ import {
   type SettingsSection
 } from '../../../../main/features/settings-model'
 import { accountColor } from '../../format'
+import { SHORTCUTS } from '../../shortcuts'
+import { ChatSettings } from '../chat/ChatSettings'
 import type { SettingsTab } from './bus'
 import { resetSettings, termOptions, updateSettings, useSettings } from './store'
 
@@ -455,17 +457,6 @@ function Behavior(): React.JSX.Element {
   )
 }
 
-const SHORTCUTS: { keys: string[][]; what: string }[] = [
-  { keys: [['Ctrl', 'K']], what: 'Paleta de comandos' },
-  { keys: [['Ctrl', 'Shift', 'P']], what: 'Paleta de comandos (alternativo)' },
-  { keys: [['Ctrl', ',']], what: 'Configuración' },
-  { keys: [['Ctrl', 'Shift', 'F']], what: 'Buscar en el historial de conversaciones' },
-  { keys: [['Ctrl', 'Shift', 'B']], what: 'Enviar a varios espacios' },
-  { keys: [['Ctrl', 'Shift', 'C']], what: 'Copiar la selección de la terminal' },
-  { keys: [['Ctrl', 'Shift', 'V']], what: 'Pegar en la terminal' },
-  { keys: [['Clic derecho']], what: 'En la terminal: copia si hay selección, si no pega' },
-  { keys: [['Esc']], what: 'Cerrar ventanas y paletas' }
-]
 
 function Shortcuts(): React.JSX.Element {
   return (
@@ -523,6 +514,7 @@ function Data({ onClose }: { onClose(): void }): React.JSX.Element {
           </span>
         </button>
       </div>
+      <ChatSettings />
       <p className="hint f-settings-note">
         La configuración se guarda en <span className="mono">%APPDATA%\Sloth\features\settings.json</span>.
       </p>

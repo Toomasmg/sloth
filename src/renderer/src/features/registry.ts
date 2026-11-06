@@ -13,6 +13,10 @@ import onboarding from './onboarding'
 import teamConfig from './team-config'
 import team from './team'
 import layout from '../layout/feature'
+import chat from './chat'
+import help from './help'
+import report from './report'
+import sound from './sound'
 
 /** Todas las funciones de la interfaz, en el orden en que aparecen en cada lugar. */
-export const FEATURE_UIS: FeatureUi[] = [history, git, worktrees, palette, broadcast, templates, updater, exportImport, gruv, settings, onboarding, teamConfig, team, layout]
+export const FEATURE_UIS: FeatureUi[] = [history, git, worktrees, palette, broadcast, templates, updater, exportImport, gruv, settings, onboarding, teamConfig, team, layout, chat, help, report, sound]

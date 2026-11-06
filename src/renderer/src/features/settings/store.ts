@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import type { ITheme } from '@xterm/xterm'
 import { api } from '../../api'
+import { accountColor } from '../../format'
 import {
   DEFAULT_SETTINGS,
   cloneSettings,
@@ -207,3 +208,10 @@ export function termOptions(p: SettingsPayload = state): TermOptions {
 /** Color elegido para la cuenta, o undefined si usa el automático. Para que el núcleo lo use en colorOf. */
 export const customAccountColor = (accountId: string | undefined): string | undefined =>
   accountId ? state.settings.accountColors[accountId] : undefined
+
+/**
+ * Color de identidad de una cuenta: el elegido en Configuración o, si no hay, el automático por
+ * posición. Es LA función que usan App (colorOf), broadcast y el tablero de Gruv.
+ */
+export const resolveAccountColor = (accountId: string | undefined, index: number, p: SettingsPayload = state): string =>
+  (accountId ? p.settings.accountColors[accountId] : undefined) ?? accountColor(index)

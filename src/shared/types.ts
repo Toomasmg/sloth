@@ -56,7 +56,22 @@ export interface Workspace {
   /** Al reabrir, retomar la última conversación de esa carpeta (`claude --continue`). */
   resume?: boolean
   ticket?: string
+  /** Emoji o símbolo corto elegido por el usuario (v0.5). Se muestra en sidebar, header y pestañas. */
+  icon?: string
 }
+
+/**
+ * Cambios que la UI puede hacerle a un espacio ya creado (v0.5: renombrar, ícono).
+ * `icon: null` lo quita. main valida: nombre 1–80 sin caracteres de control; ícono ≤ 16 unidades
+ * UTF-16, máximo 2 grafemas, sin letras ASCII ni controles.
+ */
+export interface WorkspacePatch {
+  name?: string
+  icon?: string | null
+}
+
+/** Cómo abrir la carpeta de un espacio desde su header (v0.5). */
+export type RevealTarget = 'folder' | 'vscode'
 
 export interface NewWorkspaceInput {
   name: string
@@ -131,6 +146,15 @@ export interface SlothApi {
   setShareSetup(id: string, share: boolean): Promise<SetupSyncReport | null>
   addWorkspace(input: NewWorkspaceInput): Promise<Workspace>
   removeWorkspace(id: string): Promise<void>
+  /** Renombrar o cambiar el ícono (canal `workspaces:update`). Devuelve el espacio actualizado. */
+  updateWorkspace(id: string, patch: WorkspacePatch): Promise<Workspace>
+  /** Abre la carpeta (cwd) del espacio en el Explorador o en VS Code (canal `workspaces:reveal`). */
+  revealWorkspace(id: string, target: RevealTarget): Promise<void>
+  /**
+   * Ruta absoluta de un archivo/carpeta soltado sobre la ventana (webUtils.getPathForFile).
+   * Devuelve '' si no tiene ruta (p. ej. texto arrastrado).
+   */
+  pathForFile(file: File): string
   setOpenPanes(ids: string[]): Promise<void>
   pickFolder(): Promise<string | null>
   ptyStart(id: string, cols: number, rows: number): Promise<PtyStartResult>

@@ -25,6 +25,8 @@ export interface SlothSettings {
   accountColors: Record<string, string>
   openAtLogin: boolean
   confirmClosePanes: boolean
+  /** Sonido suave al terminar o al pedir permiso (v0.5, función «sound»). Apagado por defecto. */
+  sounds: boolean
 }
 
 /** Lo que main manda a la interfaz (get, set, reset y el evento «changed»). */
@@ -80,7 +82,8 @@ export const DEFAULT_SETTINGS: SlothSettings = {
   },
   accountColors: {},
   openAtLogin: false,
-  confirmClosePanes: true
+  confirmClosePanes: true,
+  sounds: false
 }
 
 export type SettingsSection = 'apariencia' | 'terminal' | 'cuentas' | 'comportamiento'
@@ -136,13 +139,14 @@ export interface PatchOptions {
  */
 export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOptions = {}): SlothSettings {
   if (!isObj(patch)) throw new Error('El cambio de configuración tiene que ser un objeto.')
-  checkKeys(patch, ['theme', 'density', 'uiFontSize', 'terminal', 'accountColors', 'openAtLogin', 'confirmClosePanes'], '')
+  checkKeys(patch, ['theme', 'density', 'uiFontSize', 'terminal', 'accountColors', 'openAtLogin', 'confirmClosePanes', 'sounds'], '')
   const next = cloneSettings(current)
   if ('theme' in patch) next.theme = oneOf(patch.theme, THEMES, 'El tema')
   if ('density' in patch) next.density = oneOf(patch.density, DENSITIES, 'La densidad')
   if ('uiFontSize' in patch) next.uiFontSize = intIn(patch.uiFontSize, UI_FONT.min, UI_FONT.max, 'El tamaño de letra')
   if ('openAtLogin' in patch) next.openAtLogin = bool(patch.openAtLogin, '«Abrir al iniciar Windows»')
   if ('confirmClosePanes' in patch) next.confirmClosePanes = bool(patch.confirmClosePanes, '«Confirmar al cerrar»')
+  if ('sounds' in patch) next.sounds = bool(patch.sounds, '«Sonidos»')
   if ('terminal' in patch) {
     const t = patch.terminal
     if (!isObj(t)) throw new Error('terminal tiene que ser un objeto.')
@@ -183,7 +187,7 @@ export function normalize(raw: unknown): SlothSettings {
       /* campo inválido: queda el valor por defecto */
     }
   }
-  for (const k of ['theme', 'density', 'uiFontSize', 'openAtLogin', 'confirmClosePanes'] as const) if (k in raw) tryPatch({ [k]: raw[k] })
+  for (const k of ['theme', 'density', 'uiFontSize', 'openAtLogin', 'confirmClosePanes', 'sounds'] as const) if (k in raw) tryPatch({ [k]: raw[k] })
   if (isObj(raw.terminal))
     for (const [k, v] of Object.entries(raw.terminal)) tryPatch({ terminal: { [k]: v } })
   if (isObj(raw.accountColors))
@@ -210,6 +214,7 @@ export function resetSection(current: SlothSettings, section: unknown): SlothSet
     case 'comportamiento':
       next.openAtLogin = d.openAtLogin
       next.confirmClosePanes = d.confirmClosePanes
+      next.sounds = d.sounds
       break
     default:
       throw new Error('Sección desconocida.')

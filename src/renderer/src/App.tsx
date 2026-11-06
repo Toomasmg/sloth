@@ -31,11 +31,13 @@ import {
   type Workspace
 } from '../../shared/types'
 import { api } from './api'
-import { UiContext, type UiCtx } from './features/host'
+import { UiContext, type NewWorkspacePreset, type PaneGuard, type UiCtx } from './features/host'
+import { resolveAccountColor, useSettings } from './features/settings/store'
 import { GlobalSlot, PaneBannerSlot, PaneHeaderSlot, SidebarSlot, TitlebarSlot } from './features/slots'
 import { TerminalView } from './TerminalView'
 import { NewWorkspaceDialog } from './NewWorkspaceDialog'
-import { LogoMark, Wordmark } from './Logo'
+import { Wordmark } from './Logo'
+import { EmptyState } from './EmptyState'
 import { StateIcon, StatePill } from './StateIcon'
 import { PermissionCard, toolLabel } from './PermissionCard'
 import { DaemonStatus } from './DaemonStatus'
@@ -61,7 +63,7 @@ import { useReorderDrag } from './layout/useReorderDrag'
 import { Separators } from './layout/Separators'
 import { TabBar, type TabInfo } from './layout/TabBar'
 import './layout/layout.css'
-import { accountColor, cleanError, fmtTok, shortPath, STATE_LABEL, totalTok, usageTitle } from './format'
+import { cleanError, fmtTok, shortPath, STATE_LABEL, totalTok, usageTitle } from './format'
 
 export function App(): React.JSX.Element {
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -75,6 +77,7 @@ export function App(): React.JSX.Element {
   const [maximized, setMaximized] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [newWsMode, setNewWsMode] = useState<null | 'normal' | 'ticket'>(null)
+  const [newWsPreset, setNewWsPreset] = useState<NewWorkspacePreset | undefined>(undefined)
   const [loaded, setLoaded] = useState(false)
   const [perms, setPerms] = useState<PermissionPrompt[]>([])
   const [now, setNow] = useState(() => Date.now())
@@ -214,7 +217,33 @@ export function App(): React.JSX.Element {
     })
   }
 
-  const colorOf = (accountId?: string): string => accountColor(accountId ? (accountIndex.get(accountId) ?? 0) : 0)
+  // Color de cuenta: el elegido en Configuración o el automático (se re-renderiza al cambiarlo).
+  const appSettings = useSettings()
+  const colorOf = (accountId?: string): string =>
+    resolveAccountColor(accountId, accountId ? (accountIndex.get(accountId) ?? 0) : 0, appSettings)
+
+  // Guardas antes de ocultar/reiniciar desde el header o la pestaña (ver UiCtx.onBeforeClosePane).
+  const paneGuards = useRef(new Set<PaneGuard>())
+  const onBeforeClosePane = useCallback((g: PaneGuard): (() => void) => {
+    paneGuards.current.add(g)
+    return () => void paneGuards.current.delete(g)
+  }, [])
+  const allowPaneAction = async (id: string, action: 'hide' | 'restart'): Promise<boolean> => {
+    for (const g of [...paneGuards.current]) {
+      try {
+        if ((await g(id, action)) === false) return false
+      } catch (e) {
+        console.error('[guarda de panel]', e)
+      }
+    }
+    return true
+  }
+  const requestHidePane = async (id: string): Promise<void> => {
+    if (await allowPaneAction(id, 'hide')) closePane(id)
+  }
+  const requestRestartPane = async (id: string): Promise<void> => {
+    if (await allowPaneAction(id, 'restart')) await restartPane(id)
+  }
 
   const addAccount = async (label: string): Promise<void> => {
     try {
@@ -321,7 +350,8 @@ export function App(): React.JSX.Element {
   const dragging = paneDrag.drag ?? tabDrag.drag
   const canDragPanes = viewMode === 'grid' && nVisible > 1
 
-  const hideTab = (id: string): void => {
+  const hideTab = async (id: string): Promise<void> => {
+    if (!(await allowPaneAction(id, 'hide'))) return
     const i = openPanes.indexOf(id)
     const neighbor = openPanes[i + 1] ?? openPanes[i - 1]
     closePane(id)
@@ -416,7 +446,11 @@ export function App(): React.JSX.Element {
     setMaximized,
     restartPane,
     reload,
-    openNewWorkspace: (mode) => setNewWsMode(mode),
+    openNewWorkspace: (mode, preset) => {
+      setNewWsPreset(preset)
+      setNewWsMode(mode)
+    },
+    onBeforeClosePane,
     notifyError: (m) => setError(m),
     invoke: (channel, ...args) => api.feat.invoke(channel, ...args),
     on: (channel, cb) => api.feat.on(channel, cb)
@@ -479,7 +513,7 @@ export function App(): React.JSX.Element {
               const st = statuses[acc.id]
               const u = usage[acc.id]
               return (
-                <li key={acc.id} className="account" style={{ '--acc': colorOf(acc.id) } as React.CSSProperties}>
+                <li key={acc.id} className="account" data-account-id={acc.id} style={{ '--acc': colorOf(acc.id) } as React.CSSProperties}>
                   <div className="account-top">
                     <span className="acc-chip" aria-hidden="true">
                       {acc.label.slice(0, 1).toUpperCase()}
@@ -554,7 +588,7 @@ export function App(): React.JSX.Element {
               const open = openPanes.includes(ws.id)
               const nPerm = permsByWs.get(ws.id)?.length ?? 0
               return (
-                <li key={ws.id} className="ws-li" style={{ '--acc': colorOf(ws.accountId) } as React.CSSProperties}>
+                <li key={ws.id} className="ws-li" data-account-id={ws.accountId} style={{ '--acc': colorOf(ws.accountId) } as React.CSSProperties}>
                   <button
                     className={`ws ${open ? 'open' : ''} ${focused === ws.id ? 'focused' : ''} ${ag?.state === 'waiting' || nPerm ? 'waiting' : ''}`}
                     onClick={() => openPane(ws.id)}
@@ -681,6 +715,7 @@ export function App(): React.JSX.Element {
             <section
               key={paneId}
               data-pane-id={paneId}
+              data-account-id={accId}
               className={`pane ${focused === paneId ? 'focused' : ''} ${ag ? `pane-${ag.state}` : ''} ${perm ? 'pane-perm' : ''} ${hidden ? 'hidden' : ''} ${paneDrag.drag?.id === paneId ? 'dragging' : ''}`}
               style={{ '--acc': colorOf(accId), ...rectVars(rect) } as React.CSSProperties}
               onMouseDown={() => setFocused(paneId)}
@@ -721,10 +756,10 @@ export function App(): React.JSX.Element {
                 >
                   {maximized === paneId ? <ArrowsIn size={15} aria-hidden="true" /> : <ArrowsOut size={15} aria-hidden="true" />}
                 </button>
-                <button className="icon-btn" onClick={() => void restartPane(paneId)} aria-label="Reiniciar terminal" title="Cerrar el proceso y abrir otra terminal">
+                <button className="icon-btn" onClick={() => void requestRestartPane(paneId)} aria-label="Reiniciar terminal" title="Cerrar el proceso y abrir otra terminal">
                   <ArrowClockwise size={15} aria-hidden="true" />
                 </button>
-                <button className="icon-btn" onClick={() => closePane(paneId)} aria-label="Ocultar panel" title="Ocultar (la terminal sigue corriendo)">
+                <button className="icon-btn" onClick={() => void requestHidePane(paneId)} aria-label="Ocultar panel" title="Ocultar (la terminal sigue corriendo)">
                   <EyeSlash size={15} aria-hidden="true" />
                 </button>
                 </span>
@@ -780,11 +815,16 @@ export function App(): React.JSX.Element {
           accounts={accounts}
           statuses={statuses}
           usage={usage}
-          defaultRepo={workspaces[workspaces.length - 1]?.repoPath ?? ''}
-          onClose={() => setNewWsMode(null)}
+          defaultRepo={newWsPreset?.repoPath ?? workspaces[workspaces.length - 1]?.repoPath ?? ''}
+          preset={newWsPreset}
+          onClose={() => {
+            setNewWsMode(null)
+            setNewWsPreset(undefined)
+          }}
           onCreated={(ws) => {
             setWorkspaces((w) => [...w, ws])
             setNewWsMode(null)
+            setNewWsPreset(undefined)
             openPane(ws.id)
           }}
         />
@@ -815,38 +855,6 @@ function focusTerminal(id: string, tries = 8): void {
   const ta = document.querySelector<HTMLElement>(`[data-pane-id="${CSS.escape(id)}"] .xterm-helper-textarea`)
   if (ta && ta.closest<HTMLElement>('.pane')?.offsetParent !== null) ta.focus()
   else if (tries > 0) requestAnimationFrame(() => focusTerminal(id, tries - 1))
-}
-
-function EmptyState({ hasAccounts, hasWs }: { hasAccounts: boolean; hasWs: boolean }): React.JSX.Element {
-  const steps = [
-    { done: hasAccounts, title: 'Agregá tus cuentas', text: 'Cada una se abre en su propia carpeta para iniciar sesión.' },
-    { done: hasWs, title: 'Creá un espacio', text: 'Un repo y una cuenta, o directo desde un ticket.' },
-    { done: false, title: 'Abrí varios en paralelo', text: 'Cada uno en su PowerShell, con su estado en vivo.' }
-  ]
-  return (
-    <div className="empty">
-      <div className="empty-logo">
-        <LogoMark size={72} />
-      </div>
-      <h1>
-        <span>Sloth</span>
-      </h1>
-      <p className="empty-lead">Varias cuentas de Claude, cada una en su terminal y su repo.</p>
-      <ol className="steps">
-        {steps.map((s, i) => (
-          <li key={s.title} className={s.done ? 'done' : ''}>
-            <span className="step-n" aria-hidden="true">
-              {i + 1}
-            </span>
-            <div>
-              <strong>{s.title}</strong>
-              <p>{s.text}</p>
-            </div>
-          </li>
-        ))}
-      </ol>
-    </div>
-  )
 }
 
 function AddAccount({ onAdd }: { onAdd: (label: string) => Promise<void> }): React.JSX.Element {
