@@ -13,6 +13,9 @@ import { createTerminalBackend, type PendingPermission, type TerminalBackend } f
 import { createWorktree } from './git'
 import { baseSettingsFor, syncSharedSetup, unshareSetup } from './setup'
 import { UsageScanner } from './usage'
+import { FEATURES } from './features'
+import type { FeatureContext } from './features/context'
+import type { UiCommand } from '../shared/features'
 import {
   accountIdFromLoginPane,
   isLoginPane,
@@ -23,10 +26,12 @@ import {
   type NewWorkspaceInput,
   type PermissionAnswer,
   type PermissionPrompt,
+  type PtyChunk,
   type Workspace
 } from '../shared/types'
 
 let win: BrowserWindow | null = null
+const windowListeners: ((w: BrowserWindow) => void)[] = []
 const agents = new Map<string, AgentStatus>()
 
 function send(channel: string, ...args: unknown[]): void {
@@ -77,9 +82,22 @@ app.whenReady().then(async () => {
 
   writeHookScript()
   const usage = new UsageScanner()
+  const hookListeners: ((p: HookEventPayload) => void)[] = []
+  const dataListeners: ((id: string, chunks: PtyChunk[]) => void)[] = []
+  const exitListeners: ((id: string, code: number) => void)[] = []
+  const commandOverrides: ((ws: Workspace, acc: Account) => string | undefined)[] = []
+  const safe = (name: string, fn: () => void): void => {
+    try {
+      fn()
+    } catch (e) {
+      console.error(`[función] ${name}:`, e)
+    }
+  }
+  const uiCommand = (cmd: UiCommand): void => send('ui:command', cmd)
 
   /** Evento de hook de Claude → estado del espacio (+ aviso de Windows si la ventana no está enfocada). */
   function onHook(p: HookEventPayload): void {
+    for (const l of hookListeners) safe('hook', () => l(p))
     const ws = store.workspace(p.ws)
     if (!ws) return
     const { state, detail } = stateForEvent(p)
@@ -128,9 +146,13 @@ app.whenReady().then(async () => {
         log: (...a: unknown[]) => console.log('[terminales]', ...a)
       }).then(async (b) => {
         term = b
-        b.on('data', (id: string, chunks: unknown[]) => send('pty:data', id, chunks))
+        b.on('data', (id: string, chunks: PtyChunk[]) => {
+          send('pty:data', id, chunks)
+          for (const l of dataListeners) safe('pty-data', () => l(id, chunks))
+        })
         b.on('exit', (id: string, code: number) => {
           send('pty:exit', id, code)
+          for (const l of exitListeners) safe('pty-exit', () => l(id, code))
           if (store.workspace(id)) setAgent(id, { state: 'exited', at: Date.now() })
         })
         b.on('hook', onHook)
@@ -202,6 +224,11 @@ app.whenReady().then(async () => {
 
   function claudeCommand(ws: Workspace, acc: Account): string | undefined {
     if (!ws.autoStartClaude) return undefined
+    for (const o of commandOverrides) {
+      let cmd: string | undefined
+      safe('override', () => (cmd = o(ws, acc)))
+      if (cmd) return cmd
+    }
     if (ws.initialPrompt && !ws.initialPromptUsed) {
       store.updateWorkspace(ws.id, { initialPromptUsed: true })
       return `claude ${psQuote(ws.initialPrompt)}`
@@ -324,7 +351,7 @@ app.whenReady().then(async () => {
     Object.fromEntries(store.accounts.map((a) => [a.id, accountStatus(a)]))
   )
 
-  ipcMain.handle('workspaces:add', async (_e, input: NewWorkspaceInput) => {
+  async function addWorkspace(input: NewWorkspaceInput): Promise<Workspace> {
     const name = String(input?.name ?? '').trim()
     const repoPath = String(input?.repoPath ?? '').trim()
     if (!name) throw new Error('Poné un nombre.')
@@ -352,7 +379,8 @@ app.whenReady().then(async () => {
     }
     store.addWorkspace(ws)
     return ws
-  })
+  }
+  ipcMain.handle('workspaces:add', (_e, input: NewWorkspaceInput) => addWorkspace(input))
 
   ipcMain.handle('workspaces:remove', async (_e, id: string) => {
     // El worktree queda en disco a propósito: puede tener trabajo sin commitear.
@@ -390,8 +418,50 @@ app.whenReady().then(async () => {
   ipcMain.handle('clipboard:read', () => clipboard.readText())
   ipcMain.on('clipboard:write', (_e, text: string) => clipboard.writeText(String(text)))
 
+  // Funciones (features): cada una con sus canales feat:<nombre>:<op>.
+  for (const f of FEATURES) {
+    const ctx: FeatureContext = {
+      name: f.name,
+      store,
+      usage,
+      backend,
+      terminal: () => term,
+      window: () => win,
+      onWindow: (cb) => {
+        windowListeners.push(cb)
+        if (win) safe(f.name, () => cb(win!))
+      },
+      handle: (op, fn) => {
+        ipcMain.handle(`feat:${f.name}:${op}`, (_e, ...args: unknown[]) => fn(...args))
+      },
+      emit: (event, ...args) => send(`feat:${f.name}:${event}`, ...args),
+      ui: uiCommand,
+      onHook: (cb) => hookListeners.push(cb),
+      onPtyData: (cb) => dataListeners.push(cb),
+      onPtyExit: (cb) => exitListeners.push(cb),
+      agents: () => agents,
+      setAgent,
+      addWorkspace,
+      prepareAccount,
+      restartTerminal: async (id) => {
+        await (await backend()).kill(id)
+        uiCommand({ type: 'restart-pane', id })
+      },
+      addClaudeCommandOverride: (fn) => commandOverrides.push(fn),
+      log: (...a) => console.log(`[${f.name}]`, ...a)
+    }
+    try {
+      await f.register(ctx)
+    } catch (e) {
+      console.error(`[función ${f.name}] no se pudo registrar:`, e)
+    }
+  }
+
   // Al salir solo soltamos la conexión: en modo daemon las terminales siguen trabajando.
-  app.on('before-quit', () => term?.dispose())
+  app.on('before-quit', () => {
+    for (const f of FEATURES) safe(f.name, () => f.dispose?.())
+    term?.dispose()
+  })
 
   createWindow()
 })
@@ -436,6 +506,13 @@ function createWindow(): void {
   else void win.loadURL('app://ui/index.html')
 
   win.on('closed', () => (win = null))
+  for (const cb of windowListeners) {
+    try {
+      cb(win)
+    } catch (e) {
+      console.error('[función] onWindow:', e)
+    }
+  }
 }
 
 app.on('second-instance', () => {

@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { AgentStatus, SlothApi, PermissionPrompt, PtyChunk } from '../shared/types'
+import { isFeatChannel, type UiCommand } from '../shared/features'
 
 function listen<A extends unknown[]>(channel: string, cb: (...args: A) => void): () => void {
   const handler = (_e: IpcRendererEvent, ...args: unknown[]): void => cb(...(args as A))
@@ -37,7 +38,17 @@ const api: SlothApi = {
   onPermission: (cb) => listen<[PermissionPrompt]>('permission:new', cb),
   onPermissionResolved: (cb) => listen<[string]>('permission:resolved', cb),
   daemonInfo: () => ipcRenderer.invoke('daemon:info'),
-  shutdownTerminals: () => ipcRenderer.invoke('daemon:shutdown')
+  shutdownTerminals: () => ipcRenderer.invoke('daemon:shutdown'),
+  onUi: (cb) => listen<[UiCommand]>('ui:command', cb),
+  // Lista blanca: la UI solo puede hablar con canales feat:<función>:<op>.
+  feat: {
+    invoke: (channel, ...args) =>
+      isFeatChannel(channel) ? ipcRenderer.invoke(channel, ...args) : Promise.reject(new Error(`Canal inválido: ${channel}`)),
+    on: (channel, cb) => {
+      if (!isFeatChannel(channel)) throw new Error(`Canal inválido: ${channel}`)
+      return listen(channel, cb)
+    }
+  }
 }
 
 contextBridge.exposeInMainWorld('sloth', api)

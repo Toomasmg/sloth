@@ -148,4 +148,11 @@ export interface SlothApi {
   onPermissionResolved(cb: (id: string) => void): () => void
   daemonInfo(): Promise<DaemonInfo>
   shutdownTerminals(): Promise<void>
+  /** Órdenes de main a la UI (recargar, abrir/reiniciar panel, traer ventana). */
+  onUi(cb: (cmd: import('./features').UiCommand) => void): () => void
+  /** Canales de las funciones: solo `feat:<función>:<op>`. */
+  feat: {
+    invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T>
+    on(channel: string, cb: (...args: any[]) => void): () => void
+  }
 }

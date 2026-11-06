@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowClockwise,
   ArrowsIn,
@@ -26,6 +26,8 @@ import {
   type Workspace
 } from '../../shared/types'
 import { api } from './api'
+import { UiContext, type UiCtx } from './features/host'
+import { GlobalSlot, PaneBannerSlot, PaneHeaderSlot, SidebarSlot, TitlebarSlot } from './features/slots'
 import { TerminalView } from './TerminalView'
 import { NewWorkspaceDialog } from './NewWorkspaceDialog'
 import { LogoMark, Wordmark } from './Logo'
@@ -136,6 +138,29 @@ export function App(): React.JSX.Element {
     setGenerations((g) => ({ ...g, [id]: (g[id] ?? 0) + 1 }))
   }
 
+  /** Relee cuentas y espacios de main (las funciones crean o editan espacios). */
+  const reload = useCallback(async (): Promise<void> => {
+    const s = await api.getState()
+    setAccounts(s.accounts)
+    setWorkspaces(s.workspaces)
+    setAgents((a) => ({ ...a, ...s.agents }))
+    const valid = new Set([...s.workspaces.map((w) => w.id), ...s.accounts.map((a) => loginPaneId(a.id))])
+    setOpenPanesState((prev) => prev.filter((x) => valid.has(x)))
+  }, [])
+
+  // Órdenes de main (de las funciones): recargar, abrir o reiniciar un panel.
+  const openPaneRef = useRef(openPane)
+  openPaneRef.current = openPane
+  useEffect(
+    () =>
+      api.onUi((cmd) => {
+        if (cmd.type === 'reload') void reload()
+        else if (cmd.type === 'open-pane') void reload().then(() => openPaneRef.current(cmd.id))
+        else if (cmd.type === 'restart-pane') setGenerations((g) => ({ ...g, [cmd.id]: (g[cmd.id] ?? 0) + 1 }))
+      }),
+    [reload]
+  )
+
   const accountIndex = useMemo(() => new Map(accounts.map((a, i) => [a.id, i])), [accounts])
   const accountById = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts])
   const wsById = useMemo(() => new Map(workspaces.map((w) => [w.id, w])), [workspaces])
@@ -213,7 +238,29 @@ export function App(): React.JSX.Element {
   const working = countBy('working')
   const done = countBy('done')
 
+  const uiCtx: UiCtx = {
+    accounts,
+    workspaces,
+    statuses,
+    usage,
+    agents,
+    permissions: perms,
+    openPanes,
+    focused,
+    maximized,
+    openPane,
+    closePane,
+    setMaximized,
+    restartPane,
+    reload,
+    openNewWorkspace: (mode) => setNewWsMode(mode),
+    notifyError: (m) => setError(m),
+    invoke: (channel, ...args) => api.feat.invoke(channel, ...args),
+    on: (channel, cb) => api.feat.on(channel, cb)
+  }
+
   return (
+    <UiContext.Provider value={uiCtx}>
     <div className={`shell ${docVisible ? '' : 'doc-hidden'}`}>
       <header className="titlebar">
         <div className="titlebar-brand">
@@ -248,6 +295,7 @@ export function App(): React.JSX.Element {
           )}
         </div>
         <div className="titlebar-right">
+          <TitlebarSlot />
           <DaemonStatus />
         </div>
         <div className="sr-only" role="alert">
@@ -376,6 +424,7 @@ export function App(): React.JSX.Element {
             })}
           </ul>
         </section>
+        <SidebarSlot />
       </aside>
 
       <main className="panes" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
@@ -419,6 +468,7 @@ export function App(): React.JSX.Element {
                 </span>
                 {ag && <StatePill state={ag.state} detail={ag.detail} />}
                 <span className="pane-actions">
+                <PaneHeaderSlot paneId={paneId} />
                 <button
                   className="icon-btn"
                   onClick={() => setMaximized(maximized === paneId ? null : paneId)}
@@ -444,11 +494,14 @@ export function App(): React.JSX.Element {
                   onAnswer={(answer, message) => answerPermission(perm, answer, message)}
                 />
               )}
+              <PaneBannerSlot paneId={paneId} />
               <TerminalView id={paneId} generation={generations[paneId] ?? 0} onError={onTermError} />
             </section>
           )
         })}
       </main>
+
+      <GlobalSlot />
 
       {newWsMode && (
         <NewWorkspaceDialog
@@ -477,6 +530,7 @@ export function App(): React.JSX.Element {
       )}
     </div>
     </div>
+    </UiContext.Provider>
   )
 }
 

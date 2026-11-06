@@ -1,0 +1,74 @@
+import { createContext, useContext } from 'react'
+import type {
+  Account,
+  AccountStatus,
+  AccountUsage,
+  AgentStatus,
+  PermissionPrompt,
+  Workspace
+} from '../../../shared/types'
+
+/** Lo que cada función ve de la app desde la interfaz. */
+export interface UiCtx {
+  accounts: Account[]
+  workspaces: Workspace[]
+  statuses: Record<string, AccountStatus>
+  usage: Record<string, AccountUsage>
+  agents: Record<string, AgentStatus>
+  permissions: PermissionPrompt[]
+  openPanes: string[]
+  focused: string | null
+  maximized: string | null
+  openPane(id: string): void
+  closePane(id: string): void
+  setMaximized(id: string | null): void
+  restartPane(id: string): Promise<void>
+  /** Vuelve a leer cuentas y espacios de main (después de crear o editar desde una función). */
+  reload(): Promise<void>
+  openNewWorkspace(mode: 'normal' | 'ticket'): void
+  notifyError(message: string): void
+  /** `invoke('feat:<función>:<op>', ...)` hacia main. */
+  invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T>
+  /** Escucha `feat:<función>:<evento>` desde main. Devuelve la función para dejar de escuchar. */
+  on(channel: string, cb: (...args: any[]) => void): () => void
+}
+
+export const UiContext = createContext<UiCtx | null>(null)
+
+export function useUi(): UiCtx {
+  const ctx = useContext(UiContext)
+  if (!ctx) throw new Error('useUi fuera de UiContext')
+  return ctx
+}
+
+/** Acción para la paleta de comandos (Ctrl+K). */
+export interface Command {
+  id: string
+  title: string
+  subtitle?: string
+  group: string
+  keywords?: string
+  /** Texto del atajo, solo para mostrar (p. ej. "Ctrl+Shift+F"). */
+  shortcut?: string
+  run(): void | Promise<void>
+}
+
+/**
+ * Cada función exporta uno de estos desde `features/<nombre>/index.tsx`. Todos los lugares son
+ * opcionales. Que sean livianos: nada de polling con la ventana oculta (ver visibility.ts).
+ */
+export interface FeatureUi {
+  name: string
+  /** Chip o botón en la barra de título (lado derecho, antes del estado del daemon). */
+  Titlebar?: React.FC
+  /** Sección al final del sidebar. */
+  Sidebar?: React.FC
+  /** Botones extra en el header de un panel, antes de maximizar. */
+  PaneHeader?: React.FC<{ paneId: string }>
+  /** Franja arriba de la terminal de un panel (debajo de la tarjeta de permiso). */
+  PaneBanner?: React.FC<{ paneId: string }>
+  /** Modales, paneles laterales o la paleta: se montan una sola vez. */
+  Global?: React.FC
+  /** Comandos que aporta a la paleta. */
+  commands?(ctx: UiCtx): Command[]
+}

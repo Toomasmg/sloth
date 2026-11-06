@@ -1,0 +1,14 @@
+import type { Feature } from './context'
+import rotation from './rotation'
+import history from './history'
+import git from './git'
+import worktrees from './worktrees'
+import broadcast from './broadcast'
+import templates from './templates'
+import tray from './tray'
+import updater from './updater'
+import exportImport from './export-import'
+import gruv from './gruv'
+
+/** Todas las funciones del lado main. Para sumar una: crear su archivo y agregarla acá. */
+export const FEATURES: Feature[] = [rotation, history, git, worktrees, broadcast, templates, tray, updater, exportImport, gruv]
