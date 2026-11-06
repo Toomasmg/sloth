@@ -275,7 +275,7 @@ export function App(): React.JSX.Element {
                     </span>
                     <div className="grow-min">
                       <div className="item-title">{acc.label}</div>
-                      <div className={`item-sub ${st?.loggedIn ? '' : 'warn'}`}>
+                      <div className={`item-sub ${st?.loggedIn ? '' : 'warn'}`} title={st?.email}>
                         {st?.loggedIn ? st.email ?? 'Sesión iniciada' : 'Sin sesión'}
                       </div>
                     </div>
@@ -308,9 +308,11 @@ export function App(): React.JSX.Element {
                     </dl>
                   )}
                   <label className="switch" title="Enlaza tus skills, agents, hooks, plugins, settings y MCP de ~/.claude">
+                    <span className="switch-text">
+                      Usar mi setup de <span className="mono">~/.claude</span>
+                    </span>
                     <input type="checkbox" role="switch" checked={acc.shareSetup !== false} onChange={() => void toggleShare(acc)} />
                     <span className="switch-track" aria-hidden="true" />
-                    Usar mi setup de ~/.claude
                   </label>
                 </li>
               )
@@ -351,7 +353,6 @@ export function App(): React.JSX.Element {
                     <span className="grow-min">
                       <span className="item-title">
                         <span className="ws-name">{ws.name}</span>
-                        {ws.ticket && <span className="tag">{ws.ticket}</span>}
                         {nPerm > 0 && (
                           <span className="perm-tag">
                             <ShieldWarning size={11} weight="fill" aria-hidden="true" />
@@ -361,7 +362,9 @@ export function App(): React.JSX.Element {
                       </span>
                       <span className="item-sub">
                         <span className="acc-dot" aria-hidden="true" />
-                        {acc?.label ?? 'cuenta borrada'} · <span className="mono">{ws.branch ?? shortPath(ws.cwd)}</span>
+                        <span className="ws-acc">{acc?.label ?? 'cuenta borrada'}</span>
+                        {ws.ticket && <span className="tag">{ws.ticket}</span>}
+                        <span className="mono ws-where">{ws.branch ?? shortPath(ws.cwd)}</span>
                       </span>
                     </span>
                   </button>
@@ -397,18 +400,25 @@ export function App(): React.JSX.Element {
               aria-label={login ? `Terminal de la cuenta ${acc?.label}` : `${ws?.name} con ${acc?.label}`}
             >
               <header className="pane-head">
-                <span className="acc-badge" title={email}>
-                  {acc?.label ?? '?'}
-                </span>
-                <span className="pane-title">{login ? 'Terminal de cuenta' : ws?.name}</span>
-                {ws?.ticket && <span className="tag">{ws.ticket}</span>}
-                {!login && ws && (
-                  <span className="pane-path mono" title={ws.cwd}>
-                    {shortPath(ws.cwd)}
+                <span className="pane-id">
+                  <span className="acc-dot pane-dot" aria-hidden="true" />
+                  <span className="pane-title" title={login ? undefined : ws?.name}>
+                    {login ? 'Terminal de cuenta' : ws?.name}
                   </span>
-                )}
+                  {ws?.ticket && <span className="tag">{ws.ticket}</span>}
+                  <span className="pane-meta">
+                    <span className="acc-badge" title={email}>
+                      {acc?.label ?? '?'}
+                    </span>
+                    {!login && ws && (
+                      <span className="pane-path mono" title={ws.cwd}>
+                        {shortPath(ws.cwd)}
+                      </span>
+                    )}
+                  </span>
+                </span>
                 {ag && <StatePill state={ag.state} detail={ag.detail} />}
-                <span className="spacer" />
+                <span className="pane-actions">
                 <button
                   className="icon-btn"
                   onClick={() => setMaximized(maximized === paneId ? null : paneId)}
@@ -423,6 +433,7 @@ export function App(): React.JSX.Element {
                 <button className="icon-btn" onClick={() => closePane(paneId)} aria-label="Ocultar panel" title="Ocultar (la terminal sigue corriendo)">
                   <EyeSlash size={15} aria-hidden="true" />
                 </button>
+                </span>
               </header>
               {perm && (
                 <PermissionCard
@@ -516,7 +527,7 @@ function AddAccount({ onAdd }: { onAdd: (label: string) => Promise<void> }): Rea
         Nombre de la cuenta nueva
       </label>
       <input id="new-acc" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nueva cuenta: Personal, Trabajo…" />
-      <button className="btn sm primary" type="submit" disabled={!label.trim()} aria-label="Agregar cuenta">
+      <button className="btn icon-only" type="submit" disabled={!label.trim()} aria-label="Agregar cuenta" title="Agregar cuenta">
         <Plus size={14} weight="bold" aria-hidden="true" />
       </button>
     </form>
