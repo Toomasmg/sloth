@@ -34,6 +34,8 @@ export interface FeatureContext {
   setAgent(wsId: string, status: AgentStatus): void
   /** Mismas validaciones que «Nuevo espacio» (incluye crear worktree si viene branch). */
   addWorkspace(input: NewWorkspaceInput): Promise<Workspace>
+  /** Quita un espacio igual que la UI: cierra su terminal, olvida su estado y lo borra del store. */
+  removeWorkspace(id: string): Promise<void>
   /** Settings, hooks y setup compartido de la cuenta, antes de abrir Claude con ella. */
   prepareAccount(acc: Account): void
   /** Mata la terminal del panel; la UI la vuelve a abrir (con el spec actual del espacio). */

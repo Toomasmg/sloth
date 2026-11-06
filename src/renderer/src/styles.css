@@ -214,6 +214,9 @@ select {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* Con varias secciones (Limpieza, Plantillas…) scrollea el sidebar entero, no se aplasta Espacios. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .wordmark {
   display: flex;
@@ -244,9 +247,8 @@ select {
   border-bottom: 1px solid var(--line);
 }
 .section.grow {
-  flex: 1;
-  overflow-y: auto;
-  border-bottom: none;
+  flex: 1 0 auto;
+  min-height: 160px;
 }
 .section-row {
   display: flex;

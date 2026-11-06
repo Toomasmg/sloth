@@ -1,0 +1,352 @@
+/* Tablero de tickets de Gruv. Usa los tokens de styles.css. */
+.f-gruv-chip-tb {
+  color: var(--fg-2);
+  background: var(--hover);
+  cursor: pointer;
+}
+.f-gruv-chip-tb:hover,
+.f-gruv-chip-tb[aria-pressed='true'] {
+  background: var(--press);
+  color: var(--fg);
+}
+.f-gruv-chip-tb:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+.f-gruv-chip-n {
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--info-soft);
+  color: var(--info);
+  text-align: center;
+  line-height: 16px;
+}
+
+.f-gruv-backdrop {
+  place-items: stretch;
+  padding: 16px;
+}
+.f-gruv-board {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  animation: rise var(--t-med) var(--ease);
+}
+.f-gruv-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 52px;
+  flex: none;
+  padding: 0 var(--s-3) 0 var(--s-4);
+  border-bottom: 1px solid var(--line);
+}
+.f-gruv-head h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+.f-gruv-head-ic {
+  color: var(--accent);
+}
+.f-gruv-meta {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.f-gruv-head-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.f-gruv-sub {
+  font-weight: 400;
+  color: var(--fg-muted);
+  margin-left: 4px;
+}
+
+.f-gruv-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  margin: var(--s-3) var(--s-4) 0;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--card);
+  font-size: var(--fs-sm);
+}
+.f-gruv-confirm {
+  background: var(--warn-soft);
+  color: var(--fg);
+}
+.f-gruv-confirm > span {
+  flex: 1;
+  min-width: 260px;
+}
+.f-gruv-warn {
+  color: var(--warn);
+  flex: none;
+}
+.f-gruv-inline-check {
+  align-items: center;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.f-gruv-inline-check input {
+  margin: 0;
+}
+.f-gruv-msg {
+  margin: var(--s-3) var(--s-4) 0;
+  font-size: var(--fs-sm);
+}
+.f-gruv-ok {
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.f-gruv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+}
+.f-gruv-field.grow {
+  flex: 1;
+}
+.f-gruv-field > span {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.f-gruv-add {
+  align-items: flex-end;
+}
+.f-gruv-settings {
+  margin: var(--s-3) var(--s-4) 0;
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.f-gruv-settings .hint {
+  margin: 0;
+}
+.f-gruv-set-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  align-items: flex-start;
+}
+.f-gruv-repo {
+  min-width: 260px;
+}
+.f-gruv-repo-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.f-gruv-path {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.f-gruv-path-empty {
+  color: var(--fg-muted);
+  font-family: var(--font-ui);
+}
+
+.f-gruv-cols {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(180px, 1fr);
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  overflow-x: auto;
+}
+.f-gruv-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: var(--r-md);
+  background: var(--bg);
+  transition: box-shadow var(--t-fast) var(--ease);
+}
+.f-gruv-col.over {
+  box-shadow: inset 0 0 0 2px var(--brand-2);
+}
+.f-gruv-col-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.f-gruv-count {
+  font-weight: 600;
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.f-gruv-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--s-2) var(--s-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+.f-gruv-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--card);
+  cursor: grab;
+  transition: background var(--t-fast) var(--ease);
+}
+.f-gruv-card:hover {
+  background: var(--card-hover);
+}
+.f-gruv-card:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+.f-gruv-card.busy {
+  opacity: 0.6;
+}
+.f-gruv-card-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+}
+.f-gruv-id {
+  flex: none;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--accent);
+}
+.f-gruv-chip {
+  font-size: 10.5px;
+  line-height: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-xs);
+  background: var(--hover);
+  color: var(--fg-muted);
+}
+.f-gruv-prio-crit {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+.f-gruv-prio-high {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+.f-gruv-prio-mid {
+  color: var(--info);
+  background: var(--info-soft);
+}
+.f-gruv-prio-low {
+  color: var(--fg-muted);
+  background: var(--hover);
+}
+.f-gruv-link {
+  margin-left: auto;
+  width: 22px;
+  height: 22px;
+}
+.f-gruv-title {
+  margin: 0;
+  font-size: var(--fs-md);
+  color: var(--fg);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.f-gruv-sub-line {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+}
+.f-gruv-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+}
+.f-gruv-go {
+  margin-left: auto;
+}
+.f-gruv-acc {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  max-width: 100%;
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+.f-gruv-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+.f-gruv-empty {
+  padding: var(--s-4) var(--s-2);
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+  border-radius: var(--r-md);
+  border: 1px dashed var(--line-2);
+}
+.f-gruv-foot {
+  flex: none;
+  margin: 0;
+  padding: var(--s-2) var(--s-4) var(--s-3);
+  border-top: 1px solid var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f-gruv-board,
+  .f-gruv-col,
+  .f-gruv-card {
+    animation: none;
+    transition: none;
+  }
+}

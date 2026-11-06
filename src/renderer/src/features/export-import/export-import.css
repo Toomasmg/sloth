@@ -1,0 +1,111 @@
+/* Función «export-import»: vista previa y resultado. */
+.f-export-import-modal {
+  width: min(560px, calc(100vw - 32px));
+  gap: var(--s-3);
+}
+.f-export-import-modal:focus {
+  outline: none;
+}
+.f-ei-head-icon {
+  color: var(--accent);
+}
+.f-ei-ok-icon {
+  color: var(--success);
+}
+.f-ei-file {
+  margin: 0;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  background: var(--card);
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.f-ei-ver {
+  color: var(--fg-muted);
+}
+.f-ei-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.f-ei-sec h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+.f-ei-help {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+}
+.f-ei-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.f-ei-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 28px;
+  padding: 2px var(--s-2);
+  border-radius: var(--r-xs);
+  font-size: var(--fs-sm);
+}
+.f-ei-list li:hover {
+  background: var(--hover);
+}
+.f-ei-list li.skip .f-ei-name {
+  color: var(--fg-muted);
+}
+.f-ei-name {
+  color: var(--fg);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.f-ei-meta {
+  color: var(--fg-muted);
+  font-size: var(--fs-xs);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.f-ei-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--r-xs);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.f-ei-badge.add {
+  color: var(--success);
+  background: var(--success-soft);
+}
+.f-ei-badge.skip {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+.f-ei-errors li {
+  display: block;
+  color: #fca5a5;
+}

@@ -1,0 +1,275 @@
+/* Función «worktrees»: sección «Limpieza» del sidebar y modal. */
+.f-wt-section {
+  padding-top: var(--s-2);
+  padding-bottom: var(--s-2);
+}
+.f-wt-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  width: 100%;
+  height: var(--h-sm);
+  padding: 0 var(--s-1);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.f-wt-toggle:hover {
+  background: var(--hover);
+}
+.f-wt-title {
+  margin: 0;
+  padding: 0;
+}
+.f-wt-muted {
+  color: var(--fg-muted);
+}
+.f-wt-count-on {
+  color: var(--success);
+  background: var(--success-soft);
+}
+.f-wt-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-1);
+  padding: var(--s-2) var(--s-1) 0;
+}
+.f-wt-body .hint {
+  margin: 0;
+}
+
+.modal.f-wt-modal {
+  width: min(780px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  gap: var(--s-3);
+}
+.f-wt-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.f-wt-bar .hint {
+  margin: 0;
+}
+.f-wt-unsafe-toggle {
+  align-items: center;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.f-wt-unsafe-toggle.on {
+  color: var(--warn);
+}
+.f-wt-danger {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  margin: 0;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  background: var(--danger-soft);
+  color: #fecaca;
+  font-size: var(--fs-sm);
+}
+.f-wt-danger > svg {
+  color: var(--danger);
+  flex: none;
+  margin-top: 2px;
+}
+.f-wt-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  min-height: 80px;
+}
+.f-wt-repo-h {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  margin: 0 0 var(--s-1);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.f-wt-repo-h .hint {
+  margin: 0;
+  font-weight: 400;
+}
+.f-wt-none {
+  margin: 0;
+}
+.f-wt-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.f-wt-row {
+  padding: 6px var(--s-2);
+  border-radius: var(--r-sm);
+  background: var(--card);
+}
+.f-wt-row.on {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.f-wt-row.unsafe {
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+}
+.f-wt-row-main {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.f-wt-cb,
+.f-wt-cb-space {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--brand-2);
+}
+.f-wt-row-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  cursor: pointer;
+}
+.f-wt-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-sm);
+  color: var(--fg);
+  min-width: 0;
+}
+.f-wt-branch .mono,
+.f-wt-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.f-wt-path {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.f-wt-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  max-width: 55%;
+}
+.f-wt-b {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--hover);
+  color: var(--fg-2);
+}
+.f-wt-b.ok {
+  color: var(--success);
+  background: var(--success-soft);
+}
+.f-wt-b.warn {
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+.f-wt-b.dim {
+  color: var(--fg-muted);
+  font-weight: 400;
+}
+.f-wt-b.wsp {
+  color: var(--info);
+  background: var(--info-soft);
+}
+.f-wt-reasons {
+  margin: 4px 0 0 24px;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-xs);
+  color: var(--warn);
+}
+.f-wt-reasons li::before {
+  content: '• ';
+}
+.f-wt-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0 2px 24px;
+  font-size: var(--fs-sm);
+}
+.f-wt-force {
+  color: #fca5a5;
+}
+.f-wt-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--fs-sm);
+}
+.f-wt-results li {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.f-wt-results li.ok svg {
+  color: var(--success);
+}
+.f-wt-results li.bad {
+  color: #fca5a5;
+}
+.f-wt-plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  font-size: var(--fs-sm);
+}
+.f-wt-p {
+  margin: 0;
+  color: var(--fg-2);
+}
+.f-wt-plan-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.f-wt-plan-h {
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+.f-wt-plan-step {
+  color: var(--info);
+  margin-bottom: 4px;
+}
+.f-wt-cmd {
+  margin: 2px 0;
+  padding: 4px var(--s-2);
+  border-radius: var(--r-xs);
+  background: var(--term-bg);
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 11px;
+}
+
+/* Sin ligaduras: «--force» y «=>» se leen tal cual. */
+.f-wt-modal .mono,
+.f-wt-cmd {
+  font-variant-ligatures: none;
+}

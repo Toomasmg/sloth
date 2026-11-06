@@ -30,7 +30,7 @@ export function Wordmark(): React.JSX.Element {
         <div className="wordmark-name">
           <span>Sloth</span>
         </div>
-        <div className="wordmark-tag">multi-cuenta · v0.3</div>
+        <div className="wordmark-tag">multi-cuenta · v0.4</div>
       </div>
     </div>
   )

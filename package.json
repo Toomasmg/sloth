@@ -1,7 +1,7 @@
 {
   "name": "sloth",
   "productName": "Sloth",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Sloth: varias cuentas de Claude Code, cada una en su PowerShell y su repo. Liviano a propósito.",
   "private": true,
   "main": "./out/main/index.js",
@@ -11,9 +11,11 @@
     "build:daemon": "node scripts/build-daemon.mjs",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "dist": "npm run build && electron-builder --win"
+    "dist": "npm run build && electron-builder --win",
+    "release": "npm run build && electron-builder --win --publish always"
   },
   "dependencies": {
+    "electron-updater": "^6.8.11",
     "node-pty": "^1.1.0"
   },
   "devDependencies": {
@@ -81,7 +83,8 @@
       "createDesktopShortcut": true,
       "shortcutName": "Sloth",
       "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico"
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "Sloth-Setup-${version}.${ext}"
     },
     "electronFuses": {
       "runAsNode": false,
@@ -97,6 +100,14 @@
       "es",
       "es-419",
       "en-US"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Toomasmg",
+        "repo": "sloth",
+        "releaseType": "release"
+      }
     ]
   },
   "author": "Tomy"

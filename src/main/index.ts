@@ -223,12 +223,13 @@ app.whenReady().then(async () => {
   const psQuote = (s: string): string => `'${s.replace(/[\r\n]+/g, ' ').replace(/'/g, "''")}'`
 
   function claudeCommand(ws: Workspace, acc: Account): string | undefined {
-    if (!ws.autoStartClaude) return undefined
+    // Los reemplazos (p. ej. retomar tras mover de cuenta) se aplican aunque el espacio no abra Claude solo.
     for (const o of commandOverrides) {
       let cmd: string | undefined
       safe('override', () => (cmd = o(ws, acc)))
       if (cmd) return cmd
     }
+    if (!ws.autoStartClaude) return undefined
     if (ws.initialPrompt && !ws.initialPromptUsed) {
       store.updateWorkspace(ws.id, { initialPromptUsed: true })
       return `claude ${psQuote(ws.initialPrompt)}`
@@ -442,6 +443,11 @@ app.whenReady().then(async () => {
       agents: () => agents,
       setAgent,
       addWorkspace,
+      removeWorkspace: async (id) => {
+        await (await backend()).kill(id)
+        agents.delete(id)
+        store.removeWorkspace(id)
+      },
       prepareAccount,
       restartTerminal: async (id) => {
         await (await backend()).kill(id)

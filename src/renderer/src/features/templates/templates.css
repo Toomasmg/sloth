@@ -1,0 +1,151 @@
+/* Plantillas de espacio: sección compacta del sidebar y diálogos. */
+.f-templates-list {
+  max-height: 188px;
+  overflow-y: auto;
+  gap: 1px;
+}
+.f-templates-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 36px;
+  padding: 2px var(--s-1) 2px 2px;
+  border-radius: var(--r-sm);
+}
+.f-templates-row:hover {
+  background: var(--hover);
+}
+.f-templates-play {
+  width: var(--h-xs);
+  height: var(--h-xs);
+  color: var(--accent);
+  background: var(--info-soft);
+}
+.f-templates-play:hover:not(:disabled) {
+  color: var(--on-accent);
+  background: var(--accent);
+}
+.f-templates-play:disabled {
+  opacity: 0.45;
+  cursor: progress;
+}
+.f-templates-row .grow-min {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.f-templates-row .item-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.f-templates-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.f-templates-busy {
+  margin-left: 6px;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--info);
+}
+.f-templates-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.f-templates-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.f-templates-actions {
+  display: flex;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity var(--t-fast);
+}
+.f-templates-actions .icon-btn {
+  width: var(--h-xs);
+  height: var(--h-xs);
+}
+.f-templates-row:hover .f-templates-actions,
+.f-templates-row:focus-within .f-templates-actions {
+  opacity: 1;
+}
+.f-templates-row .icon-btn:focus-visible,
+.f-templates-play:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+.f-templates-modal {
+  width: min(560px, calc(100vw - 32px));
+  gap: var(--s-3);
+}
+.f-templates-mini {
+  width: min(400px, calc(100vw - 32px));
+}
+.f-templates-icon {
+  color: var(--accent);
+}
+.f-templates-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-3);
+}
+.f-templates-text {
+  width: 100%;
+  resize: vertical;
+  min-height: 60px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--fs-md);
+  outline: none;
+}
+.f-templates-text:hover {
+  border-color: var(--border-strong);
+}
+.f-templates-text:focus {
+  border-color: var(--brand-2);
+  box-shadow: var(--brand-glow);
+}
+.f-templates-vars {
+  margin: 0;
+}
+.f-templates-vars code {
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+}
+.f-templates-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-left: calc(var(--s-1) * -1);
+  padding: 2px var(--s-1);
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.f-templates-toggle:hover {
+  color: var(--fg);
+}
+.f-templates-toggle:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}

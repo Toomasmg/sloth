@@ -1,0 +1,123 @@
+/* Función «updater»: chip de la barra de título y modal «Acerca de Sloth». */
+.f-updater-chip {
+  cursor: pointer;
+  color: var(--info);
+  background: var(--info-soft);
+  transition: background var(--t-fast) var(--ease);
+}
+.f-updater-chip:hover {
+  background: rgba(103, 216, 239, 0.2);
+}
+.f-updater-chip.ready {
+  color: var(--on-accent);
+  background: var(--accent);
+}
+.f-updater-chip.ready:hover {
+  background: #c2f2fb;
+}
+.f-updater-chip:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.f-updater-bar {
+  width: 36px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--line-2);
+  overflow: hidden;
+}
+.f-updater-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--info);
+  transition: width var(--t-med) var(--ease);
+}
+.f-updater-modal {
+  width: min(460px, calc(100vw - 32px));
+}
+.f-updater-modal:focus {
+  outline: none;
+}
+.f-updater-id {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+.f-updater-name {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  background: var(--brand-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 2px;
+}
+.f-updater-status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  margin: 0;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  background: var(--card);
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+}
+.f-updater-status > svg {
+  flex: none;
+  margin-top: 1px;
+}
+.f-updater-status.info {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.f-updater-status.ready,
+.f-updater-status.ok {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.f-updater-status.error {
+  background: var(--danger-soft);
+  color: #fca5a5;
+}
+.f-updater-note {
+  margin: calc(var(--s-2) * -1) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+}
+.f-updater-modal .switch-text {
+  white-space: normal;
+}
+.f-updater-sub {
+  display: block;
+  margin-top: 2px;
+}
+.f-updater-actions {
+  align-items: center;
+}
+.f-updater-actions a.btn {
+  text-decoration: none;
+}
+.f-updater-grow {
+  flex: 1;
+}
+.f-updater-spin {
+  animation: f-updater-rot 1s linear infinite;
+}
+@keyframes f-updater-rot {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .f-updater-spin {
+    animation: none;
+  }
+  .f-updater-bar > span {
+    transition: none;
+  }
+}
+.f-updater-modal .hint {
+  margin: 0;
+}
