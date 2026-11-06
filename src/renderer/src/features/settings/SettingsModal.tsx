@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ArrowCircleUp,
   ArrowCounterClockwise,
+  Bug,
   Check,
   CircleHalf,
   DownloadSimple,
   Keyboard,
+  Megaphone,
   Moon,
   Palette,
   SlidersHorizontal,
@@ -13,12 +15,15 @@ import {
   TerminalWindow,
   UploadSimple,
   UserCircle,
+  UserPlus,
   UsersThree,
   X
 } from '@phosphor-icons/react'
 import { useUi } from '../host'
 import { openAbout } from '../updater/bus'
 import { request as requestExportImport } from '../export-import/bus'
+import { openHelp } from '../help/bus'
+import { openReport } from '../report/bus'
 import {
   ACCOUNT_PALETTE,
   CURSORS,
@@ -511,6 +516,27 @@ function Data({ onClose }: { onClose(): void }): React.JSX.Element {
           <span className="grow-min">
             <strong>Actualizaciones y versión</strong>
             <span className="hint">Abre «Acerca de Sloth»: versión instalada y búsqueda de actualizaciones.</span>
+          </span>
+        </button>
+        <button type="button" className="f-settings-action" onClick={go(() => openHelp('invite'))}>
+          <UserPlus size={18} aria-hidden="true" />
+          <span className="grow-min">
+            <strong>Invitar a un compañero</strong>
+            <span className="hint">Copia un texto con los pasos para instalar Sloth y empezar.</span>
+          </span>
+        </button>
+        <button type="button" className="f-settings-action" onClick={go(() => openHelp('whatsnew'))}>
+          <Megaphone size={18} aria-hidden="true" />
+          <span className="grow-min">
+            <strong>Novedades</strong>
+            <span className="hint">Qué cambió en la última versión de Sloth.</span>
+          </span>
+        </button>
+        <button type="button" className="f-settings-action" onClick={go(() => openReport())}>
+          <Bug size={18} aria-hidden="true" />
+          <span className="grow-min">
+            <strong>Reportar un problema</strong>
+            <span className="hint">Abre GitHub con un resumen para revisar. Sin datos personales ni credenciales.</span>
           </span>
         </button>
       </div>

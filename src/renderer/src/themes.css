@@ -28,6 +28,11 @@
   --term-fg: #e3ebf0;
   --term-cursor: #9feaf9;
   --term-selection: #2c4a52;
+  /* Logo (Logo.tsx): en oscuro, los valores de siempre. */
+  --logo-1: #9feaf9;
+  --logo-2: #47848f;
+  --logo-core-fill: #1c1f29;
+  --logo-prompt: #9feaf9;
 }
 
 /* ---------- Tamaño de letra de la interfaz (12–15 px) ---------- */
@@ -77,6 +82,11 @@ html[data-theme='light'] {
   --term-fg: #1f2430;
   --term-cursor: #3b7681;
   --term-selection: #cfe3e7;
+  /* Logo en claro: el cian pálido de oscuro no se lee sobre blanco; estos pasan 3:1 con #f1f2f5. */
+  --logo-1: #3b7681;
+  --logo-2: #2f6f7a;
+  --logo-core-fill: #12151c;
+  --logo-prompt: #9feaf9;
   --bg: #f1f2f5;
   --surface: #f8f9fb;
   --card: #e9ecf1;

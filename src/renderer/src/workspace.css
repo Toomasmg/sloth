@@ -1,0 +1,176 @@
+/* v0.5 · espacios: ícono, renombrar, abrir en VS Code / carpeta, soltar carpeta. Solo clases propias. */
+
+/* Ícono del espacio (sidebar, pestañas y header). Nunca solo color: es un emoji. */
+.ws-icon,
+.pane-tab-icon {
+  flex: none;
+  font-size: 13px;
+  line-height: 1;
+  min-width: 1.2em;
+  text-align: center;
+}
+.ws-icon {
+  margin-right: 5px;
+}
+.pane-tab-icon {
+  margin-right: 2px;
+}
+
+/* Renombrar en el sidebar: el input reemplaza al botón (nunca un input dentro de un button). */
+.ws-edit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--row-min-h);
+  padding: 6px 10px;
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+.ws-rename,
+.pane-title-input {
+  min-width: 0;
+  flex: 1 1 auto;
+  font: inherit;
+  font-weight: 600;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-sm);
+  padding: 3px 7px;
+}
+.pane-title-input {
+  width: min(24ch, 100%);
+  flex: 0 1 auto;
+  font-size: 13px;
+}
+.ws-rename:focus-visible,
+.pane-title-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Botón de ícono en el header del panel: muestra el ícono o un Smiley tenue. */
+.pane-icon-btn {
+  align-self: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+.pane-icon-btn span {
+  line-height: 1;
+}
+
+/* Menú chico del espacio en el sidebar (clic derecho). */
+.ws-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 180px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+}
+.ws-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  color: var(--fg);
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-xs);
+  cursor: pointer;
+}
+.ws-menu button:hover,
+.ws-menu button:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+.ws-menu button:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* Popover de íconos. */
+.icon-picker {
+  position: fixed;
+  z-index: 60;
+  width: 248px;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-md);
+}
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+}
+.icon-picker-grid button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-xs);
+  cursor: pointer;
+}
+.icon-picker-grid button:hover {
+  background: var(--hover);
+}
+.icon-picker-grid button[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.icon-picker-grid button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.icon-picker-none {
+  margin-top: 8px;
+  width: 100%;
+  justify-content: center;
+}
+
+/* Overlay al soltar una carpeta: no captura el puntero, lo anuncia un role=status. */
+.folder-drop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: var(--backdrop-soft, rgba(10, 11, 15, 0.6));
+}
+.folder-drop-card {
+  padding: 18px 26px;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--fg);
+  background: var(--surface);
+  border: 2px dashed var(--accent);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-md);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ws-menu,
+  .icon-picker,
+  .folder-drop {
+    transition: none;
+  }
+}

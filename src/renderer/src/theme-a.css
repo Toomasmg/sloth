@@ -114,8 +114,7 @@
   justify-content: flex-start;
   font-weight: 500;
 }
-.f-palette-tb::after {
-  content: 'Buscar o ejecutar…';
+.f-palette-tb .f-palette-tb-label {
   order: 1;
   flex: 1;
   text-align: left;

@@ -190,6 +190,32 @@ export interface TermOptions {
   minimumContrastRatio: number
 }
 
+/**
+ * Lee un token CSS del tema aplicado. Vacío (tests, sin CSS) o si el tema del documento no es el
+ * que pide `p`: se usa la constante de siempre.
+ */
+function themeToken(name: string, dark: boolean): string | undefined {
+  if (typeof document === 'undefined') return undefined
+  const el = document.documentElement
+  if (el.dataset.theme !== (dark ? 'dark' : 'light')) return undefined
+  const v = getComputedStyle(el).getPropertyValue(name).trim()
+  return v || undefined
+}
+
+/** El tema de xterm sale de los tokens --term-* (themes.css / theme-a.css); los ANSI quedan como están. */
+function termTheme(dark: boolean): ITheme {
+  const base = dark ? TERM_THEME_DARK : TERM_THEME_LIGHT
+  const background = themeToken('--term-bg', dark) ?? base.background
+  return {
+    ...base,
+    background,
+    foreground: themeToken('--term-fg', dark) ?? base.foreground,
+    cursor: themeToken('--term-cursor', dark) ?? base.cursor,
+    cursorAccent: background,
+    selectionBackground: themeToken('--term-selection', dark) ?? base.selectionBackground
+  }
+}
+
 export function termOptions(p: SettingsPayload = state): TermOptions {
   const t = p.settings.terminal
   return {
@@ -198,7 +224,7 @@ export function termOptions(p: SettingsPayload = state): TermOptions {
     lineHeight: t.lineHeight,
     cursorStyle: CURSOR[t.cursorStyle],
     cursorBlink: t.cursorBlink,
-    theme: p.dark ? TERM_THEME_DARK : TERM_THEME_LIGHT,
+    theme: termTheme(p.dark),
     minimumContrastRatio: p.dark ? 1 : 4.5
   }
 }

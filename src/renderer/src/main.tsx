@@ -23,4 +23,10 @@ void Promise.all([fontsReady, settingsReady]).then(() => {
       <App />
     </StrictMode>
   )
+  // Pantalla de carga (index.html): se va después del primer frame con la app.
+  requestAnimationFrame(() => {
+    const s = document.getElementById('splash')
+    s?.classList.add('out')
+    setTimeout(() => s?.remove(), 200)
+  })
 })

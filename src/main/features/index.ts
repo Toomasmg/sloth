@@ -15,6 +15,7 @@ import team from './team'
 import chat from './chat'
 import help from './help'
 import report from './report'
+import moveAccount from './move-account'
 
 /** Todas las funciones del lado main. Para sumar una: crear su archivo y agregarla acá. */
-export const FEATURES: Feature[] = [history, git, worktrees, broadcast, templates, tray, updater, exportImport, gruv, settings, onboarding, teamConfig, team, chat, help, report]
+export const FEATURES: Feature[] = [history, git, worktrees, broadcast, templates, tray, updater, exportImport, gruv, settings, onboarding, teamConfig, team, chat, help, report, moveAccount]

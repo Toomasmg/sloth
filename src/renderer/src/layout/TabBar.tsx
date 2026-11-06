@@ -11,6 +11,8 @@ export interface TabInfo {
   color: string
   state?: AgentState
   perms: number
+  /** Ícono del espacio (emoji), solo para mostrar. */
+  icon?: string
 }
 
 interface Props {
@@ -82,6 +84,7 @@ export function TabBar({ tabs, active, drag, scope, onSelect, onHide, onPointerD
           >
             <span className="acc-dot" aria-hidden="true" />
             <StateIcon state={t.state} size={12} />
+            {t.icon && <span className="pane-tab-icon" aria-hidden="true">{t.icon}</span>}
             <span className="pane-tab-title">{t.title}</span>
             {t.perms > 0 && (
               <span className="pane-tab-perm" aria-hidden="true">

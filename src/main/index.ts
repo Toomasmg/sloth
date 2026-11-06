@@ -552,6 +552,9 @@ function createWindow(): void {
   // Se muestra cuando ya pintó (la pantalla de carga de index.html), maximizada si quedó así.
   win.once('ready-to-show', () => {
     if (!win) return
+    // Con escala de pantalla ≠ 100 %, Electron redondea el tamaño inicial hacia arriba unos px:
+    // se reaplica el tamaño guardado para que la ventana no crezca en cada reinicio.
+    if (saved.bounds) win.setBounds(saved.bounds)
     if (saved.maximized) win.maximize()
     win.show()
   })

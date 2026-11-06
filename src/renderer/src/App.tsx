@@ -4,13 +4,17 @@ import {
   ArrowsIn,
   ArrowsLeftRight,
   ArrowsOut,
+  Code,
   DotsSixVertical,
   Equals,
+  FolderOpen,
   GridFour,
   EyeSlash,
+  PencilSimple,
   Plus,
   ShieldWarning,
   SignIn,
+  Smiley,
   Tabs as TabsIcon,
   Terminal as TerminalIcon,
   Ticket,
@@ -28,7 +32,9 @@ import {
   type AgentStatus,
   type PermissionAnswer,
   type PermissionPrompt,
-  type Workspace
+  type RevealTarget,
+  type Workspace,
+  type WorkspacePatch
 } from '../../shared/types'
 import { api } from './api'
 import { UiContext, type NewWorkspacePreset, type PaneGuard, type UiCtx } from './features/host'
@@ -63,6 +69,9 @@ import { useReorderDrag } from './layout/useReorderDrag'
 import { Separators } from './layout/Separators'
 import { TabBar, type TabInfo } from './layout/TabBar'
 import './layout/layout.css'
+import { WorkspaceIconPicker } from './WorkspaceIconPicker'
+import { useFolderDrop } from './useFolderDrop'
+import './workspace.css'
 import { cleanError, fmtTok, shortPath, STATE_LABEL, totalTok, usageTitle } from './format'
 
 export function App(): React.JSX.Element {
@@ -82,6 +91,11 @@ export function App(): React.JSX.Element {
   const [perms, setPerms] = useState<PermissionPrompt[]>([])
   const [now, setNow] = useState(() => Date.now())
   const [announceId, setAnnounceId] = useState<string | null>(null)
+  // Renombrar un espacio desde el sidebar o desde el header de su panel (uno a la vez).
+  const [renaming, setRenaming] = useState<{ id: string; from: 'side' | 'pane' } | null>(null)
+  // Picker de ícono: `back` devuelve el foco a quien lo abrió. Menú chico del sidebar (clic derecho).
+  const [iconPick, setIconPick] = useState<{ wsId: string; x: number; y: number; back: () => void } | null>(null)
+  const [wsMenu, setWsMenu] = useState<{ wsId: string; x: number; y: number } | null>(null)
   const docVisible = useDocumentVisible()
 
   const refreshStatuses = useCallback(() => void api.accountStatuses().then(setStatuses), [])
@@ -284,6 +298,41 @@ export function App(): React.JSX.Element {
     setOpenPanesState((p) => p.filter((x) => x !== ws.id))
   }
 
+  // v0.5 · espacios: cambios por IPC (validados en main), abrir en VS Code / carpeta, soltar carpeta.
+  const patchWorkspace = async (ws: Workspace, patch: WorkspacePatch): Promise<void> => {
+    try {
+      const updated = await api.updateWorkspace(ws.id, patch)
+      setWorkspaces((list) => list.map((w) => (w.id === ws.id ? updated : w)))
+    } catch (e) {
+      setError(cleanError(e))
+    }
+  }
+  const revealWs = async (ws: Workspace, target: RevealTarget): Promise<void> => {
+    try {
+      await api.revealWorkspace(ws.id, target)
+    } catch (e) {
+      setError(cleanError(e))
+    }
+  }
+  /** Cierra la edición y devuelve el foco. `next` null = cancelar. */
+  const endRename = (ws: Workspace, from: 'side' | 'pane', next: string | null): void => {
+    setRenaming(null)
+    if (next !== null && next !== ws.name) void patchWorkspace(ws, { name: next })
+    requestAnimationFrame(() => {
+      if (from === 'side') document.querySelector<HTMLElement>(`[data-ws-btn="${CSS.escape(ws.id)}"]`)?.focus()
+      else focusTerminal(ws.id)
+    })
+  }
+  const openIconPicker = (wsId: string, x: number, y: number, back: () => void): void => setIconPick({ wsId, x, y, back })
+  const dropActive = useFolderDrop({
+    canCreate: accounts.length > 0,
+    onFolder: (repoPath, name) => {
+      setNewWsPreset({ repoPath, name })
+      setNewWsMode('normal')
+    },
+    onError: (m) => setError(m)
+  })
+
   const onTermError = useCallback((m: string) => setError(m), [])
 
   // ---------- Layout de paneles: vista (grilla/pestañas), proporciones y orden ----------
@@ -422,7 +471,8 @@ export function App(): React.JSX.Element {
             account: (accId && accountById.get(accId)?.label) || 'cuenta borrada',
             color: colorOf(accId),
             state: login ? undefined : agents[id]?.state,
-            perms: permsByWs.get(id)?.length ?? 0
+            perms: permsByWs.get(id)?.length ?? 0,
+            icon: login ? undefined : wsById.get(id)?.icon
           }
         })
       : []
@@ -587,32 +637,67 @@ export function App(): React.JSX.Element {
               const acc = accountById.get(ws.accountId)
               const open = openPanes.includes(ws.id)
               const nPerm = permsByWs.get(ws.id)?.length ?? 0
+              const editing = renaming?.id === ws.id && renaming.from === 'side'
               return (
-                <li key={ws.id} className="ws-li" data-account-id={ws.accountId} style={{ '--acc': colorOf(ws.accountId) } as React.CSSProperties}>
-                  <button
-                    className={`ws ${open ? 'open' : ''} ${focused === ws.id ? 'focused' : ''} ${ag?.state === 'waiting' || nPerm ? 'waiting' : ''}`}
-                    onClick={() => openPane(ws.id)}
-                    aria-label={`${ws.name}, ${acc?.label ?? 'cuenta borrada'}, ${ag ? STATE_LABEL[ag.state] : 'sin abrir'}${nPerm ? `, ${nPerm === 1 ? 'permiso pendiente' : `${nPerm} permisos pendientes`}` : ''}`}
-                  >
-                    <StateIcon state={ag?.state} />
-                    <span className="grow-min">
-                      <span className="item-title">
-                        <span className="ws-name">{ws.name}</span>
-                        {nPerm > 0 && (
-                          <span className="perm-tag">
-                            <ShieldWarning size={11} weight="fill" aria-hidden="true" />
-                            Permiso{nPerm > 1 ? ` ×${nPerm}` : ''}
-                          </span>
-                        )}
+                <li
+                  key={ws.id}
+                  className="ws-li"
+                  data-account-id={ws.accountId}
+                  style={{ '--acc': colorOf(ws.accountId) } as React.CSSProperties}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    setWsMenu({ wsId: ws.id, x: e.clientX, y: e.clientY })
+                  }}
+                >
+                  {editing ? (
+                    <div className="ws-edit">
+                      <StateIcon state={ag?.state} />
+                      <RenameInput
+                        className="ws-rename"
+                        initial={ws.name}
+                        label={`Nuevo nombre del espacio ${ws.name}`}
+                        onDone={(next) => endRename(ws, 'side', next)}
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      className={`ws ${open ? 'open' : ''} ${focused === ws.id ? 'focused' : ''} ${ag?.state === 'waiting' || nPerm ? 'waiting' : ''}`}
+                      data-ws-btn={ws.id}
+                      onClick={() => openPane(ws.id)}
+                      onDoubleClick={() => setRenaming({ id: ws.id, from: 'side' })}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'F2') return
+                        e.preventDefault()
+                        setRenaming({ id: ws.id, from: 'side' })
+                      }}
+                      aria-label={`${ws.icon ? `${ws.icon} ` : ''}${ws.name}, ${acc?.label ?? 'cuenta borrada'}, ${ag ? STATE_LABEL[ag.state] : 'sin abrir'}${nPerm ? `, ${nPerm === 1 ? 'permiso pendiente' : `${nPerm} permisos pendientes`}` : ''}`}
+                      title="Doble clic o F2 para renombrar · clic derecho para más opciones"
+                    >
+                      <StateIcon state={ag?.state} />
+                      <span className="grow-min">
+                        <span className="item-title">
+                          {ws.icon && (
+                            <span className="ws-icon" aria-hidden="true">
+                              {ws.icon}
+                            </span>
+                          )}
+                          <span className="ws-name">{ws.name}</span>
+                          {nPerm > 0 && (
+                            <span className="perm-tag">
+                              <ShieldWarning size={11} weight="fill" aria-hidden="true" />
+                              Permiso{nPerm > 1 ? ` ×${nPerm}` : ''}
+                            </span>
+                          )}
+                        </span>
+                        <span className="item-sub">
+                          <span className="acc-dot" aria-hidden="true" />
+                          <span className="ws-acc">{acc?.label ?? 'cuenta borrada'}</span>
+                          {ws.ticket && <span className="tag">{ws.ticket}</span>}
+                          <span className="mono ws-where">{ws.branch ?? shortPath(ws.cwd)}</span>
+                        </span>
                       </span>
-                      <span className="item-sub">
-                        <span className="acc-dot" aria-hidden="true" />
-                        <span className="ws-acc">{acc?.label ?? 'cuenta borrada'}</span>
-                        {ws.ticket && <span className="tag">{ws.ticket}</span>}
-                        <span className="mono ws-where">{ws.branch ?? shortPath(ws.cwd)}</span>
-                      </span>
-                    </span>
-                  </button>
+                    </button>
+                  )}
                   <button className="icon-btn danger ws-del" onClick={() => void removeWorkspace(ws)} aria-label={`Quitar espacio ${ws.name}`} title="Quitar espacio">
                     <Trash size={14} aria-hidden="true" />
                   </button>
@@ -729,9 +814,37 @@ export function App(): React.JSX.Element {
               >
                 <span className="pane-id">
                   <span className="acc-dot pane-dot" aria-hidden="true" />
-                  <span className="pane-title" title={login ? undefined : ws?.name}>
-                    {login ? 'Terminal de cuenta' : ws?.name}
-                  </span>
+                  {ws && (
+                    <button
+                      type="button"
+                      className="icon-btn pane-icon-btn"
+                      onClick={(e) => {
+                        const btn = e.currentTarget
+                        const r = btn.getBoundingClientRect()
+                        openIconPicker(ws.id, r.left, r.bottom + 6, () => btn.focus())
+                      }}
+                      aria-label={`Elegir ícono de ${ws.name}`}
+                      title="Elegir ícono"
+                    >
+                      {ws.icon ? <span aria-hidden="true">{ws.icon}</span> : <Smiley size={14} aria-hidden="true" />}
+                    </button>
+                  )}
+                  {ws && renaming?.id === ws.id && renaming.from === 'pane' ? (
+                    <RenameInput
+                      className="pane-title-input"
+                      initial={ws.name}
+                      label={`Nuevo nombre de ${ws.name}`}
+                      onDone={(next) => endRename(ws, 'pane', next)}
+                    />
+                  ) : (
+                    <span
+                      className="pane-title"
+                      title={login ? undefined : ws?.name}
+                      onDoubleClick={ws ? () => setRenaming({ id: ws.id, from: 'pane' }) : undefined}
+                    >
+                      {login ? 'Terminal de cuenta' : ws?.name}
+                    </span>
+                  )}
                   {ws?.ticket && <span className="tag">{ws.ticket}</span>}
                   <span className="pane-meta">
                     <span className="acc-badge" title={email}>
@@ -746,6 +859,16 @@ export function App(): React.JSX.Element {
                 </span>
                 {ag && <StatePill state={ag.state} detail={ag.detail} />}
                 <span className="pane-actions">
+                {ws && (
+                  <>
+                    <button type="button" className="icon-btn" onClick={() => void revealWs(ws, 'vscode')} aria-label="Abrir en VS Code" title="Abrir en VS Code">
+                      <Code size={15} aria-hidden="true" />
+                    </button>
+                    <button type="button" className="icon-btn" onClick={() => void revealWs(ws, 'folder')} aria-label="Abrir carpeta" title="Abrir carpeta">
+                      <FolderOpen size={15} aria-hidden="true" />
+                    </button>
+                  </>
+                )}
                 <PaneHeaderSlot paneId={paneId} />
                 <button
                   className="icon-btn"
@@ -830,6 +953,55 @@ export function App(): React.JSX.Element {
         />
       )}
 
+      {dropActive && (
+        <div className="folder-drop" role="status" aria-live="polite">
+          <div className="folder-drop-card">Soltá la carpeta para crear un espacio</div>
+        </div>
+      )}
+
+      {wsMenu && wsById.get(wsMenu.wsId) && (
+        <WsMenu
+          x={wsMenu.x}
+          y={wsMenu.y}
+          onClose={() => {
+            setWsMenu(null)
+            requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-ws-btn="${CSS.escape(wsMenu.wsId)}"]`)?.focus())
+          }}
+          onRename={() => {
+            const id = wsMenu.wsId
+            setWsMenu(null)
+            setRenaming({ id, from: 'side' })
+          }}
+          onIcon={() => {
+            const id = wsMenu.wsId
+            const { x, y } = wsMenu
+            setWsMenu(null)
+            openIconPicker(id, x, y, () => document.querySelector<HTMLElement>(`[data-ws-btn="${CSS.escape(id)}"]`)?.focus())
+          }}
+        />
+      )}
+
+      {iconPick && wsById.get(iconPick.wsId) && (
+        <WorkspaceIconPicker
+          name={wsById.get(iconPick.wsId)!.name}
+          current={wsById.get(iconPick.wsId)!.icon}
+          x={iconPick.x}
+          y={iconPick.y}
+          onClose={() => {
+            const back = iconPick.back
+            setIconPick(null)
+            requestAnimationFrame(back)
+          }}
+          onPick={(icon) => {
+            const ws = wsById.get(iconPick.wsId)!
+            const back = iconPick.back
+            setIconPick(null)
+            requestAnimationFrame(back)
+            void patchWorkspace(ws, { icon })
+          }}
+        />
+      )}
+
       {error && (
         <div className="toast" role="alert">
           <WarningCircle size={18} weight="fill" aria-hidden="true" />
@@ -855,6 +1027,119 @@ function focusTerminal(id: string, tries = 8): void {
   const ta = document.querySelector<HTMLElement>(`[data-pane-id="${CSS.escape(id)}"] .xterm-helper-textarea`)
   if (ta && ta.closest<HTMLElement>('.pane')?.offsetParent !== null) ta.focus()
   else if (tries > 0) requestAnimationFrame(() => focusTerminal(id, tries - 1))
+}
+
+/** Input para renombrar. Enter o salir guardan (si hay texto); Escape cancela. Responde una sola vez. */
+function RenameInput({
+  initial,
+  label,
+  className,
+  onDone
+}: {
+  initial: string
+  label: string
+  className: string
+  onDone(next: string | null): void
+}): React.JSX.Element {
+  const [text, setText] = useState(initial)
+  const ref = useRef<HTMLInputElement>(null)
+  const done = useRef(false)
+  useEffect(() => {
+    ref.current?.focus()
+    ref.current?.select()
+  }, [])
+  const finish = (next: string | null): void => {
+    if (done.current) return
+    done.current = true
+    onDone(next)
+  }
+  const value = (): string | null => text.trim() || null
+  return (
+    <input
+      ref={ref}
+      className={className}
+      value={text}
+      maxLength={80}
+      aria-label={label}
+      spellCheck={false}
+      autoComplete="off"
+      onChange={(e) => setText(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          finish(value())
+        } else if (e.key === 'Escape') {
+          e.preventDefault()
+          e.stopPropagation()
+          finish(null)
+        }
+      }}
+      onBlur={() => finish(value())}
+    />
+  )
+}
+
+/** Menú chico de un espacio en el sidebar (clic derecho). Escape o clic afuera lo cierran. */
+function WsMenu({
+  x,
+  y,
+  onRename,
+  onIcon,
+  onClose
+}: {
+  x: number
+  y: number
+  onRename(): void
+  onIcon(): void
+  onClose(): void
+}): React.JSX.Element {
+  const ref = useRef<HTMLDivElement>(null)
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+  useEffect(() => {
+    ref.current?.querySelector<HTMLElement>('button')?.focus()
+    const onDown = (e: PointerEvent): void => {
+      if (!ref.current?.contains(e.target as Node)) closeRef.current()
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        closeRef.current()
+      }
+    }
+    document.addEventListener('pointerdown', onDown, true)
+    document.addEventListener('keydown', onKey, true)
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true)
+      document.removeEventListener('keydown', onKey, true)
+    }
+  }, [])
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>): void => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    const items = [...(ref.current?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
+    const i = items.indexOf(document.activeElement as HTMLButtonElement)
+    e.preventDefault()
+    const j = e.key === 'ArrowDown' ? (i + 1) % items.length : (i - 1 + items.length) % items.length
+    items[j]?.focus()
+  }
+  return (
+    <div
+      ref={ref}
+      className="ws-menu"
+      role="menu"
+      aria-label="Opciones del espacio"
+      style={{ left: Math.max(8, Math.min(x, window.innerWidth - 196)), top: Math.max(8, Math.min(y, window.innerHeight - 110)) }}
+      onKeyDown={onKeyDown}
+    >
+      <button type="button" role="menuitem" onClick={onRename}>
+        <PencilSimple size={14} aria-hidden="true" /> Renombrar
+      </button>
+      <button type="button" role="menuitem" onClick={onIcon}>
+        <Smiley size={14} aria-hidden="true" /> Cambiar ícono
+      </button>
+    </div>
+  )
 }
 
 function AddAccount({ onAdd }: { onAdd: (label: string) => Promise<void> }): React.JSX.Element {

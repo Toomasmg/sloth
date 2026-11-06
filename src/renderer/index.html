@@ -7,8 +7,53 @@
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://avatars.githubusercontent.com; font-src 'self' data:"
     />
     <title>Sloth</title>
+    <style>
+      /* Pantalla de carga (v0.5, T6): fondo transparente, se ve el color de la ventana. */
+      #splash {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        pointer-events: none;
+        z-index: 100;
+        transition: opacity 0.2s ease;
+      }
+      #splash.out {
+        opacity: 0;
+      }
+      #splash svg {
+        width: 64px;
+        height: 64px;
+        animation: splash-pulse 1.8s ease-in-out infinite;
+      }
+      @keyframes splash-pulse {
+        0%,
+        100% {
+          opacity: 0.55;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #splash svg {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="splash" aria-hidden="true">
+      <svg viewBox="0 0 32 32" focusable="false">
+        <ellipse cx="16" cy="16" rx="13" ry="5.2" transform="rotate(-30 16 16)" fill="none" stroke="#3f8794" stroke-width="1.7" />
+        <ellipse cx="16" cy="16" rx="13" ry="5.2" transform="rotate(30 16 16)" fill="none" stroke="#3f8794" stroke-width="1.7" />
+        <circle cx="27.3" cy="9.5" r="1.9" fill="#3f8794" />
+        <circle cx="4.7" cy="9.5" r="1.9" fill="#3f8794" />
+        <rect x="10.5" y="10.5" width="11" height="11" rx="3" fill="none" stroke="#3f8794" stroke-width="1.4" />
+        <path d="M14 14l2.6 2-2.6 2" fill="none" stroke="#3f8794" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M17.6 18.6h2" stroke="#3f8794" stroke-width="1.8" stroke-linecap="round" />
+      </svg>
+    </div>
     <div id="root"></div>
     <script type="module" src="./src/main.tsx"></script>
   </body>

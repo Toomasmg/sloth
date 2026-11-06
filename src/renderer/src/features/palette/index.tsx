@@ -234,6 +234,11 @@ function Palette({ onClose }: { onClose: (restore: boolean) => void }): React.JS
                   onMouseMove={() => i !== safeActive && setActive(i)}
                   onClick={() => run(row)}
                 >
+                  {row.cmd.icon && (
+                    <span className="f-palette-ico" aria-hidden="true">
+                      {row.cmd.icon}
+                    </span>
+                  )}
                   <span className="f-palette-text">
                     <span className="f-palette-title">
                       <Highlight text={row.cmd.title} pos={row.match?.title} />
@@ -305,6 +310,7 @@ function Titlebar(): React.JSX.Element {
   return (
     <button type="button" className="f-palette-tb" onClick={() => setOpen(true)} title="Paleta de comandos (Ctrl+K)" aria-label="Abrir paleta de comandos (Ctrl+K)">
       <CommandIcon size={13} aria-hidden="true" />
+      <span className="f-palette-tb-label">Buscar o ejecutar…</span>
       <span className="f-palette-tb-keys" aria-hidden="true">
         Ctrl K
       </span>
