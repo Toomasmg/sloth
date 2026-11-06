@@ -107,5 +107,5 @@
 }
 .f-ei-errors li {
   display: block;
-  color: #fca5a5;
+  color: var(--danger-fg);
 }

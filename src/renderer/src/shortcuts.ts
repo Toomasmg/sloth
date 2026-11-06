@@ -11,13 +11,19 @@ export interface Shortcut {
 }
 
 export const SHORTCUTS: Shortcut[] = [
-  { keys: [['Ctrl', 'K']], what: 'Paleta de comandos' },
-  { keys: [['Ctrl', 'Shift', 'P']], what: 'Paleta de comandos (alternativo)' },
-  { keys: [['Ctrl', ',']], what: 'Configuración' },
-  { keys: [['Ctrl', 'Shift', 'F']], what: 'Buscar en el historial de conversaciones' },
-  { keys: [['Ctrl', 'Shift', 'B']], what: 'Enviar a varios espacios' },
-  { keys: [['Ctrl', 'Shift', 'C']], what: 'Copiar la selección de la terminal' },
-  { keys: [['Ctrl', 'Shift', 'V']], what: 'Pegar en la terminal' },
-  { keys: [['Clic derecho']], what: 'En la terminal: copia si hay selección, si no pega' },
-  { keys: [['Esc']], what: 'Cerrar ventanas y paletas' }
+  { keys: [['Ctrl', 'K']], what: 'Paleta de comandos', group: 'General' },
+  { keys: [['Ctrl', 'Shift', 'P']], what: 'Paleta de comandos (alternativo)', group: 'General' },
+  { keys: [['Ctrl', ',']], what: 'Configuración', group: 'General' },
+  { keys: [['?']], what: 'Esta hoja de atajos', group: 'General' },
+  { keys: [['Ctrl', 'Shift', 'F']], what: 'Buscar en el historial de conversaciones', group: 'General' },
+  { keys: [['Ctrl', 'Shift', 'B']], what: 'Enviar a varios espacios', group: 'General' },
+  { keys: [['Esc']], what: 'Cerrar ventanas y paletas', group: 'General' },
+  { keys: [['Ctrl', 'Tab'], ['Ctrl', 'Shift', 'Tab']], what: 'Cambiar de panel (siguiente o anterior, en pestañas)', group: 'Paneles' },
+  { keys: [['Ctrl', 'Alt', '←']], what: 'Mover el panel a la izquierda', group: 'Paneles' },
+  { keys: [['Ctrl', 'Alt', '→']], what: 'Mover el panel a la derecha', group: 'Paneles' },
+  { keys: [['Ctrl', 'Alt', '↑']], what: 'Mover el panel a la fila de arriba', group: 'Paneles' },
+  { keys: [['Ctrl', 'Alt', '↓']], what: 'Mover el panel a la fila de abajo', group: 'Paneles' },
+  { keys: [['Ctrl', 'Shift', 'C']], what: 'Copiar la selección de la terminal', group: 'Terminal' },
+  { keys: [['Ctrl', 'Shift', 'V']], what: 'Pegar en la terminal', group: 'Terminal' },
+  { keys: [['Clic derecho']], what: 'En la terminal: copia si hay selección, si no pega', group: 'Terminal' }
 ]

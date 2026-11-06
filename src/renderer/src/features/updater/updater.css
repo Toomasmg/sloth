@@ -79,7 +79,7 @@
 }
 .f-updater-status.error {
   background: var(--danger-soft);
-  color: #fca5a5;
+  color: var(--danger-fg);
 }
 .f-updater-note {
   margin: calc(var(--s-2) * -1) 0 0;

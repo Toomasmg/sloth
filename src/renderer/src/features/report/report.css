@@ -1,0 +1,26 @@
+.f-report-modal {
+  width: min(600px, calc(100vw - 32px));
+}
+
+.f-report-note {
+  margin: 0 0 var(--s-3);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+
+.f-report-body {
+  min-height: 260px;
+  max-height: 46vh;
+  resize: vertical;
+  font-size: var(--fs-xs);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: auto;
+}
+
+.f-report-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+}

@@ -1,14 +1,55 @@
-import type { Feature } from './context'
+import { app } from 'electron'
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import type { Feature, FeatureContext } from './context'
+import { isVersion, parseHelpState, whatsNewFor } from './help-core'
+import { CHANGELOG } from '../../shared/changelog'
 
 /**
- * Función «help» (lado main): «Novedades» (versión vista por última vez) e «Invitar a un compañero».
- * STUB v0.5: lo completa T3. Canales previstos: feat:help:whatsnew → { current, lastSeen, show },
- * feat:help:seen(version) → void.
+ * Función «help» (lado main): «Novedades» (qué versión vio por última vez el usuario).
+ * Canales: feat:help:whatsnew → { current, lastSeen, show, entries }, feat:help:seen(version) → void.
+ * Estado: userData/features/help.json, { lastSeen }. Escritura atómica (tmp + rename).
  */
+const file = (): string => join(app.getPath('userData'), 'features', 'help.json')
+
+function readLastSeen(): string | null {
+  try {
+    return parseHelpState(JSON.parse(readFileSync(file(), 'utf8').replace(/^﻿/, ''))).lastSeen
+  } catch {
+    return null
+  }
+}
+
+function writeLastSeen(version: string): void {
+  const path = file()
+  mkdirSync(dirname(path), { recursive: true })
+  const tmp = `${path}.${process.pid}.tmp`
+  writeFileSync(tmp, JSON.stringify({ lastSeen: version }, null, 2), 'utf8')
+  renameSync(tmp, path)
+}
+
 const feature: Feature = {
   name: 'help',
-  register() {
-    /* T3 */
+  register(ctx: FeatureContext) {
+    ctx.handle('whatsnew', () => {
+      const current = app.getVersion()
+      const lastSeen = readLastSeen()
+      if (lastSeen === null) {
+        // Primera instalación: se marca la versión actual y no se muestran novedades.
+        try {
+          writeLastSeen(current)
+        } catch (e) {
+          ctx.log('help: no se pudo guardar la versión vista', e)
+        }
+        return { current, lastSeen: null, show: false, entries: [] }
+      }
+      return whatsNewFor(CHANGELOG, lastSeen, current)
+    })
+
+    ctx.handle('seen', (version: unknown) => {
+      if (!isVersion(version)) throw new Error('Versión inválida')
+      writeLastSeen(version)
+    })
   }
 }
 

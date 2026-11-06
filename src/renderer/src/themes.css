@@ -59,12 +59,8 @@ html[data-density='compact'] {
   --pane-head-h: 36px;
   --row-min-h: 48px;
 }
-/* Alturas que styles.css tiene fijas: se ajustan acá hasta que usen --pane-head-h / --row-min-h. */
-html[data-density='comfortable'] .pane-head {
-  height: var(--pane-head-h);
-}
+/* Densidad «cómoda» en filas (las alturas salen de --pane-head-h / --row-min-h, en styles.css). */
 html[data-density='comfortable'] .ws {
-  min-height: var(--row-min-h);
   padding-top: 9px;
   padding-bottom: 9px;
 }
@@ -141,9 +137,6 @@ html[data-theme='light'] {
 /* ---------- Valores fijos del tema claro (de a-light.css + colores fijos del núcleo y funciones) ----------
    Están en el informe como «pedido al núcleo»: cuando styles.css y las funciones usen los tokens,
    las reglas que solo cambian un color se pueden borrar. */
-html[data-theme='light'] ::selection {
-  background: var(--selection);
-}
 html[data-theme='light'] .wordmark-name span,
 html[data-theme='light'] .empty h1 span {
   background: var(--brand-text);
@@ -179,12 +172,6 @@ html[data-theme='light'] .btn.ghost {
 html[data-theme='light'] .btn.ghost:hover:not(:disabled) {
   background: var(--hover);
 }
-html[data-theme='light'] .btn.danger,
-html[data-theme='light'] .field-error,
-html[data-theme='light'] .form-error,
-html[data-theme='light'] .perm-error {
-  color: var(--danger-fg);
-}
 html[data-theme='light'] .btn.danger {
   background: var(--danger-soft);
   box-shadow: none;
@@ -203,12 +190,6 @@ html[data-theme='light'] select {
 }
 html[data-theme='light'] .inline-form input {
   background: transparent;
-}
-html[data-theme='light'] input::placeholder {
-  color: var(--placeholder);
-}
-html[data-theme='light'] .ws.open {
-  background: var(--open-bg);
 }
 html[data-theme='light'] .ws.open:hover {
   background: var(--hover);
@@ -235,18 +216,6 @@ html[data-theme='light'] .modal {
   background: #fff;
   box-shadow: var(--shadow-lg);
 }
-html[data-theme='light'] .toast {
-  background: var(--toast-bg);
-  border-color: var(--toast-border);
-  color: var(--danger-fg-strong);
-  box-shadow: var(--shadow-md);
-}
-html[data-theme='light'] .toast .icon-btn {
-  color: var(--danger-fg-strong);
-}
-html[data-theme='light'] .tb-perm {
-  box-shadow: inset 0 0 0 1px var(--warn-ring);
-}
 html[data-theme='light'] .tb-perm:hover {
   background: rgba(217, 119, 6, 0.18);
 }
@@ -268,6 +237,9 @@ html[data-theme='light'] ::-webkit-scrollbar-thumb {
   background: rgba(16, 22, 34, 0.14);
   background-clip: padding-box;
 }
+html[data-theme='light'] .sidebar:hover::-webkit-scrollbar-thumb {
+  background: rgba(16, 22, 34, 0.14);
+}
 
 /* Colores de cuenta: los tonos automáticos son pastel (pensados para oscuro). En claro el texto va
    oscuro y los puntos y marcas se oscurecen para tener 3:1 sobre el fondo. */
@@ -287,16 +259,6 @@ html[data-theme='light'] .ws.focused::before {
 }
 
 /* Funciones (colores fijos en sus .css). */
-html[data-theme='light'] .f-ei-errors li,
-html[data-theme='light'] .f-updater-status.error,
-html[data-theme='light'] .f-wt-force,
-html[data-theme='light'] .f-wt-results li.bad {
-  color: var(--danger-fg);
-}
-html[data-theme='light'] .f-wt-danger {
-  color: var(--danger-fg-strong);
-}
-html[data-theme='light'] .f-git-backdrop,
 html[data-theme='light'] .f-palette-backdrop {
   background: var(--backdrop-soft);
 }
@@ -306,20 +268,8 @@ html[data-theme='light'] .f-git-sub-backdrop {
 html[data-theme='light'] .f-git-drawer {
   box-shadow: -16px 0 48px rgba(16, 22, 34, 0.16);
 }
-html[data-theme='light'] .f-gruv-board {
-  box-shadow: var(--shadow-lg);
-}
 html[data-theme='light'] .f-git-ln {
   color: var(--fg-muted);
-}
-html[data-theme='light'] .f-git-l-add {
-  background: var(--diff-add);
-}
-html[data-theme='light'] .f-git-l-del {
-  background: var(--diff-del);
-}
-html[data-theme='light'] .f-history-snip mark {
-  background: var(--mark);
 }
 html[data-theme='light'] .f-palette {
   background: rgba(255, 255, 255, 0.98);

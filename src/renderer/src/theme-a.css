@@ -1,0 +1,630 @@
+/* =====================================================================
+   Sloth · Dirección A — «Minimal» (tipo Linear / Raycast)
+   Mucho aire, jerarquía tipográfica fuerte con Segoe UI Variable,
+   bordes casi invisibles, superficies por elevación y un solo acento.
+   Se importa después de styles.css y antes de themes.css: solo sobrescribe.
+   ===================================================================== */
+:root {
+  --bg: #111318;
+  --surface: #14161c;
+  --card: #1b1e25;
+  --card-hover: #22262e;
+  --muted: #262a33;
+  --border: #2a2e38;
+  --border-strong: #3a3f4b;
+  --fg: #eceff4;
+  --fg-2: #bec5d1;
+  --fg-muted: #8b93a3;
+  --accent: #9feaf9;
+  --brand-grad: #9feaf9;
+  --brand-glow: 0 0 0 3px rgba(159, 234, 249, 0.16);
+  --term-bg: #111318;
+  --line: rgba(255, 255, 255, 0.05);
+  --line-2: rgba(255, 255, 255, 0.08);
+  --hover: rgba(255, 255, 255, 0.04);
+  --press: rgba(255, 255, 255, 0.06);
+  --warn-soft: rgba(245, 176, 65, 0.1);
+  --info-soft: rgba(103, 216, 239, 0.1);
+  --success-soft: rgba(74, 222, 128, 0.09);
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 14px;
+  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI Variable Text', 'Segoe UI', sans-serif;
+  --side-w: 264px;
+  font-size: 13px;
+  letter-spacing: 0.002em;
+}
+
+/* ---------- Layout ---------- */
+.app {
+  grid-template-columns: var(--side-w) 1fr;
+}
+.titlebar {
+  background: var(--bg);
+  border-bottom: 0;
+  gap: var(--s-2);
+}
+.titlebar-brand {
+  width: var(--side-w);
+  background: var(--surface);
+  border-right: 0;
+  padding: 0 18px;
+}
+.titlebar-brand svg {
+  width: 18px;
+  height: 18px;
+}
+.titlebar-brand .wordmark-name {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.wordmark-name span {
+  background: none;
+  color: var(--fg);
+}
+.titlebar-brand .wordmark-tag {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--fg-muted);
+  opacity: 0.8;
+}
+/* Estados arriba: texto + ícono coloreado, sin pastillas rellenas. */
+.tb-chip {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--fg-2) !important;
+  font-weight: 500;
+  font-size: 12px;
+}
+.tb-chip svg {
+  opacity: 1;
+}
+.tb-working svg { color: var(--info); }
+.tb-waiting svg,
+.tb-perm svg { color: var(--warn); }
+.tb-done svg { color: var(--success); }
+.tb-perm {
+  color: var(--warn) !important;
+}
+.tb-perm:hover,
+.tb-daemon:hover {
+  background: var(--hover) !important;
+}
+.titlebar-status {
+  gap: 2px;
+  padding-left: var(--s-2);
+}
+.tb-daemon:not(.simple) svg:first-child {
+  color: var(--fg-muted);
+}
+.f-palette-tb {
+  height: 26px;
+  padding: 0 6px 0 10px;
+  gap: 8px;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg-muted);
+  min-width: 190px;
+  justify-content: flex-start;
+  font-weight: 500;
+}
+.f-palette-tb::after {
+  content: 'Buscar o ejecutar…';
+  order: 1;
+  flex: 1;
+  text-align: left;
+}
+.f-palette-tb .f-palette-tb-keys {
+  order: 2;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  background: var(--surface);
+  border-right: 0;
+  padding: 4px 0 12px;
+}
+.section {
+  border-bottom: 0;
+  padding: 14px 12px 6px;
+}
+.section-title {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  padding-left: 8px;
+}
+.count {
+  background: transparent;
+  color: var(--fg-muted);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0;
+  min-width: 0;
+}
+/* Cuentas: filas planas, sin tarjeta; el uso en una sola línea. */
+.list:has(> .account) {
+  gap: 2px;
+}
+.account {
+  background: transparent;
+  padding: 8px;
+  gap: 6px;
+  border-radius: 8px;
+}
+.account:hover {
+  background: var(--hover);
+}
+.account-top {
+  gap: 10px;
+}
+.acc-chip {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 11px;
+  color: var(--bg);
+  background: var(--acc);
+}
+.account .item-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.account .item-sub {
+  font-size: 12px;
+}
+.account-top .icon-btn {
+  opacity: 0;
+  width: 24px;
+  height: 24px;
+}
+.account:hover .account-top .icon-btn,
+.account-top .icon-btn:focus-visible {
+  opacity: 1;
+}
+.usage {
+  display: flex;
+  gap: 14px;
+  border-top: 0;
+  padding: 0 0 0 32px;
+  white-space: nowrap;
+}
+/* Minimal: solo lo que se mira seguido (5 h y hoy); 7 días queda en el title. */
+.usage div:nth-child(3) {
+  display: none;
+}
+.usage div {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 4px;
+  padding: 0;
+  border-left: 0;
+}
+.usage dt {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11.5px;
+  font-weight: 400;
+}
+.usage dd {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.account .switch {
+  padding-left: 32px;
+  font-size: 11.5px;
+  color: var(--fg-muted);
+}
+.switch-track {
+  width: 26px;
+  height: 16px;
+  box-shadow: none;
+  background: var(--muted);
+}
+.switch-track::after {
+  top: 3px;
+  left: 3px;
+  width: 10px;
+  height: 10px;
+}
+.switch input:checked + .switch-track {
+  background: var(--brand-2);
+}
+.switch input:checked + .switch-track::after {
+  transform: translateX(10px);
+}
+.inline-form {
+  padding: 0 0 0 8px;
+}
+.inline-form input {
+  height: 30px;
+  background: transparent;
+  border-color: transparent;
+  padding-left: 0;
+  color: var(--fg-2);
+}
+.inline-form input:hover {
+  border-color: transparent;
+}
+.inline-form input:focus {
+  border-color: var(--line-2);
+  padding-left: 8px;
+}
+.inline-form .btn.icon-only {
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--fg-muted);
+}
+
+/* Espacios: filas de navegación limpias. */
+.section-row {
+  margin-bottom: 4px;
+}
+.section-row .btn.sm {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.section-row .btn.sm:not(.primary) {
+  background: transparent;
+  box-shadow: none;
+  color: var(--fg-muted);
+}
+.section-row .btn.sm:not(.primary):hover {
+  color: var(--fg);
+}
+.btn.primary {
+  background: var(--accent);
+  color: #0d1117;
+  font-weight: 600;
+}
+.btn.primary:hover:not(:disabled) {
+  background: #b8f1fc;
+  filter: none;
+}
+.list {
+  gap: 1px;
+}
+.ws {
+  min-height: var(--row-min-h);
+  padding: 6px 32px 6px 10px;
+  gap: 10px;
+  border-radius: 8px;
+}
+.ws.open {
+  background: transparent;
+}
+.ws.focused,
+.ws.focused:hover {
+  background: var(--card);
+}
+.ws.focused::before {
+  display: none;
+}
+.ws-name {
+  color: var(--fg-2);
+  font-weight: 500;
+}
+.ws.open .ws-name,
+.ws.focused .ws-name {
+  color: var(--fg);
+  font-weight: 600;
+}
+.ws .item-sub {
+  font-size: 11.5px;
+}
+.ws .tag,
+.tag {
+  background: transparent;
+  color: var(--fg-muted);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  font-weight: 500;
+  border-radius: 4px;
+}
+.perm-tag {
+  background: transparent;
+  padding: 0;
+  font-weight: 600;
+}
+.acc-dot {
+  width: 6px;
+  height: 6px;
+}
+
+/* Secciones colapsables al pie: discretas. */
+.f-wt-section,
+.f-templates {
+  border-top: 0 !important;
+}
+.f-wt-title,
+.f-templates-toggle {
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: 12px !important;
+}
+
+/* ---------- Paneles ---------- */
+.panes {
+  padding: 2px 4px 4px;
+  background: var(--bg);
+}
+.pane {
+  border-radius: 10px;
+  background: var(--term-bg);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.pane.focused {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+.pane::after {
+  height: 1px;
+}
+.pane-head {
+  height: var(--pane-head-h);
+  padding: 0 8px 0 14px;
+  background: transparent;
+  border-bottom: 1px solid var(--line);
+}
+.pane-title {
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.pane-dot {
+  width: 7px;
+  height: 7px;
+}
+.acc-badge {
+  color: var(--fg-muted);
+  font-weight: 500;
+}
+.pill {
+  background: transparent !important;
+  color: var(--fg-2) !important;
+  font-weight: 500;
+  font-size: 12px;
+  padding: 0 4px;
+}
+.pill-working svg { color: var(--info); }
+.pill-waiting svg { color: var(--warn); }
+.pill-done svg { color: var(--success); }
+.pill-exited svg { color: var(--danger); }
+.pane-actions .icon-btn {
+  opacity: 0.35;
+}
+.terminal-host {
+  padding: 10px 6px 0 14px;
+}
+.xterm .xterm-scrollable-element {
+  background-color: var(--term-bg) !important;
+}
+
+/* Permiso: bloque claro, poco color; el ámbar solo en ícono y línea. */
+.perm-card {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding: 14px 16px 14px;
+  gap: 10px;
+}
+.perm-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+.perm-title code {
+  color: var(--fg);
+  background: var(--card);
+}
+.perm-queue {
+  background: transparent;
+  color: var(--fg-muted);
+  font-weight: 500;
+}
+.perm-code {
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+  border-radius: 8px;
+}
+.perm-actions .btn.sm:not(.primary) {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.perm-actions .btn.danger {
+  box-shadow: none;
+  background: transparent;
+  color: var(--danger-fg);
+}
+.btn.sm {
+  border-radius: 6px;
+}
+
+/* ---------- Vacío ---------- */
+.empty-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.empty-logo svg {
+  width: 40px;
+  height: 40px;
+}
+.empty h1 {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  margin-top: 28px;
+}
+.empty h1 span {
+  background: none;
+  color: var(--fg);
+}
+.empty-lead {
+  font-size: 15px;
+  color: var(--fg-muted);
+  margin-bottom: 40px;
+}
+.steps {
+  gap: 0;
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.steps li {
+  background: transparent;
+  box-shadow: none !important;
+  border-radius: 0;
+  padding: 20px;
+  border-left: 1px solid var(--line);
+}
+.steps li:first-child {
+  border-left: 0;
+}
+.step-n {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  font-family: var(--font-ui);
+}
+.steps li.done .step-n {
+  background: var(--accent);
+}
+
+/* ---------- Modal ---------- */
+.modal-backdrop {
+  background: rgba(8, 9, 12, 0.66);
+}
+.modal {
+  width: min(540px, calc(100vw - 32px));
+  border: 0;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 32px 80px rgba(0, 0, 0, 0.55);
+  padding: 0 28px 24px;
+  gap: 18px;
+  background: var(--surface);
+}
+.modal-head {
+  height: 64px;
+  border-bottom: 0;
+  margin: 0 -28px -6px;
+  padding: 8px 14px 0 28px;
+}
+.modal-head h2 {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.field > label {
+  font-weight: 500;
+  color: var(--fg-2);
+}
+input,
+select {
+  height: 34px;
+  background: var(--bg);
+  border-color: var(--line-2);
+  border-radius: 8px;
+}
+input:hover,
+select:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+input:focus,
+select:focus {
+  border-color: rgba(159, 234, 249, 0.5);
+}
+.btn {
+  border-radius: 8px;
+  font-weight: 500;
+}
+.modal-actions {
+  border-top: 0;
+  margin: 4px -28px 0;
+  padding: 8px 28px 0;
+}
+.modal .btn {
+  height: 34px;
+  padding: 0 16px;
+}
+
+/* ---------- Paleta (Raycast) ---------- */
+.f-palette-backdrop {
+  background: rgba(8, 9, 12, 0.5);
+  padding-top: 14vh;
+}
+.f-palette {
+  width: min(660px, calc(100vw - 32px));
+  border: 0;
+  border-radius: 16px;
+  background: rgba(22, 24, 31, 0.98);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 40px 100px rgba(0, 0, 0, 0.6);
+}
+.f-palette-search {
+  height: 58px;
+  padding: 0 16px 0 20px;
+  gap: 12px;
+}
+.f-palette-search input {
+  font-size: 17px;
+  font-family: var(--font-display);
+}
+.f-palette-list {
+  padding: 6px 8px 8px;
+}
+.f-palette-group {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  padding: 12px 12px 6px;
+}
+.f-palette-item {
+  min-height: 40px;
+  border-radius: 10px;
+  padding: 6px 12px;
+}
+.f-palette-item.active {
+  background: rgba(255, 255, 255, 0.06);
+}
+.f-palette-item.active::before {
+  display: none;
+}
+.f-palette-title {
+  font-weight: 500;
+}
+.f-palette kbd {
+  background: transparent;
+  color: var(--fg-muted);
+}
+.f-palette-foot {
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Scrollbars aún más discretas */
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+.sidebar:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.07);
+}

@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto'
 import { closeSync, existsSync, openSync, readSync, statSync } from 'node:fs'
 import { isAbsolute, join, normalize, relative, resolve, sep } from 'node:path'
 import { applyVars, SUGGESTED, today, validBranch, varsIn } from './templates-core'
+import { parseChatServerConfig, type ChatServerConfig } from './chat-config'
 
 export const TEAM_FORMAT = 'sloth-team'
 export const TEAM_VERSION = 1
@@ -53,6 +54,8 @@ export interface TeamConfig {
   plantillas: TeamTemplate[]
   ajustes?: TeamSettings
   links: TeamLink[]
+  /** Chat del equipo: se usa solo si el usuario lo acepta (ver chat.ts). */
+  chat?: ChatServerConfig
 }
 
 export class TeamConfigError extends Error {}
@@ -195,7 +198,7 @@ export function parseTeamConfig(textIn: string): TeamConfig {
     fail('No es un JSON válido.')
   }
   if (!isObj(data)) return fail('El archivo tiene que ser un objeto JSON.')
-  onlyKeys(data, ['formato', 'versión', 'equipo', 'plantillas', 'ajustes', 'links'], 'team.json')
+  onlyKeys(data, ['formato', 'versión', 'equipo', 'plantillas', 'ajustes', 'links', 'chat'], 'team.json')
   if (data.formato !== TEAM_FORMAT) fail(`formato: tiene que ser «${TEAM_FORMAT}».`)
   if (data.versión !== TEAM_VERSION) fail(`versión: esta versión de Sloth entiende la ${TEAM_VERSION}. Actualizá Sloth.`)
   const equipo = text(data.equipo, 60, 'equipo', true)!
@@ -212,6 +215,13 @@ export function parseTeamConfig(textIn: string): TeamConfig {
   const cfg: TeamConfig = { formato: TEAM_FORMAT, versión: TEAM_VERSION, equipo, plantillas, links: parseLinks(data.links) }
   const ajustes = parseSettings(data.ajustes)
   if (ajustes) cfg.ajustes = ajustes
+  if (data.chat !== undefined && data.chat !== null) {
+    try {
+      cfg.chat = parseChatServerConfig(data.chat)
+    } catch (e) {
+      fail(`chat: ${e instanceof Error ? e.message : 'configuración inválida.'}`)
+    }
+  }
   return cfg
 }
 

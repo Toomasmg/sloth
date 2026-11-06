@@ -156,7 +156,7 @@
   overflow: hidden;
 }
 .f-history-snip mark {
-  background: rgba(245, 176, 65, 0.28);
+  background: var(--mark);
   color: var(--fg);
   border-radius: 2px;
   padding: 0 1px;

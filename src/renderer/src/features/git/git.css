@@ -45,7 +45,7 @@
   position: fixed;
   inset: 0;
   z-index: 8;
-  background: rgba(10, 11, 15, 0.35);
+  background: var(--backdrop-soft);
   animation: fade var(--t-fast) var(--ease);
 }
 .f-git-drawer {
@@ -297,13 +297,13 @@
   padding-right: var(--s-4);
 }
 .f-git-l-add {
-  background: rgba(74, 222, 128, 0.09);
+  background: var(--diff-add);
 }
 .f-git-l-add .f-git-sign {
   color: var(--success);
 }
 .f-git-l-del {
-  background: rgba(248, 113, 113, 0.1);
+  background: var(--diff-del);
 }
 .f-git-l-del .f-git-sign {
   color: var(--danger);
@@ -395,7 +395,7 @@
   display: grid;
   place-items: start center;
   padding-top: 56px;
-  background: rgba(10, 11, 15, 0.6);
+  background: var(--backdrop-soft);
 }
 .f-git-sub {
   width: calc(100% - 32px);
