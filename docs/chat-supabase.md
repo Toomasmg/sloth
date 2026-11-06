@@ -41,7 +41,7 @@ Esto lo hace **una sola persona del equipo, una vez**. Son unos 15 minutos. Desp
 ## 4. Correr la migración, con las tablas y la seguridad
 
 1. En Supabase, andá a **SQL Editor → New query**.
-2. Copiá todo el contenido de [`supabase/migrations/0001_chat.sql`](../supabase/migrations/0001_chat.sql) de este repo, pegalo y tocá **Run**. Tiene que terminar sin errores.
+2. Copiá todo el contenido de [`supabase/migrations/0001_chat.sql`](../supabase/migrations/0001_chat.sql) de este repo, pegalo y tocá **Run**. Tiene que terminar sin errores. Después hacé lo mismo con [`supabase/migrations/0002_hardening.sql`](../supabase/migrations/0002_hardening.sql), que cierra el acceso por API a las funciones internas (responde a los avisos del Security Advisor).
 3. Comprobá que quedó bien:
    - En **Table Editor** tienen que aparecer `profiles`, `teams`, `team_members`, `team_invite_codes`, `team_invites`, `dm_threads` y `messages`. Todas tienen que tener el candado de RLS activado.
    - En **Storage** tiene que aparecer el bucket `team-photos`, **privado**.
