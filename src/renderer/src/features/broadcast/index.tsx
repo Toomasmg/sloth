@@ -377,7 +377,7 @@ function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX.Elemen
                   <span className="f-broadcast-warn-text">{warn}</span>
                   <label className="f-broadcast-warn-check">
                     <input type="checkbox" checked={interrupt} onChange={(e) => setInterrupt(e.target.checked)} />
-                    Mandar igual ahora (interrumpe)
+                    Mandar ya (le llega después de lo que está haciendo)
                   </label>
                 </div>
               )}
