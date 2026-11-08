@@ -157,6 +157,7 @@ export interface ImportResult {
   cuentas: number
   espacios: number
   permisos: number
+  permisosOmitidos?: number
   plantillas: Record<string, unknown>[]
   /** Ajustes que la interfaz aplica con «feat:settings:set». */
   ajustes: { apariencia?: ExportedAppearance; accountColors?: Record<string, string> }
@@ -468,13 +469,11 @@ const feature: Feature = {
             taken.add(ws.name.trim().toLowerCase())
             res.espacios++
             if (a.e.color && !localColors[a.accountId]) colorPatch[a.accountId] = a.e.color
+            // Seguridad: nunca se escriben reglas en la configuración de Claude desde una importación.
+            // Las reglas del archivo solo se cuentan para avisar; se revisan a mano en Sloth.
             if (g.permisos) {
               const rules = parsed.permisos.find((x) => x.espacio === a.e.nombre && x.ruta === a.e.ruta)?.reglas ?? []
-              try {
-                res.permisos += writeRules(a.folder, rules)
-              } catch (err) {
-                res.errores.push(`Reglas de «${name}»: ${(err as Error).message}`)
-              }
+              res.permisosOmitidos = (res.permisosOmitidos ?? 0) + rules.length
             }
           } catch (err) {
             res.errores.push(`Espacio «${a.e.nombre}»: ${(err as Error).message}`)
