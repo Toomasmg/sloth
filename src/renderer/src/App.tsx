@@ -30,6 +30,7 @@ import {
 import { api } from './api'
 import { UiContext, type NewWorkspacePreset, type PaneGuard, type UiCtx } from './features/host'
 import { resolveAccountColor, useSettings } from './features/settings/store'
+import { colorHex } from './features/templates/catalog'
 import { GlobalSlot, PaneBannerSlot, PaneHeaderSlot, SidebarSlot, TitlebarSlot } from './features/slots'
 import { PaletteBar, PALETTE_REMOVE_EVENT, PALETTE_RENAME_EVENT, runFeatureCommand } from './features/palette'
 import { TerminalView } from './TerminalView'
@@ -687,8 +688,8 @@ export function App(): React.JSX.Element {
             aria-label={`${ws.icon ? `${ws.icon} ` : ''}${ws.name}, ${acc?.label ?? 'cuenta borrada'}, ${ag ? STATE_LABEL[ag.state] : 'sin abrir'}${nPerm ? `, ${nPerm === 1 ? 'permiso pendiente' : `${nPerm} permisos pendientes`}` : ''}`}
             title="Doble clic o F2 para renombrar · clic derecho para más opciones"
           >
-            <span className="sl-ico" aria-hidden="true">
-              {ws.icon ? ws.icon : <FolderIcon size={14} />}
+            <span className={`sl-ico${ws.color ? '' : ' no-color'}`} aria-hidden="true" style={ws.color ? ({ '--ws': colorHex(ws.color) } as CSSProperties) : undefined}>
+              {ws.icon ? ws.icon : (ws.name.trim().slice(0, 1).toUpperCase() || <FolderIcon size={14} />)}
             </span>
             <span className="sl-txt">
               <span className="sl-name">
@@ -807,6 +808,7 @@ export function App(): React.JSX.Element {
                       </span>
                       <span className="sl-acc-meta">
                         <span className="sl-acc-name">{acc.label}</span>
+                        {appSettings.settings.accountPlans[acc.id] && <span className="sl-acc-plan">{appSettings.settings.accountPlans[acc.id]}</span>}
                         <span className={`sl-acc-sub ${st?.loggedIn ? '' : 'warn'}`} title={st?.email}>
                           {mine.length === 1 ? '1 espacio' : `${mine.length} espacios`} · {st?.loggedIn ? 'Sesión iniciada' : 'Sin sesión'}
                         </span>
