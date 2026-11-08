@@ -31,6 +31,7 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
           espacios: o.espacios.map((e) => e.id),
           plantillas: true,
           apariencia: true,
+          atajos: o.atajos > 0,
           equipo: !!o.equipo,
           permisos: o.reglasTotal > 0
         })
@@ -60,7 +61,7 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
   const allSpaces = ov.espacios.length > 0 && sel.espacios.length === ov.espacios.length
   const selSpaces = ov.espacios.filter((e) => sel.espacios.includes(e.id))
   const reglasSel = selSpaces.reduce((a, e) => a + e.reglas, 0)
-  const anyOn = sel.espacios.length > 0 || sel.plantillas || sel.apariencia || sel.equipo || sel.permisos
+  const anyOn = sel.espacios.length > 0 || sel.plantillas || sel.apariencia || sel.atajos || sel.equipo || sel.permisos
 
   const ok1 = p1.length >= MIN_PW
   const e1 = !pwOn ? '' : p1.length === 0 ? (attempt ? 'Escribí una contraseña de 8 caracteres o más.' : '') : !ok1 ? `Faltan ${MIN_PW - p1.length} caracteres para llegar a 8.` : ''
@@ -70,7 +71,7 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
 
   const toggleSpace = (id: string): void => setSel({ ...sel, espacios: sel.espacios.includes(id) ? sel.espacios.filter((x) => x !== id) : [...sel.espacios, id] })
   const toggleAllSpaces = (): void => setSel({ ...sel, espacios: allSpaces ? [] : ov.espacios.map((e) => e.id) })
-  const flag = (k: 'plantillas' | 'apariencia' | 'equipo' | 'permisos'): void => setSel({ ...sel, [k]: !sel[k] })
+  const flag = (k: 'plantillas' | 'apariencia' | 'atajos' | 'equipo' | 'permisos'): void => setSel({ ...sel, [k]: !sel[k] })
 
   const doExport = async (): Promise<void> => {
     setAttempt(true)
@@ -148,15 +149,15 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
           </div>
 
           <div style={{ boxShadow: LINE }}>
-            <label className="f-ei-row f-ei-disabled">
-              <input type="checkbox" checked={false} disabled />
+            <label className={`f-ei-row${ov.atajos === 0 ? ' f-ei-disabled' : ''}`}>
+              <input type="checkbox" checked={sel.atajos && ov.atajos > 0} disabled={ov.atajos === 0} onChange={() => flag('atajos')} />
               <span className="f-ei-grow">
                 <span className="f-ei-name">
                   <KeyboardIcon size={14} /> Atajos
                 </span>
                 <span className="f-ei-desc">Solo los que cambiaste. Los de fábrica no se guardan.</span>
               </span>
-              <span className="f-ei-size">No hay cambios</span>
+              <span className="f-ei-size">{ov.atajos === 0 ? 'No hay cambios' : `${ov.atajos} ${ov.atajos === 1 ? 'cambiado' : 'cambiados'} · ${fmtKb(prev.kb.atajos)}`}</span>
             </label>
           </div>
 
@@ -195,7 +196,7 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
                 <span className="f-ei-name">
                   <PermissionIcon size={14} /> Reglas de permisos
                 </span>
-                <span className="f-ei-desc">Los «Aprobar siempre» de cada espacio seleccionado.</span>
+                <span className="f-ei-desc">Las reglas «Permitir siempre» de Sloth de cada espacio seleccionado. No toca la configuración de Claude.</span>
               </span>
               <span className="f-ei-size">{reglasSel === 0 ? 'Ninguna' : `${reglasSel} ${reglasSel === 1 ? 'regla' : 'reglas'} · ${fmtKb(prev.kb.permisos)}`}</span>
             </label>

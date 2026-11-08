@@ -1,27 +1,49 @@
 import { useRef, useState, type DragEvent } from 'react'
 import { DoneIcon, FolderIcon, KeyboardIcon, PermissionIcon, TeamIcon, TemplatesIcon, ThemeIcon, ExportIcon } from '../../icons/SlothIcons'
 import type { UiCtx } from '../host'
-import { errText, type Conflicto, type ImportChoices, type ImportPreview, type ImportResult, type PlanSpace } from './types'
+import {
+  errText,
+  type AddRulesResult,
+  type Conflicto,
+  type ImportChoices,
+  type ImportPreview,
+  type ImportResult,
+  type PlanPermiso,
+  type PlanRule,
+  type PlanSpace
+} from './types'
 
 const LINE = 'inset 0 -1px 0 var(--line)'
 
 const plural = (k: number, uno: string, varios: string): string => `${k} ${k === 1 ? uno : varios}`
 
 const defaultChoices = (): ImportChoices => ({
-  grupos: { espacios: true, plantillas: true, apariencia: true, equipo: true, permisos: true },
+  grupos: { espacios: true, plantillas: true, apariencia: true, atajos: true, equipo: true },
   espacios: {}
 })
 
-/** Pestaña «Importar»: elegir (o soltar) el archivo, contraseña si está cifrado, resumen con conflictos y rutas, y resultado. */
+/** Resultado final: lo que devolvió main más cuántas reglas de permisos se agregaron y se omitieron. */
+type Listo = ImportResult & { reglas: { agregadas: number; omitidas: number } }
+
+const KIND_LABEL: Record<string, string> = { cmd: 'Comando', net: 'Dominio', edit: 'Edición', other: 'Herramienta' }
+
+/** Pestaña «Importar»: elegir (o soltar) el archivo, contraseña si está cifrado, resumen con conflictos y rutas, reglas de permisos una por una, y resultado. */
 export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): React.JSX.Element {
   const [pre, setPre] = useState<ImportPreview | null>(null)
   const [stage, setStage] = useState<'inicio' | 'pw' | 'plan' | 'importando' | 'listo'>('inicio')
   const [choices, setChoices] = useState<ImportChoices>(defaultChoices)
+  /** Reglas de permisos tildadas (por id de la regla). Todas arrancan destildadas. */
+  const [rulesOn, setRulesOn] = useState<Record<string, boolean>>({})
   const [pwIn, setPwIn] = useState('')
   const [err, setErr] = useState<string | null>(null)
-  const [result, setResult] = useState<ImportResult | null>(null)
+  const [result, setResult] = useState<Listo | null>(null)
   const [over, setOver] = useState(false)
   const busy = useRef(false)
+
+  const fresh = (): void => {
+    setChoices(defaultChoices())
+    setRulesOn({})
+  }
 
   const apply = (p: ImportPreview | null): void => {
     if (!p) return
@@ -30,7 +52,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
     setPwIn('')
     if (p.needsPassword) setStage('pw')
     else {
-      setChoices(defaultChoices())
+      fresh()
       setStage('plan')
     }
   }
@@ -79,7 +101,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
       const r = await ui.invoke<{ token: string; file: string; plan: NonNullable<ImportPreview['plan']> }>('feat:export-import:unlock', pre.token, pwIn)
       setPwIn('')
       setPre({ ...pre, needsPassword: false, plan: r.plan })
-      setChoices(defaultChoices())
+      fresh()
       setStage('plan')
     })
   }
@@ -98,6 +120,26 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
   /** Un espacio con carpeta que faltaba, ya elegida, pasa a «ok». */
   const statusOf = (s: PlanSpace): PlanSpace['status'] => (s.status === 'faltante' && choices.espacios[String(s.index)]?.carpeta ? 'ok' : s.status)
 
+  /** Por qué una regla no se puede tildar (null = se puede). Misma lógica que usa confirm. */
+  const reasonOf = (p: PlanPermiso, r: PlanRule): string | null => {
+    if (!r.valida) return r.motivo ?? 'no es una regla válida'
+    if (p.espacioIndex < 0) return 'su espacio no está en el archivo'
+    if (!choices.grupos.espacios) return 'marcá Espacios para asignarla'
+    const s = plan?.espacios.find((x) => x.index === p.espacioIndex)
+    if (!s) return 'su espacio no está en el archivo'
+    const st = statusOf(s)
+    if (st === 'saltear' || st === 'faltante') return 'su espacio no se importa'
+    if (st === 'conflicto' && (choices.espacios[String(s.index)]?.conflicto ?? 'saltear') === 'saltear') return 'su espacio se saltea'
+    return null
+  }
+
+  const toggleRule = (id: string): void => setRulesOn((m) => ({ ...m, [id]: !m[id] }))
+
+  /** Reglas tildadas que se pueden agregar (ya filtradas por el motivo de arriba). */
+  const ticked: { p: PlanPermiso; r: PlanRule }[] = plan
+    ? plan.permisos.flatMap((p) => p.reglas.filter((r) => rulesOn[r.id] && !reasonOf(p, r)).map((r) => ({ p, r })))
+    : []
+
   const confirm = (): void => {
     if (!pre?.plan) return
     const p = pre.plan
@@ -106,10 +148,11 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
       (p.espacios.length > 0 && choices.grupos.espacios) ||
       (tplAll > 0 && choices.grupos.plantillas) ||
       (p.apariencia && choices.grupos.apariencia) ||
+      (p.atajos > 0 && choices.grupos.atajos) ||
       (!!p.equipo && choices.grupos.equipo) ||
-      (p.reglas > 0 && choices.grupos.permisos)
+      ticked.length > 0
     if (!any) {
-      setErr('Marcá al menos un grupo para importar.')
+      setErr('Marcá al menos algo para importar.')
       return
     }
     setStage('importando')
@@ -127,15 +170,35 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
             errores.push(`Plantilla «${String(t.name)}»: ${errText(e)}`)
           }
         }
-        if (r.ajustes.apariencia || r.ajustes.accountColors) {
+        const ajustes = { ...(r.ajustes.apariencia ?? {}), ...(r.ajustes.accountColors ? { accountColors: r.ajustes.accountColors } : {}), ...(r.ajustes.accountPlans ? { accountPlans: r.ajustes.accountPlans } : {}), ...(r.ajustes.atajos ? { shortcuts: r.ajustes.atajos } : {}) }
+        if (Object.keys(ajustes).length) {
           try {
-            await ui.invoke('feat:settings:set', { ...(r.ajustes.apariencia ?? {}), ...(r.ajustes.accountColors ? { accountColors: r.ajustes.accountColors } : {}) })
+            await ui.invoke('feat:settings:set', ajustes)
           } catch (e) {
             errores.push(`Ajustes: ${errText(e)}`)
           }
         }
+        // Reglas: solo las tildadas, en el espacio que quedó (creado o ya existente). Main las valida de nuevo.
+        let agregadas = 0
+        const enviar = ticked.flatMap(({ p: g, r: rule }) => {
+          const wsId = r.espaciosWs[String(g.espacioIndex)]
+          return wsId && rule.draft ? [{ workspaceId: wsId, ...rule.draft }] : []
+        })
+        if (enviar.length) {
+          try {
+            const a = await ui.invoke<AddRulesResult>('feat:permissions:addRules', { reglas: enviar })
+            agregadas = a.agregadas
+          } catch (e) {
+            errores.push(`Reglas de permisos: ${errText(e)}`)
+          }
+        }
         await ui.reload()
-        setResult({ ...r, plantillas: r.plantillas.slice(0, plantillas), errores })
+        setResult({
+          ...r,
+          plantillas: r.plantillas.slice(0, plantillas),
+          errores,
+          reglas: { agregadas, omitidas: p.reglas - agregadas }
+        })
         setStage('listo')
       } catch (e) {
         setErr(errText(e))
@@ -181,11 +244,13 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
     if (result.espacios) parts.push(plural(result.espacios, 'espacio', 'espacios'))
     if (result.plantillas.length) parts.push(plural(result.plantillas.length, 'plantilla', 'plantillas'))
     if (result.ajustes.apariencia) parts.push('tu apariencia')
-    if (result.permisos) parts.push(plural(result.permisos, 'regla de permisos', 'reglas de permisos'))
+    if (result.ajustes.atajos) parts.push('tus atajos')
+    if (result.reglas.agregadas) parts.push(plural(result.reglas.agregadas, 'regla de permisos', 'reglas de permisos'))
     if (result.cuentas) parts.push(plural(result.cuentas, 'cuenta', 'cuentas'))
     const doneMsg = parts.length
       ? `Se importaron ${parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}`}.`
       : 'No se importó nada.'
+    const reglasMsg = plan && plan.reglas > 0 ? `Reglas de permisos: ${result.reglas.agregadas} agregadas, ${result.reglas.omitidas} omitidas.` : ''
     return (
       <div className="f-ei-done" role="region" aria-label="Resultado de la importación">
         <div className="f-ei-done-head">
@@ -197,6 +262,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
             <div role="status" className="f-ei-muted f-ei-done-msg">
               {doneMsg}
             </div>
+            {reglasMsg && <div className="f-ei-muted f-ei-done-msg">{reglasMsg}</div>}
           </div>
         </div>
         {result.cuentas > 0 && <p className="f-ei-muted">Las cuentas nuevas quedan sin sesión: iniciá sesión en cada una desde Configuración › Cuentas.</p>}
@@ -292,6 +358,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
   if (choices.grupos.espacios && conflicts) issues.push(conflicts === 1 ? '1 conflicto' : `${conflicts} conflictos`)
   if (choices.grupos.espacios && missing) issues.push(missing === 1 ? '1 ruta que no existe en esta PC' : `${missing} rutas que no existen en esta PC`)
   const tplN = plan.plantillas.nuevas.length + plan.plantillas.existentes.length + plan.plantillas.salteadas.length
+  const rulesHave = plan.permisos.some((p) => p.reglas.length > 0)
 
   return (
     <div className="f-ei-tab">
@@ -332,7 +399,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
                     <span className="f-ei-name">
                       <FolderIcon size={14} /> Espacios
                     </span>
-                    <span className="f-ei-desc">Nombre, ruta, color y cuenta asignada. Los archivos del proyecto no vienen en el archivo.</span>
+                    <span className="f-ei-desc">Nombre, ruta, colores y cuenta asignada, más el plan de cada cuenta. Los archivos del proyecto no vienen en el archivo.</span>
                   </span>
                   <span className="f-ei-size">
                     {spaces.filter((s) => statusOf(s) === 'ok' || statusOf(s) === 'conflicto').length} de {spaces.length} para importar
@@ -344,7 +411,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
                   return (
                     <div key={s.index} className={`f-ei-sub${st === 'saltear' || st === 'ya' ? ' muted' : ''}`}>
                       <div className="f-ei-sub-head">
-                        <span className="f-ei-dot" style={{ background: 'var(--fg-muted)' }} aria-hidden="true" />
+                        <span className="f-ei-dot" style={{ background: s.color ?? 'var(--fg-muted)' }} aria-hidden="true" />
                         <span className="f-ei-name">{s.nombre}</span>
                         <span className="f-ei-chip">{s.cuenta}</span>
                         <span className={`f-ei-badge ${st}`}>{badgeText(st)}</span>
@@ -419,8 +486,19 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
             disabled={importing}
             icon={<ThemeIcon size={14} />}
             name="Apariencia"
-            desc="Tema, densidad y tamaño del texto que trae el archivo."
+            desc="Tema, densidad, tamaño del texto y color de acento que trae el archivo."
             sum="Del archivo"
+          />
+
+          <Group
+            present={plan.atajos > 0}
+            on={choices.grupos.atajos}
+            onToggle={() => setChoices((c) => ({ ...c, grupos: { ...c.grupos, atajos: !c.grupos.atajos } }))}
+            disabled={importing}
+            icon={<KeyboardIcon size={14} />}
+            name="Atajos"
+            desc="Los atajos que cambió el archivo. Reemplazan los tuyos solo en esas acciones."
+            sum={plural(plan.atajos, 'atajo', 'atajos')}
           />
 
           <Group
@@ -434,24 +512,61 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
             sum="Solo la URL"
           />
 
-          <Group
-            present={plan.reglas > 0}
-            on={choices.grupos.permisos}
-            onToggle={() => setChoices((c) => ({ ...c, grupos: { ...c.grupos, permisos: !c.grupos.permisos } }))}
-            disabled={importing}
-            icon={<PermissionIcon size={14} />}
-            name="Reglas de permisos"
-            desc="Los «Aprobar siempre» de cada espacio, en su .claude/settings.local.json."
-            sum={plural(plan.reglas, 'regla', 'reglas')}
-          />
-
-          {/* Atajos: el archivo no trae cambios de atajos */}
-          <div className="f-ei-row muted">
-            <span className="f-ei-grow">
-              <KeyboardIcon size={14} /> Atajos
-            </span>
-            <span className="f-ei-size">No trae este grupo</span>
-          </div>
+          {/* Reglas de permisos: una por una, todas destildadas. */}
+          {rulesHave ? (
+            <div style={{ boxShadow: LINE }}>
+              <div className="f-ei-row">
+                <span className="f-ei-grow">
+                  <span className="f-ei-name">
+                    <PermissionIcon size={14} /> Reglas de permisos
+                  </span>
+                  <span className="f-ei-desc">
+                    Las «Permitir siempre» de Sloth. Vienen destildadas: tildá solo las que quieras agregar. Nunca se escriben en la configuración de Claude.
+                  </span>
+                </span>
+                <span className="f-ei-size">
+                  {ticked.length} de {plan.reglasValidas} marcadas
+                </span>
+              </div>
+              {plan.permisos.map((p) =>
+                p.reglas.length ? (
+                  <div key={p.reglas[0].id} className="f-ei-sub">
+                    <div className="f-ei-sub-head">
+                      <span className="f-ei-name">{p.espacio}</span>
+                      <span className="f-ei-chip">Espacio</span>
+                    </div>
+                    <div className="f-ei-path mono" title={p.ruta}>
+                      {p.ruta}
+                    </div>
+                    {p.reglas.map((r) => {
+                      const off = reasonOf(p, r)
+                      return (
+                        <label key={r.id} className={`f-ei-row sub${off ? ' f-ei-disabled' : ''}`}>
+                          <input
+                            type="checkbox"
+                            checked={!off && !!rulesOn[r.id]}
+                            disabled={!!off || importing}
+                            onChange={() => toggleRule(r.id)}
+                            aria-label={`Agregar la regla ${r.texto} del espacio ${p.espacio}`}
+                          />
+                          <span className="f-ei-chip">{r.valida && r.draft ? KIND_LABEL[r.draft.kind] : 'No válida'}</span>
+                          <span className="f-ei-grow mono f-ei-rule-text" title={r.texto}>
+                            {r.texto}
+                          </span>
+                          {off && <span className="f-ei-muted f-ei-fix">{off}</span>}
+                        </label>
+                      )
+                    })}
+                  </div>
+                ) : null
+              )}
+            </div>
+          ) : (
+            <div className="f-ei-row muted" style={{ boxShadow: LINE }}>
+              <span className="f-ei-grow">Reglas de permisos</span>
+              <span className="f-ei-size">No trae este grupo</span>
+            </div>
+          )}
         </div>
       </section>
 

@@ -5,10 +5,18 @@ import { DoneIcon, ErrorIcon, UpdateIcon, CloseIcon } from '../../icons/SlothIco
 import logo from '../../assets/sloth-logo.png'
 import { onOpenAbout, openAbout } from './bus'
 import { setPhase, setRestarting, usePhase } from './phase'
-import { useUpdateStatus, type NoteGroup, type UpdateStatus } from './useUpdateStatus'
+import { useUpdateDot, useUpdateStatus, type NoteGroup, type UpdateStatus } from './useUpdateStatus'
 import './updater.css'
 
 const REPO_URL = 'https://github.com/Toomasmg/sloth'
+
+/**
+ * Punto del acceso a Configuración (el engranaje lo muestra): hay una versión que quedó para después
+ * con «Más tarde». Lo pinta el engranaje de features/settings; no hace nada más.
+ */
+export function UpdateDot(): React.JSX.Element | null {
+  return useUpdateDot() ? <span className="f-updater-dot" role="img" aria-label="Hay una versión pendiente" title="Hay una versión pendiente" /> : null
+}
 
 const errText = (e: unknown): string =>
   String((e as Error)?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')

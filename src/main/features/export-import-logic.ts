@@ -2,33 +2,42 @@
  * Lógica pura de exportar/importar la configuración (sin electron: se prueba con Node).
  *
  * Formato 2 (`.sloth`, o `.json` sin cifrar): {formato, formatoVersion: 2, versión, exportado, ...grupos}.
- * Grupos: espacios (+ cuentas que usan), plantillas, apariencia, equipo (solo la URL de Supabase)
- * y permisos (las reglas «Permitir siempre aquí» de cada espacio). Con contraseña, el archivo es
- * {formato, formatoVersion, versión, exportado, cifrado, datos} (ver export-crypto.ts).
+ * Grupos: espacios (+ cuentas que usan, con su plan), plantillas, apariencia (tema, densidad, tamaño y
+ * color de acento), atajos (solo los cambiados), equipo (solo la URL de Supabase) y permisos (las
+ * reglas «Permitir siempre» de Sloth de cada espacio, en `permissions.json`). Con contraseña, el archivo
+ * es {formato, formatoVersion, versión, exportado, cifrado, datos} (ver export-crypto.ts).
  *
- * Formato 1 (sin formatoVersion, las listas `cuentas`/`espacios` con name/repoPath): se sigue leyendo.
+ * Todos los campos nuevos son opcionales: los archivos viejos se leen igual. Formato 1 (sin
+ * formatoVersion, las listas `cuentas`/`espacios` con name/repoPath) también se sigue leyendo.
  * El archivo NUNCA lleva configDir, ids internos, credenciales, tokens, sesiones ni transcripts.
+ * Las reglas nunca se escriben en la configuración de Claude: solo se agregan a las de Sloth.
  */
 import type { Account, Workspace } from '../../shared/types'
+import { TEMPLATE_COLOR_KEYS } from '../../shared/templates-shared'
 import { normalizeSupabaseUrl } from './chat-config'
-import { DENSITIES, THEMES, UI_FONT, ACCOUNT_PALETTE } from './settings-model'
+import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, THEMES, UI_FONT, SHORTCUT_IDS, canonicalCombo, type AccentChoice } from './settings-model'
 import { decryptText, type Encrypted, WRONG_PASSWORD } from './export-crypto'
+import { checkRule, FILE_EDIT_TOOLS, type PermissionKind, type RuleDraft } from './permissions-core'
 
 export const FORMAT = 'sloth-config'
 export const FORMAT_VERSION = 2
 export const MAX_FILE_BYTES = 2 * 1024 * 1024
 const MAX_RULES = 500
-const MAX_RULE_LEN = 300
+const MAX_PLAN_LEN = 20
 
 export interface ExportedAccount {
   label: string
   shareSetup: boolean
+  /** Plan escrito a mano («Pro», «Max»…). Es una etiqueta: nunca sale de credenciales. */
+  plan?: string
 }
 export interface ExportedSpace {
   nombre: string
   ruta: string
   /** Hex de la paleta de cuentas (el color de la cuenta asignada). */
   color?: string
+  /** Color propio del espacio (TEMPLATE_COLOR_KEYS: cielo, hoja, lila, ambar, coral). */
+  colorEspacio?: string
   cuenta: string
 }
 /** Plantilla sin ids locales: la cuenta va por nombre (sin `cuenta` = «sugerida»). */
@@ -42,15 +51,22 @@ export interface ExportedTemplate {
   autoStartClaude: boolean
   resume: boolean
 }
+/** Una regla «Permitir siempre» de Sloth: tipo, herramienta y comando/dominio/«*» exacto. */
+export interface ExportedRule {
+  kind: PermissionKind
+  tool: string
+  match: string
+}
 export interface ExportedPermissions {
   espacio: string
   ruta: string
-  reglas: string[]
+  reglas: ExportedRule[]
 }
 export interface ExportedAppearance {
   theme?: string
   density?: string
   uiFontSize?: number
+  accent?: string
 }
 export interface ExportDoc {
   formato: typeof FORMAT
@@ -61,12 +77,13 @@ export interface ExportDoc {
   espacios?: ExportedSpace[]
   plantillas?: ExportedTemplate[]
   apariencia?: ExportedAppearance
+  atajos?: Record<string, string>
   equipo?: { supabaseUrl: string }
   permisos?: ExportedPermissions[]
 }
 
-export type SectionId = 'espacios' | 'plantillas' | 'apariencia' | 'equipo' | 'permisos'
-export const SECTIONS: readonly SectionId[] = ['espacios', 'plantillas', 'apariencia', 'equipo', 'permisos']
+export type SectionId = 'espacios' | 'plantillas' | 'apariencia' | 'atajos' | 'equipo' | 'permisos'
+export const SECTIONS: readonly SectionId[] = ['espacios', 'plantillas', 'apariencia', 'atajos', 'equipo', 'permisos']
 
 const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x)
 
@@ -90,7 +107,7 @@ export function exportTemplates(raw: unknown, accounts: readonly Account[]): Exp
   })
 }
 
-/** Espacios del archivo: solo ruta, nombre, color y cuenta asignada (ni ids ni ramas ni prompts). */
+/** Espacios del archivo: ruta, nombre, colores y cuenta asignada (ni ids ni ramas ni prompts). */
 export function exportSpaces(workspaces: readonly Workspace[], accounts: readonly Account[], colorOf: (accountId: string) => string | undefined): ExportedSpace[] {
   const labelOf = new Map(accounts.map((a) => [a.id, a.label]))
   return workspaces.flatMap((w) => {
@@ -99,7 +116,21 @@ export function exportSpaces(workspaces: readonly Workspace[], accounts: readonl
     const e: ExportedSpace = { nombre: w.name, ruta: w.repoPath, cuenta }
     const color = colorOf(w.accountId)
     if (color) e.color = color
+    if (w.color && (TEMPLATE_COLOR_KEYS as readonly string[]).includes(w.color)) e.colorEspacio = w.color
     return [e]
+  })
+}
+
+/** Reglas de Sloth (permissions.json) de cada espacio, ya validadas. Sin `on: false` ni reglas inválidas. */
+export function exportRules(rules: readonly unknown[], workspaces: readonly Workspace[]): ExportedPermissions[] {
+  return workspaces.flatMap((w) => {
+    const reglas: ExportedRule[] = []
+    for (const r of rules) {
+      if (!isObj(r) || r.workspaceId !== w.id || r.on === false) continue
+      const c = checkRule(r)
+      if (c.ok) reglas.push({ kind: c.rule.kind, tool: c.rule.tool, match: c.rule.match })
+    }
+    return reglas.length ? [{ espacio: w.name, ruta: w.repoPath, reglas }] : []
   })
 }
 
@@ -110,6 +141,7 @@ export function sectionSizes(doc: ExportDoc): Record<SectionId, number> {
     espacios: kb({ cuentas: doc.cuentas, espacios: doc.espacios }),
     plantillas: kb(doc.plantillas),
     apariencia: kb(doc.apariencia),
+    atajos: kb(doc.atajos),
     equipo: kb(doc.equipo),
     permisos: kb(doc.permisos)
   }
@@ -133,6 +165,13 @@ const str = (o: Record<string, unknown>, key: string, where: string, max: number
 }
 
 const bool = (o: Record<string, unknown>, key: string, def: boolean): boolean => (typeof o[key] === 'boolean' ? (o[key] as boolean) : def)
+
+/** Plan de cuenta del archivo: texto corto y sin controles; si no es válido, se ignora. */
+const planOf = (v: unknown): string | undefined => {
+  if (typeof v !== 'string') return undefined
+  const t = v.trim()
+  return t && t.length <= MAX_PLAN_LEN && !/[\u0000-\u001f]/.test(t) ? t : undefined
+}
 
 /** Lista de plantillas, acepte el archivo un array o un objeto con `templates`/`plantillas`. */
 export function templateList(raw: unknown): unknown[] | null {
@@ -159,6 +198,19 @@ export interface ParsedSpace extends ExportedSpace {
   ticket?: string
 }
 
+/** Una regla del archivo, ya revisada. `texto` es lo que se muestra (comando, dominio…). */
+export interface ParsedRule {
+  texto: string
+  valida: boolean
+  motivo?: string
+  draft?: RuleDraft
+}
+export interface ParsedPermiso {
+  espacio: string
+  ruta: string
+  reglas: ParsedRule[]
+}
+
 export interface ParsedImport {
   version: string
   formatoVersion: number
@@ -166,8 +218,10 @@ export interface ParsedImport {
   espacios: ParsedSpace[]
   plantillas: ExportedTemplate[]
   apariencia?: ExportedAppearance
+  /** Atajos cambiados: id → combinación canónica. Solo los ids y combinaciones válidos. */
+  atajos?: Record<string, string>
   equipo?: string
-  permisos: ExportedPermissions[]
+  permisos: ParsedPermiso[]
 }
 
 /** Qué contiene el texto: JSON en claro o archivo cifrado (hay que pedir la contraseña). */
@@ -199,6 +253,46 @@ export function openEnvelope(env: Extract<Envelope, { kind: 'cifrado' }>, passwo
   return decryptText(env.encrypted, password)
 }
 
+/**
+ * Regla en el formato que usaba Sloth antes (texto de Claude: `Bash(npm test)`, `WebFetch(domain:x)`,
+ * `Edit`, `mcp__s__t`). Solo se convierte lo que Sloth podría guardar igual: nada que amplíe el permiso
+ * (una edición limitada a rutas, o «Bash» sin comando, no se importa).
+ */
+function fromTextRule(text: string): { ok: true; raw: unknown } | { ok: false; motivo: string } {
+  const m = /^([A-Za-z_][\w.:-]*)(?:\((.*)\))?$/s.exec(text.trim())
+  if (!m) return { ok: false, motivo: 'formato no reconocido' }
+  const [, name, arg] = m
+  if (name === 'Bash') {
+    return arg === undefined
+      ? { ok: false, motivo: 'regla general de comandos: Sloth solo guarda comandos exactos' }
+      : { ok: true, raw: { kind: 'cmd', tool: 'Bash', match: arg } }
+  }
+  if (name === 'WebFetch') {
+    return arg?.startsWith('domain:')
+      ? { ok: true, raw: { kind: 'net', tool: 'WebFetch', match: arg.slice('domain:'.length) } }
+      : { ok: false, motivo: 'Sloth solo guarda dominios de WebFetch' }
+  }
+  if (FILE_EDIT_TOOLS.has(name)) {
+    return arg === undefined ? { ok: true, raw: { kind: 'edit', tool: name, match: '*' } } : { ok: false, motivo: 'limitada a rutas: Sloth no la importa' }
+  }
+  if (name.startsWith('mcp__') && arg === undefined) return { ok: true, raw: { kind: 'other', tool: name, match: '*' } }
+  return { ok: false, motivo: 'Sloth no maneja esa herramienta' }
+}
+
+/** Una regla del archivo: objeto de Sloth o texto de la versión anterior. Siempre pasa por checkRule. */
+function parseRule(item: unknown): ParsedRule {
+  const shown = (typeof item === 'string' ? item : JSON.stringify(item) ?? '').slice(0, 200)
+  let raw: unknown = item
+  if (typeof item === 'string') {
+    const conv = fromTextRule(item)
+    if (!conv.ok) return { texto: shown, valida: false, motivo: conv.motivo }
+    raw = conv.raw
+  }
+  const c = checkRule(raw)
+  if (!c.ok) return { texto: shown, valida: false, motivo: c.motivo }
+  return { texto: c.rule.label, valida: true, draft: c.rule }
+}
+
 export function parseImport(text: string): ParsedImport {
   let data: unknown
   try {
@@ -226,7 +320,10 @@ export function parseImport(text: string): ParsedImport {
     const k = label.toLowerCase()
     if (seen.has(k)) return
     seen.add(k)
-    cuentas.push({ label, shareSetup: bool(a, 'shareSetup', true) })
+    const c: ExportedAccount = { label, shareSetup: bool(a, 'shareSetup', true) }
+    const plan = planOf(a.plan)
+    if (plan) c.plan = plan
+    cuentas.push(c)
   })
 
   const espacios: ParsedSpace[] = rawWs.map((w, i) => {
@@ -252,6 +349,8 @@ export function parseImport(text: string): ParsedImport {
     }
     const color = typeof w.color === 'string' && ACCOUNT_PALETTE.some((c) => c.hex === w.color) ? (w.color as string) : undefined
     if (color) e.color = color
+    const colorEspacio = typeof w.colorEspacio === 'string' && (TEMPLATE_COLOR_KEYS as readonly string[]).includes(w.colorEspacio) ? w.colorEspacio : undefined
+    if (colorEspacio) e.colorEspacio = colorEspacio
     return e
   })
 
@@ -288,6 +387,19 @@ export function parseImport(text: string): ParsedImport {
     if (typeof a.theme === 'string' && (THEMES as readonly string[]).includes(a.theme)) apariencia.theme = a.theme
     if (typeof a.density === 'string' && (DENSITIES as readonly string[]).includes(a.density)) apariencia.density = a.density
     if (Number.isInteger(a.uiFontSize) && (a.uiFontSize as number) >= UI_FONT.min && (a.uiFontSize as number) <= UI_FONT.max) apariencia.uiFontSize = a.uiFontSize as number
+    if (typeof a.accent === 'string' && (ACCENTS as readonly AccentChoice[]).includes(a.accent as AccentChoice)) apariencia.accent = a.accent as AccentChoice
+  }
+
+  // Atajos: solo ids conocidos y combinaciones válidas (la Configuración vuelve a validar al aplicar).
+  let atajos: Record<string, string> | undefined
+  if (isObj(data.atajos)) {
+    const out: Record<string, string> = {}
+    for (const id of SHORTCUT_IDS) {
+      const v = data.atajos[id]
+      const canon = typeof v === 'string' ? canonicalCombo(v) : null
+      if (canon) out[id] = canon
+    }
+    if (Object.keys(out).length) atajos = out
   }
 
   let equipo: string | undefined
@@ -299,31 +411,23 @@ export function parseImport(text: string): ParsedImport {
     }
   }
 
-  const permisos: ExportedPermissions[] = []
+  // Permisos: cada regla queda en la lista, válida o no. Las inválidas se muestran y no se pueden tildar.
+  const permisos: ParsedPermiso[] = []
   if (Array.isArray(data.permisos)) {
     if (data.permisos.length > 500) throw new Error('Demasiados espacios con reglas en el archivo.')
     data.permisos.forEach((p, i) => {
       const where = `Permisos ${i + 1}`
       if (!isObj(p) || !Array.isArray(p.reglas)) throw new Error(`${where}: formato inválido.`)
       if (p.reglas.length > MAX_RULES) throw new Error(`${where}: demasiadas reglas.`)
-      const reglas = p.reglas.map((r) => {
-        if (typeof r !== 'string' || !r.trim() || r.length > MAX_RULE_LEN || /[\u0000-\u001f]/.test(r)) throw new Error(`${where}: una regla no es válida.`)
-        return r.trim()
+      permisos.push({
+        espacio: str(p, 'espacio', where, 120, true)!,
+        ruta: str(p, 'ruta', where, 1024, true)!,
+        reglas: p.reglas.map(parseRule)
       })
-      permisos.push({ espacio: str(p, 'espacio', where, 120, true)!, ruta: str(p, 'ruta', where, 1024, true)!, reglas: [...new Set(reglas)] })
     })
   }
 
-  return {
-    version,
-    formatoVersion,
-    cuentas,
-    espacios,
-    plantillas,
-    apariencia,
-    equipo,
-    permisos
-  }
+  return { version, formatoVersion, cuentas, espacios, plantillas, apariencia, atajos, equipo, permisos }
 }
 
 // ---------- Plan (vista previa) ----------
@@ -345,14 +449,33 @@ export interface PlanAccount {
   label: string
   action: 'crear' | 'existe'
 }
+/** Una regla del archivo en la vista previa. `id` = «<grupo>.<regla>» (la interfaz la usa como clave). */
+export interface PlanRule {
+  id: string
+  texto: string
+  valida: boolean
+  motivo?: string
+  draft?: RuleDraft
+}
+/** Reglas de un espacio del archivo. `espacioIndex` = -1 si el espacio no está en el archivo. */
+export interface PlanPermiso {
+  espacioIndex: number
+  espacio: string
+  ruta: string
+  reglas: PlanRule[]
+}
 export interface ImportPlan {
   version: string
   cuentas: PlanAccount[]
   espacios: PlanSpace[]
   plantillas: { nuevas: string[]; existentes: string[]; salteadas: { name: string; reason: string }[] }
   apariencia: boolean
+  atajos: number
   equipo: string | null
+  permisos: PlanPermiso[]
+  /** Reglas en total (válidas e inválidas) y cuántas son válidas. */
   reglas: number
+  reglasValidas: number
 }
 
 const norm = (p: string): string => p.replace(/[\\/]+$/, '').replace(/\//g, '\\').toLowerCase()
@@ -403,14 +526,29 @@ export function buildPlan(
       nuevas.push(t.name)
     }
   }
+
+  const permisos: PlanPermiso[] = parsed.permisos.map((p, i) => {
+    const espacioIndex = parsed.espacios.findIndex((e) => e.nombre === p.espacio && e.ruta === p.ruta)
+    return {
+      espacioIndex,
+      espacio: p.espacio,
+      ruta: p.ruta,
+      reglas: p.reglas.map((r, j) => ({ id: `${i}.${j}`, texto: r.texto, valida: r.valida, motivo: r.motivo, draft: r.draft }))
+    }
+  })
+  const todas = permisos.flatMap((p) => p.reglas)
+
   return {
     version: parsed.version,
     cuentas,
     espacios,
     plantillas: { nuevas, existentes, salteadas },
     apariencia: !!parsed.apariencia && Object.keys(parsed.apariencia).length > 0,
+    atajos: parsed.atajos ? Object.keys(parsed.atajos).length : 0,
     equipo: parsed.equipo ?? null,
-    reglas: parsed.permisos.reduce((a, p) => a + p.reglas.length, 0)
+    permisos,
+    reglas: todas.length,
+    reglasValidas: todas.filter((r) => r.valida).length
   }
 }
 
@@ -432,9 +570,4 @@ export function templatesToSave(parsed: ParsedImport, plan: ImportPlan, idByLabe
       autoStartClaude: t.autoStartClaude,
       resume: t.resume
     }))
-}
-
-/** Reglas de permiso para escribir en `.claude/settings.local.json`: solo texto razonable. */
-export function cleanRules(rules: readonly string[]): string[] {
-  return [...new Set(rules.map((r) => r.trim()).filter((r) => r.length > 0 && r.length <= MAX_RULE_LEN && !/[\u0000-\u001f]/.test(r)))].slice(0, MAX_RULES)
 }

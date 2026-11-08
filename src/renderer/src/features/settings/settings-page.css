@@ -11,6 +11,7 @@ html[data-night='true'] {
 
 .f-settings-gear {
   color: var(--fg-2);
+  position: relative;
 }
 
 /* ---------- Pantalla ---------- */

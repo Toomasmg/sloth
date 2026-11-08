@@ -1,6 +1,6 @@
 import { app, net, powerMonitor } from 'electron'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import type { AppUpdater, CancellationToken, UpdateInfo } from 'electron-updater'
 import type { Feature, FeatureContext } from './context'
 import { groupNotes, type NoteGroup } from './updater-notes'
@@ -47,6 +47,44 @@ const EVERY_MS = 6 * 60 * 60 * 1000
 const REPO_API = 'https://api.github.com/repos/Toomasmg/sloth/releases/tags'
 
 let timer: NodeJS.Timeout | null = null
+
+/**
+ * «Más tarde»: la versión pospuesta y el día (local, AAAA-MM-DD). Sobrevive a reiniciar Sloth: el
+ * aviso no vuelve con esa misma versión hasta el día siguiente (al arrancar, o en un chequeo).
+ */
+interface Postponed {
+  version: string
+  day: string
+}
+const laterFile = (): string => join(app.getPath('userData'), 'features', 'updater-later.json')
+const dayNow = (): string => {
+  const d = new Date()
+  const p = (n: number): string => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+function readPostponed(): Postponed | null {
+  try {
+    const raw = JSON.parse(readFileSync(laterFile(), 'utf8').replace(/^﻿/, '')) as Partial<Postponed>
+    return typeof raw.version === 'string' && typeof raw.day === 'string' ? { version: raw.version, day: raw.day } : null
+  } catch {
+    return null
+  }
+}
+function writePostponed(p: Postponed): void {
+  try {
+    mkdirSync(dirname(laterFile()), { recursive: true })
+    const tmp = `${laterFile()}.${process.pid}.tmp`
+    writeFileSync(tmp, JSON.stringify(p), 'utf8')
+    renameSync(tmp, laterFile())
+  } catch {
+    /* sin disco: el aviso vuelve en el próximo arranque, nada más */
+  }
+}
+/** ¿Esta versión quedó para después hoy? Otra versión, o el día siguiente, vuelve a avisar. */
+const isPostponed = (version: string): boolean => {
+  const p = readPostponed()
+  return !!p && p.version === version && p.day === dayNow()
+}
 
 /** Canal de actualizaciones: se lee del archivo de Configuración (default «estable»). */
 export function readChannel(): UpdateChannel {
@@ -156,7 +194,7 @@ const feature: Feature = {
           u.on('checking-for-update', () => set({ state: 'checking', error: undefined }))
           u.on('update-available', (info) => {
             const same = status.version === info.version
-            set({ state: 'available', version: info.version, upToDate: false, later: same ? status.later : false, queued: same ? status.queued : false, releaseDate: info.releaseDate, error: undefined })
+            set({ state: 'available', version: info.version, upToDate: false, later: isPostponed(info.version), queued: same ? status.queued : false, releaseDate: info.releaseDate, error: undefined })
             void loadNotes(info)
           })
           u.on('update-not-available', () => {
@@ -278,7 +316,10 @@ const feature: Feature = {
     ctx.handle('cancel', () => cancel())
     // «Más tarde»: oculta el aviso; el punto del acceso a Configuración queda hasta actualizar.
     ctx.handle('later', () => {
-      if (status.state === 'available' || status.state === 'ready' || status.state === 'downloading') set({ later: true })
+      if ((status.state === 'available' || status.state === 'ready' || status.state === 'downloading') && status.version) {
+        writePostponed({ version: status.version, day: dayNow() })
+        set({ later: true })
+      }
       return status
     })
     // «Al cerrar Sloth»: se descarga (si hace falta) y se instala al salir (autoInstallOnAppQuit).

@@ -9,6 +9,8 @@ import { SHORTCUT_ACTIONS, bindingOf, comboFromEvent, findConflict, keyTokenOf, 
 import { openReport } from '../report/bus'
 import { request as requestExportImport } from '../export-import/bus'
 import { openHelp } from '../help/bus'
+import { setPhase } from '../updater/phase'
+import { useUpdateDot } from '../updater/useUpdateStatus'
 import { SoundTest } from '../sound/SoundTest'
 import { resolveAccountColor, pickProjectsDir, projectsDirOf, useSettings } from './store'
 import { errText, Group, Row, Seg, Slider, ToggleRow, useSave, SectionHint } from './ui'
@@ -852,6 +854,8 @@ export function UpdatesSection(): React.JSX.Element {
   const [st, setSt] = useState<UpdateStatus | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  /** «Más tarde» dejó una versión pendiente: mismo dato que el punto del engranaje. */
+  const pendiente = useUpdateDot()
 
   useEffect(() => {
     ui.invoke<UpdateStatus>('feat:updater:status').then(setSt, () => undefined)
@@ -913,6 +917,17 @@ export function UpdatesSection(): React.JSX.Element {
           {msg}
         </p>
       )}
+      {pendiente && st?.version && (
+        <div role="status" className="f-set-card f-set-status">
+          <div className="grow">
+            <div className="f-set-row-title">Dejaste para después la versión {st.version}</div>
+            <div className="f-set-hint">No te vuelve a avisar hasta mañana. Podés verla cuando quieras.</div>
+          </div>
+          <button type="button" className="btn sm" onClick={() => setPhase('notes')}>
+            Ver novedades
+          </button>
+        </div>
+      )}
       <Group id="g-canal" title="Canal">
         {UPDATE_CHANNELS.map((c: UpdateChannel) => {
           const on = p.settings.updateChannel === c
@@ -962,8 +977,9 @@ export function AboutSection({ onClose }: { onClose(): void }): React.JSX.Elemen
         </div>
       </div>
       <Group id="g-mas" title="Más">
-        <ToggleLikeButton title="Exportar configuración" hint="Cuentas, espacios y plantillas a un JSON (sin sesiones ni credenciales)." onClick={go(() => requestExportImport({ kind: 'export' }))} />
-        <ToggleLikeButton title="Importar configuración" hint="Desde un JSON exportado en otra PC; antes te muestra qué va a agregar." onClick={go(() => requestExportImport({ kind: 'import' }))} />
+        <ToggleLikeButton title="Exportar configuración…" hint="Espacios, plantillas, apariencia, atajos y reglas de permisos en un archivo .sloth (sin sesiones ni credenciales)." onClick={go(() => requestExportImport({ kind: 'export' }))} />
+        <ToggleLikeButton title="Importar configuración…" hint="Desde un archivo .sloth de otra PC; antes te muestra qué va a agregar, y las reglas de permisos una por una." onClick={go(() => requestExportImport({ kind: 'import' }))} />
+        <ToggleLikeButton title="Ayuda y atajos" hint="Cómo se usa Sloth y la lista de atajos de teclado." onClick={go(() => openHelp('ayuda'))} />
         <ToggleLikeButton title="Novedades" hint="Qué cambió en la última versión de Sloth." onClick={go(() => openHelp('whatsnew'))} />
         <ToggleLikeButton title="Invitar a un compañero" hint="Copia un texto con los pasos para instalar Sloth y empezar." onClick={go(() => openHelp('invite'))} />
       </Group>
