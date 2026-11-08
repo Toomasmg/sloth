@@ -4,7 +4,7 @@ import { cleanError, shortPath } from '../../format'
 import { applyVars, BRANCH_VARS, TEMPLATE_COLOR_KEYS, TEMPLATE_ICON_KEYS, SUGGESTED, today, unknownVars, validBranch, varsIn, type VarValues } from '../../../../shared/templates-shared'
 import { colorHex, iconPath, TEMPLATE_COLORS, TEMPLATE_ICONS, VAR_CHIPS } from './catalog'
 import { loadTemplates, openDialog, setPreselect, useTemplates, type TemplateDto } from './store'
-import { CloseIcon, SearchIcon, TemplatesIcon } from '../../icons/SlothIcons'
+import { SearchIcon } from '../../icons/SlothIcons'
 
 /** Campos que se editan en el formulario (lo que el usuario puede cambiar de una plantilla propia). */
 interface Fields {
@@ -407,13 +407,16 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
     <div className="tp-overlay" onMouseDown={(e) => e.target === e.currentTarget && requestClose()}>
       <div className="tp-screen" role="dialog" aria-modal="true" aria-labelledby="tp-title">
         <header className="tp-head">
-          <TemplatesIcon size={18} className="tp-head-icon" />
-          <h2 id="tp-title">Plantillas de espacio</h2>
-          <span className="tp-count">{list.length === 1 ? '1 plantilla' : `${list.length} plantillas`}</span>
-          <span className="grow" />
-          <button type="button" className="icon-btn" onClick={requestClose} aria-label="Cerrar plantillas" title="Cerrar (Esc)">
-            <CloseIcon size={14} />
+          <button type="button" className="tp-back" onClick={requestClose} title="Cerrar (Esc)">
+            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 5l-7 7 7 7" />
+            </svg>
+            Espacios
           </button>
+          <span className="tp-divider" aria-hidden="true" />
+          <h2 id="tp-title">Plantillas de espacio</h2>
+          <span className="grow" />
+          <span className="tp-count">{`${list.length} ${list.length === 1 ? 'plantilla' : 'plantillas'} · ${list.filter((t) => t.team).length} del equipo`}</span>
         </header>
 
         <div className="tp-body">
@@ -424,6 +427,9 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
             </label>
 
             <button type="button" className="btn primary tp-new-btn" aria-expanded={creating} onClick={() => setCreating((v) => !v)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
               Nueva plantilla
             </button>
 
@@ -531,8 +537,8 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
                   <button type="button" className="btn primary" onClick={useNow}>
                     Usar esta plantilla
                   </button>
-                  <button type="button" className="btn" aria-pressed={defaultId === cur.id} onClick={() => void toggleDefault()}>
-                    {defaultId === cur.id ? 'Quitar predeterminada' : 'Fijar como predeterminada'}
+                  <button type="button" className="btn tp-def" aria-pressed={defaultId === cur.id} onClick={() => void toggleDefault()}>
+                    {defaultId === cur.id ? 'Es la predeterminada' : 'Fijar como predeterminada'}
                   </button>
                   <button type="button" className="btn" onClick={() => void dup()}>
                     Duplicar
@@ -644,7 +650,7 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
                               aria-label={TEMPLATE_COLORS[k].name}
                               title={TEMPLATE_COLORS[k].name}
                               className={`tp-color-pick${on ? ' on' : ''}`}
-                              style={{ background: TEMPLATE_COLORS[k].hex }}
+                              style={{ background: TEMPLATE_COLORS[k].hex, color: TEMPLATE_COLORS[k].hex }}
                               onClick={() => setField('color', k)}
                             />
                           )
