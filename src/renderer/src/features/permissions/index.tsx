@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
-import { useUi, type FeatureUi } from '../host'
+import { useUi, type Command, type FeatureUi } from '../host'
 import { PermissionReview } from './PermissionReview'
 import { DecisionsPanel } from './DecisionsPanel'
 import { setFocusedSpace } from './api'
-import { closePermissionUi, openPermissionReview, usePermissionUi } from './store'
+import { closePermissionUi, openPermissionDecisions, openPermissionReview, usePermissionUi } from './store'
 import { PermissionIcon } from '../../icons/SlothIcons'
 import './permissions.css'
 
@@ -60,6 +60,26 @@ const Global = (): React.JSX.Element | null => {
   )
 }
 
-const ui: FeatureUi = { name: 'permissions', Titlebar, Global }
+/** Comandos de la paleta: revisar los pedidos vivos y abrir el panel de decisiones. */
+const commands = (): Command[] => [
+  {
+    id: 'permissions:review',
+    title: 'Revisar pedidos de permiso',
+    subtitle: 'Los pedidos vivos, uno por uno',
+    group: 'Permisos',
+    keywords: 'permiso pedido revisar aprobar rechazar',
+    run: () => openPermissionReview(null)
+  },
+  {
+    id: 'permissions:decisions',
+    title: 'Decisiones de permisos',
+    subtitle: 'Lo que aprobaste o rechazaste, y las reglas guardadas',
+    group: 'Permisos',
+    keywords: 'decisiones permisos reglas historial allow deny',
+    run: () => openPermissionDecisions()
+  }
+]
+
+const ui: FeatureUi = { name: 'permissions', Titlebar, Global, commands }
 
 export default ui

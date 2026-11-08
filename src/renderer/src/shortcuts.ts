@@ -13,7 +13,7 @@ export interface Shortcut {
   keys: string[][]
   what: string
   /** Para agrupar en la hoja de atajos. */
-  group?: 'General' | 'Paneles' | 'Terminal'
+  group?: 'General' | 'Paneles' | 'Terminal' | 'Chat'
 }
 
 export const SHORTCUTS: Shortcut[] = [
@@ -23,7 +23,12 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: [['?']], what: 'Esta hoja de atajos', group: 'General' },
   { keys: [['Ctrl', 'Shift', 'F']], what: 'Buscar en el historial de conversaciones', group: 'General' },
   { keys: [['Ctrl', 'Shift', 'B']], what: 'Enviar a varios espacios', group: 'General' },
+  { keys: [['Ctrl', 'N']], what: 'Nuevo espacio', group: 'General' },
+  { keys: [['Ctrl', 'B']], what: 'Mostrar u ocultar la barra lateral', group: 'General' },
+  { keys: [['Ctrl', 'Shift', 'M']], what: 'Abrir el chat del equipo', group: 'Chat' },
   { keys: [['Esc']], what: 'Cerrar ventanas y paletas', group: 'General' },
+  { keys: [['F2']], what: 'Renombrar el panel activo (o el espacio enfocado en la lista)', group: 'Paneles' },
+  { keys: [['Ctrl', 'Alt', '1–4']], what: 'Distribución: 1 (uno), 2 (dos), 3 o 4 (cuatro) paneles a la vista', group: 'Paneles' },
   { keys: [['Ctrl', 'Tab'], ['Ctrl', 'Shift', 'Tab']], what: 'Cambiar de panel (siguiente o anterior, en pestañas)', group: 'Paneles' },
   { keys: [['Ctrl', 'Alt', '←']], what: 'Mover el panel a la izquierda', group: 'Paneles' },
   { keys: [['Ctrl', 'Alt', '→']], what: 'Mover el panel a la derecha', group: 'Paneles' },
@@ -50,8 +55,13 @@ export const SHORTCUT_ACTIONS: readonly ShortcutAction[] = [
   { id: 'broadcast', name: 'Enviar a varios espacios', def: 'Ctrl Shift B' },
   { id: 'layout', name: 'Cambiar distribución', def: 'Ctrl Alt 1–4', fixed: true },
   { id: 'settings', name: 'Abrir configuración', def: 'Ctrl ,' },
-  { id: 'chat', name: 'Abrir el chat del equipo', def: 'Ctrl Shift M' }
+  { id: 'chat', name: 'Abrir el chat del equipo', def: 'Ctrl Shift M' },
+  { id: 'history', name: 'Buscar en el historial de conversaciones', def: 'Ctrl Shift F' },
+  { id: 'rename', name: 'Renombrar el panel activo', def: 'F2' }
 ]
+
+/** Texto para mostrar de una acción: «Ctrl+Shift+F». */
+export const comboLabel = (id: ShortcutId): string => bindingOf(id).split(' ').join('+')
 
 /** Combinación vigente de una acción: la personalizada, o el por defecto. */
 export function bindingOf(id: ShortcutId, custom: Partial<Record<ShortcutId, string>> = getSettings().settings.shortcuts): string {
@@ -98,11 +108,11 @@ export function matchShortcut(id: ShortcutId, e: KeyboardEvent): boolean {
   return e.ctrlKey === b.ctrl && e.altKey === b.alt && e.shiftKey === b.shift && keyTokenOf(e) === b.key
 }
 
-/** Combinación canónica de un evento para grabarla, o null si no es una combinación usable (sin Ctrl/Alt o solo modificadores). */
+/** Combinación canónica de un evento para grabarla, o null si no es una combinación usable (sin Ctrl/Alt o solo modificadores). Una tecla F sola sirve. */
 export function comboFromEvent(e: KeyboardEvent): string | null {
   const key = keyTokenOf(e)
   if (!key) return null
-  if (!e.ctrlKey && !e.altKey) return null
+  if (!e.ctrlKey && !e.altKey) return /^F(?:[1-9]|1[0-2])$/.test(key) && !e.shiftKey ? key : null
   return canonicalCombo([e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', key].filter(Boolean).join(' '))
 }
 

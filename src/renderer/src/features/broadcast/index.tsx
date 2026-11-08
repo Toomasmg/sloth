@@ -3,6 +3,7 @@ import { isLoginPane } from '../../../../shared/types'
 import { useUi, type FeatureUi, type UiCtx } from '../host'
 import { resolveAccountColor } from '../settings/store'
 import { shortPath } from '../../format'
+import { comboLabel, isCapturingShortcut, matchShortcut } from '../../shortcuts'
 import { CloseIcon, BroadcastIcon, DoneIcon, WaitingIcon, PermissionIcon, IdleIcon, WorkingIcon } from '../../icons/SlothIcons'
 import { cancelQueued, releaseQueued, startBatch, useBatches, type Batch } from './store'
 import { canReceive, isReady, SPACE_CHIP, SPACE_LABEL, spaceStatus, type SpaceStatus } from './state'
@@ -562,7 +563,7 @@ function Global(): React.JSX.Element | null {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && e.code === 'KeyB') {
+      if (!isCapturingShortcut() && matchShortcut('broadcast', e)) {
         e.preventDefault()
         e.stopPropagation()
         setOpen(!isOpen)
@@ -621,7 +622,7 @@ const ui: FeatureUi = {
             subtitle: 'El mismo mensaje en varias terminales a la vez',
             group: 'Espacios',
             keywords: 'broadcast difundir prompt todos multiple',
-            shortcut: 'Ctrl+Shift+B',
+            shortcut: comboLabel('broadcast'),
             run: () => setOpen(true)
           }
         ]

@@ -1,10 +1,10 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { HistoryIcon } from '../../icons/SlothIcons'
+import { comboLabel, isCapturingShortcut, matchShortcut } from '../../shortcuts'
 import type { FeatureUi } from '../host'
 import { HistoryPage } from './HistoryPage'
 import './history.css'
 
-const SHORTCUT = 'Ctrl+Shift+F'
 
 // Abierta o cerrada, compartido entre el botón, el atajo y la paleta.
 let isOpen = false
@@ -28,7 +28,7 @@ function Global(): React.JSX.Element | null {
   // Fase de captura: funciona aunque la terminal (xterm) tenga el foco.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && (e.key === 'F' || e.key === 'f' || e.code === 'KeyF')) {
+      if (!isCapturingShortcut() && matchShortcut('history', e)) {
         e.preventDefault()
         e.stopPropagation()
         setOpen(!isOpen)
@@ -47,7 +47,7 @@ function TitlebarButton(): React.JSX.Element {
       className="icon-btn f-history-tb"
       onClick={() => setOpen(true)}
       aria-label="Historial de sesiones"
-      title={`Historial de sesiones (${SHORTCUT})`}
+      title={`Historial de sesiones (${comboLabel('history')})`}
     >
       <HistoryIcon size={15} />
     </button>
@@ -66,7 +66,7 @@ const ui: FeatureUi = {
         subtitle: 'Conversaciones de Claude de todas las cuentas: retomar, buscar, exportar',
         group: 'Historial',
         keywords: 'historial buscar conversaciones transcript sesion resume retomar exportar markdown fijar',
-        shortcut: SHORTCUT,
+        shortcut: comboLabel('history'),
         icon: <HistoryIcon size={16} />,
         run: () => setOpen(true)
       }

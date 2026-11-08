@@ -4,7 +4,8 @@ import type { Workspace } from '../../../../shared/types'
 import { api } from '../../api'
 import { cleanError, shortPath, STATE_LABEL } from '../../format'
 import { ChangesIcon, CloseIcon, EditorIcon, FolderIcon, MaximizeIcon, MoveAccountIcon, SearchIcon } from '../../icons/SlothIcons'
-import { resolveAccountColor, useSettings } from '../settings/store'
+import { bindingOf, isCapturingShortcut, matchShortcut } from '../../shortcuts'
+import { getSettings, resolveAccountColor, useSettings } from '../settings/store'
 import { FEATURE_UIS } from '../registry'
 import { useUi, type Command, type FeatureUi, type UiCtx } from '../host'
 import { fuzzyFilter, splitHighlight, type FuzzyMatch } from './fuzzy'
@@ -179,7 +180,7 @@ function spaceActions(ctx: UiCtx, ws: Workspace): Item[] {
     {
       ...base,
       id: 'x-code',
-      title: 'Abrir en VS Code',
+      title: `Abrir en ${getSettings().settings.editor === 'Bloc de notas' ? 'carpeta' : getSettings().settings.editor}`,
       subtitle: ws.cwd,
       icon: <EditorIcon size={15} aria-hidden="true" />,
       run: () => {
@@ -327,10 +328,10 @@ export function PaletteBar(): React.JSX.Element {
       inputRef.current?.focus()
     }
     const onKey = (e: KeyboardEvent): void => {
-      if (!e.ctrlKey || e.altKey || e.metaKey) return
-      const k = e.code === 'KeyK' && !e.shiftKey
-      const p = e.code === 'KeyP' && e.shiftKey
-      if (!k && !p) return
+      if (isCapturingShortcut()) return
+      // Ctrl+Shift+P es el alternativo fijo; el atajo principal es el de Configuración (por defecto Ctrl K).
+      const alt = e.ctrlKey && e.shiftKey && !e.altKey && !e.metaKey && e.code === 'KeyP'
+      if (!matchShortcut('palette', e) && !alt) return
       e.preventDefault()
       e.stopPropagation()
       focusField?.()
@@ -495,7 +496,7 @@ export function PaletteBar(): React.JSX.Element {
           spellCheck={false}
           autoComplete="off"
         />
-        <kbd className="pal-hint">{open ? 'Esc' : 'Ctrl K'}</kbd>
+        <kbd className="pal-hint">{open ? 'Esc' : bindingOf('palette')}</kbd>
       </label>
 
       {open && (

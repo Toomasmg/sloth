@@ -106,7 +106,7 @@ const FAQS: { id: string; q: string; a: string }[] = [
   }
 ]
 
-const GROUPS = ['General', 'Paneles', 'Terminal'] as const
+const GROUPS = ['General', 'Paneles', 'Chat', 'Terminal'] as const
 const SECTIONS = [
   { id: 'ay-primeros', label: 'Primeros pasos' },
   { id: 'ay-atajos', label: 'Atajos de teclado' },

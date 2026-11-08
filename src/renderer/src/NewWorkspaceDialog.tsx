@@ -78,7 +78,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
   const [carpeta, setCarpeta] = useState(props.preset?.repoPath ?? (ticketMode ? props.defaultRepo : ''))
   const [nameRaw, setNameRaw] = useState(props.preset?.name ?? '')
   const [nameTouched, setNameTouched] = useState(Boolean(props.preset?.name))
-  const [accountId, setAccountId] = useState(suggested)
+  const [accountId, setAccountId] = useState(() => (props.preset?.accountId && accounts.some((a) => a.id === props.preset?.accountId) ? props.preset.accountId : suggested))
   const [colorKey, setColorKey] = useState<(typeof TEMPLATE_COLOR_KEYS)[number]>('cielo')
   const [wtOn, setWtOn] = useState(false)
   const [branchRaw, setBranchRaw] = useState('')
