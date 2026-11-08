@@ -9,6 +9,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.2',
+    date: '2026-11-08',
+    title: 'Todo lo del diseño, funcionando',
+    items: [
+      'Tickets de Gruv: cambiá el estado, tomá o soltá el ticket, tildá criterios, comentá y cargá horas desde Sloth. Cada acción se hace solo cuando la tocás.',
+      'Ramas aparte: tamaño en disco de cada una, cuánto libera la limpieza y página propia.',
+      'Historial: «Borrar» manda la conversación a la Papelera de Windows (se puede recuperar).',
+      'Atajos nuevos: F1 ayuda, Ctrl+1 a Ctrl+4 para ir a cada panel y Ctrl+Shift+Enter para enviar a todos.',
+      '«Probar conexión» del chat prueba de verdad, y al importar ves la apariencia que trae el archivo.',
+      'Reportar un problema: botón «Ver en GitHub» al terminar.'
+    ]
+  },
+  {
     version: '0.6.1',
     date: '2026-11-08',
     title: 'Igual al diseño',
