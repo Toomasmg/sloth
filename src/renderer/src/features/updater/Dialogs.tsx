@@ -3,6 +3,7 @@ import { useUi } from '../host'
 import { DoneIcon, ErrorIcon, UpdateIcon, CloseIcon } from '../../icons/SlothIcons'
 import logo from '../../assets/sloth-logo.png'
 import { setPhase, setRestarting, usePhase } from './phase'
+import { showUpdateToast } from './bus'
 import { useUpdateStatus, type NoteGroup, type UpdateStatus } from './useUpdateStatus'
 
 const REPO_URL = 'https://github.com/Toomasmg/sloth'
@@ -12,13 +13,24 @@ const errText = (e: unknown): string =>
 
 const mb = (bytes: number | undefined): string => ((bytes ?? 0) / 1_000_000).toFixed(1).replace('.', ',')
 
-/** Color y fondo por grupo de novedades: Nuevo / Mejoras / Arreglos (tokens del tema). */
-const GROUP_TONE: Record<string, { fg: string; bg: string }> = {
-  nuevo: { fg: 'var(--info)', bg: 'var(--info-soft)' },
-  mejoras: { fg: 'var(--success)', bg: 'var(--success-soft)' },
-  arreglos: { fg: 'var(--warn)', bg: 'var(--warn-soft)' }
+/** Ícono de trazo con el path del artboard (los diálogos de actualización usan estos, no los de SlothIcons). */
+function Ico({ d, size, sw = 2, className }: { d: string; size: number; sw?: number; className?: string }): React.JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d={d} />
+    </svg>
+  )
 }
-const toneOf = (g: NoteGroup): { fg: string; bg: string } => GROUP_TONE[g.id] ?? { fg: 'var(--fg-2)', bg: 'var(--card)' }
+
+const ICON_UPDATE = 'M12 4l1.8 4.7 4.7 1.8-4.7 1.8L12 17l-1.8-4.7-4.7-1.8 4.7-1.8z'
+
+/** Color, fondo y ícono por grupo de novedades: Nuevo / Mejoras / Arreglos (artboard: los tonos «-fg» claros). */
+const GROUP_TONE: Record<string, { fg: string; bg: string; icon: string }> = {
+  nuevo: { fg: 'var(--info)', bg: 'var(--info-soft)', icon: ICON_UPDATE },
+  mejoras: { fg: 'var(--success-fg)', bg: 'var(--success-soft)', icon: 'M5 16l4.5-4.5 3 3L19 7.5M14.5 7.5H19v4.5' },
+  arreglos: { fg: 'var(--warn-fg)', bg: 'var(--warn-soft)', icon: 'M12 3.5a8.5 8.5 0 1 0 0 17a8.5 8.5 0 1 0 0-17zM8.5 12.5l2.5 2.5 4.5-5' }
+}
+const toneOf = (g: NoteGroup): { fg: string; bg: string; icon: string } => GROUP_TONE[g.id] ?? { fg: 'var(--fg-2)', bg: 'var(--card)', icon: ICON_UPDATE }
 
 function statusLine(st: UpdateStatus): { icon: React.ReactNode; text: string; tone: string } {
   switch (st.state) {
@@ -85,7 +97,11 @@ export function UpdateDialogs(): React.JSX.Element | null {
     setPhase('dl')
     void call('feat:updater:download')
   }
-  const queue = (): void => void call('feat:updater:queue', () => setPhase(null))
+  const queue = (): void =>
+    void call('feat:updater:queue', () => {
+      setPhase(null)
+      showUpdateToast(`La ${v} se instala cuando cierres Sloth`)
+    })
   const restartNow = async (): Promise<void> => {
     setRestarting(true)
     setErr(null)
@@ -106,7 +122,7 @@ export function UpdateDialogs(): React.JSX.Element | null {
       <>
         <div className="f-updater-head" role="status">
           <span className="f-updater-ico round">
-            <UpdateIcon size={18} className="f-updater-spin" />
+            <Ico d="M12 4a8 8 0 1 1-8 8" size={18} className="f-updater-spin" />
           </span>
           <div className="f-updater-titles">
             <h2 id="f-updater-title">{title}</h2>
@@ -137,7 +153,7 @@ export function UpdateDialogs(): React.JSX.Element | null {
               <section key={g.id} aria-labelledby={`f-up-${g.id}`} className="f-updater-group">
                 <h3 id={`f-up-${g.id}`} style={{ color: t.fg }}>
                   <span className="f-updater-gdot" style={{ background: t.bg, color: t.fg }} aria-hidden="true">
-                    {g.id === 'arreglos' ? <DoneIcon size={12} /> : <UpdateIcon size={12} />}
+                    <Ico d={t.icon} size={13} />
                   </span>
                   {g.label}
                 </h3>
@@ -173,10 +189,10 @@ export function UpdateDialogs(): React.JSX.Element | null {
       <>
         <div className="f-updater-head" role="alert">
           <span className="f-updater-ico danger">
-            <ErrorIcon size={18} />
+            <Ico d="M12 3.5l7 3v5c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9v-5zM12 8.5v4M12 15.5h.01" size={18} sw={1.8} />
           </span>
           <div className="f-updater-titles">
-            <h2 id="f-updater-title">{title}</h2>
+            <h2 id="f-updater-title" className="f-updater-err-title">{title}</h2>
             <p>
               Sloth {v} no se instaló. La {cur} sigue funcionando.
               {st.error ? ` (${st.error})` : ''}
@@ -200,7 +216,7 @@ export function UpdateDialogs(): React.JSX.Element | null {
       <>
         <div className="f-updater-head">
           <span className="f-updater-ico ok">
-            <DoneIcon size={18} />
+            <Ico d="M5 12.5l4.5 4.5L19 7.5" size={18} sw={2.2} />
           </span>
           <div className="f-updater-titles">
             <h2 id="f-updater-title">{title}</h2>
@@ -230,7 +246,7 @@ export function UpdateDialogs(): React.JSX.Element | null {
       <>
         <div className="f-updater-head">
           <span className="f-updater-ico">
-            <UpdateIcon size={18} />
+            <Ico d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14" size={18} sw={1.8} />
           </span>
           <div className="f-updater-titles">
             <h2 id="f-updater-title">{title}</h2>
@@ -248,7 +264,16 @@ export function UpdateDialogs(): React.JSX.Element | null {
         </div>
         <footer className="f-updater-actions">
           <span className="f-updater-grow" />
-          <button type="button" className="btn" onClick={() => void call('feat:updater:cancel', () => setPhase(null))}>
+          <button
+            type="button"
+            className="btn"
+            onClick={() =>
+              void call('feat:updater:cancel', () => {
+                setPhase(null)
+                showUpdateToast(`Descarga cancelada. La ${v} sigue disponible.`)
+              })
+            }
+          >
             Cancelar
           </button>
         </footer>
@@ -274,11 +299,6 @@ export function UpdateDialogs(): React.JSX.Element | null {
           <p className="form-error" role="alert">
             {err}
           </p>
-        )}
-        {!restarting && (
-          <button type="button" className="icon-btn f-updater-x" onClick={close} aria-label="Cerrar">
-            <CloseIcon size={14} />
-          </button>
         )}
       </section>
     </div>

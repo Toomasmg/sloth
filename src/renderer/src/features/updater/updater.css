@@ -1,20 +1,22 @@
 /* Función «updater»: aviso en la barra superior, diálogos de novedades / descarga / reinicio y «Acerca de». */
+/* Artboard «Actualizaciones»: la píldora de la barra es verde (éxito), 30 px, con botones de 24 px. */
 .f-updater-banner {
   display: flex;
   align-items: center;
-  gap: var(--s-2);
-  min-height: 28px;
+  gap: 8px;
+  min-height: 30px;
   max-width: 100%;
-  padding: 2px 4px 2px 10px;
-  border-radius: 999px;
-  background: var(--info-soft);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-sizing: border-box;
+  padding: 3px 4px 3px 10px;
+  border-radius: 15px;
+  background: var(--success-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 28%, transparent);
   color: var(--fg-2);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
 }
 .f-updater-banner > svg {
   flex: none;
-  color: var(--info);
+  color: var(--success-fg);
 }
 .f-updater-banner-text {
   min-width: 0;
@@ -25,9 +27,15 @@
   text-overflow: ellipsis;
 }
 .f-updater-banner .btn.sm {
-  height: 22px;
+  height: 24px;
   padding: 0 9px;
-  border-radius: 999px;
+  border-radius: 12px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.f-updater-banner .btn.ghost {
+  font-weight: 400;
+  color: var(--fg-2);
 }
 
 .f-updater-backdrop {
@@ -35,25 +43,33 @@
 }
 .f-updater-dialog {
   position: relative;
-  width: min(560px, calc(100vw - 32px));
+  width: min(560px, calc(100% - 24px));
   max-height: min(640px, calc(100vh - 48px));
   display: flex;
   flex-direction: column;
-  gap: var(--s-3);
+  gap: 16px;
   box-sizing: border-box;
-  padding: var(--s-5);
+  padding: 22px;
   border-radius: 14px;
-  background: var(--surface);
-  box-shadow: var(--shadow-lg), inset 0 0 0 1px var(--line-strong);
+  background: var(--card);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 0 1px var(--line-strong);
   overflow: hidden;
 }
 .f-updater-dialog:focus {
   outline: none;
 }
-.f-updater-x {
-  position: absolute;
-  top: var(--s-3);
-  right: var(--s-3);
+/* Pie de los diálogos: botones de 34 px como en el artboard. */
+.f-updater-dialog .f-updater-actions .btn {
+  height: 34px;
+  padding: 0 14px;
+  font-size: var(--fs-md);
+}
+.f-updater-dialog .f-updater-actions .btn.primary {
+  padding: 0 16px;
+  font-weight: 600;
+}
+.f-updater-dialog .f-updater-actions .btn.ghost {
+  padding: 0 12px;
 }
 .f-updater-head {
   display: flex;
@@ -66,14 +82,17 @@
 }
 .f-updater-titles h2 {
   margin: 0;
-  font-size: var(--fs-xl);
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
+.f-updater-titles h2.f-updater-err-title {
+  font-size: var(--fs-xl);
+}
 .f-updater-titles p {
   margin: 4px 0 0;
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
   line-height: 1.5;
 }
 .f-updater-logo {
@@ -104,9 +123,9 @@
 }
 .f-updater-box {
   margin: 0;
-  padding: var(--s-3) var(--s-4);
+  padding: 12px 14px;
   border-radius: 12px;
-  background: var(--card);
+  background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--fg-2);
   line-height: 1.55;
@@ -114,27 +133,28 @@
 .f-updater-notes {
   display: flex;
   flex-direction: column;
-  gap: var(--s-4);
+  gap: 14px;
   max-height: min(420px, 52vh);
   overflow-y: auto;
-  padding-right: var(--s-1);
+  padding-right: 4px;
 }
 .f-updater-group {
   display: flex;
   flex-direction: column;
-  gap: var(--s-2);
+  gap: 8px;
 }
 .f-updater-group h3 {
   margin: 0;
   display: flex;
   align-items: center;
-  gap: var(--s-2);
-  font-size: var(--fs-xs);
+  gap: 8px;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 .f-updater-gdot {
   width: 22px;
   height: 22px;
+  flex: none;
   border-radius: 7px;
   display: grid;
   place-items: center;
@@ -150,7 +170,7 @@
 .f-updater-group li {
   display: flex;
   align-items: flex-start;
-  gap: var(--s-2);
+  gap: 10px;
   line-height: 1.5;
   color: var(--fg);
 }
@@ -187,8 +207,29 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 6px 12px;
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+
+/* Aviso «Se instala al cerrar Sloth» (abajo a la derecha, como en el artboard). */
+.f-updater-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 42px;
+  z-index: 40;
+  max-width: calc(100% - 36px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--toast-bg);
+  color: var(--fg);
+  box-shadow: var(--shadow-md), inset 0 0 0 1px var(--line-strong);
+}
+.f-updater-toast > svg {
+  flex: none;
+  stroke: var(--success-fg);
 }
 .f-updater-actions {
   display: flex;

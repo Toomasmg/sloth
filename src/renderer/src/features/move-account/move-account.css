@@ -1,40 +1,77 @@
-/* «Mover espacio a otra cuenta» (v0.6). Clases con prefijo f-move-. */
+/* «Mover espacio a otra cuenta» (diseño MoverCuenta.dc.html). Clases con prefijo f-move-.
+   Medidas en px literales (los --s-* de themes.css no coinciden con el diseño); colores por token. */
+
+.f-move-backdrop {
+  background: rgba(4, 5, 8, 0.66);
+}
+html[data-theme='light'] .f-move-backdrop {
+  background: var(--backdrop);
+}
 
 .modal.f-move-modal {
-  width: min(560px, calc(100vw - 32px));
+  box-sizing: border-box;
+  width: min(560px, calc(100vw - 24px));
   display: flex;
   flex-direction: column;
-  gap: var(--s-4);
-  padding: var(--s-5);
+  gap: 16px;
+  padding: 22px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 0 1px var(--line-strong);
+  color: var(--fg);
+  font-size: 13px;
 }
 
-.f-move-head-icon {
-  color: var(--brand-2);
-  flex: none;
+.f-move-head {
+  display: flex;
+  flex-direction: column;
+}
+.f-move-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--fg);
 }
 .f-move-lead {
-  margin: calc(var(--s-1) * -1) 0 0;
-  font-size: var(--fs-sm);
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--fg-2);
+  line-height: 1.5;
+}
+
+.f-move-muted {
+  font-size: 12px;
   color: var(--fg-muted);
   line-height: 1.5;
+}
+.f-move-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.f-move-label {
+  font-size: 12px;
+  color: var(--fg-2);
 }
 
 /* Espacio de origen */
 .f-move-space {
   display: flex;
   align-items: center;
-  gap: var(--s-3);
-  padding: var(--s-3);
-  border-radius: var(--r-md);
-  background: var(--input-bg);
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .f-move-space-icon {
   width: 36px;
   height: 36px;
   flex: none;
-  border-radius: var(--r-sm);
-  background: var(--info-soft);
+  border-radius: 9px;
+  background: var(--accent-soft);
   color: var(--info);
   display: grid;
   place-items: center;
@@ -44,65 +81,69 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 .f-move-space-name {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 .f-move-space-path {
+  margin-top: 2px;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  color: var(--fg-muted);
+  color: var(--fg-2);
   overflow-wrap: anywhere;
 }
 .f-move-space-acc {
   flex: none;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  font-size: var(--fs-sm);
   text-align: right;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.f-move-space-acc strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--fg);
+  font-weight: 600;
 }
 
 .f-move-section {
   display: flex;
   flex-direction: column;
-  gap: var(--s-2);
+  gap: 8px;
 }
-.f-move-section h3 {
-  margin: 0 0 0 var(--s-1);
-  font-size: var(--fs-sm);
+.f-move-h3 {
+  margin: 0 0 0 4px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--fg-muted);
+  color: var(--fg-2);
 }
 
-/* Cuentas destino */
+/* Cuentas destino (radiogroup) */
 .f-move-list {
-  display: flex;
-  flex-direction: column;
-  border-radius: var(--r-md);
-  background: var(--input-bg);
+  border-radius: 12px;
+  background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--line);
   overflow: hidden;
 }
 .f-move-row {
   display: flex;
   align-items: center;
-  gap: var(--s-2);
-  padding-right: var(--s-3);
+  gap: 8px;
 }
 .f-move-row.sep {
   box-shadow: inset 0 -1px 0 var(--line);
 }
 .f-move-opt {
+  position: relative;
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--s-3);
-  padding: var(--s-3);
+  gap: 12px;
+  padding: 12px 14px;
   cursor: pointer;
+  color: var(--fg);
+  transition: background 0.12s, box-shadow 0.12s;
 }
 .f-move-opt.off {
   cursor: default;
@@ -111,17 +152,32 @@
   background: var(--hover);
 }
 .f-move-opt.on {
-  background: var(--info-soft);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px rgba(138, 180, 255, 0.55);
 }
+.f-move-opt:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+/* El radio nativo queda para teclado y lectores; lo que se ve es .f-move-mark. */
 .f-move-opt input {
-  accent-color: var(--brand-2);
+  position: absolute;
+  width: 1px;
+  height: 1px;
   margin: 0;
-  width: 16px;
-  height: 16px;
-  flex: none;
+  opacity: 0;
+  pointer-events: none;
 }
-.f-move-opt input:disabled {
-  opacity: 0.4;
+.f-move-ini {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--info);
+  font-weight: 700;
+  display: grid;
+  place-items: center;
 }
 .f-move-opt-main {
   flex: 1;
@@ -135,7 +191,7 @@
 }
 .f-move-opt-sub {
   font-size: 12px;
-  color: var(--fg-muted);
+  color: var(--fg-2);
 }
 .f-move-opt-sub.warn {
   color: var(--warn-fg);
@@ -145,31 +201,69 @@
   font-size: 11px;
   padding: 3px 8px;
   border-radius: 9px;
-  background: var(--surface-2);
+  background: var(--btn-2);
   color: var(--fg-2);
+}
+.f-move-mark {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px #4a5160;
+  display: grid;
+  place-items: center;
+}
+.f-move-mark.on {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.f-move-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: transparent;
+}
+.f-move-mark.on .f-move-dot {
+  background: var(--accent);
 }
 .f-move-login {
   flex: none;
+  height: 30px;
+  margin-right: 12px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.12s;
+}
+.f-move-login:hover {
+  filter: brightness(1.12);
 }
 
 /* Cajas de texto y el resumen */
 .f-move-box {
   margin: 0;
-  padding: var(--s-3);
-  border-radius: var(--r-md);
-  background: var(--input-bg);
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--line);
-  color: var(--fg-2);
+}
+.f-move-body {
+  color: var(--fg);
   line-height: 1.55;
 }
 .f-move-keep {
   display: flex;
   align-items: flex-start;
-  gap: var(--s-3);
+  gap: 12px;
   cursor: pointer;
 }
 .f-move-keep input {
-  accent-color: var(--brand-2);
+  accent-color: var(--accent);
   width: 16px;
   height: 16px;
   margin: 2px 0 0;
@@ -192,15 +286,22 @@
 .f-move-text {
   box-sizing: border-box;
   width: 100%;
-  padding: var(--s-2) var(--s-3);
+  padding: 10px;
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: 8px;
   background: var(--input-bg);
   color: var(--fg);
   font: inherit;
   line-height: 1.5;
   resize: vertical;
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.f-move-text:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgba(138, 180, 255, 0.7), 0 0 0 3px rgba(138, 180, 255, 0.18);
+}
+.f-move-text:disabled {
+  opacity: 0.6;
 }
 
 /* Avisos de estado real */
@@ -208,78 +309,35 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-2) var(--s-3);
-  padding: var(--s-3);
-  border-radius: var(--r-md);
-  color: var(--fg);
+  gap: 10px 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
   line-height: 1.4;
 }
 .f-move-banner.warn {
   background: var(--warn-soft);
-  box-shadow: inset 0 0 0 1px var(--warn);
+  box-shadow: inset 0 0 0 1px var(--warn-ring);
   color: var(--warn-fg);
 }
-.f-move-banner.ok {
-  background: var(--success-soft);
-  box-shadow: inset 0 0 0 1px var(--ok);
-  color: var(--ok-fg);
-}
-.f-move-banner.info {
-  background: var(--input-bg);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+.f-move-warn-ico {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--warn) 18%, transparent);
+  color: var(--warn-fg);
+  display: grid;
+  place-items: center;
 }
 .f-move-banner-text {
   flex: 1 1 200px;
   font-weight: 600;
-}
-.f-move-banner-title {
-  font-weight: 600;
-}
-.f-move-big {
-  flex-wrap: nowrap;
-  align-items: flex-start;
-  padding: var(--s-4);
+  line-height: 1.4;
 }
 .f-move-spin {
   flex: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  animation: f-move-spin 0.9s linear infinite;
+  animation: f-move-spin 1s linear infinite;
 }
-.f-move-check {
-  flex: none;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--success-soft);
-  color: var(--ok-fg);
-}
-.f-move-done {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-3);
-}
-.f-move-p {
-  margin: var(--s-1) 0 0;
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-}
-
-.f-move-err {
-  margin: 0;
-}
-.f-move-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-2);
-}
-
 @keyframes f-move-spin {
   to {
     transform: rotate(360deg);
@@ -290,6 +348,184 @@
     animation-duration: 3s;
   }
 }
+
+/* Botón secundario del aviso («Esperar a que termine», «Seguir sin conversación») */
+.f-move-btn {
+  flex: none;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--btn-2);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 500;
+  box-shadow: inset 0 0 0 1px var(--line);
+  cursor: pointer;
+  transition: filter 0.12s;
+}
+.f-move-btn:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+.f-move-btn:disabled {
+  color: var(--fg-2);
+  cursor: default;
+}
+.f-move-btn:focus-visible,
+.f-move-go:focus-visible,
+.f-move-cancel:focus-visible,
+.f-move-login:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.f-move-ok {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 30%, transparent);
+  color: var(--fg);
+}
+.f-move-ok-ico {
+  flex: none;
+  color: var(--success-fg);
+}
+
+/* Pie: error, aviso de copia y acciones */
+.f-move-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.f-move-err {
+  font-size: 12px;
+  color: var(--danger-fg);
+  line-height: 1.5;
+}
+.f-move-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.f-move-actions.end {
+  justify-content: flex-end;
+}
+.f-move-grow {
+  flex: 1;
+}
+.f-move-cancel {
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg-2);
+  font: inherit;
+  cursor: pointer;
+}
+.f-move-go {
+  min-height: 34px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.12s;
+}
+.f-move-go.blocked {
+  background: var(--seg-on);
+  color: var(--fg-2);
+}
+.f-move-go:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+.f-move-go:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Estado «moviendo» */
+.f-move-running {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.f-move-run-ico {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+}
+.f-move-run-text {
+  min-width: 0;
+}
+.f-move-run-title {
+  font-weight: 600;
+}
+.f-move-run-text .f-move-muted {
+  margin-top: 2px;
+  color: var(--fg-2);
+}
+
+/* Estado «listo» */
+.f-move-done {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.f-move-donebox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 30%, transparent);
+}
+.f-move-done-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.f-move-check {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--success) 18%, transparent);
+  color: var(--success-fg);
+  display: grid;
+  place-items: center;
+}
+.f-move-done-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.f-move-done-p {
+  margin: 0;
+  color: var(--fg);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.f-move-donebox .f-move-muted.f-move-done-p {
+  color: var(--fg-2);
+}
+
 @media (max-width: 560px) {
   .f-move-space-acc {
     display: none;

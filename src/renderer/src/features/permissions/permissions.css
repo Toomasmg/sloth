@@ -1,14 +1,16 @@
 /* Función «permissions»: tarjeta de pedido, revisión a pantalla completa y panel de decisiones. */
 
 /* ---------- Tarjeta en el panel del espacio (PermissionCard.tsx) ---------- */
+/* Tarjeta flotante dentro del panel (diseño Espacios): margen 0 10 10, radio 12, anillo ámbar. */
 .pc-card {
-  margin: 0;
-  padding: var(--s-3) var(--s-4);
+  margin: 0 10px 10px;
+  padding: 14px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
-  gap: var(--s-2);
-  background: var(--warn-soft);
-  box-shadow: inset 0 -1px 0 var(--line);
+  gap: 10px;
+  background: var(--perm-bg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 0 0 1px var(--warn-ring);
   animation: pc-in 160ms var(--ease);
 }
 @keyframes pc-in {
@@ -28,9 +30,9 @@
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: var(--r-sm);
+  border-radius: 9px;
   background: rgba(240, 180, 90, 0.18);
-  color: var(--warn-fg);
+  color: var(--warn);
 }
 .pc-head-text {
   flex: 1;
@@ -47,7 +49,7 @@
 }
 .pc-sub {
   font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  color: var(--fg-2);
   overflow-wrap: anywhere;
 }
 .pc-timer {
@@ -67,11 +69,11 @@
   display: block;
   margin: 0;
   padding: 9px 11px;
-  border-radius: var(--r-sm);
+  border-radius: var(--radius);
   background: var(--bg);
   box-shadow: inset 0 0 0 1px var(--line);
   font-family: var(--font-mono);
-  font-size: var(--fs-sm);
+  font-size: 12.5px;
   color: var(--fg);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -86,6 +88,15 @@
 }
 .pc-actions .spacer {
   flex: 1;
+}
+/* Botones de la tarjeta: 30 px; «Rechazar» es texto coral sin fondo. */
+.pc-actions .btn.sm {
+  height: 30px;
+  padding: 0 14px;
+}
+.pc-actions .btn.ghost.danger {
+  background: transparent;
+  box-shadow: none;
 }
 .pc-deny-form {
   display: flex;
@@ -126,13 +137,50 @@
   box-sizing: border-box;
 }
 .pr-modal {
-  width: min(680px, 100%);
+  width: min(640px, 100%);
   max-height: calc(100vh - 32px);
   display: flex;
   flex-direction: column;
   padding: 0;
   overflow: hidden;
   outline: none;
+  border: 0;
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 0 1px var(--line-strong);
+}
+.pr-nav {
+  width: 28px;
+  height: 28px;
+  background: var(--btn-2);
+  color: var(--fg);
+}
+.pr-risk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.pr-risk-label {
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+}
+.pr-risk-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 9px;
+  border-radius: 11px;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+}
+.pr-risk-pill.info {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.pr-risk-pill.warn {
+  background: var(--warn-soft);
+  color: var(--warn-fg);
 }
 .pr-head {
   display: flex;
@@ -216,7 +264,7 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.pr-meta-wide dd {
+.pr-meta dd.mono {
   font-weight: 400;
   color: var(--fg-2);
 }
@@ -354,7 +402,19 @@
   width: 100%;
   box-sizing: border-box;
   min-height: 64px;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--input-bg);
   resize: vertical;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+}
+.pr-actions .btn {
+  height: 32px;
+  padding: 0 12px;
+}
+.pr-actions .btn.primary {
+  padding: 0 14px;
 }
 .pr-hint {
   font-size: var(--fs-xs);
@@ -389,7 +449,12 @@
   place-items: center;
   border-radius: 50%;
   background: var(--success-soft);
-  color: var(--ok);
+  color: var(--success-fg);
+}
+.pr-empty .btn {
+  height: 32px;
+  margin-top: 4px;
+  padding: 0 14px;
 }
 .pr-empty-title {
   font-size: var(--fs-md);
@@ -418,13 +483,53 @@
 
 /* ---------- Panel Decisiones ---------- */
 .pd-modal {
-  width: min(440px, 100%);
+  width: min(380px, 100%);
   max-height: calc(100vh - 32px);
   display: flex;
   flex-direction: column;
   padding: 0;
   overflow: hidden;
   margin-left: auto;
+  border: 0;
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--shadow-lg), inset 0 0 0 1px var(--line);
+}
+.pd-dnd .switch-track {
+  width: 32px;
+  height: 18px;
+}
+.pd-modal .switch input:not(:checked) + .switch-track {
+  background: var(--seg-on, #3a4152);
+}
+.pd-head .seg > button[aria-pressed='true'] {
+  background: var(--seg-on, #3a4152);
+}
+.pd-dnd .switch-track::after {
+  width: 14px;
+  height: 14px;
+}
+.pd-dnd .switch input:checked + .switch-track::after {
+  transform: translateX(14px);
+}
+.pd-dnd-on {
+  font-size: var(--fs-xs);
+  color: var(--warn-fg);
+}
+.pd-row .switch-track {
+  width: 36px;
+  height: 21px;
+}
+.pd-row .switch-track::after {
+  width: 17px;
+  height: 17px;
+}
+.pd-row .switch input:checked + .switch-track::after {
+  transform: translateX(15px);
+}
+.pd-row .btn.sm {
+  height: 26px;
+  padding: 0 9px;
 }
 .pd-head {
   display: flex;
@@ -450,7 +555,9 @@
 }
 .pd-dnd-text {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   font-size: var(--fs-sm);
   color: var(--fg);
 }
@@ -488,11 +595,11 @@
   border-radius: var(--r-sm);
 }
 .pd-row:hover {
-  background: var(--hover);
+  background: var(--row-hover, rgba(255, 255, 255, 0.045));
 }
 .pd-time {
   flex: none;
-  width: 42px;
+  width: 40px;
   padding-top: 2px;
   font-size: var(--fs-xs);
   color: var(--fg-muted);
@@ -524,7 +631,7 @@
 }
 .pd-tag.ok {
   background: var(--success-soft);
-  color: var(--ok);
+  color: var(--success-fg);
 }
 .pd-tag.lila {
   background: rgba(181, 156, 255, 0.16);
@@ -541,6 +648,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.pd-tagline .pd-space {
+  font-size: var(--fs-sm);
 }
 .pd-text {
   font-size: var(--fs-sm);

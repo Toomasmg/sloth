@@ -134,9 +134,9 @@ export const DEFAULT_SETTINGS: SlothSettings = {
   uiFontSize: 13,
   accent: 'cielo',
   terminal: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontFamily: 'JetBrains Mono',
-    lineHeight: 1.15,
+    lineHeight: 1.7,
     cursorStyle: 'barra',
     cursorBlink: true,
     shell: 'PowerShell 7',

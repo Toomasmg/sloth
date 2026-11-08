@@ -3,7 +3,7 @@ import { useUi } from '../host'
 import { cleanError } from '../../format'
 import { resolveAccountColor } from '../settings/store'
 import { SPACE_CHIP, SPACE_LABEL, spaceStatus } from '../broadcast/state'
-import { CloseIcon, DoneIcon, ErrorIcon, IdleIcon, TicketIcon, WorkingIcon } from '../../icons/SlothIcons'
+import { CloseIcon, SearchIcon, SpaceIcon } from '../../icons/SlothIcons'
 import type { Workspace } from '../../../../shared/types'
 import {
   isMine,
@@ -46,14 +46,16 @@ const PRIO_PATH = {
   3: 'M6 9.5l6 6 6-6'
 } as const
 const prioPath = (p?: string): string => PRIO_PATH[(Math.min(prioRank(p), 3) as keyof typeof PRIO_PATH)]
-const prioTone = (p?: string): string => (prioRank(p) === 0 ? 'var(--danger-fg)' : prioRank(p) === 1 ? 'var(--warn-fg)' : 'var(--fg-2)')
+/** Color del texto de prioridad, como en el artboard: urgente coral, alta ámbar, media gris claro, baja gris. */
+const prioTone = (p?: string): string =>
+  prioRank(p) === 0 ? 'var(--danger-fg)' : prioRank(p) === 1 ? 'var(--warn-fg)' : prioRank(p) === 2 ? 'var(--g-c9)' : 'var(--fg-2)'
 
-/** Clase de chip por estado de Gruv (color + texto; el color solo no alcanza). */
-function estadoChip(k?: string): string {
-  if (k === 'en_curso') return 'chip-working'
-  if (k === 'en_revision' || k === 'en_qa' || k === 'pre_rtd') return 'chip-waiting'
-  if (k === 'bloqueado' || k === 'rechazado') return 'chip-error'
-  return 'chip-idle'
+/** Clase de color por estado de Gruv (`f-gruv-st-*`). El texto va siempre: el color solo no alcanza. */
+function estadoKind(k?: string): 'todo' | 'doing' | 'review' | 'error' {
+  if (k === 'en_curso') return 'doing'
+  if (k === 'en_revision' || k === 'en_qa' || k === 'pre_rtd') return 'review'
+  if (k === 'bloqueado' || k === 'rechazado') return 'error'
+  return 'todo'
 }
 
 const initials = (name: string): string =>
@@ -266,9 +268,6 @@ export function Board(): React.JSX.Element {
     tone = 'ok'
     connText = `Conectado con ${accLabel(snap.fetchedBy) ?? 'una cuenta'} · actualizado ${timeAgo(snap.fetchedAt)}`
   }
-  const ConnIcon = tone === 'busy' ? WorkingIcon : tone === 'bad' ? ErrorIcon : tone === 'ok' ? DoneIcon : IdleIcon
-  const connClass = tone === 'busy' ? 'chip-working' : tone === 'bad' ? 'chip-error' : tone === 'ok' ? 'chip-done' : 'chip-idle'
-
   const offline = Boolean(snap?.lastError) && !running
 
   const bodyLoading = !snap || (running && tickets.length === 0)
@@ -282,19 +281,19 @@ export function Board(): React.JSX.Element {
           Espacios
         </button>
         <span className="f-gruv-sep" aria-hidden="true" />
-        <span role="status" className={`chip ${connClass} f-gruv-conn`}>
-          <ConnIcon size={12} />
+        <span role="status" className="f-gruv-conn" data-tone={tone}>
+          <span className="f-gruv-conn-dot" aria-hidden="true" />
           {connText}
         </span>
         <span className="f-gruv-grow" />
         {running ? (
-          <button type="button" className="btn sm" onClick={() => void ui.invoke('feat:gruv:cancel')}>
+          <button type="button" className="f-gruv-b f-gruv-b--sm" onClick={() => void ui.invoke('feat:gruv:cancel')}>
             <CloseIcon size={13} /> Cancelar consulta
           </button>
         ) : null}
         <button
           type="button"
-          className="btn sm"
+          className="f-gruv-b f-gruv-b--sm"
           onClick={askRefresh}
           disabled={running || !snap}
           title="Lee los tickets de Gruv con la cuenta que la consulta (solo lectura)"
@@ -322,26 +321,15 @@ export function Board(): React.JSX.Element {
               <input type="checkbox" onChange={(e) => setConfirmRefresh(!e.target.checked)} />
               No volver a preguntar
             </label>
-            <button type="button" className="btn sm primary" autoFocus onClick={() => void refresh()}>
+            <button type="button" className="f-gruv-b f-gruv-b--sm f-gruv-b--pri" autoFocus onClick={() => void refresh()}>
               Consultar
             </button>
-            <button type="button" className="btn sm ghost" onClick={() => setConfirming(false)}>
+            <button type="button" className="f-gruv-b f-gruv-b--sm" onClick={() => setConfirming(false)}>
               Cancelar
             </button>
           </div>
         )}
 
-        {offline && (
-          <div className="f-gruv-alert f-gruv-offline" role="alert">
-            <span className="f-gruv-alert-text">
-              No pudimos hablar con Gruv. Mostramos lo último que cargamos.
-              <span className="f-gruv-alert-detail">{snap?.lastError}</span>
-            </span>
-            <button type="button" className="btn sm primary" onClick={() => void refresh()} disabled={running}>
-              Reintentar
-            </button>
-          </div>
-        )}
         {err && (
           <p className="form-error" role="alert">
             {err}
@@ -388,9 +376,7 @@ export function Board(): React.JSX.Element {
 
             <div className="f-gruv-filters">
               <label className="f-gruv-search">
-                <svg width={14} height={14} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round">
-                  <path d="M4.5 10.5a6 6 0 1 0 12 0a6 6 0 1 0 -12 0M15 15l5 5" />
-                </svg>
+                <SearchIcon size={14} strokeWidth={1.9} />
                 <input
                   type="search"
                   value={q}
@@ -406,7 +392,7 @@ export function Board(): React.JSX.Element {
                     <button
                       key={e.clave}
                       type="button"
-                      className={`f-gruv-chipf ${on ? 'on' : ''}`}
+                      className={`f-gruv-chipf f-gruv-st-${estadoKind(e.clave)} ${on ? 'on' : ''}`}
                       aria-pressed={on}
                       onClick={() => setStSel((s) => (on ? s.filter((x) => x !== e.clave) : [...s, e.clave]))}
                     >
@@ -449,6 +435,18 @@ export function Board(): React.JSX.Element {
             </div>
 
             <div aria-busy={running} className="f-gruv-body">
+              {offline && (
+                <div className="f-gruv-alert f-gruv-offline" role="alert">
+                  <span className="f-gruv-alert-text">
+                    No pudimos hablar con Gruv. Mostramos lo último que cargamos.
+                    {snap?.lastError && <span className="f-gruv-alert-detail">{snap.lastError}</span>}
+                  </span>
+                  <button type="button" className="f-gruv-b f-gruv-b--xs f-gruv-b--solid-danger" onClick={() => void refresh()} disabled={running}>
+                    Reintentar
+                  </button>
+                </div>
+              )}
+
               {bodyLoading && (
                 <div role="status" className="f-gruv-skel">
                   <div />
@@ -464,7 +462,7 @@ export function Board(): React.JSX.Element {
                   {snap.lastError ? (
                     <>
                       <span className="f-gruv-empty-title">No pudimos cargar los tickets.</span>
-                      <button type="button" className="btn sm primary" onClick={() => void refresh()} disabled={running}>
+                      <button type="button" className="f-gruv-b f-gruv-b--sm f-gruv-b--pri" onClick={() => void refresh()} disabled={running}>
                         Reintentar
                       </button>
                     </>
@@ -474,7 +472,7 @@ export function Board(): React.JSX.Element {
                     <>
                       <span className="f-gruv-empty-title">Todavía no se consultó Gruv.</span>
                       <span className="f-gruv-muted">Actualizá para traer tus tickets y los del equipo.</span>
-                      <button type="button" className="btn sm primary" onClick={askRefresh} disabled={running}>
+                      <button type="button" className="f-gruv-b f-gruv-b--sm f-gruv-b--pri" onClick={askRefresh} disabled={running}>
                         Actualizar
                       </button>
                     </>
@@ -501,7 +499,7 @@ export function Board(): React.JSX.Element {
                             <span className="f-gruv-code mono">{t.id}</span>
                             {ws && st && (
                               <span className={`chip f-gruv-space ${SPACE_CHIP[st]}`}>
-                                <TicketIcon size={11} />
+                                <SpaceIcon size={11} strokeWidth={2.2} />
                                 <span className="f-gruv-ellipsis">
                                   {ws.name} · {SPACE_LABEL[st]}
                                 </span>
@@ -510,7 +508,7 @@ export function Board(): React.JSX.Element {
                           </span>
                           <span className="f-gruv-row-title">{t.titulo}</span>
                           <span className="f-gruv-row-meta">
-                            <span className={`chip ${estadoChip(t.estado)}`}>{estadoName(t.estado)}</span>
+                            <span className={`f-gruv-st f-gruv-st-${estadoKind(t.estado)}`}>{estadoName(t.estado)}</span>
                             {t.prioridad && (
                               <span className="f-gruv-prio" style={{ color: prioTone(t.prioridad) }}>
                                 <PrioGlyph p={t.prioridad} />
@@ -541,7 +539,7 @@ export function Board(): React.JSX.Element {
                   <span className="f-gruv-muted">Probá con otra palabra o sacá algún filtro.</span>
                   <button
                     type="button"
-                    className="btn sm"
+                    className="f-gruv-b f-gruv-b--sm"
                     onClick={() => {
                       setQ('')
                       setStSel([])
@@ -577,10 +575,6 @@ export function Board(): React.JSX.Element {
           </section>
         </div>
       </main>
-
-      <div className="f-gruv-foot">
-        Solo se lee Gruv. Estado, asignación, comentarios y horas se cambian desde Gruv.
-      </div>
     </div>
   )
 }
@@ -602,8 +596,8 @@ function Detail(props: {
   const { t, ws, mine, estados } = props
   const st = ws ? spaceStatus(ws.id, ui.agents, ui.permissions) : null
   const resp = t.responsable
-  const avBg = mine ? 'var(--accent-soft)' : resp ? 'var(--team-soft)' : 'var(--hover)'
-  const avFg = mine ? 'var(--accent)' : resp ? 'var(--team-fg)' : 'var(--fg-muted)'
+  const avBg = mine ? 'var(--accent-soft)' : resp ? 'var(--team-soft)' : 'var(--btn-2)'
+  const avFg = mine ? 'var(--info)' : resp ? 'var(--team-fg)' : 'var(--fg-muted)'
   const wsAcc = ws ? ui.accounts.findIndex((a) => a.id === ws.accountId) : -1
   const crit = t.criterios ?? []
   const done = crit.filter((c) => c.hecho).length
@@ -653,7 +647,7 @@ function Detail(props: {
         </div>
         {!resp && (
           <>
-            <button type="button" className="btn sm" disabled aria-describedby="f-gruv-w-take">
+            <button type="button" className="f-gruv-b f-gruv-b--md f-gruv-b--pri" disabled aria-describedby="f-gruv-w-take">
               Tomarlo
             </button>
             <span id="f-gruv-w-take" className="f-gruv-why">
@@ -663,7 +657,7 @@ function Detail(props: {
         )}
         {mine && (
           <>
-            <button type="button" className="btn sm" disabled aria-describedby="f-gruv-w-drop">
+            <button type="button" className="f-gruv-b f-gruv-b--md" disabled aria-describedby="f-gruv-w-drop">
               Soltar
             </button>
             <span id="f-gruv-w-drop" className="f-gruv-why">
@@ -671,49 +665,52 @@ function Detail(props: {
             </span>
           </>
         )}
-        {resp && !mine && <span className="f-gruv-muted">Lo tiene {resp}</span>}
+        {resp && !mine && <span className="f-gruv-owner">Lo tiene {resp}</span>}
       </div>
 
       <div className="f-gruv-actions">
-        {ws && st ? (
-          <>
-            <span className={`chip ${SPACE_CHIP[st]} f-gruv-space-lg`}>
-              <span className="f-gruv-ellipsis">
-                {ws.name} · {SPACE_LABEL[st]}
+        <div className="f-gruv-actions-row">
+          {ws && st ? (
+            <>
+              <span className={`chip ${SPACE_CHIP[st]} f-gruv-space-lg`}>
+                <span className="f-gruv-ellipsis">
+                  {ws.name} · {SPACE_LABEL[st]}
+                </span>
               </span>
-            </span>
-            <button type="button" className="btn primary" onClick={() => props.onOpenSpace(ws)}>
-              Abrir espacio
-            </button>
-          </>
-        ) : (
-          <>
-            <button type="button" className="btn primary" onClick={props.onStart} disabled={props.busy || props.disabledAll}>
+              <button type="button" className="f-gruv-b f-gruv-b--pri" onClick={() => props.onOpenSpace(ws)}>
+                Abrir espacio
+              </button>
+            </>
+          ) : (
+            <button type="button" className="f-gruv-b f-gruv-b--pri" onClick={props.onStart} disabled={props.busy || props.disabledAll}>
+              <SpaceIcon size={14} strokeWidth={2} />
               {props.busy ? 'Creando…' : 'Empezar en Sloth'}
             </button>
-            <span className="f-gruv-why-block">
-              {props.tplName
-                ? `Crea un espacio con la plantilla «${props.tplName}».`
-                : `Crea el espacio ${t.id} y arranca Claude con /ticket ${t.id}.`}
+          )}
+          {t.url ? (
+            <a className="f-gruv-b" href={t.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${t.id} en Gruv`}>
+              <ExternalGlyph />
+              Abrir en Gruv
+            </a>
+          ) : (
+            <button type="button" className="f-gruv-b" disabled title="Gruv no dio el link de este ticket">
+              <ExternalGlyph />
+              Abrir en Gruv
+            </button>
+          )}
+          {ws && wsAcc >= 0 && (
+            <span className="f-gruv-acc">
+              <span className="f-gruv-dot" style={{ background: resolveAccountColor(ws.accountId, wsAcc) }} aria-hidden="true" />
+              {ui.accounts[wsAcc].label}
             </span>
-          </>
-        )}
-        {t.url ? (
-          <a className="btn" href={t.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${t.id} en Gruv`}>
-            <ExternalGlyph />
-            Abrir en Gruv
-          </a>
-        ) : (
-          <button type="button" className="btn" disabled title="Gruv no dio el link de este ticket">
-            <ExternalGlyph />
-            Abrir en Gruv
-          </button>
-        )}
-        {ws && wsAcc >= 0 && (
-          <span className="f-gruv-acc">
-            <span className="f-gruv-dot" style={{ background: resolveAccountColor(ws.accountId, wsAcc) }} aria-hidden="true" />
-            {ui.accounts[wsAcc].label}
-          </span>
+          )}
+        </div>
+        {!(ws && st) && (
+          <p className="f-gruv-help">
+            {props.tplName
+              ? `Crea un espacio con la plantilla «${props.tplName}».`
+              : `Crea el espacio ${t.id} y arranca Claude con /ticket ${t.id}.`}
+          </p>
         )}
       </div>
 
@@ -726,7 +723,7 @@ function Detail(props: {
         <section className="f-gruv-sec" aria-labelledby="f-gruv-c-t">
           <div className="f-gruv-sec-head">
             <h3 id="f-gruv-c-t">Criterios de aceptación</h3>
-            <span className="f-gruv-strong">
+            <span className="f-gruv-prog-label">
               {done} de {crit.length}
             </span>
           </div>
@@ -753,37 +750,34 @@ function Detail(props: {
         <h3 id="f-gruv-co-t">Comentarios</h3>
         <div className="f-gruv-inline">
           <input className="f-gruv-input" disabled placeholder="Escribí un comentario" aria-label={`Comentar en ${t.id}`} aria-describedby="f-gruv-w-com" />
-          <button type="button" className="btn" disabled>
+          <button type="button" className="f-gruv-b" disabled>
             Publicar
           </button>
         </div>
-        <div className="f-gruv-inline-foot">
-          <span id="f-gruv-w-com" className="f-gruv-why">
-            {WHERE}
-          </span>
-          {t.url ? (
-            <a className="f-gruv-link" href={t.url} target="_blank" rel="noreferrer">
-              Abrir en Gruv
-            </a>
-          ) : null}
-        </div>
+        <span id="f-gruv-w-com" className="f-gruv-why">
+          {WHERE}
+        </span>
       </section>
 
       <section className="f-gruv-sec" aria-labelledby="f-gruv-h-t">
-        <h3 id="f-gruv-h-t">Horas</h3>
-        <div className="f-gruv-inline">
-          <input
-            className="f-gruv-input narrow"
-            disabled
-            inputMode="decimal"
-            placeholder="Ej.: 2 o 1,5"
-            aria-label={`Horas a sumar en ${t.id}`}
-            aria-describedby="f-gruv-w-hr"
-          />
-          <button type="button" className="btn" disabled>
+        <h3 id="f-gruv-h-t">Horas cargadas</h3>
+        <div className="f-gruv-hours">
+          <label className="f-gruv-hours-field">
+            <span>Horas a sumar</span>
+            <input
+              className="f-gruv-input narrow"
+              disabled
+              inputMode="decimal"
+              placeholder="Ej.: 2 o 1,5"
+              aria-label={`Horas a sumar en ${t.id}`}
+              aria-describedby="f-gruv-w-hr"
+            />
+          </label>
+          <button type="button" className="f-gruv-b" disabled>
             Sumar horas
           </button>
         </div>
+        <p className="f-gruv-muted f-gruv-hours-help">Más de 0 y hasta 12 horas por carga. Podés usar coma o punto.</p>
         <span id="f-gruv-w-hr" className="f-gruv-why">
           {WHERE}
         </span>

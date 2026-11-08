@@ -110,10 +110,12 @@
 }
 .tp-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 6px 14px;
   min-height: 48px;
-  padding: 8px 14px 8px 18px;
+  padding: 8px 16px;
+  box-sizing: border-box;
   flex: none;
   background: var(--surface);
   box-shadow: inset 0 -1px 0 var(--line);
@@ -124,8 +126,27 @@
   font-weight: 700;
   letter-spacing: -0.01em;
 }
-.tp-head-icon {
-  color: var(--accent);
+.tp-back {
+  height: 30px;
+  padding: 0 10px 0 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg-2);
+  font: inherit;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.tp-back:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.tp-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--line-strong);
 }
 .tp-count {
   font-size: 12px;
@@ -137,12 +158,14 @@
   min-height: 0;
 }
 .tp-list {
-  flex: 0 0 300px;
+  flex: 0 1 340px;
   min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px 10px;
+  gap: 12px;
+  padding: 14px 10px;
   overflow-y: auto;
   background: var(--surface);
   box-shadow: inset -1px 0 0 var(--line);
@@ -154,9 +177,9 @@
   height: 32px;
   padding: 0 10px;
   border-radius: 8px;
-  background: var(--input-bg);
+  background: var(--card);
   color: var(--fg-3);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .tp-search input {
   flex: 1;
@@ -175,16 +198,18 @@
 }
 .tp-new-btn {
   width: 100%;
-  justify-content: center;
+  height: 32px;
+  gap: 6px;
+  font-weight: 600;
 }
 .tp-new {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 12px;
+  padding: 14px;
   border-radius: 12px;
   background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .tp-new-title {
   font-weight: 600;
@@ -200,10 +225,10 @@
   gap: 2px;
 }
 .tp-group h3 {
-  margin: 6px 0 2px 8px;
+  margin: 8px 0 2px 8px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--fg-3);
+  color: var(--fg-2);
 }
 .tp-row {
   display: flex;
@@ -224,7 +249,7 @@
 }
 .tp-row[aria-current='true'] {
   background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 .tp-row-tile {
   width: 30px;
@@ -270,7 +295,7 @@
   flex: none;
   font-size: 10px;
   font-weight: 600;
-  padding: 1px 7px;
+  padding: 1px 6px;
   border-radius: 8px;
   background: var(--accent-soft);
   color: var(--accent);
@@ -284,7 +309,7 @@
   color: var(--team-fg);
 }
 .tp-badge.mine {
-  background: var(--muted);
+  background: var(--seg-on);
   color: var(--fg-2);
 }
 .tp-empty {
@@ -326,12 +351,12 @@
   line-height: 1.5;
 }
 .tp-detail {
-  max-width: 720px;
+  max-width: 760px;
   margin: 0 auto;
-  padding: clamp(18px, 3vw, 30px) clamp(16px, 3vw, 32px) 48px;
+  padding: clamp(18px, 3.5vw, 32px) clamp(16px, 4vw, 36px) 56px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
 .tp-title-row {
   display: flex;
@@ -355,7 +380,7 @@
 }
 .tp-title-text h2 {
   margin: 0;
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.02em;
   overflow-wrap: anywhere;
@@ -365,6 +390,11 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+.tp-badges .tp-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 9px;
+}
 .tp-dirty {
   display: flex;
   flex-wrap: wrap;
@@ -372,9 +402,12 @@
   gap: 10px;
   padding: 10px 14px;
   border-radius: 10px;
-  background: var(--warn-soft);
-  box-shadow: inset 0 0 0 1px var(--warn-line);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 35%, transparent);
   color: var(--warn-fg);
+}
+.tp-dirty strong {
+  font-weight: 600;
 }
 .tp-dirty-dot {
   width: 8px;
@@ -391,9 +424,12 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-.tp-actions .btn[aria-pressed='true'] {
-  background: var(--accent-soft);
-  color: var(--accent);
+.tp-actions .btn {
+  height: 32px;
+}
+.tp-actions .btn.tp-def[aria-pressed='true'] {
+  background: var(--success-soft);
+  color: var(--success-fg);
 }
 .tp-card {
   display: flex;
@@ -414,7 +450,7 @@
 }
 .tp-kv > span:first-child {
   font-size: 12px;
-  color: var(--fg-3);
+  color: var(--fg-2);
 }
 .tp-kv .pre {
   white-space: pre-wrap;
@@ -430,6 +466,26 @@
 .tp-editor {
   gap: 16px;
 }
+.tp-editor .field {
+  gap: 6px;
+}
+.tp-editor .field > label {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--fg-2);
+}
+.tp-editor .field > input,
+.tp-editor .field > select {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--input-bg);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.tp-editor .field > input[aria-invalid='true'],
+.tp-editor .field > select[aria-invalid='true'] {
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
 .tp-field-group {
   display: flex;
   flex-direction: column;
@@ -439,11 +495,16 @@
   font-size: 12px;
   color: var(--fg-2);
 }
-.tp-icons,
-.tp-colors {
+.tp-icons {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
+}
+.tp-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   align-items: center;
 }
 .tp-icon-pick {
@@ -461,7 +522,7 @@
 }
 .tp-icon-pick.on {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--fg);
   box-shadow: inset 0 0 0 1.5px var(--accent);
 }
 .tp-color-pick {
@@ -501,7 +562,7 @@
   padding: 0;
   border: 0;
   border-radius: 11px;
-  background: var(--muted);
+  background: var(--seg-on);
   cursor: pointer;
 }
 .switch-btn.on {
@@ -537,8 +598,8 @@
   padding: 0 9px;
   border: 0;
   border-radius: 7px;
-  background: var(--muted);
-  color: var(--accent);
+  background: var(--btn-2);
+  color: var(--info);
   font-size: 12px;
   cursor: pointer;
 }
@@ -551,14 +612,14 @@
   gap: 8px;
 }
 .tp-preview h3 {
-  margin: 0;
+  margin: 0 0 0 4px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--fg-3);
+  color: var(--fg-2);
 }
 .tp-preview-box {
-  padding: 12px 14px;
-  border-radius: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
   background: var(--input-bg);
   box-shadow: inset 0 0 0 1px var(--line);
   white-space: pre-wrap;
@@ -568,8 +629,8 @@
 .tp-seg-var {
   padding: 0 3px;
   border-radius: 4px;
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--info);
   font-weight: 600;
 }
 .tp-muted {
@@ -628,8 +689,8 @@
   gap: 10px;
   padding: 12px 14px;
   border-radius: 10px;
-  background: var(--danger-soft);
-  box-shadow: inset 0 0 0 1px var(--toast-border);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent);
 }
 .tp-confirm span {
   flex: 1 1 240px;

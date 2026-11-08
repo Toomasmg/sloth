@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { api } from '../../api'
 import { useUi } from '../host'
-import { AddAccountIcon, TeamIcon, UpdateIcon } from '../../icons/SlothIcons'
+import { AddAccountIcon, MoreIcon, TeamIcon, UpdateIcon } from '../../icons/SlothIcons'
+import { fmtTok, totalTok, usageTitle } from '../../format'
 import { LogoMark } from '../../Logo'
 import { loginPaneId, type Account } from '../../../../shared/types'
 import type { ChatConfigView, ChatSnapshot } from '../../../../shared/chat'
@@ -12,7 +13,7 @@ import { openHelp } from '../help/bus'
 import { setPhase } from '../updater/phase'
 import { useUpdateDot } from '../updater/useUpdateStatus'
 import { SoundTest } from '../sound/SoundTest'
-import { resolveAccountColor, pickProjectsDir, projectsDirOf, useSettings } from './store'
+import { resolveAccountColor, pickProjectsDir, projectsDirOf, updateSettings, useSettings } from './store'
 import { errText, Group, Row, Seg, Slider, ToggleRow, useSave, SectionHint } from './ui'
 import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, EDITORS, LINE_HEIGHT, PLAN_SUGGESTIONS, SCROLLBACK, SHELLS, TERM_FONTS, TERM_FONT, UI_FONT, UPDATE_CHANNELS, type AccentChoice, type CursorShape, type Density, type EditorChoice, type ShellChoice, type ShortcutId, type SoundName, type TermFont, type ThemeChoice, type UpdateChannel } from '../../../../main/features/settings-model'
 
@@ -101,14 +102,24 @@ export function GeneralSection(): React.JSX.Element {
 
 const ACC_COLORS = ACCOUNT_PALETTE
 
-export function AccountsSection({ onClose }: { onClose(): void }): React.JSX.Element {
+export function AccountsSection({ onClose, adding, setAdding }: { onClose(): void; adding: boolean; setAdding(v: boolean | ((v: boolean) => boolean)): void }): React.JSX.Element {
   const ui = useUi()
   const p = useSettings()
   const save = useSave()
-  const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
+  const [plan, setPlan] = useState('Pro')
   const [nameErr, setNameErr] = useState(false)
   const [confirm, setConfirm] = useState<string | null>(null)
+  /** Fila con el menú «más» abierto (usar mi setup, quitar). */
+  const [menu, setMenu] = useState<string | null>(null)
+
+  /** «Usar mi setup de ~/.claude» de una cuenta: guarda y recarga la lista. */
+  const toggleShare = (acc: Account): void => {
+    save(async () => {
+      await api.setShareSetup(acc.id, acc.shareSetup === false)
+      await ui.reload()
+    })
+  }
 
   const addAccount = (e: FormEvent): void => {
     e.preventDefault()
@@ -120,6 +131,7 @@ export function AccountsSection({ onClose }: { onClose(): void }): React.JSX.Ele
     setNameErr(false)
     save(async () => {
       const acc: Account = await api.addAccount(n)
+      if (plan.trim()) await updateSettings({ accountPlans: { [acc.id]: plan.trim() } })
       await ui.reload()
       setAdding(false)
       setName('')
@@ -139,18 +151,25 @@ export function AccountsSection({ onClose }: { onClose(): void }): React.JSX.Ele
 
   return (
     <>
-      <div className="f-set-toolbar">
-        <button type="button" className="btn primary sm" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>
-          <AddAccountIcon size={14} /> Agregar cuenta
-        </button>
-      </div>
       {adding && (
-        <form className="f-set-card f-set-form" onSubmit={addAccount} noValidate>
+        <form className="f-set-card f-set-form f-set-form-add" onSubmit={addAccount} noValidate>
           <div className="f-set-form-title">Nueva cuenta de Claude</div>
-          <label className="f-set-stack">
-            <span className="f-set-hint">Nombre para reconocerla</span>
-            <input className="f-set-input" value={name} placeholder="Ej.: Cosmos de Mateo" onChange={(e) => setName(e.target.value)} aria-invalid={nameErr} />
-          </label>
+          <div className="f-set-form-row">
+            <label className="f-set-stack grow2">
+              <span className="f-set-label">Nombre para reconocerla</span>
+              <input className="f-set-input" value={name} placeholder="Ej.: Cosmos de Mateo" onChange={(e) => setName(e.target.value)} aria-invalid={nameErr} />
+            </label>
+            <label className="f-set-stack grow1">
+              <span className="f-set-label">Plan</span>
+              <select className="f-set-select" value={plan} onChange={(e) => setPlan(e.target.value)}>
+                {PLAN_SUGGESTIONS.map((x) => (
+                  <option key={x} value={x}>
+                    {x}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           {nameErr && (
             <p role="alert" className="form-error">
               Poné un nombre para la cuenta.
@@ -182,6 +201,7 @@ export function AccountsSection({ onClose }: { onClose(): void }): React.JSX.Ele
           const custom = p.settings.accountColors[a.id]
           const spaces = ui.workspaces.filter((w) => w.accountId === a.id).length
           const busy = confirm === a.id
+          const u = ui.usage[a.id]
           return (
             <div key={a.id} className="f-set-acc" style={{ '--acc': color } as React.CSSProperties}>
               <div className="f-set-row">
@@ -194,6 +214,22 @@ export function AccountsSection({ onClose }: { onClose(): void }): React.JSX.Ele
                     {spaces === 1 ? '1 espacio' : `${spaces} espacios`}
                     {logged && st?.email ? ` · ${st.email}` : ''}
                   </span>
+                  {u && (
+                    <dl className="sl-usage" title={usageTitle(u)}>
+                      <div>
+                        <dt>5 h</dt>
+                        <dd>{fmtTok(totalTok(u.last5h))}</dd>
+                      </div>
+                      <div>
+                        <dt>Hoy</dt>
+                        <dd>{fmtTok(totalTok(u.today))}</dd>
+                      </div>
+                      <div>
+                        <dt>7 días</dt>
+                        <dd>{fmtTok(totalTok(u.last7d))}</dd>
+                      </div>
+                    </dl>
+                  )}
                 </div>
                 <PlanField key={`${a.id}-${p.settings.accountPlans[a.id] ?? ''}`} label={a.label} value={p.settings.accountPlans[a.id] ?? ''} onCommit={(plan) => save({ accountPlans: { [a.id]: plan || null } })} />
                 <span className={`f-set-state ${logged ? 'ok' : 'warn'}`}>
@@ -212,7 +248,19 @@ export function AccountsSection({ onClose }: { onClose(): void }): React.JSX.Ele
                     </>
                   ) : (
                     <>
-                      {!logged && (
+                      {logged ? (
+                        <button
+                          type="button"
+                          className="btn sm"
+                          aria-label={`Abrir terminal de ${a.label}`}
+                          onClick={() => {
+                            onClose()
+                            ui.openPane(loginPaneId(a.id))
+                          }}
+                        >
+                          Terminal
+                        </button>
+                      ) : (
                         <button
                           type="button"
                           className="btn primary sm"
@@ -224,13 +272,43 @@ export function AccountsSection({ onClose }: { onClose(): void }): React.JSX.Ele
                           Iniciar sesión
                         </button>
                       )}
-                      <button type="button" className="btn ghost sm" aria-label={`Quitar la cuenta ${a.label}`} onClick={() => setConfirm(a.id)}>
-                        Quitar
+                      <button
+                        type="button"
+                        className="btn ghost sm icon-only"
+                        aria-haspopup="menu"
+                        aria-expanded={menu === a.id}
+                        aria-label={`Más acciones de ${a.label}`}
+                        title="Más"
+                        onClick={() => setMenu(menu === a.id ? null : a.id)}
+                      >
+                        <MoreIcon size={15} aria-hidden="true" />
                       </button>
                     </>
                   )}
                 </div>
               </div>
+              {menu === a.id && !busy && (
+                <div className="f-set-acc-menu" role="menu" aria-label={`Acciones de ${a.label}`}>
+                  <label className="switch" role="menuitem" title="Enlaza tus skills, agents, hooks, plugins, settings y MCP de ~/.claude">
+                    <span className="switch-text">
+                      Usar mi setup de <span className="mono">~/.claude</span>
+                    </span>
+                    <input type="checkbox" role="switch" checked={a.shareSetup !== false} onChange={() => toggleShare(a)} />
+                    <span className="switch-track" aria-hidden="true" />
+                  </label>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="btn sm danger"
+                    onClick={() => {
+                      setMenu(null)
+                      setConfirm(a.id)
+                    }}
+                  >
+                    Quitar cuenta
+                  </button>
+                </div>
+              )}
               <AccountSwatches acc={a} index={i} custom={custom} onPick={(hex) => save({ accountColors: { [a.id]: hex } })} onAuto={() => save({ accountColors: { [a.id]: null } })} />
             </div>
           )
@@ -356,21 +434,12 @@ export function AppearanceSection(): React.JSX.Element {
             const on = s.accent === a
             return (
               <button key={a} type="button" role="radio" aria-checked={on} className={`f-set-accent ${on ? 'on' : ''}`} onClick={() => save({ accent: a })}>
-                <span className="f-set-accent-dot" style={{ background: ACCENT_HEX[a].hex }} aria-hidden="true" />
+                <span className="f-set-accent-dot" style={{ background: ACCENT_HEX[a].hex, boxShadow: on ? `0 0 0 2px var(--card), 0 0 0 4px ${ACCENT_HEX[a].hex}` : undefined }} aria-hidden="true" />
                 {ACCENT_HEX[a].name}
               </button>
             )
           })}
         </div>
-      </Group>
-
-      <Group id="g-lite" title="Rendimiento">
-        <ToggleRow
-          title="Modo liviano"
-          hint="Para PCs con pocos recursos: menos efectos y menos trabajo en segundo plano."
-          checked={s.lightMode}
-          onChange={(lightMode) => save({ lightMode })}
-        />
       </Group>
 
       <Group id="g-de" title="Densidad y tamaño">
@@ -396,6 +465,15 @@ export function AppearanceSection(): React.JSX.Element {
         <div className="f-set-preview" style={{ fontSize: `${s.uiFontSize}px` }}>
           Así se ve el texto: «Front · filtros de tickets» está trabajando.
         </div>
+      </Group>
+
+      <Group id="g-lite" title="Rendimiento">
+        <ToggleRow
+          title="Modo liviano"
+          hint="Para PCs con pocos recursos: menos efectos y menos trabajo en segundo plano."
+          checked={s.lightMode}
+          onChange={(lightMode) => save({ lightMode })}
+        />
       </Group>
     </>
   )
@@ -434,12 +512,12 @@ export function TerminalSection(): React.JSX.Element {
         <span style={{ color: th.blue }}>›</span>{' '}
         <span
           className={`f-set-cursor ${t.cursorBlink ? 'blink' : ''}`}
-          style={{ display: 'inline-block', verticalAlign: 'text-bottom', width: cursor.w, height: cursor.h, background: t.cursorStyle === 'subrayado' ? 'transparent' : th.cursor, borderBottom: t.cursorStyle === 'subrayado' ? `2px solid ${th.cursor}` : undefined }}
+          style={{ display: 'inline-block', verticalAlign: 'text-bottom', width: cursor.w, height: cursor.h, background: th.cursor }}
           aria-hidden="true"
         />
       </pre>
       )}
-      <Group id="g-term" title="Texto y cursor">
+      <Group id="g-term" label="Texto y cursor">
         <Row title={<label htmlFor="f-set-tfont">Fuente</label>}>
           <select id="f-set-tfont" className="f-set-select" value={t.fontFamily} onChange={(e) => save({ terminal: { fontFamily: e.target.value as TermFont } })}>
             {TERM_FONTS.map((f) => (
@@ -559,7 +637,10 @@ export function ShortcutsSection(): React.JSX.Element {
           const label = isCap ? 'Apretá la combinación…' : showCombo(bindingOf(a.id, custom))
           return (
             <div key={a.id} className="f-set-row">
-              <span className="f-set-row-title grow">{a.name}</span>
+              <span className="f-set-row-text">
+                <span className="f-set-row-title">{a.name}</span>
+                {a.fixed && <span className="f-set-hint">Fijo: 1 a 4 eligen la distribución.</span>}
+              </span>
               <div className="f-set-row-ctl">
                 <button
                   type="button"
@@ -577,7 +658,7 @@ export function ShortcutsSection(): React.JSX.Element {
                     }
                   }}
                 >
-                  {isCap ? label : label.split('+').map((k, i) => <kbd key={i}>{k}</kbd>)}
+                  {label}
                 </button>
                 {changed && (
                   <button type="button" className="btn ghost sm" onClick={() => save({ shortcuts: { [a.id]: null } })}>
@@ -594,7 +675,7 @@ export function ShortcutsSection(): React.JSX.Element {
           {msg}
         </p>
       )}
-      <SectionHint>Tocá un atajo y apretá la combinación nueva. Ctrl o Alt son obligatorios, salvo en F1 a F12. Esc cancela. «Cambiar distribución» es fijo: 1 a 4 eligen la distribución.</SectionHint>
+      <SectionHint>Tocá un atajo y apretá la combinación nueva. Esc cancela.</SectionHint>
     </>
   )
 }
@@ -778,7 +859,7 @@ export function TeamSection(): React.JSX.Element {
           <div className="f-set-hint">{sub}</div>
         </div>
         <button type="button" className="btn sm" onClick={() => void reloadState()}>
-          Actualizar estado
+          Probar conexión
         </button>
       </div>
 
@@ -920,7 +1001,7 @@ export function UpdatesSection(): React.JSX.Element {
   return (
     <>
       <div className="f-set-card f-set-status">
-        <span className="f-set-status-ico" style={{ background: 'var(--success-soft)', color: 'var(--ok-fg)' }} aria-hidden="true">
+        <span className="f-set-status-ico lg" style={{ background: 'var(--success-soft)', color: 'var(--ok-fg)' }} aria-hidden="true">
           <UpdateIcon size={18} />
         </span>
         <div className="grow">
@@ -953,7 +1034,7 @@ export function UpdatesSection(): React.JSX.Element {
           </button>
         </div>
       )}
-      <Group id="g-canal" title="Canal">
+      <Group id="g-canal" label="Canal de actualizaciones">
         {UPDATE_CHANNELS.map((c: UpdateChannel) => {
           const on = p.settings.updateChannel === c
           const hint = c === 'estable' ? 'Recomendado. Recibís las versiones probadas.' : 'Recibís las novedades antes, pueden tener errores.'
@@ -989,7 +1070,7 @@ export function AboutSection({ onClose }: { onClose(): void }): React.JSX.Elemen
   return (
     <>
       <div className="f-set-card f-set-about">
-        <LogoMark size={96} />
+        <LogoMark size={110} />
         <div className="f-set-about-name">Sloth {version}</div>
         <div className="f-set-hint">Varias cuentas de Claude, sin apuro.</div>
         <div className="f-set-actions center">

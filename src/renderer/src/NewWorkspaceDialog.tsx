@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Account, AccountStatus, AccountUsage, NewWorkspaceInput, Workspace } from '../../shared/types'
 import { api } from './api'
-import { cleanError, emptyTotals, fmtTok, totalTok } from './format'
+import { cleanError, emptyTotals, totalTok } from './format'
 import type { NewWorkspacePreset } from './features/host'
 import { useUi } from './features/host'
 import { useTemplates, openDialog, peekPreselect, takePreselect, usesTicket, type TemplateDto } from './features/templates/store'
@@ -304,6 +304,26 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
   const counts = recent?.counts ?? {}
   const canCreate = accounts.length > 0
 
+  // Muestra de color: letra inicial sobre el tono del color (como en el diseño).
+  const colorSwatch = (k: (typeof TEMPLATE_COLOR_KEYS)[number], on: boolean): React.JSX.Element => {
+    const hex = TEMPLATE_COLORS[k].hex
+    return (
+      <button
+        key={k}
+        type="button"
+        role="radio"
+        aria-checked={on}
+        aria-label={TEMPLATE_COLORS[k].name}
+        title={TEMPLATE_COLORS[k].name}
+        className={`nw-color${on ? ' on' : ''}`}
+        style={{ background: `${hex}2e`, color: hex }}
+        onClick={() => setColorKey(k)}
+      >
+        {(name.trim().charAt(0) || '?').toUpperCase()}
+      </button>
+    )
+  }
+
   const previewBranch = wtOn ? branchResolved || 'rama nueva' : cur ? (cur.isGit ? (cur.branch ?? 'sin rama') : 'sin Git') : 'sin carpeta'
   const previewName = name.trim() || 'Sin nombre'
   const previewIni = (name.trim().charAt(0) || '?').toUpperCase()
@@ -372,14 +392,15 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
                   aria-invalid={invalidOf('carpeta')}
                   aria-describedby="nw-carpeta-hint"
                 />
-                <button type="button" className="nw-btn" onClick={() => void pick()}>
+                <button
+                  type="button"
+                  className="nw-btn"
+                  onClick={() => (folderRows.length ? setPickerOpen((v) => !v) : void pick())}
+                  aria-expanded={folderRows.length ? pickerOpen : undefined}
+                  aria-controls={folderRows.length ? 'nw-recent' : undefined}
+                >
                   Elegir…
                 </button>
-                {folderRows.length > 0 && (
-                  <button type="button" className="nw-btn ghost" onClick={() => setPickerOpen((v) => !v)} aria-expanded={pickerOpen} aria-controls="nw-recent">
-                    Recientes
-                  </button>
-                )}
               </div>
               {showErr('carpeta') && (
                 <span className="nw-err" role="alert">
@@ -412,6 +433,9 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
                       {f.spaces.length > 0 && <span className="nw-recent-dup">Ya tiene espacio</span>}
                     </button>
                   ))}
+                  <button type="button" className="nw-recent-row nw-recent-other" onClick={() => void pick()}>
+                    <span className="nw-recent-name">Otra carpeta…</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -487,34 +511,23 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
                 Cuenta de Claude
               </span>
               <div role="radiogroup" aria-labelledby="nw-acc-lbl" className="nw-accs">
-                {accounts.map((a) => {
+                {accounts.map((a, i) => {
                   const on = a.id === accountId
-                  const st = statuses[a.id]
                   const n = recent ? (counts[a.id] ?? 0) : null
                   return (
                     <button key={a.id} type="button" role="radio" aria-checked={on} className={`nw-acc${on ? ' on' : ''}`} onClick={() => setAccountId(a.id)}>
-                      <span className="nw-acc-ini" aria-hidden="true">
+                      <span className={`nw-acc-ini${i % 2 ? ' alt' : ''}`} aria-hidden="true">
                         {a.label.charAt(0).toUpperCase()}
                       </span>
                       <span className="nw-acc-text">
                         <span className="nw-acc-name">{a.label}</span>
-                        <span className="nw-acc-sub">
-                          {st?.email ?? (st?.loggedIn ? 'con sesión' : 'sin sesión')}
-                          {' · '}
-                          {n === null ? '…' : `${n} ${n === 1 ? 'espacio' : 'espacios'}`}
-                        </span>
+                        <span className="nw-acc-sub">{n === null ? '…' : n === 1 ? '1 espacio abierto' : `${n} espacios abiertos`}</span>
                       </span>
                     </button>
                   )
                 })}
               </div>
               {accounts.length === 0 && <span className="nw-err">Agregá una cuenta de Claude antes de crear un espacio.</span>}
-              {!ticketMode && (
-                <span className="nw-hint">
-                  Sugerimos la cuenta con sesión que menos usaste en las últimas 5 h.{' '}
-                  {usage[accountId] ? `Uso 5 h: ${fmtTok(totalTok(usage[accountId].last5h))}.` : ''}
-                </span>
-              )}
             </div>
 
             {!ticketMode && (
@@ -530,9 +543,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
                     </button>
                     {tplState.list.map((t) => (
                       <button key={t.id} type="button" className="nw-chip" aria-pressed={tpl?.id === t.id} onClick={() => pickTemplate(t)}>
-                        <span className="nw-chip-dot" style={{ background: colorHex(t.color) }} aria-hidden="true" />
                         {t.name}
-                        {t.team && <span className="nw-chip-team">equipo</span>}
                       </button>
                     ))}
                     <button type="button" className="nw-chip ghost" onClick={openTemplates}>
@@ -543,7 +554,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
                 </div>
 
                 <div className="nw-field">
-                  <label htmlFor="nw-msg">Primer mensaje para Claude (editable, opcional)</label>
+                  <label htmlFor="nw-msg">Primer mensaje para Claude (editable)</label>
                   <textarea
                     id="nw-msg"
                     className="nw-input nw-textarea"
@@ -588,22 +599,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
                     Color del ícono
                   </span>
                   <div role="radiogroup" aria-labelledby="nw-col-lbl" className="nw-colors">
-                    {TEMPLATE_COLOR_KEYS.map((k, i) => {
-                      const on = colorIdx === i
-                      return (
-                        <button
-                          key={k}
-                          type="button"
-                          role="radio"
-                          aria-checked={on}
-                          aria-label={TEMPLATE_COLORS[k].name}
-                          title={TEMPLATE_COLORS[k].name}
-                          className={`nw-color${on ? ' on' : ''}`}
-                          style={{ background: TEMPLATE_COLORS[k].hex }}
-                          onClick={() => setColorKey(k)}
-                        />
-                      )
-                    })}
+                    {TEMPLATE_COLOR_KEYS.map((k, i) => colorSwatch(k, colorIdx === i))}
                   </div>
                 </div>
               </>
@@ -613,18 +609,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
               <div className="nw-field">
                 <span className="nw-lbl">Color del ícono</span>
                 <div role="radiogroup" aria-label="Color del ícono" className="nw-colors">
-                  {TEMPLATE_COLOR_KEYS.map((k) => (
-                    <button
-                      key={k}
-                      type="button"
-                      role="radio"
-                      aria-checked={colorKey === k}
-                      aria-label={TEMPLATE_COLORS[k].name}
-                      className={`nw-color${colorKey === k ? ' on' : ''}`}
-                      style={{ background: TEMPLATE_COLORS[k].hex }}
-                      onClick={() => setColorKey(k)}
-                    />
-                  ))}
+                  {TEMPLATE_COLOR_KEYS.map((k) => colorSwatch(k, colorKey === k))}
                 </div>
               </div>
             )}
@@ -720,7 +705,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
         <footer className="nw-foot">
           <span className="nw-keys">Enter crea · Esc cancela</span>
           <span className="nw-grow" />
-          <button type="button" className="nw-btn ghost" onClick={onClose}>
+          <button type="button" className="nw-btn" onClick={onClose}>
             Cancelar
           </button>
           <button type="submit" className="nw-btn primary" aria-busy={busy} disabled={busy}>

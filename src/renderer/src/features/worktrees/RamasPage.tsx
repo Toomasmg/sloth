@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { openDrawer } from '../git/store'
-import { BranchIcon, ChangesIcon, CloseIcon, DoneIcon, FolderIcon, NewSpaceIcon, SearchIcon, WorktreeIcon } from '../../icons/SlothIcons'
+import { BranchIcon, CloseIcon, DoneIcon, PlusIcon, SearchIcon } from '../../icons/SlothIcons'
 import { closeRamas, setRamasDialog, useRamas } from './store'
 
 // ---------- Tipos (los mismos que devuelve main) ----------
@@ -102,7 +102,7 @@ function chipsOf(r: RowView): Chip[] {
   else if (r.changes < 0) out.push({ label: 'No se pudo leer el estado', tone: 'err' })
   if (r.ahead > 0) out.push({ label: plural(r.ahead, 'commit por subir', 'commits por subir'), tone: 'neutral' })
   if (out.length === 0 && r.exists) out.push({ label: 'Al día', tone: 'ok' })
-  if (r.merged && !r.gone) out.push({ label: r.pr ? `PR #${r.pr.number} mergeado` : 'Ya mergeada', tone: 'neutral' })
+  if (r.merged && !r.gone) out.push({ label: 'Ya mergeada', tone: 'neutral' })
   return out
 }
 
@@ -285,14 +285,14 @@ export function RamasPage(): React.JSX.Element | null {
         <header className="f-wt-head">
           <div className="f-wt-head-text">
             <h2 id="f-wt-h">Ramas aparte</h2>
-            <p className="hint">Una rama aparte es una copia de trabajo del mismo repo en otra carpeta, para que dos Claude no se pisen.</p>
+            <p className="f-wt-sub">Una rama aparte es una copia de trabajo del mismo repo en otra carpeta, para que dos Claude no se pisen.</p>
           </div>
           <div className="f-wt-head-actions">
-            <button type="button" className="btn sm" onClick={() => setRamasDialog('limpiar')} disabled={scanning}>
-              <WorktreeIcon size={14} /> Limpiar ramas que ya no se usan
+            <button type="button" className="f-wt-btn lg solid" onClick={() => setRamasDialog('limpiar')} disabled={scanning}>
+              Limpiar ramas que ya no se usan
             </button>
-            <button type="button" className="btn sm primary" onClick={() => setRamasDialog('nueva')} disabled={scanning || !repos?.length}>
-              <NewSpaceIcon size={14} /> Nueva rama aparte
+            <button type="button" className="f-wt-btn lg primary" onClick={() => setRamasDialog('nueva')} disabled={scanning || !repos?.length}>
+              <PlusIcon size={14} /> Nueva rama aparte
             </button>
             <button type="button" className="icon-btn" onClick={closeRamas} aria-label="Cerrar">
               <CloseIcon size={16} />
@@ -344,13 +344,22 @@ export function RamasPage(): React.JSX.Element | null {
           {groups.map(({ repo, rows }) => (
             <section key={repo.id} className="f-wt-group" aria-labelledby={`f-wt-g-${repo.id}`}>
               <header className="f-wt-group-head">
-                <BranchIcon size={14} className="f-wt-group-icon" />
-                <h3 id={`f-wt-g-${repo.id}`} className="mono">{repo.id}</h3>
-                <span className="hint">{plural(repo.rows.filter((r) => !r.isMain).length, 'rama aparte', 'ramas aparte')}</span>
-                {repo.defaultBase && <span className="hint">· base: {repo.defaultBase}</span>}
+                <span className="f-wt-group-icon" aria-hidden="true">
+                  <BranchIcon size={14} />
+                </span>
+                <h2 id={`f-wt-g-${repo.id}`} className="mono">{repo.id}</h2>
+                <span className="f-wt-group-count">{plural(repo.rows.filter((r) => !r.isMain).length, 'rama aparte', 'ramas aparte')}</span>
               </header>
               {repo.error && <p className="form-error f-wt-pad">{repo.error}</p>}
-              {rows.length === 0 && <p className="hint f-wt-pad">Nada coincide con los filtros.</p>}
+              <div className="f-wt-row f-wt-cols" aria-hidden="true">
+                <span>Rama</span>
+                <span>Carpeta</span>
+                <span>Espacio</span>
+                <span>Estado</span>
+                <span>Último uso</span>
+                <span className="f-wt-cols-end">Acciones</span>
+              </div>
+              {rows.length === 0 && <p className="f-wt-empty-group">Nada coincide con los filtros.</p>}
               {rows.map((r, i) => {
                 const removing = rmPath === r.path
                 const hasCh = r.changes > 0
@@ -370,10 +379,10 @@ export function RamasPage(): React.JSX.Element | null {
                       {sp ? (
                         <>
                           <span className="f-wt-space-name">{sp.name}</span>
-                          {sp.accountLabel && <span className="hint">{sp.accountLabel}</span>}
+                          {sp.accountLabel && <span className="f-wt-space-acc">{sp.accountLabel}</span>}
                         </>
                       ) : (
-                        <span className="hint">Sin espacio</span>
+                        <span className="f-wt-muted">Sin espacio</span>
                       )}
                     </div>
                     <div className="f-wt-cell f-wt-chips">
@@ -386,28 +395,28 @@ export function RamasPage(): React.JSX.Element | null {
                     <div className="f-wt-cell f-wt-last">{ago(r.lastUseAt ?? r.lastCommitAt)}</div>
                     <div className="f-wt-actions">
                       {sp ? (
-                        <button type="button" className="btn sm" onClick={() => openSpace(r)}>
+                        <button type="button" className="f-wt-btn solid" onClick={() => openSpace(r)}>
                           Abrir espacio
                         </button>
                       ) : (
-                        <button type="button" className="btn sm" onClick={() => newSpaceHere(r)}>
+                        <button type="button" className="f-wt-btn solid" onClick={() => newSpaceHere(r)}>
                           Abrir un espacio
                         </button>
                       )}
-                      <button type="button" className="btn sm ghost" onClick={() => void openFolder(r)} aria-label={`Abrir carpeta de ${r.branch ?? r.path}`}>
-                        <FolderIcon size={13} /> Abrir carpeta
+                      <button type="button" className="f-wt-btn ring" onClick={() => void openFolder(r)} aria-label={`Abrir carpeta de ${r.branch ?? r.path}`}>
+                        Abrir carpeta
                       </button>
                       <button
                         type="button"
-                        className="btn sm ghost"
+                        className="f-wt-btn plain"
                         onClick={() => viewChanges(r)}
                         disabled={!sp}
                         title={sp ? 'Ver los cambios en el panel Git' : 'Abrí un espacio para ver sus cambios'}
                       >
-                        <ChangesIcon size={13} /> Ver cambios
+                        Ver cambios
                       </button>
                       {!r.isMain && !removing && (
-                        <button type="button" className="btn sm ghost f-wt-remove" onClick={() => askRemove(r)} aria-label={`Quitar la rama aparte ${r.branch ?? r.path}`}>
+                        <button type="button" className="f-wt-btn plain f-wt-remove" onClick={() => askRemove(r)} aria-label={`Quitar la rama aparte ${r.branch ?? r.path}`}>
                           Quitar
                         </button>
                       )}
@@ -458,10 +467,10 @@ export function RamasPage(): React.JSX.Element | null {
                           </p>
                         )}
                         <div className="f-wt-confirm-actions">
-                          <button id="f-wt-rm-ok" type="button" className="btn sm danger" onClick={() => void doRemove(r)} disabled={rmBusy}>
+                          <button id="f-wt-rm-ok" type="button" className="f-wt-btn lg danger" onClick={() => void doRemove(r)} disabled={rmBusy}>
                             {hasCh ? 'Quitar y perder cambios' : 'Quitar'}
                           </button>
-                          <button type="button" className="btn sm ghost" onClick={() => { setRmPath(null); setRmErr('') }} disabled={rmBusy}>
+                          <button type="button" className="f-wt-btn lg plain" onClick={() => { setRmPath(null); setRmErr('') }} disabled={rmBusy}>
                             Cancelar
                           </button>
                         </div>
@@ -474,13 +483,23 @@ export function RamasPage(): React.JSX.Element | null {
           ))}
 
           {repos && shownCount === 0 && repos.length > 0 && (
-            <p className="hint f-wt-empty">Ninguna rama aparte coincide con los filtros.</p>
+            <p className="f-wt-empty">Ninguna rama aparte coincide con los filtros.</p>
           )}
 
-          <p className="hint f-wt-foot">Cada rama aparte vive en su propia carpeta, al lado de la copia principal. Quitarla borra esa carpeta; la rama queda en el repo.</p>
+          <p className="f-wt-foot">Cada rama aparte vive en su propia carpeta, al lado de la copia principal. Quitarla borra esa carpeta; la rama queda en el repo.</p>
         </div>
 
-        {dialog === 'nueva' && repos && <NuevaDialog repos={repos} onDone={async () => { setRamasDialog(null); say('Rama aparte creada'); await scan() }} onClose={() => setRamasDialog(null)} />}
+        {dialog === 'nueva' && repos && (
+          <NuevaDialog
+            repos={repos}
+            onDone={async (msg) => {
+              setRamasDialog(null)
+              say(msg)
+              await scan()
+            }}
+            onClose={() => setRamasDialog(null)}
+          />
+        )}
         {dialog === 'limpiar' && (
           <LimpiarDialog
             candidates={candidates}
@@ -506,7 +525,19 @@ export function RamasPage(): React.JSX.Element | null {
 
 // ---------- Nueva rama aparte ----------
 
-function NuevaDialog({ repos, onDone, onClose }: { repos: RepoView[]; onDone: () => Promise<void> | void; onClose: () => void }): React.JSX.Element {
+/** Mismas reglas y textos que el diseño (Ramas.dc.html › branchErr). */
+function branchError(b: string, repo: RepoView | undefined, repos: RepoView[]): string {
+  if (!b) return 'Poné un nombre para la rama.'
+  if (/\s/.test(b)) return 'Sin espacios: usá guiones o barras (feat/mi-cambio).'
+  if (!/^[A-Za-z0-9._/-]+$/.test(b) || b.includes('..') || /^[/.-]/.test(b) || /[/.]$/.test(b) || b.endsWith('.lock'))
+    return 'Esa rama no es válida. Usá letras, números, guiones, puntos o barras.'
+  if (repo && b === repo.mainBranch) return 'Esa es la copia principal del repo. Elegí otro nombre.'
+  if (repo && repos.some((x) => x.id === repo.id && x.rows.some((r) => !r.isMain && r.branch === b)))
+    return 'Ya hay una rama aparte con ese nombre en este repo.'
+  return ''
+}
+
+function NuevaDialog({ repos, onDone, onClose }: { repos: RepoView[]; onDone: (msg: string) => Promise<void> | void; onClose: () => void }): React.JSX.Element {
   const ui = useUi()
   const [repoPath, setRepoPath] = useState(repos[0]?.mainPath ?? '')
   const repo = repos.find((r) => r.mainPath === repoPath) ?? repos[0]
@@ -525,7 +556,7 @@ function NuevaDialog({ repos, onDone, onClose }: { repos: RepoView[]; onDone: ()
     inputRef.current?.focus()
   }, [])
 
-  const localErr = name.trim() === '' ? 'Poné un nombre para la rama.' : /\s/.test(name) ? 'Sin espacios: usá guiones o barras (feat/mi-cambio).' : ''
+  const localErr = branchError(name.trim(), repo, repos)
   const shownErr = tried ? localErr || err : err
   const folder = repo ? folderFor(repo.mainPath, name) : ''
 
@@ -545,7 +576,7 @@ function NuevaDialog({ repos, onDone, onClose }: { repos: RepoView[]; onDone: ()
     setBusy(true)
     try {
       await ui.invoke('feat:worktrees:create', { repoPath: repo.mainPath, name: name.trim(), base: effBase, openSpace, accountId: openSpace ? accId : undefined })
-      await onDone()
+      await onDone(`Rama aparte creada: ${name.trim()} (desde ${effBase})`)
     } catch (e2) {
       setErr(errText(e2))
     } finally {
@@ -582,6 +613,7 @@ function NuevaDialog({ repos, onDone, onClose }: { repos: RepoView[]; onDone: ()
               value={name}
               onChange={(e) => {
                 setName(e.target.value)
+                setTried(false)
                 setErr('')
               }}
               onKeyDown={(e) => {
@@ -637,10 +669,10 @@ function NuevaDialog({ repos, onDone, onClose }: { repos: RepoView[]; onDone: ()
           {err && !tried && <p role="alert" className="f-wt-err">{err}</p>}
 
           <div className="f-wt-form-actions">
-            <button type="button" className="btn ghost" onClick={onClose} disabled={busy}>
+            <button type="button" className="f-wt-btn lg plain" onClick={onClose} disabled={busy}>
               Cancelar
             </button>
-            <button type="submit" className="btn primary" disabled={busy}>
+            <button type="submit" className="f-wt-btn lg primary" disabled={busy}>
               {busy ? 'Creando…' : 'Crear rama aparte'}
             </button>
           </div>
@@ -705,10 +737,10 @@ function LimpiarDialog({
 
   return (
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
-      <div className="modal f-wt-dialog" role="dialog" aria-modal="true" aria-labelledby="f-wt-cl-t">
+      <div className="modal f-wt-dialog wide" role="dialog" aria-modal="true" aria-labelledby="f-wt-cl-t">
         <div className="f-wt-form">
           <h2 id="f-wt-cl-t">Limpiar ramas que ya no se usan</h2>
-          <p className="hint f-wt-lead">
+          <p className="f-wt-lead">
             Estas ramas aparte no tienen espacio, no tienen cambios ni commits sin subir, y ya están mergeadas o borradas en origin. Destildá las que quieras conservar.
           </p>
 
@@ -719,7 +751,7 @@ function LimpiarDialog({
                   <input type="checkbox" checked={on(c.path)} onChange={() => setSel((s) => ({ ...s, [c.path]: !on(c.path) }))} aria-label={`Quitar ${c.branch ?? c.path}`} />
                   <span className="f-wt-pick-text">
                     <span className="mono">{c.branch}</span>
-                    <span className="hint mono" title={c.path}>
+                    <span className="f-wt-reason" title={c.path}>
                       {reasonOf(c)} · {shortFolder(c.path)}
                     </span>
                     {failed[c.path] && <span className="f-wt-err">{failed[c.path]}</span>}
@@ -738,12 +770,12 @@ function LimpiarDialog({
           )}
 
           <div className="f-wt-form-actions">
-            <span className="hint f-wt-grow">{chosen.length ? `${freeLabel}` : ''}</span>
-            <button type="button" className="btn ghost" onClick={onClose} disabled={busy}>
+            <span className="f-wt-grow">{chosen.length ? `${freeLabel}` : ''}</span>
+            <button type="button" className="f-wt-btn lg plain" onClick={onClose} disabled={busy}>
               {candidates.length ? 'Cancelar' : 'Cerrar'}
             </button>
             {candidates.length > 0 && (
-              <button type="button" className="btn danger" onClick={() => void confirm()} disabled={busy}>
+              <button type="button" className="f-wt-btn lg danger" onClick={() => void confirm()} disabled={busy}>
                 {busy ? 'Quitando…' : chosen.length ? `Quitar ${plural(chosen.length, 'rama', 'ramas')}` : 'Quitar ramas'}
               </button>
             )}

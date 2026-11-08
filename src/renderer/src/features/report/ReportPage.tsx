@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUi } from '../host'
-import { CloseIcon, ReportIcon } from '../../icons/SlothIcons'
+import { CloseIcon, PlusIcon, WarningIcon } from '../../icons/SlothIcons'
 import { PageShell } from '../help/PageShell'
 import './report.css'
 
@@ -55,6 +55,7 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
   const nextId = useRef(3)
   const [sys, setSys] = useState(true)
   const [logs, setLogs] = useState(false)
+  const [sysView, setSysView] = useState(false)
   const [shot, setShot] = useState(false)
   const [shotData, setShotData] = useState<Shot | null>(null)
   const [shotBusy, setShotBusy] = useState(false)
@@ -168,11 +169,13 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
     return (
       <PageShell labelId="rp-title" title="Reportar un problema" onClose={onClose}>
         <div className="rp-wrap">
-          <section role="status" className="rp-thanks">
-            <span className="rp-thanks-ico">
-              <ReportIcon size={20} />
+          <section role="status" aria-labelledby="rp-title" className="rp-thanks">
+            <span className="rp-thanks-ico" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12.5l4.5 4.5L19 7.5" />
+              </svg>
             </span>
-            <h1 id="rp-title">Gracias. Falta un paso en GitHub</h1>
+            <h1 id="rp-title">¡Gracias! Falta un paso en GitHub</h1>
             <p>
               Abrimos GitHub con el reporte «{sent.title}». Revisalo y tocá «Submit new issue». Recién ahí queda creado el issue.
             </p>
@@ -208,7 +211,7 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
             <h2 id="rp-tipo" className="rp-h">
               Tipo
             </h2>
-            <div role="radiogroup" aria-labelledby="rp-tipo" className="seg rp-types">
+            <div role="radiogroup" aria-labelledby="rp-tipo" className="rp-types">
               {TYPES.map((t) => (
                 <button
                   key={t.id}
@@ -301,13 +304,14 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
                       }
                     }}
                   />
-                  <button type="button" className="icon-btn" onClick={() => removeStep(st.id)} aria-label={`Quitar el paso ${i + 1}`} title="Quitar el paso">
+                  <button type="button" className="rp-step-x" onClick={() => removeStep(st.id)} aria-label={`Quitar el paso ${i + 1}`} title="Quitar el paso">
                     <CloseIcon size={14} />
                   </button>
                 </div>
               ))}
               <div className="rp-steps-foot">
-                <button type="button" className="btn sm" onClick={addStep} disabled={steps.length >= STEPS_MAX}>
+                <button type="button" className="btn sm rp-add" onClick={addStep} disabled={steps.length >= STEPS_MAX}>
+                  <PlusIcon size={13} />
                   Agregar paso
                 </button>
                 <span className="hint">
@@ -323,8 +327,15 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
             </h2>
             <div className="group">
               <div className="rp-att">
-                <Check label="Información del sistema" hint="Versión de Sloth, Windows y cantidad de espacios abiertos." on={sys} onToggle={() => setSys(!sys)} />
-                {sys && <PreviewLines title="Esto es lo que se manda" lines={preview?.sys} err={previewErr} />}
+                <div className="rp-att-top">
+                  <Check label="Información del sistema" hint="Versión de Sloth, Windows y cantidad de espacios abiertos." on={sys} onToggle={() => setSys(!sys)} />
+                  {sys && (
+                    <button type="button" className="rp-view" aria-expanded={sysView} onClick={() => setSysView(!sysView)}>
+                      {sysView ? 'Ocultar' : 'Ver qué se manda'}
+                    </button>
+                  )}
+                </div>
+                {sys && sysView && <PreviewLines title="Esto es lo que se manda:" lines={preview?.sys} err={previewErr} />}
               </div>
               <div className="rp-att">
                 <Check
@@ -336,7 +347,8 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
                 {logs && (
                   <>
                     <p role="note" className="rp-warn">
-                      Revisá las líneas: las rutas personales se reemplazan, pero el registro puede tener nombres de tus espacios.
+                      <WarningIcon size={14} />
+                      <span>Aviso: las rutas personales se reemplazan por «C:\Users\…». Nunca van tokens ni contraseñas.</span>
                     </p>
                     <PreviewLines title={`Vista previa · ${preview?.logs.length ?? 0} líneas`} lines={preview?.logs} err={previewErr} />
                   </>
@@ -345,7 +357,7 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
               <div className="rp-att">
                 <Check
                   label="Captura de la ventana"
-                  hint="Una imagen de lo que se ve en Sloth ahora. Revisala: puede mostrar lo que hay en las terminales."
+                  hint="Una imagen de lo que ves en Sloth, para entender el problema más rápido."
                   on={shot}
                   onToggle={() => void toggleShot()}
                   busy={shotBusy}
@@ -353,7 +365,7 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
                 {shot && shotData && (
                   <figure className="rp-shot">
                     <img src={shotData.dataUrl} alt="Captura de la ventana de Sloth que se va a adjuntar" />
-                    <figcaption className="hint">Se guarda en tu PC y se abre su carpeta al enviar. No se sube sola.</figcaption>
+                    <figcaption className="hint">Se guarda en tu PC y se abre su carpeta al enviar. No se sube sola. Revisala: puede mostrar lo que hay en las terminales.</figcaption>
                   </figure>
                 )}
               </div>

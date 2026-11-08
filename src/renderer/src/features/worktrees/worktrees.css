@@ -1,4 +1,5 @@
-/* «Ramas aparte» (v0.6): sección del sidebar, panel y diálogos. Clases con prefijo f-wt-. */
+/* «Ramas aparte» (v0.6): sección del sidebar, panel y diálogos. Clases con prefijo f-wt-.
+   Medidas en px según Ramas.dc.html (los tokens --s-* de themes.css no coinciden con el diseño). */
 
 .f-wt-section {
   padding-top: var(--s-2);
@@ -42,9 +43,9 @@
 .f-wt-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: var(--s-2) var(--s-3);
-  padding: var(--s-4) var(--s-4) var(--s-3);
+  align-items: flex-end;
+  gap: 12px 16px;
+  padding: 24px 24px 20px;
   box-shadow: inset 0 -1px 0 var(--line);
 }
 .f-wt-head-text {
@@ -53,42 +54,43 @@
 }
 .f-wt-head-text h2 {
   margin: 0;
-  font-size: var(--fs-xl);
+  font-size: 24px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 }
-.f-wt-head-text .hint {
-  margin: var(--s-1) 0 0;
+.f-wt-sub {
+  margin: 6px 0 0;
+  color: var(--fg-2);
   line-height: 1.5;
 }
 .f-wt-head-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-2);
+  gap: 8px;
 }
 
 .f-wt-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--s-4);
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: var(--s-4);
+  gap: 20px;
 }
 
 .f-wt-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
-  gap: var(--s-2);
+  gap: 10px;
 }
 .f-wt-tile {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: var(--s-3) var(--s-4);
-  border-radius: var(--r-lg);
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 12px;
   background: var(--card);
   box-shadow: inset 0 0 0 1px var(--line);
 }
@@ -98,25 +100,25 @@
   letter-spacing: -0.01em;
 }
 .f-wt-tile-l {
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  font-size: 12px;
+  color: var(--fg-2);
 }
 
 .f-wt-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-2);
+  gap: 8px;
 }
 .f-wt-search {
   flex: 1 1 240px;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: var(--s-2);
-  height: var(--h-sm);
-  padding: 0 var(--s-2);
-  border-radius: var(--r-sm);
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
   background: var(--input-bg);
   color: var(--fg-muted);
   box-shadow: inset 0 0 0 1px var(--line);
@@ -130,27 +132,31 @@
   font: inherit;
   box-shadow: none;
 }
+.f-wt-search input::placeholder {
+  color: var(--placeholder);
+}
 .f-wt-select {
-  height: var(--h-sm);
-  padding: 0 var(--s-2);
+  height: 32px;
+  padding: 0 10px;
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: 8px;
   background: var(--input-bg);
   color: var(--fg);
   font: inherit;
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 .f-wt-pill {
-  height: var(--h-sm);
-  padding: 0 var(--s-3);
+  height: 32px;
+  padding: 0 12px;
   border: 0;
   border-radius: 16px;
-  background: var(--surface-2);
+  background: var(--btn-2);
   color: var(--fg-2);
   font: inherit;
-  font-size: var(--fs-sm);
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 .f-wt-pill.on {
   background: var(--info-soft);
@@ -162,21 +168,31 @@
   outline-offset: 1px;
 }
 .f-wt-result {
-  font-size: var(--fs-sm);
+  margin-left: 4px;
+  font-size: 12px;
   color: var(--fg-muted);
 }
 
 .f-wt-empty,
 .f-wt-none {
   margin: 0;
-  padding: var(--s-4);
+  padding: 28px 16px;
   text-align: center;
-  border-radius: var(--r-lg);
+  color: var(--fg-2);
+  border-radius: 12px;
   background: var(--card);
   box-shadow: inset 0 0 0 1px var(--line);
 }
+.f-wt-empty-group {
+  margin: 0;
+  padding: 16px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
 .f-wt-foot {
   margin: 0;
+  font-size: 12px;
+  color: var(--fg-muted);
   line-height: 1.5;
 }
 
@@ -185,7 +201,7 @@
 .f-wt-group {
   display: flex;
   flex-direction: column;
-  border-radius: var(--r-lg);
+  border-radius: 12px;
   background: var(--card);
   box-shadow: inset 0 0 0 1px var(--line);
   overflow: hidden;
@@ -194,20 +210,32 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-1) var(--s-2);
-  padding: var(--s-3) var(--s-4);
+  gap: 8px 10px;
+  padding: 12px 16px;
   box-shadow: inset 0 -1px 0 var(--line);
 }
-.f-wt-group-head h3 {
+.f-wt-group-head h2 {
   margin: 0;
-  font-size: var(--fs-md);
+  font-size: 14px;
   font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
 }
 .f-wt-group-icon {
-  color: var(--ok);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 7px;
+  background: var(--success-soft);
+  color: var(--success-fg);
+}
+.f-wt-group-count {
+  font-size: 12px;
+  color: var(--fg-2);
 }
 .f-wt-pad {
-  padding: var(--s-3) var(--s-4);
+  padding: 12px 16px;
 }
 
 /* ---------- Filas ---------- */
@@ -217,11 +245,24 @@
   grid-template-columns: minmax(140px, 1fr) minmax(150px, 1.2fr) minmax(120px, 1fr) minmax(160px, 1.2fr) 88px auto;
   gap: 10px 14px;
   align-items: center;
-  padding: var(--s-3) var(--s-4);
+  padding: 12px 16px;
   min-width: 0;
 }
 .f-wt-row.sep {
   box-shadow: inset 0 -1px 0 var(--line);
+}
+/* Encabezados de columna: mismo grid que las filas. */
+.f-wt-cols {
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.f-wt-cols-end {
+  text-align: right;
 }
 .f-wt-cell {
   min-width: 0;
@@ -245,7 +286,7 @@
   font-size: 11px;
   padding: 1px 7px;
   border-radius: 9px;
-  background: var(--surface-2);
+  background: var(--btn-2);
   color: var(--fg-2);
   white-space: nowrap;
 }
@@ -267,6 +308,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.f-wt-space-acc {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.f-wt-muted {
+  color: var(--fg-muted);
 }
 .f-wt-chips {
   display: flex;
@@ -294,28 +342,103 @@
   justify-content: flex-end;
   gap: 6px;
 }
+
+/* Botones del panel y diálogos (alturas 28 / 30 / 32 px del diseño). */
+.f-wt-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg-2);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, filter 0.12s;
+}
+.f-wt-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+.f-wt-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.f-wt-btn:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 1px;
+}
+.f-wt-btn.solid {
+  background: var(--btn-2);
+  color: var(--fg);
+}
+.f-wt-btn.solid:hover:not(:disabled) {
+  filter: brightness(1.12);
+  background: var(--btn-2);
+}
+.f-wt-btn.ring {
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.f-wt-btn.plain {
+  color: var(--fg-2);
+}
+.f-wt-btn.primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+.f-wt-btn.primary:hover:not(:disabled) {
+  background: var(--accent);
+  filter: brightness(1.12);
+}
+.f-wt-btn.danger {
+  background: var(--danger-soft);
+  color: var(--danger-fg-strong);
+  font-weight: 600;
+}
+.f-wt-btn.danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+  filter: brightness(1.12);
+}
+.f-wt-btn.lg {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.f-wt-btn.lg.primary {
+  padding: 0 14px;
+}
 .f-wt-remove {
-  color: var(--danger-fg);
+  color: var(--danger-fg-strong);
 }
 
 /* Confirmación de «Quitar»: ocupa toda la fila. */
 .f-wt-confirm {
   grid-column: 1 / -1;
   min-width: 0;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: var(--s-2);
-  padding: var(--s-3) var(--s-4);
-  border-radius: var(--r-md);
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
   background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 .f-wt-confirm.danger {
-  box-shadow: inset 0 0 0 1px var(--danger);
+  box-shadow: inset 0 0 0 1px var(--toast-border);
 }
 .f-wt-confirm-text {
   margin: 0;
   line-height: 1.5;
+}
+.f-wt-confirm.danger .f-wt-confirm-text {
+  color: var(--danger-fg-strong);
 }
 .f-wt-confirm-field {
   display: flex;
@@ -327,42 +450,50 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--s-2);
+  gap: 8px;
+}
+.f-wt-confirm .f-wt-btn.lg {
+  height: 30px;
+  font-size: 12px;
+  border-radius: 8px;
 }
 
 .f-wt-input {
-  height: var(--h-sm);
+  height: 32px;
   box-sizing: border-box;
   max-width: 420px;
-  padding: 0 var(--s-2);
+  padding: 0 10px;
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: 8px;
   background: var(--input-bg);
   color: var(--fg);
   font: inherit;
   font-size: 12.5px;
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.f-wt-input::placeholder {
+  color: var(--placeholder);
 }
 .f-wt-input[aria-invalid='true'] {
   box-shadow: inset 0 0 0 1px var(--danger);
 }
 .f-wt-err {
   margin: 0;
-  font-size: var(--fs-sm);
+  font-size: 12px;
   color: var(--danger-fg);
 }
 
 .f-wt-toast {
   position: fixed;
-  right: var(--s-4);
-  bottom: var(--s-4);
+  right: 18px;
+  bottom: 18px;
   z-index: 30;
   max-width: calc(100vw - 36px);
   display: flex;
   align-items: center;
-  gap: var(--s-2);
-  padding: var(--s-2) var(--s-3);
-  border-radius: var(--r-md);
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
   background: var(--toast-bg);
   color: var(--fg);
   box-shadow: var(--shadow-lg);
@@ -372,32 +503,41 @@
 
 .modal.f-wt-dialog {
   width: min(520px, calc(100vw - 32px));
-  padding: var(--s-5);
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 20px;
+  border-radius: 14px;
+}
+.modal.f-wt-dialog.wide {
+  width: min(560px, calc(100vw - 32px));
 }
 .f-wt-dialog .f-wt-form {
   display: flex;
   flex-direction: column;
-  gap: var(--s-3);
+  gap: 14px;
 }
 .f-wt-dialog h2 {
   margin: 0;
-  font-size: var(--fs-xl);
+  font-size: 18px;
   font-weight: 700;
 }
 .f-wt-lead {
   margin: 0;
+  font-size: 13px;
+  color: var(--fg-2);
   line-height: 1.5;
 }
 .f-wt-field {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  font-size: var(--fs-sm);
+  font-size: 12px;
   color: var(--fg-2);
 }
 .f-wt-folder-box {
-  padding: var(--s-2);
-  border-radius: var(--r-sm);
+  padding: 8px 10px;
+  border-radius: 8px;
   background: var(--input-bg);
   color: var(--fg-2);
   font-size: 12px;
@@ -407,34 +547,35 @@
 .f-wt-check {
   display: flex;
   align-items: center;
-  gap: var(--s-2);
+  gap: 10px;
   cursor: pointer;
 }
 .f-wt-check input {
-  accent-color: var(--brand-2);
+  accent-color: var(--accent);
   margin: 0;
   width: 16px;
   height: 16px;
+  flex: none;
 }
 .f-wt-grow {
   flex: 1 1 200px;
+  font-size: 12px;
+  color: var(--fg-muted);
 }
 
 .f-wt-list {
   display: flex;
   flex-direction: column;
-  border-radius: var(--r-md);
-  background: var(--input-bg);
+  border-radius: 10px;
+  background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--line);
   overflow: hidden;
-  max-height: 320px;
-  overflow-y: auto;
 }
 .f-wt-pick {
   display: flex;
   align-items: flex-start;
-  gap: var(--s-3);
-  padding: var(--s-3);
+  gap: 12px;
+  padding: 11px 12px;
   cursor: pointer;
 }
 .f-wt-pick:hover {
@@ -444,7 +585,7 @@
   box-shadow: inset 0 -1px 0 var(--line);
 }
 .f-wt-pick input {
-  accent-color: var(--brand-2);
+  accent-color: var(--accent);
   margin: 3px 0 0;
   width: 16px;
   height: 16px;
@@ -456,6 +597,14 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+.f-wt-reason {
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---------- Spinner y movimiento ---------- */
@@ -477,6 +626,9 @@
 @media (max-width: 900px) {
   .f-wt-row {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .f-wt-cols {
+    display: none;
   }
   .f-wt-actions {
     justify-content: flex-start;

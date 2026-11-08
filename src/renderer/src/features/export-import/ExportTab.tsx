@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { DoneIcon, FolderIcon, KeyboardIcon, PermissionIcon, TeamIcon, TemplatesIcon, ThemeIcon } from '../../icons/SlothIcons'
 import type { UiCtx } from '../host'
 import { errText, fmtKb, type Overview, type Preview, type Selection } from './types'
+import { Ico, P } from './ico'
 
 const MIN_PW = 8
 const LINE = 'inset 0 -1px 0 var(--line)'
@@ -56,6 +56,13 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
+  // El aviso de «Archivo guardado» dura 6 s (como en el artboard).
+  useEffect(() => {
+    if (!saved) return
+    const t = window.setTimeout(() => setSaved(null), 6000)
+    return () => window.clearTimeout(t)
+  }, [saved])
+
   if (!ov || !sel || !prev) return <p className="f-ei-help">Leyendo tu configuración…</p>
 
   const allSpaces = ov.espacios.length > 0 && sel.espacios.length === ov.espacios.length
@@ -90,7 +97,7 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
     try {
       const r = await ui.invoke<{ file: string } | null>('feat:export-import:export', sel, pwOn ? p1 : undefined)
       if (r) {
-        setSaved(r.file)
+        setSaved(r.file.split(/[\\/]/).pop() ?? r.file)
         setAttempt(false)
       }
     } catch (e) {
@@ -103,21 +110,23 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
   return (
     <div className="f-ei-tab">
       <div role="note" className="f-ei-lock">
-        <PermissionIcon size={16} />
+        <span className="f-ei-lock-ico" aria-hidden="true">
+          <Ico d={P.lock} size={16} />
+        </span>
         <span>Las sesiones de tus cuentas de Claude no se exportan nunca: en la otra PC vas a iniciar sesión de nuevo.</span>
       </div>
 
       <section className="f-ei-sec" aria-labelledby="ex-qi">
-        <h3 id="ex-qi">Qué incluir</h3>
+        <h2 id="ex-qi" className="f-ei-h">
+          Qué incluir
+        </h2>
         <div className="f-ei-card">
           {/* Espacios: el grupo tiene selección individual por espacio. */}
           <div style={{ boxShadow: LINE }}>
             <label className="f-ei-row">
               <input type="checkbox" checked={allSpaces} disabled={ov.espacios.length === 0} onChange={toggleAllSpaces} />
               <span className="f-ei-grow">
-                <span className="f-ei-name">
-                  <FolderIcon size={14} /> Espacios
-                </span>
+                <span className="f-ei-name">Espacios</span>
                 <span className="f-ei-desc">Ruta, nombre, color y cuenta asignada de cada espacio. No se exportan los archivos del proyecto.</span>
               </span>
               <span className="f-ei-size">
@@ -139,10 +148,8 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
             <label className="f-ei-row">
               <input type="checkbox" checked={sel.plantillas} onChange={() => flag('plantillas')} />
               <span className="f-ei-grow">
-                <span className="f-ei-name">
-                  <TemplatesIcon size={14} /> Plantillas
-                </span>
-                <span className="f-ei-desc">Las plantillas para crear espacios (migración, revisión de PR, ticket de Gruv).</span>
+                <span className="f-ei-name">Plantillas</span>
+                <span className="f-ei-desc">Las plantillas para crear espacios: migración, revisión de PR y ticket de Gruv.</span>
               </span>
               <span className="f-ei-size">{ov.plantillas === 0 ? 'Ninguna' : `${ov.plantillas} · ${fmtKb(prev.kb.plantillas)}`}</span>
             </label>
@@ -152,9 +159,7 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
             <label className={`f-ei-row${ov.atajos === 0 ? ' f-ei-disabled' : ''}`}>
               <input type="checkbox" checked={sel.atajos && ov.atajos > 0} disabled={ov.atajos === 0} onChange={() => flag('atajos')} />
               <span className="f-ei-grow">
-                <span className="f-ei-name">
-                  <KeyboardIcon size={14} /> Atajos
-                </span>
+                <span className="f-ei-name">Atajos</span>
                 <span className="f-ei-desc">Solo los que cambiaste. Los de fábrica no se guardan.</span>
               </span>
               <span className="f-ei-size">{ov.atajos === 0 ? 'No hay cambios' : `${ov.atajos} ${ov.atajos === 1 ? 'cambiado' : 'cambiados'} · ${fmtKb(prev.kb.atajos)}`}</span>
@@ -165,12 +170,8 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
             <label className="f-ei-row">
               <input type="checkbox" checked={sel.apariencia} onChange={() => flag('apariencia')} />
               <span className="f-ei-grow">
-                <span className="f-ei-name">
-                  <ThemeIcon size={14} /> Apariencia
-                </span>
-                <span className="f-ei-desc">
-                  Tema, densidad y tamaño del texto ({ov.apariencia.theme} · {ov.apariencia.density} · {ov.apariencia.uiFontSize} px).
-                </span>
+                <span className="f-ei-name">Apariencia</span>
+                <span className="f-ei-desc">Tema, color de acento, densidad y tamaño del texto.</span>
               </span>
               <span className="f-ei-size">{fmtKb(prev.kb.apariencia)}</span>
             </label>
@@ -180,10 +181,8 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
             <label className={`f-ei-row${ov.equipo ? '' : ' f-ei-disabled'}`}>
               <input type="checkbox" checked={sel.equipo && !!ov.equipo} disabled={!ov.equipo} onChange={() => flag('equipo')} />
               <span className="f-ei-grow">
-                <span className="f-ei-name">
-                  <TeamIcon size={14} /> Equipo y chat
-                </span>
-                <span className="f-ei-desc">Solo la URL del proyecto de Supabase. Nunca tu sesión ni tu key.</span>
+                <span className="f-ei-name">Equipo y chat</span>
+                <span className="f-ei-desc">Solo la URL del proyecto de Supabase. Nunca tu sesión.</span>
               </span>
               <span className="f-ei-size">{ov.equipo ? fmtKb(prev.kb.equipo) : 'No hay equipo configurado'}</span>
             </label>
@@ -193,10 +192,8 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
             <label className={`f-ei-row${reglasSel === 0 ? ' f-ei-disabled' : ''}`}>
               <input type="checkbox" checked={sel.permisos && reglasSel > 0} disabled={reglasSel === 0} onChange={() => flag('permisos')} />
               <span className="f-ei-grow">
-                <span className="f-ei-name">
-                  <PermissionIcon size={14} /> Reglas de permisos
-                </span>
-                <span className="f-ei-desc">Las reglas «Permitir siempre» de Sloth de cada espacio seleccionado. No toca la configuración de Claude.</span>
+                <span className="f-ei-name">Reglas de permisos</span>
+                <span className="f-ei-desc">Los «Permitir siempre aquí» de cada espacio seleccionado.</span>
               </span>
               <span className="f-ei-size">{reglasSel === 0 ? 'Ninguna' : `${reglasSel} ${reglasSel === 1 ? 'regla' : 'reglas'} · ${fmtKb(prev.kb.permisos)}`}</span>
             </label>
@@ -205,7 +202,9 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
       </section>
 
       <section className="f-ei-sec" aria-labelledby="ex-se">
-        <h3 id="ex-se">Seguridad</h3>
+        <h2 id="ex-se" className="f-ei-h">
+          Seguridad
+        </h2>
         <div className="f-ei-card">
           <label className="f-ei-row">
             <input type="checkbox" checked={pwOn} onChange={() => { setPwOn(!pwOn); setAttempt(false) }} />
@@ -216,7 +215,7 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
           </label>
           {pwOn && (
             <div className="f-ei-pw">
-              <label className="field">
+              <label className="f-ei-pwfield">
                 <span>Contraseña</span>
                 <input
                   ref={pw1}
@@ -227,11 +226,11 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
                   aria-describedby="ex-pw1-h"
                   onChange={(e) => setP1(e.target.value)}
                 />
-                <span id="ex-pw1-h" className={e1 ? 'field-error' : 'field-help'}>
+                <span id="ex-pw1-h" className={e1 ? 'f-ei-fieldmsg bad' : 'f-ei-fieldmsg'}>
                   {e1 || 'Mínimo 8 caracteres.'}
                 </span>
               </label>
-              <label className="field">
+              <label className="f-ei-pwfield">
                 <span>Repetir contraseña</span>
                 <input
                   ref={pw2}
@@ -242,7 +241,7 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
                   aria-describedby="ex-pw2-h"
                   onChange={(e) => setP2(e.target.value)}
                 />
-                <span id="ex-pw2-h" className={e2 ? 'field-error' : okMatch ? 'f-ei-ok-text' : 'field-help'}>
+                <span id="ex-pw2-h" className={e2 ? 'f-ei-fieldmsg bad' : okMatch ? 'f-ei-fieldmsg ok' : 'f-ei-fieldmsg'}>
                   {e2 || (okMatch ? 'Coinciden.' : 'Escribila igual que la anterior.')}
                 </span>
               </label>
@@ -253,6 +252,7 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
 
       <details className="f-ei-card f-ei-preview">
         <summary>
+          <Ico d={P.chevDown} size={14} />
           Vista previa del archivo
           <span className="f-ei-hint">{pwOn ? 'Así queda el contenido antes de cifrarlo' : 'Cambia según lo que marcás'}</span>
         </summary>
@@ -269,16 +269,16 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
           </span>
         )}
         <span className="f-ei-grow" />
-        <button type="button" className="btn primary" onClick={() => void doExport()} disabled={busy} aria-busy={busy}>
+        <button type="button" className="f-ei-btn primary" onClick={() => void doExport()} disabled={busy} aria-busy={busy}>
           {busy ? 'Guardando…' : 'Exportar…'}
         </button>
       </div>
 
       {saved && (
-        <div role="status" className="f-ei-saved">
-          <DoneIcon size={14} />
-          <span className="f-ei-grow mono">{saved}</span>
-          <button type="button" className="btn sm" onClick={() => void ui.invoke('feat:export-import:reveal').catch((e) => setErr(errText(e)))}>
+        <div role="status" className="f-ei-toast">
+          <Ico d={P.check} size={15} sw={2.2} />
+          <span className="f-ei-toast-text">Archivo guardado: {saved}</span>
+          <button type="button" className="f-ei-btn secondary sm" onClick={() => void ui.invoke('feat:export-import:reveal').catch((e) => setErr(errText(e)))}>
             Mostrar en la carpeta
           </button>
         </div>

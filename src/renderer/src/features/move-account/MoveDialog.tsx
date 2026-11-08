@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { loginPaneId, type Account } from '../../../../shared/types'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
-import { CloseIcon, DoneIcon, MoveAccountIcon, PermissionIcon } from '../../icons/SlothIcons'
+import { CheckIcon, PermissionIcon, TerminalIcon } from '../../icons/SlothIcons'
 import { closeMove, spacesTxt, type Phase, type MoveRes } from './state'
 
 export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
@@ -17,6 +17,7 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
   const [choice, setChoice] = useState<string | null>(null)
   const [phase, setPhase] = useState<Phase>('form')
   const [err, setErr] = useState<string | null>(null)
+  /** Desmarcado por defecto: el resumen es opcional. */
   const [keep, setKeep] = useState(false)
   /** Tras un fallo al copiar la conversación: se ofrece seguir sin ella. */
   const [copyFailed, setCopyFailed] = useState(false)
@@ -139,7 +140,7 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
   }
 
   return (
-    <div className="modal-backdrop" onMouseDown={() => !busyRef.current && closeMove()}>
+    <div className="modal-backdrop f-move-backdrop" onMouseDown={() => !busyRef.current && closeMove()}>
       <form
         className="modal f-move-modal"
         role="dialog"
@@ -149,28 +150,26 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
         onMouseDown={(e) => e.stopPropagation()}
         onSubmit={(e) => void confirm(e)}
       >
-        <header className="modal-head">
-          <MoveAccountIcon size={18} className="f-move-head-icon" />
-          <h2 id="f-move-title">Mover espacio a otra cuenta</h2>
-          <button type="button" className="icon-btn" onClick={closeMove} disabled={phase === 'moving'} aria-label="Cerrar" title="Cerrar">
-            <CloseIcon size={16} />
-          </button>
-        </header>
-        <p className="f-move-lead">Vos elegís la cuenta. Sloth no cambia de cuenta sola ni detecta límites.</p>
+        <div className="f-move-head">
+          <h2 id="f-move-title" className="f-move-title">
+            Mover espacio a otra cuenta
+          </h2>
+          <p className="f-move-lead">Vos elegís la cuenta. Sloth no cambia de cuenta sola ni detecta límites.</p>
+        </div>
 
         <div className="f-move-space">
           <span className="f-move-space-icon" aria-hidden="true">
-            <MoveAccountIcon size={18} />
+            <TerminalIcon size={18} strokeWidth={1.8} />
           </span>
           <div className="f-move-space-text">
             <span className="f-move-space-name">{ws.name}</span>
-            <span className="f-move-space-path mono">
+            <span className="f-move-space-path">
               {ws.cwd}
               {ws.branch ? ` · ${ws.branch}` : ''}
             </span>
           </div>
           <div className="f-move-space-acc">
-            <span className="hint">Cuenta actual</span>
+            <span className="f-move-muted">Cuenta actual</span>
             <strong>{from?.label ?? 'una cuenta borrada'}</strong>
           </div>
         </div>
@@ -178,16 +177,18 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
         {phase === 'form' && (
           <>
             <section aria-labelledby="f-move-dest" className="f-move-section">
-              <h3 id="f-move-dest">Cuenta destino</h3>
+              <h3 id="f-move-dest" className="f-move-h3">
+                Cuenta destino
+              </h3>
               {accounts.length < 2 ? (
-                <p className="hint">Necesitás al menos otra cuenta. Creala desde la barra lateral.</p>
+                <p className="f-move-hint">Necesitás al menos otra cuenta. Creala desde la barra lateral.</p>
               ) : (
                 <div role="radiogroup" aria-labelledby="f-move-dest" className="f-move-list">
                   {rows.map((r, i) => {
                     const pickable = !r.current && r.logged
                     const picked = pickable && choice === r.a.id
                     return (
-                      <div key={r.a.id} className={`f-move-row${i > 0 ? ' sep' : ''}`}>
+                      <div key={r.a.id} className={`f-move-row${i < rows.length - 1 ? ' sep' : ''}`}>
                         <label className={`f-move-opt${picked ? ' on' : ''}${pickable ? '' : ' off'}`}>
                           <input
                             ref={pickable && r.a.id === firstPick ? firstRef : undefined}
@@ -201,6 +202,9 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
                               setErr(null)
                             }}
                           />
+                          <span className="f-move-ini" aria-hidden="true">
+                            {r.a.label.charAt(0).toUpperCase()}
+                          </span>
                           <span className="f-move-opt-main">
                             <span className="f-move-opt-title">{r.a.label}</span>
                             <span className={`f-move-opt-sub${r.logged ? '' : ' warn'}`}>
@@ -208,9 +212,14 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
                             </span>
                           </span>
                           {r.current && <span className="f-move-badge">Cuenta actual</span>}
+                          {pickable && (
+                            <span className={`f-move-mark${picked ? ' on' : ''}`} aria-hidden="true">
+                              <span className="f-move-dot" />
+                            </span>
+                          )}
                         </label>
                         {!r.current && !r.logged && (
-                          <button type="button" className="btn sm primary f-move-login" onClick={() => login(r.a)}>
+                          <button type="button" className="f-move-login" onClick={() => login(r.a)}>
                             Iniciar sesión
                           </button>
                         )}
@@ -222,8 +231,10 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
             </section>
 
             <section aria-labelledby="f-move-que" className="f-move-section">
-              <h3 id="f-move-que">Qué pasa</h3>
-              <p className="f-move-box">
+              <h3 id="f-move-que" className="f-move-h3">
+                Qué pasa
+              </h3>
+              <p className="f-move-box f-move-body">
                 La terminal se reinicia con la otra cuenta y Claude sigue la misma conversación. Tus archivos no cambian.
               </p>
             </section>
@@ -232,13 +243,13 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
               <label className="f-move-box f-move-keep">
                 <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
                 <span className="f-move-keep-text">
-                  <span className="f-move-keep-title">Además, dejarle a Claude un resumen de lo que estaba haciendo</span>
-                  <span className="hint">Claude lo lee al arrancar en la cuenta nueva.</span>
+                  <span className="f-move-keep-title">Dejarle a Claude un resumen de lo que estaba haciendo</span>
+                  <span className="f-move-muted">Claude lo lee al arrancar en la cuenta nueva.</span>
                 </span>
               </label>
               {keep && (
                 <label className="f-move-field">
-                  <span className="hint">Vista previa del resumen (podés editarlo)</span>
+                  <span className="f-move-label">Vista previa del resumen (podés editarlo)</span>
                   <textarea
                     className="f-move-text"
                     rows={4}
@@ -253,61 +264,76 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
 
             {working && !waiting && !freed && (
               <div role="status" className="f-move-banner warn">
-                <PermissionIcon size={16} />
+                <span className="f-move-warn-ico" aria-hidden="true">
+                  <PermissionIcon size={16} strokeWidth={1.8} />
+                </span>
                 <span className="f-move-banner-text">Claude está trabajando ahora: si lo movés se corta lo que está haciendo</span>
-                <button type="button" ref={waitRef} className="btn sm" onClick={wait}>
+                <button type="button" id="mc-wait" ref={waitRef} className="f-move-btn" onClick={wait}>
                   Esperar a que termine
                 </button>
               </div>
             )}
             {working && waiting && (
               <div role="status" className="f-move-banner warn">
-                <span className="f-move-spin" aria-hidden="true" />
+                <svg className="f-move-spin" width={18} height={18} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                  <path d="M12 4a8 8 0 1 1-8 8" />
+                </svg>
                 <span className="f-move-banner-text">Esperando a que Claude termine…</span>
-                <button type="button" ref={waitRef} className="btn sm" disabled>
+                <button type="button" id="mc-wait" ref={waitRef} className="f-move-btn" disabled aria-disabled="true">
                   Esperando…
                 </button>
               </div>
             )}
             {!working && freed && (
-              <div role="status" className="f-move-banner ok">
-                <DoneIcon size={15} />
+              <div role="status" className="f-move-ok">
+                <CheckIcon size={15} strokeWidth={2.2} className="f-move-ok-ico" />
                 <span>Claude terminó lo que estaba haciendo. Ya podés moverlo.</span>
               </div>
             )}
 
-            {err && (
-              <p className="form-error f-move-err" role="alert">
-                {err}
-              </p>
-            )}
-            {copyFailed && (
-              <div role="alert" className="f-move-banner warn">
-                <span className="f-move-banner-text">Podés seguir sin la conversación: Claude arranca de cero en la cuenta nueva (con el resumen, si lo dejaste).</span>
-                <button type="button" className="btn sm" onClick={() => void move(false)}>
-                  Seguir sin conversación
+            <div className="f-move-foot">
+              {err && (
+                <div role="alert" className="f-move-err">
+                  {err}
+                </div>
+              )}
+              {copyFailed && (
+                <div role="alert" className="f-move-banner warn">
+                  <span className="f-move-banner-text">Podés seguir sin la conversación: Claude arranca de cero en la cuenta nueva (con el resumen, si lo dejaste).</span>
+                  <button type="button" className="f-move-btn" onClick={() => void move(false)}>
+                    Seguir sin conversación
+                  </button>
+                </div>
+              )}
+
+              <div className="f-move-actions">
+                <button type="button" className="f-move-cancel" onClick={closeMove} ref={cancelRef}>
+                  Cancelar
+                </button>
+                <span className="f-move-grow" />
+                <button
+                  type="submit"
+                  className={`f-move-go${blocked ? ' blocked' : ''}`}
+                  aria-disabled={blocked || undefined}
+                  disabled={accounts.length < 2}
+                >
+                  {choice ? `Mover a ${destLabel}` : 'Mover a…'}
                 </button>
               </div>
-            )}
-
-            <footer className="f-move-actions">
-              <button type="button" className="btn ghost" onClick={closeMove} ref={cancelRef}>
-                Cancelar
-              </button>
-              <span className="spacer" />
-              <button type="submit" className={`btn ${blocked ? '' : 'primary'}`} aria-disabled={blocked || undefined} disabled={accounts.length < 2}>
-                {choice ? `Mover a ${destLabel}` : 'Mover a…'}
-              </button>
-            </footer>
+            </div>
           </>
         )}
 
         {phase === 'moving' && (
-          <div role="status" className="f-move-banner info f-move-big">
-            <span className="f-move-spin" aria-hidden="true" />
-            <div>
-              <div className="f-move-banner-title">Reiniciando la terminal…</div>
-              <div className="hint">
+          <div role="status" className="f-move-running">
+            <span className="f-move-run-ico" aria-hidden="true">
+              <svg className="f-move-spin" width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                <path d="M12 4a8 8 0 1 1-8 8" />
+              </svg>
+            </span>
+            <div className="f-move-run-text">
+              <div className="f-move-run-title">Reiniciando la terminal…</div>
+              <div className="f-move-muted">
                 Se cierra la terminal de {ws.name} y se abre con {destLabel}.
               </div>
             </div>
@@ -316,30 +342,28 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
 
         {phase === 'done' && (
           <div className="f-move-done">
-            <div role="status" className="f-move-banner ok f-move-big">
-              <span className="f-move-check">
-                <DoneIcon size={15} />
-              </span>
-              <div>
-                <div className="f-move-banner-title">«{ws.name}» ya está en {destLabel}</div>
-                <p className="f-move-p">
-                  {resumed
-                    ? 'La terminal arrancó de nuevo con la otra cuenta y Claude sigue la misma conversación.'
-                    : `La terminal arrancó de nuevo con la otra cuenta. Claude empieza de cero en ${ws.cwd}.`}
-                </p>
-                {keep && summary && <p className="hint f-move-p">Le dejamos el resumen para que lo lea al arrancar.</p>}
+            <div role="status" className="f-move-donebox">
+              <div className="f-move-done-head">
+                <span className="f-move-check" aria-hidden="true">
+                  <CheckIcon size={15} strokeWidth={2.2} />
+                </span>
+                <span className="f-move-done-title">«{ws.name}» ya está en {destLabel}</span>
               </div>
+              <p className="f-move-done-p">
+                {resumed
+                  ? 'La terminal arrancó de nuevo con la otra cuenta y Claude sigue la misma conversación.'
+                  : `La terminal arrancó de nuevo con la otra cuenta. Claude empieza de cero en ${ws.cwd}.`}
+              </p>
+              {keep && summary && <p className="f-move-muted f-move-done-p">Le dejamos el resumen para que lo lea al arrancar.</p>}
             </div>
-            <footer className="f-move-actions">
-              <span className="spacer" />
-              <button type="button" className="btn primary" onClick={closeMove} autoFocus>
+            <div className="f-move-actions end">
+              <button type="button" className="f-move-go" onClick={closeMove} autoFocus>
                 Volver al espacio
               </button>
-            </footer>
+            </div>
           </div>
         )}
       </form>
     </div>
   )
 }
-

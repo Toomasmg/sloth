@@ -3,9 +3,10 @@ import { isLoginPane } from '../../../../shared/types'
 import { useUi, type UiCtx } from '../host'
 import { resolveAccountColor } from '../settings/store'
 import { shortPath } from '../../format'
-import { CloseIcon, BroadcastIcon, DoneIcon, WaitingIcon, PermissionIcon, IdleIcon, WorkingIcon } from '../../icons/SlothIcons'
+import { CloseIcon, DoneIcon, WaitingIcon, PermissionIcon, IdleIcon, WorkingIcon, TerminalIcon } from '../../icons/SlothIcons'
 import { cancelQueued, startBatch, useBatches, type Batch } from './store'
 import { canReceive, isReady, SPACE_CHIP, SPACE_LABEL, spaceStatus, type SpaceStatus } from './state'
+import { colorHex } from '../templates/catalog'
 
 const CONFIRM_OVER = 3
 /** Lo mismo que el diseño: se corta en 2000 caracteres. */
@@ -33,6 +34,8 @@ export interface Target {
   accIndex: number
   status: SpaceStatus
   ticket?: string
+  /** Color del espacio (clave de TEMPLATE_COLOR_KEYS). Sin color: ícono neutro. */
+  color?: string
   hidden: boolean
 }
 
@@ -55,6 +58,7 @@ function targetsOf(ctx: UiCtx): Target[] {
       accIndex: accIdx.get(ws.accountId) ?? 0,
       status: spaceStatus(ws.id, ctx.agents, ctx.permissions),
       ticket: ws.ticket,
+      color: ws.color,
       hidden: !isOpenPane
     })
   }
@@ -70,7 +74,7 @@ function resolveVars(text: string, t: Pick<Target, 'name' | 'branch'>): string {
 
 const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many)
 
-/** Avión de papel (el set de íconos de Sloth no tiene uno). */
+/** Avión de papel (el set de íconos de Sloth no tiene uno). También es el ícono del título. */
 function PaperPlane({ size }: { size: number }): React.JSX.Element {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}>
@@ -212,8 +216,12 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
     nWorking === 0
       ? ''
       : interrupt
-        ? `${nWorking} ${plural(nWorking, 'está trabajando', 'están trabajando')}: le mandás el mensaje ahora.`
-        : `${nWorking} ${plural(nWorking, 'está trabajando', 'están trabajando')}: el mensaje le llega cuando termine lo que hace.`
+        ? nWorking === 1
+          ? '1 está trabajando: le mandás el mensaje ahora y corta lo que hace'
+          : `${nWorking} están trabajando: les mandás el mensaje ahora y corta lo que hacen`
+        : nWorking === 1
+          ? '1 está trabajando: el mensaje le llega cuando termine lo actual'
+          : `${nWorking} están trabajando: el mensaje les llega cuando terminen lo actual`
 
   const sendLabel = chosen.length
     ? confirming
@@ -247,7 +255,7 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
       >
         <header className="f-broadcast-head">
           <span className="f-broadcast-badge" aria-hidden="true">
-            <BroadcastIcon size={18} />
+            <PaperPlane size={18} />
           </span>
           <div className="f-broadcast-titles">
             <h2 id="f-broadcast-title">Enviar a varios espacios</h2>
@@ -294,7 +302,16 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
               {groups.map((g) => (
                 <div key={g.id || 'x'} role="group" aria-label={g.name} className="f-broadcast-group">
                   <div className="f-broadcast-group-head">
-                    <span className="f-broadcast-dot" style={{ background: resolveAccountColor(g.id, g.accIndex) }} aria-hidden="true" />
+                    <span
+                      className="f-broadcast-dot"
+                      style={{
+                        color: resolveAccountColor(g.id, g.accIndex),
+                        background: `color-mix(in srgb, ${resolveAccountColor(g.id, g.accIndex)} 18%, transparent)`
+                      }}
+                      aria-hidden="true"
+                    >
+                      {g.name.trim().charAt(0).toUpperCase()}
+                    </span>
                     {g.name}
                     <span className="f-broadcast-group-count">
                       {g.rows.length} {plural(g.rows.length, 'espacio', 'espacios')}
@@ -313,7 +330,7 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
                       const hintId = `f-broadcast-h-${t.id}`
                       return (
                         <li key={t.id}>
-                          <label className={`f-broadcast-row ${ok ? '' : 'dead'}`}>
+                          <label className={`f-broadcast-row ${ok ? '' : 'dead'} ${ok && sel.has(t.id) ? 'on' : ''}`}>
                             <input
                               type="checkbox"
                               checked={ok && sel.has(t.id)}
@@ -321,6 +338,20 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
                               onChange={() => toggle(t.id)}
                               aria-describedby={hint ? hintId : undefined}
                             />
+                            <span
+                              className={`f-broadcast-ico${t.color ? ' has-color' : ''}`}
+                              aria-hidden="true"
+                              style={
+                                t.color
+                                  ? {
+                                      color: colorHex(t.color),
+                                      background: `color-mix(in srgb, ${colorHex(t.color)} 17%, transparent)`
+                                    }
+                                  : undefined
+                              }
+                            >
+                              <TerminalIcon size={14} />
+                            </span>
                             <span className="f-broadcast-main">
                               <span className="f-broadcast-name">
                                 {t.name}
@@ -356,10 +387,13 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
               )}
               {warn && (
                 <div className="f-broadcast-warn" role="status">
+                  <span className="f-broadcast-warn-ico" aria-hidden="true">
+                    <PermissionIcon size={16} strokeWidth={1.8} />
+                  </span>
                   <span className="f-broadcast-warn-text">{warn}</span>
                   <label className="f-broadcast-warn-check">
                     <input type="checkbox" checked={interrupt} onChange={(e) => setInterrupt(e.target.checked)} />
-                    Mandar ya (le llega después de lo que está haciendo)
+                    Mandar igual ahora (interrumpe)
                   </label>
                 </div>
               )}
@@ -416,7 +450,7 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
                 <span className="f-broadcast-tools-label">Se reemplaza por el espacio o la rama de cada destino.</span>
               </div>
               <div>
-                <button type="button" className="btn sm ghost" aria-expanded={preview} onClick={() => setPreview((p) => !p)}>
+                <button type="button" className="f-broadcast-toggle" aria-expanded={preview} onClick={() => setPreview((p) => !p)}>
                   {preview ? 'Ocultar vista previa' : 'Ver cómo llega a cada espacio'}
                 </button>
                 {preview && (
@@ -529,7 +563,7 @@ function Progress({ batch, onAgain, onClose }: { batch: Batch; onAgain: () => vo
         </button>
         <span className="f-broadcast-grow" />
         <button type="button" className="btn primary" onClick={onClose}>
-          Cerrar
+          Volver a los espacios
         </button>
       </footer>
     </div>

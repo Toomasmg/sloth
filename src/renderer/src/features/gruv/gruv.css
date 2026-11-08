@@ -1,4 +1,6 @@
-/* Tickets de Gruv: pantalla de lista + detalle. Usa los tokens de themes.css / styles.css. */
+/* Tickets de Gruv: pantalla de lista + detalle (artboard Tickets.dc.html).
+   Medidas en px literales del artboard. Colores por tokens de themes.css / styles.css;
+   los tonos intermedios del artboard se derivan con color-mix() de esos tokens (tema claro incluido). */
 
 /* Chip en la barra de título */
 .f-gruv-chip-tb {
@@ -27,6 +29,10 @@
 
 /* ---------- Página ---------- */
 .f-gruv-page {
+  /* Tonos del artboard que no tienen token propio: mezcla de tokens (se adapta al tema). */
+  --g-c9: color-mix(in srgb, var(--fg) 50%, var(--fg-2)); /* #c9cdd6 en oscuro */
+  --g-dc: color-mix(in srgb, var(--fg) 80%, var(--fg-2)); /* #dcdfe6 en oscuro */
+  --g-box: color-mix(in srgb, var(--fg-muted) 45%, var(--card)); /* borde del check vacío (#4a5160) */
   position: fixed;
   inset: 0;
   z-index: 10;
@@ -53,7 +59,7 @@
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: var(--fg-2);
+  color: var(--g-c9);
   font: inherit;
   display: inline-flex;
   align-items: center;
@@ -61,7 +67,7 @@
   cursor: pointer;
 }
 .f-gruv-back:hover {
-  background: var(--hover);
+  background: var(--card);
   color: var(--fg);
 }
 .f-gruv-back:focus-visible {
@@ -71,20 +77,117 @@
 .f-gruv-sep {
   width: 1px;
   height: 18px;
-  background: var(--line-2);
-}
-.f-gruv-conn {
-  min-width: 0;
-  max-width: 100%;
+  background: var(--line-strong);
 }
 .f-gruv-grow {
   flex: 1 1 0;
 }
-.f-gruv-foot {
-  flex: none;
-  padding: 10px clamp(16px, 4vw, 32px) 16px;
+
+/* Estado de conexión: píldora de 26 px con punto de 7 px */
+.f-gruv-conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 11px;
+  box-sizing: border-box;
+  border-radius: 13px;
+  background: var(--btn-2);
+  color: var(--fg-2);
   font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.f-gruv-conn[data-tone='ok'] {
+  background: var(--success-soft);
+  color: var(--success-fg);
+}
+.f-gruv-conn[data-tone='bad'] {
+  background: var(--danger-soft);
+  color: var(--danger-fg);
+}
+.f-gruv-conn[data-tone='busy'] {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.f-gruv-conn-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--fg-muted);
+}
+.f-gruv-conn[data-tone='ok'] .f-gruv-conn-dot {
+  background: var(--success);
+}
+.f-gruv-conn[data-tone='bad'] .f-gruv-conn-dot {
+  background: var(--danger);
+}
+.f-gruv-conn[data-tone='busy'] .f-gruv-conn-dot {
+  background: var(--accent);
+}
+
+/* Botones (artboard: 28 / 30 / 32 / 34 px, radio 7–8, borde interno 1 px) */
+.f-gruv-b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 8px;
+  background: var(--btn-2);
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: filter var(--t-fast);
+}
+.f-gruv-b:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+.f-gruv-b:focus-visible,
+.f-gruv-link:focus-visible,
+.f-gruv-row:focus-visible,
+.f-gruv-chipf:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+.f-gruv-b:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.f-gruv-b--md {
+  height: 32px;
+}
+.f-gruv-b--sm {
+  height: 30px;
+  padding: 0 12px;
+}
+.f-gruv-b--xs {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 7px;
+}
+.f-gruv-b--pri {
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+  box-shadow: none;
+}
+.f-gruv-b--solid-danger {
+  background: var(--danger-fg);
+  color: var(--bg);
+  font-weight: 600;
+  box-shadow: none;
 }
 
 .f-gruv-main {
@@ -93,7 +196,7 @@
   width: 100%;
   max-width: 1280px;
   margin: 0 auto;
-  padding: 22px clamp(16px, 4vw, 32px) 8px;
+  padding: 22px clamp(16px, 4vw, 32px) 56px;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -131,9 +234,11 @@
   color: var(--fg-muted);
   overflow-wrap: anywhere;
 }
+/* Sin conexión: dentro de la lista, arriba de las filas (artboard). */
 .f-gruv-offline {
-  background: var(--danger-soft);
-  box-shadow: inset 0 0 0 1px var(--toast-border);
+  margin: 0 0 8px;
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 30%, transparent);
   color: var(--danger-fg-strong);
 }
 .f-gruv-confirm {
@@ -161,7 +266,7 @@
   box-sizing: border-box;
   min-width: 0;
   max-width: 100%;
-  border-radius: var(--r-lg);
+  border-radius: 12px;
   background: var(--card);
   box-shadow: inset 0 0 0 1px var(--line);
   overflow: hidden;
@@ -203,7 +308,7 @@
   cursor: pointer;
 }
 .f-gruv-tab:hover {
-  color: var(--fg);
+  filter: brightness(1.12);
 }
 .f-gruv-tab.on {
   color: var(--fg);
@@ -221,15 +326,15 @@
   box-sizing: border-box;
   border-radius: 9px;
   background: var(--btn-2);
-  color: var(--fg-2);
-  font-size: 11px;
+  color: var(--g-c9);
+  font-size: var(--fs-xs);
   font-weight: 600;
   display: grid;
   place-items: center;
 }
 .f-gruv-tab.on .f-gruv-badge {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: color-mix(in srgb, var(--accent) 35%, var(--fg));
 }
 
 /* Filtros */
@@ -245,6 +350,7 @@
   gap: 8px;
   height: 34px;
   padding: 0 10px;
+  box-sizing: border-box;
   border-radius: 8px;
   background: var(--input-bg);
   color: var(--fg-muted);
@@ -256,7 +362,10 @@
 .f-gruv-search input {
   flex: 1;
   min-width: 0;
+  width: auto;
+  height: auto;
   border: 0;
+  padding: 0;
   background: transparent;
   color: var(--fg);
   font: inherit;
@@ -271,32 +380,28 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+/* Chip de estado: fuera de filtro, gris; dentro, con el color de su estado (--st-*). */
 .f-gruv-chipf {
   height: 26px;
   padding: 0 11px;
+  box-sizing: border-box;
   border: 0;
   border-radius: 13px;
-  background: var(--btn-2);
+  background: var(--card-hover);
   color: var(--fg-2);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 500;
   cursor: pointer;
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .f-gruv-chipf:hover {
-  color: var(--fg);
+  filter: brightness(1.12);
 }
 .f-gruv-chipf.on {
-  background: var(--accent-soft);
-  color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
-.f-gruv-chipf:focus-visible,
-.f-gruv-link:focus-visible,
-.f-gruv-row:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 1px;
+  background: var(--st-bg, var(--accent-soft));
+  color: var(--st-fg, var(--accent));
+  box-shadow: inset 0 0 0 1px var(--st-fg, var(--accent));
 }
 .f-gruv-filter-row {
   display: flex;
@@ -309,18 +414,28 @@
   align-items: center;
   gap: 8px;
   color: var(--fg-2);
-  font-size: 12px;
+  font-size: var(--fs-sm);
+}
+.f-gruv-prio-field select,
+.f-gruv-field select {
+  appearance: none;
+  background-color: var(--input-bg);
+  background-image: linear-gradient(45deg, transparent 50%, var(--fg-muted) 50%),
+    linear-gradient(135deg, var(--fg-muted) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 28px;
+  color: var(--fg);
+  font: inherit;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 .f-gruv-prio-field select {
   height: 30px;
   min-width: 150px;
-  padding: 0 10px;
+  padding-left: 10px;
   border: 0;
   border-radius: 8px;
-  background: var(--input-bg);
-  color: var(--fg);
-  font: inherit;
-  box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 .f-gruv-link {
   height: 28px;
@@ -330,7 +445,7 @@
   background: transparent;
   color: var(--accent);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 500;
   cursor: pointer;
   text-decoration: none;
@@ -346,7 +461,7 @@
   align-items: center;
   padding: 8px 16px;
   box-shadow: inset 0 1px 0 var(--line);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--fg-2);
 }
 .f-gruv-body {
@@ -361,13 +476,13 @@
 .f-gruv-skel > div {
   height: 66px;
   border-radius: 9px;
-  background: var(--hover);
+  background: var(--card-hover);
   /* Esqueleto de carga: unas pocas pasadas y queda quieto (nada de animación infinita en listas). */
   animation: fade var(--t-med) var(--ease) 2 alternate both;
 }
 .f-gruv-skel span {
   padding: 0 6px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--fg-muted);
 }
 .f-gruv-empty {
@@ -382,7 +497,7 @@
   font-weight: 600;
 }
 .f-gruv-muted {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--fg-muted);
 }
 .f-gruv-strong {
@@ -414,11 +529,11 @@
   cursor: pointer;
 }
 .f-gruv-row:hover {
-  background: var(--hover);
+  background: var(--card-hover);
 }
 .f-gruv-row.sel {
   background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .f-gruv-row-top {
   display: flex;
@@ -439,24 +554,65 @@
 .f-gruv-code {
   flex: none;
   font-size: 12px;
-  color: var(--warn-fg);
+  color: var(--warn);
 }
 .f-gruv-code-lg {
   font-size: 12px;
 }
+
+/* Estado de un ticket (fila y detalle): mismo color que su chip de filtro. */
+.f-gruv-st-todo {
+  --st-bg: var(--btn-2);
+  --st-fg: var(--g-c9);
+}
+.f-gruv-st-doing {
+  --st-bg: var(--info-soft);
+  --st-fg: var(--info);
+}
+.f-gruv-st-review {
+  --st-bg: var(--team-soft);
+  --st-fg: var(--team-fg);
+}
+.f-gruv-st-error {
+  --st-bg: var(--danger-soft);
+  --st-fg: var(--danger-fg);
+}
+.f-gruv-st {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  background: var(--st-bg, var(--btn-2));
+  color: var(--st-fg, var(--g-c9));
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Chip de espacio (broadcast): en la fila, 20 px; en el detalle, 26 px. */
 .f-gruv-space {
   margin-left: auto;
   min-width: 0;
   max-width: 62%;
   height: 20px;
   padding: 0 7px;
-  font-size: 11px;
+  gap: 5px;
+  border-radius: 10px;
+  font-size: var(--fs-xs);
   font-weight: 500;
+}
+.f-gruv-space > svg {
+  width: 11px;
+  height: 11px;
 }
 .f-gruv-space-lg {
   max-width: 100%;
   height: 26px;
-  font-size: 12px;
+  padding: 0 9px;
+  gap: 6px;
+  font-size: var(--fs-sm);
 }
 .f-gruv-ellipsis {
   min-width: 0;
@@ -468,23 +624,23 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 .f-gruv-who {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
-  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  color: var(--g-c9);
 }
 .f-gruv-av {
   width: 26px;
   height: 26px;
   flex: none;
   border-radius: 50%;
-  background: var(--hover);
-  color: var(--fg-2);
-  font-size: 11px;
+  background: var(--btn-2);
+  color: var(--fg-muted);
+  font-size: var(--fs-xs);
   font-weight: 700;
   display: grid;
   place-items: center;
@@ -498,12 +654,12 @@
 }
 .f-gruv-av.sm[data-mine='true'] {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--info);
 }
 .f-gruv-av.lg {
   width: 32px;
   height: 32px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 /* ---------- Detalle ---------- */
@@ -533,19 +689,15 @@
 }
 .f-gruv-field > label,
 .f-gruv-lbl {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--fg-2);
 }
 .f-gruv-field select {
   height: 34px;
   min-width: 170px;
-  padding: 0 10px;
+  padding-left: 10px;
   border: 0;
   border-radius: 8px;
-  background: var(--input-bg);
-  color: var(--fg);
-  font: inherit;
-  box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 .f-gruv-field select:disabled {
   opacity: 0.85;
@@ -564,16 +716,9 @@
   font-weight: 500;
 }
 .f-gruv-why {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--fg-muted);
   line-height: 1.4;
-}
-.f-gruv-why-block {
-  font-size: 12px;
-  color: var(--fg-2);
-  line-height: 1.5;
-  min-width: 0;
-  flex: 1 1 220px;
 }
 
 .f-gruv-assign {
@@ -590,25 +735,42 @@
   flex: 1 1 160px;
   min-width: 0;
 }
+.f-gruv-owner {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
 .f-gruv-assign .f-gruv-why {
   flex-basis: 100%;
 }
 
+/* Acciones: fila de botones y, debajo, la ayuda (artboard: caja en columna). */
 .f-gruv-actions {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 10px;
   padding: 14px;
   border-radius: 10px;
   background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--line);
 }
+.f-gruv-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.f-gruv-help {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
 .f-gruv-acc {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--fg-2);
 }
 .f-gruv-dot {
@@ -625,7 +787,7 @@
 }
 .f-gruv-sec h3 {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--fg-2);
 }
@@ -635,16 +797,21 @@
   justify-content: space-between;
   gap: 10px;
 }
+.f-gruv-prog-label {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--g-c9);
+}
 .f-gruv-desc {
   margin: 0;
   line-height: 1.6;
-  color: var(--fg);
+  color: var(--g-dc);
   overflow-wrap: anywhere;
 }
 .f-gruv-progress {
   height: 4px;
   border-radius: 2px;
-  background: var(--hover);
+  background: var(--seg-on);
   overflow: hidden;
 }
 .f-gruv-progress > span {
@@ -663,21 +830,46 @@
 }
 .f-gruv-crit label {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  padding: 8px 10px;
+  padding: 9px 10px;
   border-radius: 8px;
   line-height: 1.45;
 }
+/* Casilla de 18 px, radio 5, borde interno 1.5 px; marcada en verde con tilde. */
 .f-gruv-crit input {
-  width: 16px;
-  height: 16px;
-  margin: 2px 0 0;
+  appearance: none;
+  position: relative;
+  width: 18px;
+  height: 18px;
+  margin: 0;
   flex: none;
-  accent-color: var(--ok);
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--g-box);
+  opacity: 1;
+}
+.f-gruv-crit input:checked {
+  background: var(--ok);
+  box-shadow: none;
+}
+.f-gruv-crit input:checked::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 3px;
+  width: 4px;
+  height: 8px;
+  border: solid var(--bg);
+  border-width: 0 2.25px 2.25px 0;
+  transform: rotate(45deg);
 }
 .f-gruv-crit input:disabled {
   cursor: not-allowed;
+}
+.f-gruv-crit input:checked + span {
+  color: var(--fg-muted);
 }
 
 .f-gruv-inline {
@@ -686,12 +878,21 @@
   gap: 8px;
   align-items: center;
 }
-.f-gruv-inline-foot {
+.f-gruv-hours {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+.f-gruv-hours-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.f-gruv-hours-field > span {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
 }
 .f-gruv-input {
   flex: 1 1 220px;
@@ -708,6 +909,7 @@
 }
 .f-gruv-input.narrow {
   flex: 0 0 160px;
+  width: 160px;
 }
 .f-gruv-input::placeholder {
   color: var(--placeholder);

@@ -27,13 +27,23 @@ interface ObState {
   show: boolean
 }
 
-const STEPS = [
-  { title: 'Entorno', sub: 'Claude Code, Node, git' },
-  { title: 'Cuentas', sub: 'Iniciar sesión' },
-  { title: 'Repo', sub: 'Y config del equipo' },
-  { title: 'Primer espacio', sub: 'Y tres tips' }
-]
+/** Pasos (la app tiene 4; el diseño los muestra en fila). */
+const STEPS = [{ title: 'Tu PC' }, { title: 'Cuenta de Claude' }, { title: 'Repo · opcional' }, { title: 'Primer espacio' }]
 const TICKET_RE = /^[A-Z][A-Z0-9]*-\d+$/
+
+/** Título y subtítulo de la tarjeta de cada paso. */
+function stepHead(i: number, repo: string): { title: string; sub: string } {
+  const heads = [
+    { title: 'Revisá tu PC', sub: 'Sloth usa lo que ya tenés instalado. Revisamos que esté todo; lo opcional lo podés dejar para después.' },
+    { title: 'Cuenta de Claude', sub: 'Cada cuenta de Claude vive en su carpeta, con su propia sesión. Agregá una o más (por ejemplo, Trabajo y Personal).' },
+    { title: 'Repo del equipo · opcional', sub: 'Elegí la carpeta del repo con el que vas a trabajar. Si el repo trae la configuración del equipo, la cargamos.' },
+    {
+      title: 'Primer espacio',
+      sub: `Un espacio = un repo + una cuenta + una PowerShell con Claude. ${repo ? `Va en ${repoName(repo)}.` : 'Elegí el repo en el paso anterior.'}`
+    }
+  ]
+  return heads[i] ?? heads[0]
+}
 
 // ---------- Paso 1: entorno ----------
 
@@ -78,7 +88,6 @@ function EnvStep(): React.JSX.Element {
   }
   return (
     <>
-      <p className="f-onboarding-lead">Sloth usa lo que ya tenés instalado. Revisamos que esté todo; lo opcional lo podés dejar para después.</p>
       <ul className="f-onboarding-checks" aria-busy={busy}>
         {(items ?? []).map((it) => (
           <li key={it.id} className={`is-${it.state}`}>
@@ -155,7 +164,6 @@ function AccountsStep({ onLogin, statuses }: { onLogin: (id: string) => void; st
   }
   return (
     <>
-      <p className="f-onboarding-lead">Cada cuenta de Claude vive en su carpeta, con su propia sesión. Agregá una o más (por ejemplo, Trabajo y Personal).</p>
       {ui.accounts.length > 0 && (
         <ul className="f-onboarding-accs">
           {ui.accounts.map((a) => {
@@ -170,8 +178,8 @@ function AccountsStep({ onLogin, statuses }: { onLogin: (id: string) => void; st
                   <span className={`item-sub ${s?.loggedIn ? '' : 'warn'}`}>{s?.loggedIn ? (s.email ?? 'Sesión iniciada') : 'Sin sesión'}</span>
                 </span>
                 {s?.loggedIn ? (
-                  <span className="f-onboarding-badge ok">
-                    <DoneIcon size={14} /> Sesión iniciada
+                  <span className="f-onboarding-ok-text">
+                    <DoneIcon size={13} /> Sesión iniciada
                   </span>
                 ) : (
                   <button type="button" className="btn sm" onClick={() => onLogin(a.id)}>
@@ -190,10 +198,12 @@ function AccountsStep({ onLogin, statuses }: { onLogin: (id: string) => void; st
           void add()
         }}
       >
-        <label htmlFor="f-ob-acc" className="sr-only">
-          Nombre de la cuenta
-        </label>
-        <input id="f-ob-acc" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} placeholder="Nombre: Trabajo, Personal…" />
+        <div>
+          <label htmlFor="f-ob-acc" className="f-onboarding-label">
+            Nombre para reconocerla
+          </label>
+          <input id="f-ob-acc" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} placeholder="Ej.: Tomy" />
+        </div>
         <button type="submit" className="btn primary" disabled={!label.trim() || busy}>
           <AddAccountIcon size={13} /> {ui.accounts.length ? 'Agregar otra cuenta' : 'Agregar cuenta'}
         </button>
@@ -323,7 +333,6 @@ function RepoStep({ repo, setRepo }: { repo: string; setRepo: (p: string) => voi
 
   return (
     <>
-      <p className="f-onboarding-lead">Elegí la carpeta del repo con el que vas a trabajar. Si el repo trae la configuración del equipo, la cargamos.</p>
       <div className="f-onboarding-repos" role="radiogroup" aria-label="Repos encontrados">
         {list.map((p) => (
           <button key={p} type="button" role="radio" aria-checked={repo === p} className={`f-onboarding-repo ${repo === p ? 'on' : ''}`} onClick={() => setRepo(p)}>
@@ -437,13 +446,9 @@ function SpaceStep({ repo, statuses, onCreated }: { repo: string; statuses: Reco
     }
   }
 
-  if (!ui.accounts.length)
-    return <p className="f-onboarding-warn">Agregá una cuenta primero (paso 2) para poder crear un espacio.</p>
+  if (!ui.accounts.length) return <p className="f-onboarding-warn">Agregá una cuenta primero (paso 2) para poder crear un espacio.</p>
   return (
     <>
-      <p className="f-onboarding-lead">
-        Un espacio = un repo + una cuenta + una PowerShell con Claude. {repo ? <>Va en <span className="mono">{repoName(repo)}</span>.</> : 'Elegí el repo en el paso anterior.'}
-      </p>
       <div className="f-onboarding-seg" role="radiogroup" aria-label="Tipo de espacio">
         <button type="button" role="radio" aria-checked={mode === 'normal'} className={mode === 'normal' ? 'on' : ''} onClick={() => setMode('normal')}>
           <EditorIcon size={15} /> Normal
@@ -479,9 +484,11 @@ function SpaceStep({ repo, statuses, onCreated }: { repo: string; statuses: Reco
         </div>
       </div>
       {err && <p className="form-error">{err}</p>}
-      <button type="button" className="btn primary" disabled={!can || busy} onClick={() => void create()}>
-        <NewSpaceIcon size={13} /> {busy ? 'Creando…' : 'Crear espacio'}
-      </button>
+      <div>
+        <button type="button" className="btn primary" disabled={!can || busy} onClick={() => void create()}>
+          <NewSpaceIcon size={13} /> {busy ? 'Creando…' : 'Crear espacio'}
+        </button>
+      </div>
     </>
   )
 }
@@ -492,11 +499,26 @@ const TIPS = [
   { icon: EditorIcon, title: 'Las terminales siguen vivas', text: 'Si cerrás Sloth, Claude sigue trabajando. Al volver a abrir, cada panel se reconecta donde estaba.' }
 ]
 
-function Tour(): React.JSX.Element {
+/** Resumen después de crear el primer espacio, y los tips. */
+function Tour({ created, accounts, repo }: { created: Workspace | null; accounts: { id: string; label: string }[]; repo: string }): React.JSX.Element {
+  const accLabel = created ? (accounts.find((a) => a.id === created.accountId)?.label ?? 'sin cuenta') : ''
+  const rows = [
+    { k: 'Cuentas', v: accounts.map((a) => a.label).join(', ') || 'Ninguna' },
+    { k: 'Repo', v: repo ? repoName(repo) : '—' },
+    { k: 'Espacio', v: created ? `${created.name} · ${accLabel}` : '—' }
+  ]
   return (
     <>
-      <p className="f-onboarding-lead">¡Listo! Tres cosas que conviene saber:</p>
-      <ol className="f-onboarding-tips">
+      <p className="f-onboarding-done">{created ? `Listo. «${created.name}» ya está abierto con la cuenta ${accLabel}.` : 'Listo.'}</p>
+      <div className="f-onboarding-sum">
+        {rows.map((r) => (
+          <div key={r.k} className="f-onboarding-sum-row">
+            <span>{r.k}</span>
+            <span>{r.v}</span>
+          </div>
+        ))}
+      </div>
+      <ol className="f-onboarding-tips" aria-label="Tips">
         {TIPS.map((t, i) => (
           <li key={t.title}>
             <span className="f-onboarding-tip-ic" aria-hidden="true">
@@ -523,6 +545,7 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
   const [repo, setRepoState] = useState(initial.repoPath ?? '')
   const [docked, setDocked] = useState<string | null>(null)
   const [tour, setTour] = useState(false)
+  const [created, setCreated] = useState<Workspace | null>(null)
   const headRef = useRef<HTMLHeadingElement>(null)
   const statuses = useLiveStatuses(step === 1 || docked !== null)
 
@@ -563,27 +586,40 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
   const loggedCount = ui.accounts.filter((a) => statuses[a.id]?.loggedIn).length
   const doneFlags = [step > 0, loggedCount > 0, Boolean(repo) && step > 2, ui.workspaces.length > 0]
   const last = step === STEPS.length - 1
-  const title = tour ? 'Tres tips y a trabajar' : ['Revisemos tu PC', 'Tus cuentas de Claude', 'El repo del equipo', 'Tu primer espacio'][step]
+  const head = tour ? { title: 'Listo', sub: 'Tres cosas que conviene saber para arrancar.' } : stepHead(step, repo)
+  const progressLabel = tour ? 'Listo para abrir' : `Paso ${step + 1} de ${STEPS.length}`
 
   const renderBody = (): React.JSX.Element => (
     <div className="f-onboarding-body">
       {step === 0 && <EnvStep />}
       {step === 1 && <AccountsStep onLogin={login} statuses={statuses} />}
       {step === 2 && <RepoStep repo={repo} setRepo={setRepo} />}
-      {step === 3 && (tour ? <Tour /> : <SpaceStep repo={repo} statuses={statuses} onCreated={() => setTour(true)} />)}
+      {step === 3 &&
+        (tour ? (
+          <Tour created={created} accounts={ui.accounts} repo={repo} />
+        ) : (
+          <SpaceStep
+            repo={repo}
+            statuses={statuses}
+            onCreated={(ws) => {
+              setCreated(ws)
+              setTour(true)
+            }}
+          />
+        ))}
     </div>
   )
   const renderFoot = (): React.JSX.Element => (
     <footer className="f-onboarding-foot">
-      {step > 0 && (
-        <button type="button" className="btn ghost" onClick={() => (tour ? setTour(false) : setStep(step - 1))}>
-          <span aria-hidden="true">←</span> Atrás
+      {(step > 0 || tour) && (
+        <button type="button" className="btn" onClick={() => (tour ? setTour(false) : setStep(step - 1))}>
+          Atrás
         </button>
       )}
       <span className="spacer" />
       {last && tour ? (
         <button type="button" className="btn primary" onClick={() => finish(false)}>
-          Empezar a usar Sloth
+          Abrir Sloth
         </button>
       ) : last ? (
         <button type="button" className="btn ghost" onClick={() => setTour(true)}>
@@ -592,10 +628,10 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
       ) : (
         <>
           <button type="button" className="btn ghost" onClick={() => setStep(step + 1)}>
-            Saltar paso
+            Saltear por ahora
           </button>
           <button type="button" className="btn primary" onClick={() => setStep(step + 1)}>
-            Siguiente <span aria-hidden="true">→</span>
+            Siguiente
           </button>
         </>
       )}
@@ -611,63 +647,70 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
             <p className="f-onboarding-hero-title">Bienvenido a Sloth</p>
             <p className="f-onboarding-hero-sub">Trabajá con varias cuentas de Claude al mismo tiempo, cada una en su carpeta y su terminal. Sin apuro, sin mezclar nada.</p>
           </div>
-          <button type="button" className="f-onboarding-skip" onClick={() => finish(true)}>
-            Saltar asistente
-          </button>
         </div>
         <section className="f-onboarding-main">
-          <header className="f-onboarding-head">
-            <div className="f-onboarding-topbar">
-              <span className="f-onboarding-kicker">
-                Paso {step + 1} de {STEPS.length}
+          <div className="f-onboarding-top">
+            <div className="f-onboarding-progress-wrap">
+              <span className="f-onboarding-kicker" aria-live="polite">
+                {progressLabel}
               </span>
-              <div className="f-onboarding-progress" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} aria-label={`Paso ${step + 1} de ${STEPS.length}`}>
-                <span style={{ width: `${((step + (tour ? 1 : 0.5)) / STEPS.length) * 100}%` }} />
+              <div className="f-onboarding-progress" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} aria-label={progressLabel}>
+                {STEPS.map((s, i) => (
+                  <span key={s.title} className={tour || doneFlags[i] ? 'on' : ''} />
+                ))}
               </div>
-              <button type="button" className="icon-btn" onClick={() => onClose(false)} aria-label="Cerrar el asistente (seguís después desde Ctrl+K)" title="Cerrar (Esc)">
-                <CloseIcon size={16} />
-              </button>
             </div>
+            <button type="button" className="icon-btn" onClick={() => onClose(false)} aria-label="Cerrar el asistente (seguís después desde Ctrl+K)" title="Cerrar (Esc)">
+              <CloseIcon size={16} />
+            </button>
+          </div>
+
+          <header className="f-onboarding-head">
             <h2 className="f-onboarding-section">Empezá en cuatro pasos</h2>
+            <p className="f-onboarding-sub">Podés saltear el último y hacerlo cuando quieras.</p>
           </header>
+
           <ol className="f-onboarding-steps">
             {STEPS.map((s, i) => {
-              if (i === step)
-                return (
-                  <li key={s.title} className="f-onboarding-step is-current" aria-current="step">
-                    <div className="f-onboarding-step-card">
-                      <div className="f-onboarding-step-top">
-                        <span className="f-onboarding-n on" aria-hidden="true">
-                          {i + 1}
-                        </span>
-                        <h1 id="f-ob-title" ref={headRef} tabIndex={-1}>
-                          {title}
-                        </h1>
-                      </div>
-                      {renderBody()}
-                      {renderFoot()}
-                    </div>
-                  </li>
-                )
-              const done = doneFlags[i]
+              const cur = i === step
+              const done = doneFlags[i] && !cur
               return (
-                <li key={s.title} className="f-onboarding-step">
-                  <button type="button" className={`f-onboarding-step-btn ${done ? 'is-done' : ''}`} onClick={() => setStep(i)}>
-                    <span className={`f-onboarding-n ${done ? 'ok' : ''}`} aria-hidden="true">
-                      {done ? <DoneIcon size={14} /> : i + 1}
+                <li key={s.title}>
+                  <button
+                    type="button"
+                    className={`f-onboarding-step-btn${cur ? ' is-current' : ''}${done ? ' is-done' : ''}`}
+                    aria-current={cur ? 'step' : undefined}
+                    onClick={() => setStep(i)}
+                  >
+                    <span className={`f-onboarding-n${done ? ' ok' : cur ? ' on' : ''}`} aria-hidden="true">
+                      {done ? <DoneIcon size={12} /> : i + 1}
                     </span>
-                    <span className="grow-min">
-                      <span className="item-title">{s.title}</span>
-                      <span className={`item-sub ${done ? 'ok' : ''}`}>{done ? 'Listo' : s.sub}</span>
-                    </span>
+                    <span className="item-title">{s.title}</span>
                   </button>
                 </li>
               )
             })}
           </ol>
-          <p className="f-onboarding-keys">
-            <kbd>Ctrl K</kbd> buscar cualquier cosa · <kbd>Ctrl ,</kbd> configuración · <kbd>?</kbd> atajos
-          </p>
+
+          <div className="f-onboarding-card-body">
+            <div className="f-onboarding-step-head">
+              <h1 id="f-ob-title" ref={headRef} tabIndex={-1}>
+                {head.title}
+              </h1>
+              <p>{head.sub}</p>
+            </div>
+            {renderBody()}
+            {renderFoot()}
+          </div>
+
+          <div className="f-onboarding-bottom">
+            <p className="f-onboarding-keys">
+              <kbd>Ctrl K</kbd> buscar cualquier cosa · <kbd>Ctrl ,</kbd> configuración · <kbd>?</kbd> atajos
+            </p>
+            <button type="button" className="f-onboarding-skip" onClick={() => finish(true)}>
+              Saltar asistente
+            </button>
+          </div>
         </section>
       </div>
     </div>
