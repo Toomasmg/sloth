@@ -11,8 +11,8 @@ import './export-import.css'
 type Tab = 'exportar' | 'importar'
 
 /**
- * Exportar / importar la configuración: página a pantalla completa con dos pestañas (la abre la paleta
- * o Configuración). Vuelve a Configuración con «‹ Configuración», como en el artboard.
+ * Exportar / importar la configuración: página a pantalla completa con dos pestañas (la abre la paleta,
+ * el menú de Sloth o Configuración → Copia de seguridad). Vuelve a Configuración con «‹ Configuración», como en el artboard.
  */
 function EiPage({ initial, onClose }: { initial: Tab; onClose: () => void }): React.JSX.Element {
   const ui = useUi()

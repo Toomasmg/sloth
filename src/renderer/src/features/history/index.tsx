@@ -8,10 +8,18 @@ import './history.css'
 
 // Abierta o cerrada, compartido entre el botón, el atajo y la paleta.
 let isOpen = false
+// Espacio con el que se abre (menú «más» del panel): la página lo toma como filtro inicial.
+let initialSpace: string | undefined
 const listeners = new Set<() => void>()
 const setOpen = (v: boolean): void => {
   isOpen = v
   for (const l of listeners) l()
+}
+
+/** Abre el historial; `spaceKey` (id del espacio) lo deja filtrado por ese espacio. */
+export function openHistory(spaceKey?: string): void {
+  initialSpace = spaceKey
+  setOpen(true)
 }
 const useOpen = (): boolean =>
   useSyncExternalStore(
@@ -31,7 +39,8 @@ function Global(): React.JSX.Element | null {
       if (!isCapturingShortcut() && matchShortcut('history', e)) {
         e.preventDefault()
         e.stopPropagation()
-        setOpen(!isOpen)
+        if (isOpen) setOpen(false)
+        else openHistory()
       }
     }
     window.addEventListener('keydown', onKey, true)
@@ -39,7 +48,7 @@ function Global(): React.JSX.Element | null {
   }, [])
   return open ? (
     <Suspense fallback={null}>
-      <HistoryPage onClose={() => setOpen(false)} />
+      <HistoryPage key={initialSpace ?? 'todos'} initialSpace={initialSpace} onClose={() => setOpen(false)} />
     </Suspense>
   ) : null
 }
@@ -49,7 +58,7 @@ function TitlebarButton(): React.JSX.Element {
     <button
       type="button"
       className="icon-btn f-history-tb"
-      onClick={() => setOpen(true)}
+      onClick={() => openHistory()}
       aria-label="Historial de sesiones"
       title={`Historial de sesiones (${comboLabel('history')})`}
     >
@@ -72,7 +81,7 @@ const ui: FeatureUi = {
         keywords: 'historial buscar conversaciones transcript sesion resume retomar exportar markdown fijar',
         shortcut: comboLabel('history'),
         icon: <HistoryIcon size={16} />,
-        run: () => setOpen(true)
+        run: () => openHistory()
       }
     ]
   }

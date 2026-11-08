@@ -6,6 +6,7 @@ import type { NewWorkspacePreset } from './features/host'
 import { useUi } from './features/host'
 import { useTemplates, openDialog, peekPreselect, takePreselect, usesTicket, type TemplateDto } from './features/templates/store'
 import { TEMPLATE_COLORS, colorHex } from './features/templates/catalog'
+import { setBoardOpen } from './features/gruv/model'
 import { applyVars, folderLabel, missingVars, TEMPLATE_COLOR_KEYS, TICKET_RE, today, validBranch, type VarValues } from '../../shared/templates-shared'
 import './NewWorkspaceDialog.css'
 
@@ -298,6 +299,11 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
     onClose()
     openDialog({ kind: 'manage' })
   }
+  // Tickets de Gruv: el tablero crea el espacio desde el ticket elegido. Cierra este diálogo para no encimarlo.
+  const openGruv = (): void => {
+    onClose()
+    setBoardOpen(true)
+  }
 
   // ---- Piezas visuales ----
   const folderRows = recent?.folders ?? []
@@ -546,8 +552,13 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
                         {t.name}
                       </button>
                     ))}
-                    <button type="button" className="nw-chip ghost" onClick={openTemplates}>
-                      Administrar…
+                  </div>
+                  <div className="nw-links">
+                    <button type="button" className="nw-link" onClick={openTemplates}>
+                      Administrar plantillas…
+                    </button>
+                    <button type="button" className="nw-link" onClick={openGruv}>
+                      Desde un ticket de Gruv…
                     </button>
                   </div>
                   {tpl?.description && <span className="nw-hint">{tpl.description}</span>}

@@ -50,6 +50,33 @@
   height: 34px;
   width: auto;
 }
+/* El logo + «Sloth» es el disparador del menú de la app: botón sin marco, con chevron chico. */
+button.sl-top-brand {
+  padding: 2px 6px 2px 2px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+button.sl-top-brand:hover,
+button.sl-top-brand.on {
+  background: var(--hover);
+}
+button.sl-top-brand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.sl-top-chev {
+  flex: none;
+  margin-left: -2px;
+  color: var(--fg-muted);
+  transition: transform var(--t-fast) var(--ease);
+}
+button.sl-top-brand.on .sl-top-chev {
+  transform: rotate(180deg);
+}
 .sl-top-name {
   font-size: 14px;
   font-weight: 700;
@@ -580,6 +607,113 @@ body.is-resizing-side .panes {
 .sl-foot .inline-form input {
   height: 30px;
 }
+/* ---------- Herramientas (sidebar, plegable) ---------- */
+.tools {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.tools-head {
+  margin: 0;
+  font: inherit;
+}
+.tools-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.tools-toggle:hover {
+  color: var(--fg);
+}
+.tools-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.tools-chev {
+  width: 10px;
+  flex: none;
+  text-align: center;
+}
+.tools-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 2px;
+}
+.tools-body[hidden] {
+  display: none;
+}
+/* Fila de 30 px: ícono de 16 y texto de 13, como el resto de la barra lateral. */
+.tools-row {
+  width: 100%;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.tools-row:hover:not(:disabled) {
+  background: var(--hover);
+}
+.tools-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.tools-row:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.tools-row-ico {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--fg-2);
+}
+.tools-row-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tools-row-badge {
+  flex: none;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  display: inline-grid;
+  place-items: center;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--fg-2);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
 /* «Nuevo espacio»: botón neutro de 36 px con el atajo como texto (no de acento). */
 .sl-newbtn {
   width: 100%;
@@ -898,6 +1032,22 @@ body.is-resizing-side .panes {
 .pane-menu-wrap {
   position: relative;
   display: inline-flex;
+}
+.app-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+/* Menú de la app: sale desde el logo, alineado a la izquierda. */
+.pane-menu.app-menu {
+  left: 0;
+  right: auto;
+  top: calc(100% + 6px);
+  min-width: 248px;
+}
+.pane-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--line);
 }
 .pane-menu-btn.on {
   background: var(--btn-2);

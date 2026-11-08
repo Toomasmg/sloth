@@ -27,7 +27,7 @@ import './history.css'
 const DEFAULTS: Omit<Filters, 'q' | 'range'> = { space: 'todos', acc: 'todas', showHidden: false }
 const defaultRange = (): Range => (getSettings().settings.lightMode ? '7' : '30')
 
-export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Element {
+export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; initialSpace?: string }): React.JSX.Element {
   const ui = useUi()
   const inv = useRef(ui.invoke)
   inv.current = ui.invoke
@@ -37,7 +37,7 @@ export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Ele
   const [pinned, setPinned] = useState<Set<string>>(new Set())
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const [q, setQ] = useState('')
-  const [space, setSpace] = useState(DEFAULTS.space)
+  const [space, setSpace] = useState(initialSpace ?? DEFAULTS.space)
   const [acc, setAcc] = useState(DEFAULTS.acc)
   const [range, setRange] = useState<Range>(defaultRange)
   const [showHidden, setShowHidden] = useState(DEFAULTS.showHidden)

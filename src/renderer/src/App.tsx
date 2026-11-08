@@ -27,7 +27,6 @@ import { openPermissionReview } from './features/permissions/store'
 import { PaletteBar, PALETTE_REMOVE_EVENT, PALETTE_RENAME_EVENT, runFeatureCommand } from './features/palette'
 import { TerminalView } from './TerminalView'
 import { NewWorkspaceDialog } from './NewWorkspaceDialog'
-import { LogoMark } from './Logo'
 import { EmptyState } from './EmptyState'
 import { StateIcon, StatePill } from './StateIcon'
 import { PermissionCard, toolLabel } from './PermissionCard'
@@ -61,7 +60,10 @@ import { Separators } from './layout/Separators'
 import { SIDE_DEFAULT, SideResizer, clampSide, sideMax } from './layout/SideResizer'
 import { PaneInput, PaneMenu, type PaneMenuItem } from './layout/PaneMenu'
 import { CrumbMenu, type CrumbGroup, type CrumbItem } from './layout/CrumbMenu'
-import { LimpiarRamasRow } from './features/worktrees/CleanRow'
+import { openRamas } from './features/worktrees/store'
+import { openHistory } from './features/history/index'
+import { AppMenu } from './layout/AppMenu'
+import { ToolsSection } from './layout/ToolsSection'
 import { TabBar, type TabInfo } from './layout/TabBar'
 import './layout/layout.css'
 import './layout/shell.css'
@@ -73,12 +75,14 @@ import {
   BranchIcon,
   BroadcastIcon,
   CheckIcon,
+  ChangesIcon,
   ChatIcon,
   CloseIcon,
   EditorIcon,
   ErrorIcon,
   FolderIcon,
   FourPanesIcon,
+  HistoryIcon,
   MaximizeIcon,
   MoveAccountIcon,
   OnePaneIcon,
@@ -87,9 +91,11 @@ import {
   SettingsIcon,
   SidebarIcon,
   SpaceIcon,
+  TemplatesIcon,
   ThreePanesIcon,
   TwoPanesIcon,
-  UpdateIcon
+  UpdateIcon,
+  WorktreeIcon
 } from './icons/SlothIcons'
 
 /* Íconos que SlothIcons todavía no tiene: mismo trazo (grilla 24, 1,6) que el resto. */
@@ -898,10 +904,7 @@ export function App(): React.JSX.Element {
             >
               <SidebarIcon size={17} aria-hidden="true" />
             </button>
-            <div className="sl-top-brand">
-              <LogoMark size={34} />
-              <span className="sl-top-name">Sloth</span>
-            </div>
+            <AppMenu ctx={uiCtx} />
           </div>
           <div className="sl-top-search">
             <PaletteBar />
@@ -1044,8 +1047,9 @@ export function App(): React.JSX.Element {
               </section>
             )}
 
+            <ToolsSection ctx={uiCtx} />
+
             <div className="sl-foot">
-              <LimpiarRamasRow />
               <button type="button" className="sl-newbtn" disabled={accounts.length === 0} onClick={() => setNewWsMode('normal')}>
                 <Plus size={15} weight="bold" aria-hidden="true" />
                 Nuevo espacio
@@ -1096,16 +1100,16 @@ export function App(): React.JSX.Element {
                       </button>
                     )}
                     <div className="seg" role="group" aria-label="Distribución de paneles">
-                      <button type="button" aria-pressed={layoutPressed.uno} onClick={() => pickLayout('uno')} title="Uno: 1 panel a la vista; el resto en pestañas">
+                      <button type="button" aria-pressed={layoutPressed.uno} onClick={() => pickLayout('uno')} title="Uno (Ctrl+Alt+1): 1 panel a la vista; el resto en pestañas">
                         <OnePaneIcon size={14} aria-hidden="true" /> Uno
                       </button>
-                      <button type="button" aria-pressed={layoutPressed.dos} onClick={() => pickLayout('dos')} title="Dos: hasta 2 paneles a la vista; el resto en pestañas">
+                      <button type="button" aria-pressed={layoutPressed.dos} onClick={() => pickLayout('dos')} title="Dos (Ctrl+Alt+2): hasta 2 paneles a la vista; el resto en pestañas">
                         <TwoPanesIcon size={14} aria-hidden="true" /> Dos
                       </button>
-                      <button type="button" aria-pressed={layoutPressed.tres} onClick={() => pickLayout('tres')} title="Tres: hasta 3 paneles a la vista; el resto en pestañas">
+                      <button type="button" aria-pressed={layoutPressed.tres} onClick={() => pickLayout('tres')} title="Tres (Ctrl+Alt+3): hasta 3 paneles a la vista; el resto en pestañas">
                         <ThreePanesIcon size={14} aria-hidden="true" /> Tres
                       </button>
-                      <button type="button" aria-pressed={layoutPressed.cuatro} onClick={() => pickLayout('cuatro')} title="Cuatro: hasta 4 paneles a la vista; el resto en pestañas">
+                      <button type="button" aria-pressed={layoutPressed.cuatro} onClick={() => pickLayout('cuatro')} title="Cuatro (Ctrl+Alt+4): hasta 4 paneles a la vista; el resto en pestañas">
                         <FourPanesIcon size={14} aria-hidden="true" /> Cuatro
                       </button>
                     </div>
@@ -1160,9 +1164,35 @@ export function App(): React.JSX.Element {
                           onSelect: () => setRenaming({ id: ws.id, from: 'pane' })
                         },
                         {
+                          id: 'git',
+                          label: 'Ver cambios (Git)',
+                          icon: <ChangesIcon size={15} aria-hidden="true" />,
+                          sepBefore: true,
+                          onSelect: () => runFeatureCommand('git:changes', { ...uiCtx, focused: paneId })
+                        },
+                        {
+                          id: 'historial',
+                          label: 'Historial de este espacio',
+                          icon: <HistoryIcon size={15} aria-hidden="true" />,
+                          onSelect: () => openHistory(ws.id)
+                        },
+                        {
+                          id: 'ramas',
+                          label: 'Ramas aparte de este repo',
+                          icon: <WorktreeIcon size={15} aria-hidden="true" />,
+                          onSelect: () => openRamas(null, ws.repoPath)
+                        },
+                        {
+                          id: 'plantilla',
+                          label: 'Guardar como plantilla',
+                          icon: <TemplatesIcon size={15} aria-hidden="true" />,
+                          onSelect: () => runFeatureCommand('templates:from-focused', { ...uiCtx, focused: paneId })
+                        },
+                        {
                           id: 'vscode',
                           label: editorLabel === 'carpeta' ? 'Abrir carpeta' : `Abrir en ${editorLabel}`,
                           icon: <EditorIcon size={15} aria-hidden="true" />,
+                          sepBefore: true,
                           onSelect: () => void revealWs(ws, 'vscode')
                         },
                         {
@@ -1188,6 +1218,7 @@ export function App(): React.JSX.Element {
                     label: 'Reiniciar terminal',
                     hint: 'cierra el proceso',
                     icon: <UpdateIcon size={15} />,
+                    sepBefore: Boolean(ws),
                     onSelect: () => void requestRestartPane(paneId)
                   },
                   {
@@ -1196,6 +1227,7 @@ export function App(): React.JSX.Element {
                     hint: 'la terminal sigue',
                     icon: <CloseIcon size={15} aria-hidden="true" />,
                     danger: true,
+                    sepBefore: true,
                     onSelect: () => void requestHidePane(paneId)
                   }
                 ]

@@ -156,7 +156,7 @@ export function RamasPage(): React.JSX.Element | null {
   const ui = useUi()
   const uiRef = useRef(ui)
   uiRef.current = ui
-  const { open, dialog, nonce } = useRamas()
+  const { open, dialog, nonce, repoPath } = useRamas()
 
   const [repos, setRepos] = useState<RepoView[] | null>(null)
   const [scanErr, setScanErr] = useState('')
@@ -204,6 +204,14 @@ export function RamasPage(): React.JSX.Element | null {
     void scan()
     setTimeout(() => panelRef.current?.focus(), 0)
   }, [open, nonce, scan])
+
+  // Filtro de repo inicial: una vez por apertura, cuando hay lista (el repo del espacio, o todos).
+  const repoAppliedFor = useRef(-1)
+  useEffect(() => {
+    if (!repos || repoAppliedFor.current === nonce) return
+    repoAppliedFor.current = nonce
+    setRepoF(repoPath ? (repoIdOf(repos, repoPath) ?? 'todos') : 'todos')
+  }, [repos, nonce, repoPath])
 
   // Tamaños: main los cuenta en segundo plano y avisa fila por fila. Al cerrar la pantalla se cancelan.
   useEffect(() => {
@@ -618,6 +626,13 @@ export function RamasPage(): React.JSX.Element | null {
 }
 
 // ---------- Nueva rama aparte ----------
+
+/** Id del repo al que pertenece una carpeta (la copia principal o una rama aparte). */
+function repoIdOf(repos: RepoView[], path: string): string | undefined {
+  const normPath = (p: string): string => p.replace(/[\\/]+$/, '').toLowerCase()
+  const want = normPath(path)
+  return repos.find((r) => normPath(r.mainPath) === want || r.rows.some((x) => normPath(x.path) === want))?.id
+}
 
 /** Mismas reglas y textos que el diseño (Ramas.dc.html › branchErr). */
 function branchError(b: string, repo: RepoView | undefined, repos: RepoView[]): string {

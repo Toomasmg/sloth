@@ -30,6 +30,7 @@ export const NAV: readonly NavItem[] = [
     sepBefore: true
   },
   { id: 'updates', name: 'Actualizaciones', sub: 'Sloth se actualiza solo. Acá elegís cómo.', color: '#5fd4a6', icon: 'Update' },
+  { id: 'backup', name: 'Copia de seguridad', sub: 'Llevá tu configuración a otra PC o guardala en un archivo.', color: '#7fc8e8', icon: 'Export' },
   { id: 'about', name: 'Acerca de Sloth', sub: 'Versión, repositorio y reportes.', color: '#a6abb8', icon: 'Help' }
 ]
 
@@ -79,7 +80,11 @@ const INDEX: readonly [string, SectionId][] = [
   ['Canal beta', 'updates'],
   ['Versión instalada', 'about'],
   ['Repositorio', 'about'],
-  ['Reportar un problema', 'about']
+  ['Reportar un problema', 'about'],
+  ['Exportar configuración', 'backup'],
+  ['Importar configuración', 'backup'],
+  ['Reglas de permisos y decisiones', 'notif'],
+  ['Plantillas del equipo', 'equipo']
 ]
 
 const norm = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()

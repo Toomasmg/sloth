@@ -10,6 +10,8 @@ import { SHORTCUT_ACTIONS, bindingOf, comboFromEvent, findConflict, keyTokenOf, 
 import { openReport } from '../report/bus'
 import { request as requestExportImport } from '../export-import/bus'
 import { openHelp } from '../help/bus'
+import { openPermissionDecisions } from '../permissions/store'
+import { runFeatureCommand } from '../palette'
 import { setPhase } from '../updater/phase'
 import { useUpdateDot } from '../updater/useUpdateStatus'
 import { SoundTest } from '../sound/SoundTest'
@@ -689,7 +691,7 @@ const SOUND_OPTIONS: { value: SoundName | 'Sin sonido'; label: string }[] = [
   { value: 'Sin sonido', label: 'Sin sonido' }
 ]
 
-export function NotificationsSection(): React.JSX.Element {
+export function NotificationsSection({ onClose }: { onClose(): void }): React.JSX.Element {
   const p = useSettings()
   const s = p.settings
   const save = useSave()
@@ -703,6 +705,11 @@ export function NotificationsSection(): React.JSX.Element {
         <ToggleRow title="No molestar" hint="Silencia todo hasta que lo apagues." checked={s.noMolestar} onChange={(noMolestar) => save({ noMolestar })} />
       </Group>
       {s.noMolestar && <SectionHint>«No molestar» está activo: no suena nada ni avisa.</SectionHint>}
+      <p className="f-set-note">
+        <button type="button" className="f-set-link" onClick={goAfterClose(onClose, () => openPermissionDecisions())}>
+          Ver reglas de permisos y decisiones
+        </button>
+      </p>
       <Group id="g-so" title="Sonido">
         <Row title={<label htmlFor="f-set-sound">Sonido de aviso</label>} hint="Suena aunque la ventana esté en segundo plano.">
           <select
@@ -729,7 +736,7 @@ export function NotificationsSection(): React.JSX.Element {
 
 /* ---------- Equipo y chat ---------- */
 
-export function TeamSection(): React.JSX.Element {
+export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element {
   const ui = useUi()
   const [snap, setSnap] = useState<ChatSnapshot | null>(null)
   const [cfg, setCfg] = useState<ChatConfigView | null>(null)
@@ -959,6 +966,19 @@ export function TeamSection(): React.JSX.Element {
           {msg.text}
         </p>
       )}
+
+      <Group id="g-tc" title="Plantillas del equipo">
+        <ToggleLikeButton
+          title="Importar o actualizar las plantillas del equipo"
+          hint="Las trae del archivo .sloth	eam.json del repo de tus espacios."
+          onClick={goAfterClose(onClose, () => runFeatureCommand('team-config:import', ui))}
+        />
+        <ToggleLikeButton
+          title="Exportar mi configuración como la del equipo"
+          hint="Genera team.json en el repo con tus plantillas (sin cuentas ni rutas)."
+          onClick={goAfterClose(onClose, () => runFeatureCommand('team-config:export', ui))}
+        />
+      </Group>
     </>
   )
 }
@@ -1077,6 +1097,38 @@ export function UpdatesSection(): React.JSX.Element {
 
 /* ---------- Acerca de ---------- */
 
+/** Lleva la ventana de otra función: cierra la Configuración y, después, abre la otra (para que tome el foco). */
+function goAfterClose(onClose: () => void, fn: () => void): () => void {
+  return () => {
+    onClose()
+    requestAnimationFrame(fn)
+  }
+}
+
+/* ---------- Copia de seguridad ---------- */
+
+export function BackupSection({ onClose }: { onClose(): void }): React.JSX.Element {
+  return (
+    <>
+      <Group id="g-bk" title="Exportar e importar">
+        <ToggleLikeButton
+          title="Exportar configuración…"
+          hint="Un archivo .sloth con espacios, plantillas, apariencia, atajos y reglas de permisos. Sirve para pasarla a otra PC o guardarla."
+          onClick={goAfterClose(onClose, () => requestExportImport({ kind: 'export' }))}
+        />
+        <ToggleLikeButton
+          title="Importar configuración…"
+          hint="Desde un archivo .sloth de otra PC. Antes te muestra qué va a agregar, y las reglas de permisos una por una."
+          onClick={goAfterClose(onClose, () => requestExportImport({ kind: 'import' }))}
+        />
+      </Group>
+      <SectionHint>
+        Se lleva: espacios, plantillas, apariencia, atajos y reglas de permisos. Las sesiones de Claude nunca se exportan: en la otra PC vas a iniciar sesión de nuevo, y las credenciales de las cuentas tampoco viajan.
+      </SectionHint>
+    </>
+  )
+}
+
 export function AboutSection({ onClose }: { onClose(): void }): React.JSX.Element {
   const ui = useUi()
   const [version, setVersion] = useState<string>('…')
@@ -1085,10 +1137,7 @@ export function AboutSection({ onClose }: { onClose(): void }): React.JSX.Elemen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   // Las otras ventanas se abren después de cerrar la Configuración, para que tomen el foco.
-  const go = (fn: () => void) => (): void => {
-    onClose()
-    requestAnimationFrame(fn)
-  }
+  const go = (fn: () => void) => goAfterClose(onClose, fn)
   return (
     <>
       <div className="f-set-card f-set-about">
@@ -1105,11 +1154,8 @@ export function AboutSection({ onClose }: { onClose(): void }): React.JSX.Elemen
         </div>
       </div>
       <Group id="g-mas" title="Más">
-        <ToggleLikeButton title="Exportar configuración…" hint="Espacios, plantillas, apariencia, atajos y reglas de permisos en un archivo .sloth (sin sesiones ni credenciales)." onClick={go(() => requestExportImport({ kind: 'export' }))} />
-        <ToggleLikeButton title="Importar configuración…" hint="Desde un archivo .sloth de otra PC; antes te muestra qué va a agregar, y las reglas de permisos una por una." onClick={go(() => requestExportImport({ kind: 'import' }))} />
-        <ToggleLikeButton title="Ayuda y atajos" hint="Cómo se usa Sloth y la lista de atajos de teclado." onClick={go(() => openHelp('ayuda'))} />
         <ToggleLikeButton title="Novedades" hint="Qué cambió en la última versión de Sloth." onClick={go(() => openHelp('whatsnew'))} />
-        <ToggleLikeButton title="Invitar a un compañero" hint="Copia un texto con los pasos para instalar Sloth y empezar." onClick={go(() => openHelp('invite'))} />
+        <ToggleLikeButton title="Buscar actualizaciones" hint="Mira si hay una versión nueva y la baja sola." onClick={go(() => runFeatureCommand('updater:check', ui))} />
       </Group>
     </>
   )

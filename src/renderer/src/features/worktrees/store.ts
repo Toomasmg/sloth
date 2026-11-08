@@ -11,9 +11,11 @@ interface RamasState {
   nonce: number
   /** Ramas aparte que se pueden limpiar, según el último escaneo. null = todavía no hubo escaneo. */
   candidates: number | null
+  /** Carpeta del repo para filtrar al abrir (menú «más» de un espacio). null = todos los repos. */
+  repoPath: string | null
 }
 
-let state: RamasState = { open: false, dialog: null, nonce: 0, candidates: null }
+let state: RamasState = { open: false, dialog: null, nonce: 0, candidates: null, repoPath: null }
 const listeners = new Set<() => void>()
 
 function set(next: Partial<RamasState>): void {
@@ -21,8 +23,9 @@ function set(next: Partial<RamasState>): void {
   for (const l of listeners) l()
 }
 
-export function openRamas(dialog: RamasDialog = null): void {
-  set({ open: true, dialog, nonce: state.nonce + 1 })
+/** Abre el panel. `repoPath` (carpeta de un espacio) deja filtrado el repo de ese espacio. */
+export function openRamas(dialog: RamasDialog = null, repoPath: string | null = null): void {
+  set({ open: true, dialog, nonce: state.nonce + 1, repoPath })
 }
 
 export function closeRamas(): void {
