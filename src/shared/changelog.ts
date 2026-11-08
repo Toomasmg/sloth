@@ -16,7 +16,11 @@ export const CHANGELOG: ChangelogEntry[] = [
       'La ruta «cuenta › espacio» de arriba de los paneles se puede tocar: elegí otro espacio y te lleva ahí.',
       'Vuelve «Limpiar ramas que ya no se usan» a la barra lateral, con la cantidad de ramas para limpiar.',
       'El botón «Cambios» del encabezado de cada panel ya no se encima con el número de archivos.',
-      'El menú «más» de cada panel se ve completo, sin textos encimados.'
+      'El menú «más» de cada panel se ve completo, sin textos encimados.',
+      'Todo a la vista: menú de Sloth en el logo (ayuda, novedades, actualizaciones, reportar, exportar e importar), sección «Herramientas» en la barra lateral y más opciones en el menú «más» de cada panel.',
+      'Configuración: nueva sección «Copia de seguridad» para exportar e importar.',
+      'La barra lateral se agranda o achica arrastrando su borde.',
+      'Nueva distribución «Tres»: tres paneles a la vista (Ctrl+Alt+3).'
     ]
   },
   {
