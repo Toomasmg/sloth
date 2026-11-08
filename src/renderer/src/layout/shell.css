@@ -751,9 +751,16 @@
 .pane-head .pane-title {
   font-weight: 600;
 }
-.pane-head .pane-actions button {
+/* Solo los botones de ícono del encabezado son cuadrados de 28 px (no los ítems del menú «más» ni «Cambios»). */
+.pane-head .pane-actions .icon-btn {
   width: 28px;
   height: 28px;
+}
+.pane-head .pane-menu-item {
+  width: 100%;
+  height: auto;
+  min-height: 32px;
+  white-space: nowrap;
 }
 .pane-head .pane-id {
   align-items: center;
