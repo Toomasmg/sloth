@@ -28,6 +28,15 @@
   --logo-2: #5b86c9;
   --logo-core-fill: #1b1f29;
   --logo-prompt: #8ab4ff;
+  /* Ventana principal (diseño Espacios): tarjetas de cuenta, grilla de paneles, paneles y campos. */
+  --card-acc: #14171f;
+  --panes-bg: #090a0e;
+  --pane-bg: #0f1117;
+  --term-bg: #0f1117;
+  /* Buscadores y filtros (filtro de la barra lateral, buscador de Configuración). */
+  --search-bg: #171a22;
+  --newbtn-bg: #191c25;
+  --seg-on: #3a4152;
 }
 
 /* ---------- Tamaño de letra de la interfaz (12–15 px) ---------- */
@@ -82,6 +91,12 @@ html[data-theme='light'] {
   --logo-2: #2459b8;
   --logo-core-fill: #12151c;
   --logo-prompt: #2f6fe0;
+  --card-acc: #ffffff;
+  --panes-bg: #e6e6e2;
+  --pane-bg: #ffffff;
+  --search-bg: #ebebe7;
+  --newbtn-bg: #ffffff;
+  --seg-on: #ffffff;
 
   /* Superficies y bordes. */
   --bg: #f6f6f4; /* fondo */
@@ -387,4 +402,9 @@ html[data-night='true']:not([data-theme='light']) {
   html.f-settings-switching * {
     transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease !important;
   }
+}
+
+/* Terminal de cada panel (diseño Espacios): padding 10 arriba y 14 a los lados; gana a theme-a.css. */
+.terminal-host {
+  padding: 10px 14px 0;
 }

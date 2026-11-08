@@ -2,7 +2,19 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import type { Workspace } from '../../../../shared/types'
 import { api } from '../../api'
 import { cleanError, shortPath, STATE_LABEL } from '../../format'
-import { ChangesIcon, CloseIcon, EditorIcon, FolderIcon, MaximizeIcon, MoveAccountIcon, PencilIcon, SearchIcon, TrashIcon } from '../../icons/SlothIcons'
+import { ChangesIcon, ChatIcon, CloseIcon, EditorIcon, FolderIcon, MaximizeIcon, MoveAccountIcon, PaletteIcon, PencilIcon, SearchIcon, SettingsIcon, SpaceIcon, TrashIcon, TicketIcon, UpdateIcon } from '../../icons/SlothIcons'
+
+/** Ícono de cada grupo para los comandos que no traen uno propio: todo ítem tiene cuadrado con ícono. */
+const GROUP_ICON: Record<string, ReactNode> = {
+  Espacios: <SpaceIcon size={15} />,
+  Equipo: <ChatIcon size={15} />,
+  Permisos: <PaletteIcon size={15} />,
+  Configuración: <SettingsIcon size={15} />,
+  Tickets: <TicketIcon size={15} />,
+  Actualizaciones: <UpdateIcon size={15} />
+}
+const DEFAULT_ICON: ReactNode = <PaletteIcon size={15} />
+const groupIcon = (group: string): ReactNode => GROUP_ICON[group] ?? DEFAULT_ICON
 import { bindingOf, isCapturingShortcut, matchShortcut } from '../../shortcuts'
 import { getSettings, resolveAccountColor, useSettings } from '../settings/store'
 import { FEATURE_UIS } from '../registry'
@@ -140,7 +152,7 @@ function spaceItem(ctx: UiCtx, ws: Workspace, colorOf: (accountId: string) => st
     title: ws.name,
     subtitle: `${acc?.label ?? 'cuenta borrada'} · ${ws.branch ?? shortPath(ws.cwd)}`,
     keywords: [ws.ticket, ws.branch, ws.repoPath].filter(Boolean).join(' '),
-    icon: <FolderIcon size={15} />,
+    icon: <SpaceIcon size={15} />,
     iconStyle: { color: colorOf(ws.accountId), background: `color-mix(in srgb, ${colorOf(ws.accountId)} 16%, transparent)` },
     meta: stateMeta(ctx, ws),
     spaceId: ws.id,
@@ -242,7 +254,7 @@ function buildItems(ctx: UiCtx, colorOf: (accountId: string) => string): Item[] 
       title: c.title,
       subtitle: c.subtitle,
       keywords: c.keywords,
-      icon: c.icon,
+      icon: c.icon ?? groupIcon(c.group),
       shortcut: c.shortcut,
       run: () => {
         void Promise.resolve()
@@ -381,8 +393,11 @@ export function PaletteBar(): React.JSX.Element {
   const byId = new Map(items.map((it) => [it.id, it]))
   // Recientes solo en la vista general, sin texto.
   const showRecent = !scoped && !nq && kind === 'todo'
+  // Sin historial todavía, «Recientes» muestra los primeros ítems (espacios y acciones) en vez de no mostrarse.
+  const recentIdsStored = readRecent()
+  const recentIds0 = recentIdsStored.length ? recentIdsStored : items.slice(0, 3).map((it) => it.id)
   const recentRows: Row[] = showRecent
-    ? readRecent()
+    ? recentIds0
         .map((id) => byId.get(id))
         .filter((it): it is Item => Boolean(it))
         .map((item) => ({ item, match: { score: 0, title: [], subtitle: [] } }))

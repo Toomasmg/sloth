@@ -3,7 +3,7 @@
 
 .sl-shell {
   display: grid;
-  grid-template-rows: 40px minmax(0, 1fr) 28px;
+  grid-template-rows: 48px minmax(0, 1fr) 28px;
   grid-template-columns: minmax(0, 1fr);
   height: 100%;
   min-height: 0;
@@ -17,10 +17,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 40px;
+  height: 48px;
   min-width: 0;
   /* Windows dibuja sus botones a la derecha (~140 px): se deja lugar. */
-  padding: 0 148px 0 6px;
+  padding: 0 148px 0 10px;
   background: var(--surface);
   box-shadow: inset 0 -1px 0 var(--line);
   -webkit-app-region: drag;
@@ -45,11 +45,12 @@
   padding: 0 4px 0 2px;
 }
 .sl-top-brand .logo-mark {
-  height: 22px;
+  height: 34px;
   width: auto;
 }
 .sl-top-name {
   font-size: 14px;
+  font-weight: 700;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--fg);
@@ -69,8 +70,9 @@
   overflow: hidden;
 }
 .sl-top-status .chip {
-  height: 24px;
-  padding: 0 9px 0 7px;
+  height: 26px;
+  gap: 6px;
+  padding: 0 10px 0 8px;
   font-size: var(--fs-sm);
   font-weight: 500;
   border: 0;
@@ -79,6 +81,44 @@
 }
 .sl-top-status .chip:hover {
   filter: brightness(1.15);
+}
+.sl-top-status .chip > svg {
+  width: 13px;
+  height: 13px;
+}
+/* Chat y Configuración: solo íconos de 30 px, sin fondo ni texto. */
+.sl-tool {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg-2);
+  cursor: pointer;
+}
+.sl-tool:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.sl-tool-badge {
+  position: absolute;
+  top: 2px;
+  right: 1px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--team);
+  color: #140f24;
+  font-size: 9px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 0 2px var(--surface);
 }
 .sl-top-tools {
   display: flex;
@@ -121,7 +161,7 @@
 .sl-side {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   min-height: 0;
   min-width: 0;
   padding: 12px 10px 10px;
@@ -138,7 +178,7 @@
   height: 30px;
   padding: 0 10px;
   border-radius: 8px;
-  background: var(--input-bg);
+  background: var(--search-bg);
   color: var(--fg-muted);
   box-shadow: inset 0 0 0 1px var(--line);
 }
@@ -164,7 +204,7 @@
   flex: none;
   padding: 4px;
   border-radius: 12px;
-  background: var(--card);
+  background: var(--card-acc);
   box-shadow: inset 0 0 0 1px var(--line);
   --acc: var(--accent);
 }
@@ -172,6 +212,12 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  padding: 6px 4px 6px 6px;
+}
+.sl-acc-head > .icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
 }
 .sl-acc-toggle {
   flex: 1;
@@ -179,7 +225,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  height: 40px;
+  height: 34px;
   padding: 0 6px;
   border: 0;
   border-radius: 8px;
@@ -212,7 +258,7 @@
   height: 8px;
   border-radius: 50%;
   background: var(--fg-muted);
-  box-shadow: 0 0 0 2px var(--card);
+  box-shadow: 0 0 0 2px var(--card-acc);
 }
 .sl-dot.on {
   background: var(--success);
@@ -323,8 +369,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 44px;
-  padding: 6px 8px;
+  padding: 7px 8px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -439,19 +484,45 @@
 .sl-foot .inline-form input {
   height: 30px;
 }
-.sl-new {
+/* «Nuevo espacio»: botón neutro de 36 px con el atajo como texto (no de acento). */
+.sl-newbtn {
+  width: 100%;
+  height: 36px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--newbtn-bg);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 500;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  cursor: pointer;
 }
-.sl-new .btn.primary {
-  flex: 1;
-  height: 34px;
-  font-size: var(--fs-md);
+.sl-newbtn:hover:not(:disabled) {
+  background: var(--surface-hover);
 }
-.sl-new .btn.icon-only {
-  height: 34px;
-  width: 34px;
+.sl-newbtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.sl-newbtn kbd {
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  margin-left: 2px;
+}
+.sl-acc-none {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sl-acc-none .sl-hint {
+  padding: 4px;
 }
 
 /* ---------- Área de paneles ---------- */
@@ -465,9 +536,10 @@
   align-items: center;
   gap: 10px;
   flex: none;
-  min-height: 40px;
-  padding: 4px 4px 4px 10px;
+  min-height: 46px;
+  padding: 6px 14px 6px 16px;
   min-width: 0;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.05);
 }
 .sl-crumb {
   flex: 1 1 160px;
@@ -496,10 +568,73 @@
   gap: 8px;
   flex: none;
 }
+.sl-bar .seg {
+  background: var(--search-bg);
+}
 .sl-bar .seg > button {
-  height: 24px;
-  padding: 0 10px;
+  height: 26px;
+  padding: 0 9px;
   font-size: var(--fs-sm);
+}
+.sl-bar .seg > button[aria-pressed='true'] {
+  background: var(--seg-on);
+}
+/* «Enviar a todos»: 30 px, con ícono y sin fondo. */
+.sl-bcast {
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg-2);
+  font: inherit;
+  font-size: var(--fs-sm);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+.sl-bcast:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--fg);
+}
+.sl-bcast:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* Sin paneles: «No hay espacios abiertos» y Crear espacio, centrados sobre el fondo de la grilla. */
+.sl-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--panes-bg);
+  text-align: center;
+}
+.sl-empty-title {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--fg);
+}
+.sl-empty-btn {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sl-empty-hint {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
 }
 .sl-tabsrow {
   flex: none;
@@ -538,9 +673,32 @@
 
 /* Encabezado del panel: un poco más alto, con rama y el menú «más». */
 .pane-head {
-  height: 38px;
-  padding: 0 4px 0 10px;
-  gap: 6px;
+  height: 42px;
+  padding: 6px 8px 6px 12px;
+  gap: 6px 8px;
+}
+/* Ícono del espacio: cuadrado de 22 px con el color del espacio. */
+.pane-icon-btn {
+  --ws: var(--acc);
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ws) 16%, transparent);
+  color: var(--ws);
+  font-size: 12px;
+  cursor: pointer;
+}
+.pane-head .pane-title {
+  font-weight: 600;
+}
+.pane-head .pane-actions button {
+  width: 28px;
+  height: 28px;
 }
 .pane-head .pane-id {
   align-items: center;
@@ -571,7 +729,15 @@
   flex: 0 1 auto;
 }
 .pane-head .pill {
-  height: 20px;
+  height: 22px;
+  gap: 6px;
+  padding: 0 8px;
+  font-weight: 500;
+  border-radius: 11px;
+}
+.pane-head .pill > svg {
+  width: 11px;
+  height: 11px;
 }
 .pane-head .pane-actions {
   gap: 2px;
@@ -658,7 +824,7 @@
   padding: 0 10px;
   height: 36px;
   border-radius: 9px;
-  background: var(--input-bg);
+  background: var(--bg);
   box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 .pane-input:focus-within {

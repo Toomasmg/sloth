@@ -16,11 +16,12 @@ import {
 import { api } from './api'
 import { UiContext, type NewWorkspacePreset, type PaneGuard, type UiCtx } from './features/host'
 import { resolveAccountColor, useSettings } from './features/settings/store'
-import { openChat } from './features/chat/store'
+import { openChat, useChatAttach, useChatSnapshot } from './features/chat/store'
+import { openSettings } from './features/settings/bus'
 import { colorHex } from './features/templates/catalog'
 import { bindingOf, comboLabel, isCapturingShortcut, matchShortcut } from './shortcuts'
 import type { ShortcutId } from '../../main/features/settings-model'
-import { GlobalSlot, PaneBannerSlot, PaneHeaderSlot, SidebarSlot, TitlebarSlot } from './features/slots'
+import { GlobalSlot, PaneBannerSlot, PaneHeaderSlot } from './features/slots'
 import { PaletteBar, PALETTE_REMOVE_EVENT, PALETTE_RENAME_EVENT, runFeatureCommand } from './features/palette'
 import { TerminalView } from './TerminalView'
 import { NewWorkspaceDialog } from './NewWorkspaceDialog'
@@ -29,7 +30,6 @@ import { EmptyState } from './EmptyState'
 import { StateIcon, StatePill } from './StateIcon'
 import { PermissionCard, toolLabel } from './PermissionCard'
 import { decidePermission } from './features/permissions/api'
-import { DaemonStatus } from './DaemonStatus'
 import { setPaneVisible, useDocumentVisible, useVisiblePolling } from './visibility'
 import {
   LAYOUT_CAP,
@@ -64,9 +64,9 @@ import { useFolderDrop } from './useFolderDrop'
 import './workspace.css'
 import { cleanError, fmtTok, shortPath, STATE_LABEL, totalTok, usageTitle } from './format'
 import {
-  AccountIcon,
   BranchIcon,
   BroadcastIcon,
+  ChatIcon,
   CloseIcon,
   EditorIcon,
   ErrorIcon,
@@ -76,8 +76,9 @@ import {
   MoveAccountIcon,
   OnePaneIcon,
   SearchIcon,
+  SettingsIcon,
   SidebarIcon,
-  TicketIcon,
+  SpaceIcon,
   TwoPanesIcon,
   UpdateIcon
 } from './icons/SlothIcons'
@@ -98,7 +99,6 @@ const Equals = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><path d="M5 9
 const DotsSixVertical = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" strokeWidth={2.6} /></Glyph>
 const ArrowsLeftRight = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><path d="M4 8h15l-3-3M20 16H5l3 3" /></Glyph>
 const Smiley = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><circle cx="12" cy="12" r="8" /><path d="M9 10h.01M15 10h.01M9 14.5c.9 1 1.9 1.5 3 1.5s2.1-.5 3-1.5" /></Glyph>
-const TerminalIcon = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><rect x="3.5" y="5" width="17" height="14" rx="2" /><path d="M7.5 10l2.5 2-2.5 2M12.5 14.5h4" /></Glyph>
 
 /** Texto de un atajo como teclas («Ctrl + K»), siempre al día con Configuración. */
 function Keys({ id }: { id: ShortcutId }): React.JSX.Element {
@@ -343,15 +343,6 @@ export function App(): React.JSX.Element {
     if (await allowPaneAction(id, 'restart')) await restartPane(id)
   }
 
-  const addAccount = async (label: string): Promise<void> => {
-    try {
-      const acc = await api.addAccount(label)
-      setAccounts((a) => [...a, acc])
-      openPane(loginPaneId(acc.id))
-    } catch (e) {
-      setError(cleanError(e))
-    }
-  }
 
   const removeAccount = async (acc: Account): Promise<void> => {
     if (!window.confirm(`¿Quitar la cuenta «${acc.label}» de Sloth?`)) return
@@ -705,6 +696,9 @@ export function App(): React.JSX.Element {
     invoke: (channel, ...args) => api.feat.invoke(channel, ...args),
     on: (channel, cb) => api.feat.on(channel, cb)
   }
+  // Chat del equipo: el botón de la barra muestra los no leídos (useChatAttach conecta la función).
+  useChatAttach(uiCtx)
+  const chatUnread = useChatSnapshot()?.unreadTotal ?? 0
 
   // Barra de paneles: distribución elegida (se guarda en esta PC). Uno = 1 a la vista; Dos = 2; Cuatro = 4.
   const layoutPressed = { uno: viewMode === 'uno', dos: viewMode === 'dos', cuatro: viewMode === 'cuatro' }
@@ -759,7 +753,7 @@ export function App(): React.JSX.Element {
             title="Doble clic o F2 para renombrar · clic derecho para más opciones"
           >
             <span className={`sl-ico${ws.color ? '' : ' no-color'}`} aria-hidden="true" style={ws.color ? ({ '--ws': colorHex(ws.color) } as CSSProperties) : undefined}>
-              {ws.icon ? ws.icon : (ws.name.trim().slice(0, 1).toUpperCase() || <FolderIcon size={14} />)}
+              {ws.icon ? ws.icon : <SpaceIcon size={15} />}
             </span>
             <span className="sl-txt">
               <span className="sl-name">
@@ -800,7 +794,7 @@ export function App(): React.JSX.Element {
             <SidebarIcon size={17} aria-hidden="true" />
           </button>
           <div className="sl-top-brand">
-            <LogoMark size={22} />
+            <LogoMark size={34} />
             <span className="sl-top-name">Sloth</span>
           </div>
           <div className="sl-top-search">
@@ -828,8 +822,17 @@ export function App(): React.JSX.Element {
           </div>
           <div className="sl-top-tools">
             <span className="sl-top-sep" aria-hidden="true" />
-            <TitlebarSlot />
-            <DaemonStatus />
+            <button type="button" className="sl-tool" onClick={() => openChat()} aria-label={chatUnread > 0 ? `Chat del equipo, ${chatUnread} sin leer` : 'Chat del equipo'} title="Chat del equipo">
+              <ChatIcon size={17} aria-hidden="true" />
+              {chatUnread > 0 && (
+                <span className="sl-tool-badge" aria-hidden="true">
+                  {chatUnread > 99 ? '99+' : chatUnread}
+                </span>
+              )}
+            </button>
+            <button type="button" className="sl-tool" onClick={() => openSettings()} aria-label="Configuración" title={`Configuración (${comboLabel('settings')})`}>
+              <SettingsIcon size={17} aria-hidden="true" />
+            </button>
           </div>
           <div className="sr-only" role="alert">
             {announced
@@ -852,7 +855,14 @@ export function App(): React.JSX.Element {
               />
             </label>
 
-            {accounts.length === 0 && <p className="sl-hint">Agregá una cuenta para empezar.</p>}
+            {accounts.length === 0 && (
+              <section className="sl-acc sl-acc-none" aria-label="Sin cuentas">
+                <p className="sl-hint">Agregá una cuenta para empezar.</p>
+                <button type="button" className="sl-newbtn" onClick={() => openSettings('cuentas')}>
+                  Agregar cuenta
+                </button>
+              </section>
+            )}
 
             {accounts.map((acc) => {
               const st = statuses[acc.id]
@@ -904,47 +914,6 @@ export function App(): React.JSX.Element {
                     <div id={bodyId} className="sl-acc-body">
                       {shown.length > 0 && <ul className="sl-list">{shown.map(renderWs)}</ul>}
                       {shown.length === 0 && <p className="sl-acc-empty">{mine.length ? 'Ningún espacio coincide.' : 'Sin espacios. Usá + para crear uno.'}</p>}
-                      <div className="sl-acc-tools">
-                        {u && (
-                          <dl className="sl-usage" title={usageTitle(u)}>
-                            <div>
-                              <dt>5 h</dt>
-                              <dd>{fmtTok(totalTok(u.last5h))}</dd>
-                            </div>
-                            <div>
-                              <dt>Hoy</dt>
-                              <dd>{fmtTok(totalTok(u.today))}</dd>
-                            </div>
-                            <div>
-                              <dt>7 días</dt>
-                              <dd>{fmtTok(totalTok(u.last7d))}</dd>
-                            </div>
-                          </dl>
-                        )}
-                        <label className="switch" title="Enlaza tus skills, agents, hooks, plugins, settings y MCP de ~/.claude">
-                          <span className="switch-text">
-                            Usar mi setup de <span className="mono">~/.claude</span>
-                          </span>
-                          <input type="checkbox" role="switch" checked={acc.shareSetup !== false} onChange={() => void toggleShare(acc)} />
-                          <span className="switch-track" aria-hidden="true" />
-                        </label>
-                        <div className="sl-acc-actions">
-                          <button
-                            type="button"
-                            className="btn sm"
-                            onClick={() => openPane(loginPaneId(acc.id))}
-                            aria-label={st?.loggedIn ? `Abrir terminal de ${acc.label}` : `Iniciar sesión en ${acc.label}`}
-                            title={st?.loggedIn ? 'Terminal de la cuenta' : 'Iniciar sesión'}
-                          >
-                            {st?.loggedIn ? <TerminalIcon size={14} aria-hidden="true" /> : <AccountIcon size={14} />}
-                            {st?.loggedIn ? 'Terminal' : 'Iniciar sesión'}
-                          </button>
-                          <button type="button" className="btn sm danger" onClick={() => void removeAccount(acc)} aria-label={`Quitar cuenta ${acc.label}`} title="Quitar cuenta">
-                            <Trash size={14} aria-hidden="true" />
-                            Quitar
-                          </button>
-                        </div>
-                      </div>
                     </div>
                   )}
                 </section>
@@ -958,31 +927,17 @@ export function App(): React.JSX.Element {
               </section>
             )}
 
-            <SidebarSlot />
-
             <div className="sl-foot">
-              <AddAccount onAdd={addAccount} />
-              <div className="sl-new">
-                <button type="button" className="btn primary" disabled={accounts.length === 0} onClick={() => setNewWsMode('normal')}>
-                  <Plus size={14} weight="bold" aria-hidden="true" />
-                  Nuevo espacio
-                </button>
-                <button
-                  type="button"
-                  className="btn icon-only"
-                  disabled={accounts.length === 0}
-                  onClick={() => setNewWsMode('ticket')}
-                  aria-label="Espacio desde un ticket"
-                  title="Abre Claude con /ticket TCK-…"
-                >
-                  <TicketIcon size={15} aria-hidden="true" />
-                </button>
-              </div>
+              <button type="button" className="sl-newbtn" disabled={accounts.length === 0} onClick={() => setNewWsMode('normal')}>
+                <Plus size={15} weight="bold" aria-hidden="true" />
+                Nuevo espacio
+                <kbd>{comboLabel('new')}</kbd>
+              </button>
             </div>
           </aside>
 
           <main className={`panes sl-main view-${viewMode} ${openPanes.length === 0 ? 'is-empty' : ''}`} aria-label="Paneles">
-            {loaded && openPanes.length === 0 && <EmptyState hasAccounts={accounts.length > 0} hasWs={workspaces.length > 0} />}
+            {loaded && openPanes.length === 0 && <EmptyState onCreate={() => setNewWsMode('normal')} />}
             {openPanes.length > 0 && (
               <>
                 <div className="sl-bar">
@@ -1021,7 +976,7 @@ export function App(): React.JSX.Element {
                     </div>
                     <button
                       type="button"
-                      className="btn sm"
+                      className="sl-bcast"
                       disabled={workspaces.length === 0}
                       onClick={() => runFeatureCommand('broadcast:open', uiCtx)}
                       title="Mandar un mensaje a los espacios con terminal"
@@ -1055,7 +1010,6 @@ export function App(): React.JSX.Element {
                 const accId = login ? accountIdFromLoginPane(paneId) : ws?.accountId
                 const acc = accId ? accountById.get(accId) : undefined
                 const ag = ws ? agents[ws.id] : undefined
-                const email = acc ? statuses[acc.id]?.email : undefined
                 const rect = rectOf.get(paneId)
                 const hidden = !rect
                 const paneQueue = ws ? permsByWs.get(ws.id) : undefined
@@ -1131,7 +1085,8 @@ export function App(): React.JSX.Element {
                         {ws && (
                           <button
                             type="button"
-                            className="icon-btn pane-icon-btn"
+                            className="pane-icon-btn"
+                            style={ws.color ? ({ '--ws': colorHex(ws.color) } as CSSProperties) : undefined}
                             onClick={(e) => {
                               const btn = e.currentTarget
                               const r = btn.getBoundingClientRect()
@@ -1140,7 +1095,7 @@ export function App(): React.JSX.Element {
                             aria-label={`Elegir ícono de ${ws.name}`}
                             title="Elegir ícono"
                           >
-                            {ws.icon ? <span aria-hidden="true">{ws.icon}</span> : <Smiley size={14} aria-hidden="true" />}
+                            {ws.icon ? <span aria-hidden="true">{ws.icon}</span> : <SpaceIcon size={13} aria-hidden="true" />}
                           </button>
                         )}
                         {ws && renaming?.id === ws.id && renaming.from === 'pane' ? (
@@ -1157,11 +1112,6 @@ export function App(): React.JSX.Element {
                             {ws.branch}
                           </span>
                         )}
-                        <span className="pane-meta">
-                          <span className="acc-badge" title={email}>
-                            {acc?.label ?? '?'}
-                          </span>
-                        </span>
                       </span>
                       {ag && <StatePill state={ag.state} detail={ag.detail} />}
                       <span className="pane-actions">
@@ -1225,9 +1175,9 @@ export function App(): React.JSX.Element {
             <span className="sl-status-dot" aria-hidden="true" />
             Terminales activas: {activeTerms}
           </span>
+          <span className="sl-status-persist">Siguen corriendo aunque cierres la ventana</span>
           <span className="sl-status-keys">
-            <Keys id="palette" /> buscar · <Keys id="sidebar" /> barra lateral · <Keys id="new" /> nuevo espacio ·{' '}
-            <kbd>Ctrl</kbd>+<kbd>Tab</kbd> cambiar de panel
+            {comboLabel('palette')} buscar · {comboLabel('new')} nuevo · Ctrl 1–4 ir a un panel
           </span>
         </footer>
 
@@ -1448,27 +1398,5 @@ function WsMenu({
         <Smiley size={14} aria-hidden="true" /> Cambiar ícono
       </button>
     </div>
-  )
-}
-
-function AddAccount({ onAdd }: { onAdd: (label: string) => Promise<void> }): React.JSX.Element {
-  const [label, setLabel] = useState('')
-  return (
-    <form
-      className="inline-form"
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (!label.trim()) return
-        void onAdd(label).then(() => setLabel(''))
-      }}
-    >
-      <label htmlFor="new-acc" className="sr-only">
-        Nombre de la cuenta nueva
-      </label>
-      <input id="new-acc" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nueva cuenta: Personal, Trabajo…" />
-      <button className="btn icon-only" type="submit" disabled={!label.trim()} aria-label="Agregar cuenta" title="Agregar cuenta">
-        <Plus size={14} weight="bold" aria-hidden="true" />
-      </button>
-    </form>
   )
 }
