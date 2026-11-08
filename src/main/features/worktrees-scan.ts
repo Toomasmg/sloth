@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { lstat, opendir } from 'node:fs/promises'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { parsePorcelain } from './git-ops'
 import { git, gitRaw, normPath, run, validBranchName } from './git-run'
@@ -314,6 +315,57 @@ export function branchNameError(raw: string, taken: { mainBranch: string | null;
   if (b === taken.mainBranch) return 'Esa es la copia principal del repo. Elegí otro nombre.'
   if (taken.branches.includes(b)) return 'Ya hay una rama con ese nombre en este repo.'
   return ''
+}
+
+export interface FolderSize {
+  /** Bytes de los archivos contados (node_modules incluido). */
+  bytes: number
+  /** Se pasó del tiempo: `bytes` es un mínimo («más de»). */
+  partial: boolean
+  /** Se canceló (la pantalla se cerró): el número no sirve. */
+  aborted: boolean
+}
+
+const DIR_BUFFER = 256
+const STAT_BATCH = 64
+
+/**
+ * Tamaño de una carpeta, sumando sus archivos. Asíncrono y por lotes (opendir + lstat en paralelo de a 64),
+ * así no bloquea el hilo principal. No sigue enlaces ni junctions (si no, se contaría dos veces).
+ * Si pasa `deadline` (ms epoch) o se cancela por `signal`, devuelve lo contado hasta ahí.
+ */
+export async function folderSize(root: string, opts: { deadline: number; signal: AbortSignal }): Promise<FolderSize> {
+  let bytes = 0
+  const stop = (): FolderSize | null => {
+    if (opts.signal.aborted) return { bytes, partial: true, aborted: true }
+    if (Date.now() > opts.deadline) return { bytes, partial: true, aborted: false }
+    return null
+  }
+  const pending = [root]
+  while (pending.length) {
+    const early = stop()
+    if (early) return early
+    const dir = pending.pop() as string
+    const paths: string[] = []
+    try {
+      const d = await opendir(dir, { bufferSize: DIR_BUFFER })
+      for await (const e of d) paths.push(join(dir, e.name))
+    } catch {
+      continue // sin permiso o ya no existe: no suma
+    }
+    for (let i = 0; i < paths.length; i += STAT_BATCH) {
+      const late = stop()
+      if (late) return late
+      const chunk = paths.slice(i, i + STAT_BATCH)
+      const stats = await Promise.all(chunk.map((p) => lstat(p).catch(() => null)))
+      stats.forEach((st, j) => {
+        if (!st || st.isSymbolicLink()) return
+        if (st.isDirectory()) pending.push(chunk[j])
+        else if (st.isFile()) bytes += st.size
+      })
+    }
+  }
+  return { bytes, partial: false, aborted: false }
 }
 
 /** Repos distintos de los espacios (resolviendo worktrees a su repo principal). */
