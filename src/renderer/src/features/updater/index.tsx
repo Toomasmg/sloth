@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import type { FeatureUi } from '../host'
 import { useUi } from '../host'
 import { UpdateIcon } from '../../icons/SlothIcons'
-import { onOpenAbout, openAbout } from './bus'
+import { onOpenAbout, onUpdateToast, openAbout } from './bus'
 import { setPhase, usePhase } from './phase'
 import { useUpdateDot, useUpdateStatus } from './useUpdateStatus'
 import './updater.css'
@@ -74,8 +74,21 @@ function UpdateBanner(): React.JSX.Element | null {
 
 function Global(): React.JSX.Element {
   const [open, setOpen] = useState(false)
+  const [toast, setToast] = useState('')
   const { phase } = usePhase()
   useEffect(() => onOpenAbout(() => setOpen(true)), [])
+  useEffect(() => {
+    let timer: number | undefined
+    const off = onUpdateToast((m) => {
+      setToast(m)
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => setToast(''), 2400)
+    })
+    return () => {
+      off()
+      window.clearTimeout(timer)
+    }
+  }, [])
   return (
     <>
       {phase && (
@@ -87,6 +100,14 @@ function Global(): React.JSX.Element {
         <Suspense fallback={null}>
           <AboutModal onClose={() => setOpen(false)} />
         </Suspense>
+      )}
+      {toast && (
+        <div role="status" className="f-updater-toast">
+          <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" fill="none" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12.5l4.5 4.5L19 7.5" />
+          </svg>
+          <span>{toast}</span>
+        </div>
       )}
     </>
   )
