@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { DotsThree } from '@phosphor-icons/react'
 import { buildPayload } from '../features/broadcast/payload'
 import { cleanError } from '../format'
+import { MoreIcon } from '../icons/SlothIcons'
 
 export interface PaneMenuItem {
   id: string
@@ -66,7 +66,7 @@ export function PaneMenu({ label, items }: { label: string; items: PaneMenuItem[
         title={label}
         onClick={() => setOpen((o) => !o)}
       >
-        <DotsThree size={18} weight="bold" aria-hidden="true" />
+        <MoreIcon size={18} />
       </button>
       {open && (
         <div ref={menuRef} id={id} className="pane-menu" role="menu" aria-label={label} onKeyDown={onMenuKey}>
@@ -81,7 +81,7 @@ export function PaneMenu({ label, items }: { label: string; items: PaneMenuItem[
                 it.onSelect()
               }}
             >
-              <span className="pane-menu-ico" aria-hidden="true">
+              <span className="pane-menu-ico">
                 {it.icon}
               </span>
               <span className="pane-menu-label">{it.label}</span>
@@ -110,7 +110,7 @@ export function PaneInput({
   const [text, setText] = useState('')
   return (
     <label className="pane-input">
-      <span className="pane-input-prompt" aria-hidden="true">
+      <span className="pane-input-prompt">
         ›
       </span>
       <input

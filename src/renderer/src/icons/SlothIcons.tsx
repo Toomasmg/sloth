@@ -577,6 +577,246 @@ export function CloseIcon(props: SlothIconProps) {
   )
 }
 
+/** Copiar */
+export function CopyIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.2" />
+      <path d="M15.5 8.5V6.2a2 2 0 0 0-2-2H6.2a2 2 0 0 0-2 2v7.3a2 2 0 0 0 2 2h2.3" />
+    </Base>
+  )
+}
+
+/** Editar */
+export function PencilIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M4 20l1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5z" />
+      <path d="M13.5 7l3 3" />
+    </Base>
+  )
+}
+
+/** Borrar */
+export function TrashIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M4 7h16M9.5 7V4.8h5V7M6.2 7l.9 12.2h9.8L17.8 7" />
+      <path d="M10.2 11v5.2M13.8 11v5.2" />
+    </Base>
+  )
+}
+
+/** Agregar */
+export function PlusIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </Base>
+  )
+}
+
+/** Desplegar hacia abajo */
+export function ChevronDownIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M6 9.5l6 6 6-6" />
+    </Base>
+  )
+}
+
+/** Desplegar hacia la derecha */
+export function ChevronRightIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M9.5 6l6 6-6 6" />
+    </Base>
+  )
+}
+
+/** Atrás */
+export function ArrowLeftIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M19 12H5M11 6l-6 6 6 6" />
+    </Base>
+  )
+}
+
+/** Adelante */
+export function ArrowRightIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </Base>
+  )
+}
+
+/** Atención / cuidado */
+export function WarningIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M12 4.2l8.6 15.1H3.4z" />
+      <path d="M12 10v3.8" />
+      <circle cx="12" cy="16.9" r="0.6" fill="currentColor" stroke="none" />
+    </Base>
+  )
+}
+
+/** Listo / marcado */
+export function CheckIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </Base>
+  )
+}
+
+/** Reproducir */
+export function PlayIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M8 5.5v13l10.5-6.5z" />
+    </Base>
+  )
+}
+
+/** Pausa */
+export function PauseIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M8.5 5.5v13M15.5 5.5v13" />
+    </Base>
+  )
+}
+
+/** Actualizar / volver a leer */
+export function RefreshIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3" />
+      <path d="M19.5 4.5v4.6h-4.6" />
+    </Base>
+  )
+}
+
+/** Arrastrar para reordenar */
+export function GripIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      {[6, 12, 18].flatMap((y) => [9, 15].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.3" fill="currentColor" stroke="none" />))}
+    </Base>
+  )
+}
+
+/** Restaurar (deshacer / volver atrás en una acción) */
+export function RestoreIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M9 14.5L4.5 10 9 5.5M4.5 10H14a5.5 5.5 0 0 1 0 11h-3" />
+    </Base>
+  )
+}
+
+/** Achicar (salir de pantalla completa) */
+export function ArrowsInIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M9 4.5v4.5H4.5M15 4.5V9h4.5M9 19.5V15H4.5M15 19.5V15h4.5" />
+    </Base>
+  )
+}
+
+/** Ocultar */
+export function HideIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M3.5 3.5l17 17" />
+      <path d="M10.4 6.3A9.7 9.7 0 0 1 12 6c4.8 0 8.2 4.3 9.2 6a12.3 12.3 0 0 1-2.4 2.9M6.7 6.9C4.4 8.4 2.9 10.3 2.8 12c1 1.7 4.4 6 9.2 6 1.5 0 2.9-.4 4.1-1" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+    </Base>
+  )
+}
+
+/** Etiqueta */
+export function TagIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.2 1.2 0 0 1 0 1.7l-6.6 6.6a1.2 1.2 0 0 1-1.7 0z" />
+      <circle cx="8" cy="8" r="1.2" />
+    </Base>
+  )
+}
+
+/** Servidor (daemon de terminales) */
+export function ServerIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <rect x="3.5" y="4" width="17" height="6.5" rx="1.6" />
+      <rect x="3.5" y="13.5" width="17" height="6.5" rx="1.6" />
+      <path d="M7 7.2h.01M7 16.7h.01" />
+    </Base>
+  )
+}
+
+/** Terminal */
+export function TerminalIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <rect x="3" y="4.5" width="18" height="15" rx="2.4" />
+      <path d="M7 9.5l2.8 2.5L7 14.5M12.8 15h4" />
+    </Base>
+  )
+}
+
+/** Encender / apagar */
+export function PowerIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M12 3.5v8" />
+      <path d="M7 6.3a7.6 7.6 0 1 0 10 0" />
+    </Base>
+  )
+}
+
+/** Listo (círculo con marca) */
+export function CheckCircleIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <circle cx="12" cy="12" r="8.4" />
+      <path d="M8.2 12.4l2.5 2.5 5.1-5.2" />
+    </Base>
+  )
+}
+
+/** Círculo vacío */
+export function CircleIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <circle cx="12" cy="12" r="7.6" />
+    </Base>
+  )
+}
+
+/** Media vuelta de cargando (girar con la clase spin) */
+export function SpinnerIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M12 4a8 8 0 1 1-8 8" />
+    </Base>
+  )
+}
+
+/** Círculo con raya (cerrado) */
+export function MinusCircleIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <circle cx="12" cy="12" r="8.4" />
+      <path d="M8.2 12h7.6" />
+    </Base>
+  )
+}
+
 export const SLOTH_ICONS = {
   Working: WorkingIcon,
   Waiting: WaitingIcon,

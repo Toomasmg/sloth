@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CaretDown, HardDrives, Power, TerminalWindow } from '@phosphor-icons/react'
 import type { DaemonInfo } from '../../shared/types'
 import { api } from './api'
 import { cleanError } from './format'
 import { useVisiblePolling } from './visibility'
+import { ChevronDownIcon, PowerIcon, ServerIcon, TerminalIcon } from './icons/SlothIcons'
 
 /** Chip de la barra de título: dónde corren las terminales, y botón para apagarlas todas. */
 export function DaemonStatus(): React.JSX.Element | null {
@@ -73,9 +73,9 @@ export function DaemonStatus(): React.JSX.Element | null {
         aria-label={daemon ? 'Terminales persistentes' : 'Modo simple'}
         title={daemon ? 'Las terminales siguen corriendo aunque cierres Sloth' : info.reason ?? 'Las terminales viven dentro de la app'}
       >
-        {daemon ? <HardDrives size={12} aria-hidden="true" /> : <TerminalWindow size={12} aria-hidden="true" />}
+        {daemon ? <ServerIcon size={12} /> : <TerminalIcon size={12} />}
         <span className="tb-daemon-label">{daemon ? 'Terminales persistentes' : 'Modo simple'}</span>
-        <CaretDown size={10} weight="bold" aria-hidden="true" />
+        <ChevronDownIcon size={10} />
       </button>
       {open && (
         <div className="daemon-pop" role="dialog" aria-label="Estado de las terminales">
@@ -108,7 +108,7 @@ export function DaemonStatus(): React.JSX.Element | null {
             )}
           </dl>
           <button type="button" className="btn sm danger daemon-off" disabled={busy} onClick={() => void shutdown()}>
-            <Power size={14} weight="bold" aria-hidden="true" />
+            <PowerIcon size={14} />
             {busy ? 'Apagando…' : 'Apagar todas las terminales'}
           </button>
           {error && (

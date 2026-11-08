@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { PencilSimple, Trash } from '@phosphor-icons/react'
 import type { Workspace } from '../../../../shared/types'
 import { api } from '../../api'
 import { cleanError, shortPath, STATE_LABEL } from '../../format'
-import { ChangesIcon, CloseIcon, EditorIcon, FolderIcon, MaximizeIcon, MoveAccountIcon, SearchIcon } from '../../icons/SlothIcons'
+import { ChangesIcon, CloseIcon, EditorIcon, FolderIcon, MaximizeIcon, MoveAccountIcon, PencilIcon, SearchIcon, TrashIcon } from '../../icons/SlothIcons'
 import { bindingOf, isCapturingShortcut, matchShortcut } from '../../shortcuts'
 import { getSettings, resolveAccountColor, useSettings } from '../settings/store'
 import { FEATURE_UIS } from '../registry'
@@ -141,7 +140,7 @@ function spaceItem(ctx: UiCtx, ws: Workspace, colorOf: (accountId: string) => st
     title: ws.name,
     subtitle: `${acc?.label ?? 'cuenta borrada'} · ${ws.branch ?? shortPath(ws.cwd)}`,
     keywords: [ws.ticket, ws.branch, ws.repoPath].filter(Boolean).join(' '),
-    icon: <FolderIcon size={15} aria-hidden="true" />,
+    icon: <FolderIcon size={15} />,
     iconStyle: { color: colorOf(ws.accountId), background: `color-mix(in srgb, ${colorOf(ws.accountId)} 16%, transparent)` },
     meta: stateMeta(ctx, ws),
     spaceId: ws.id,
@@ -154,13 +153,13 @@ function spaceActions(ctx: UiCtx, ws: Workspace): Item[] {
   const id = ws.id
   const base = { section: 'acciones' as const, group: ws.name }
   const items: Item[] = [
-    { ...base, id: 'x-abrir', title: 'Abrir en el panel activo', subtitle: 'Lo muestra y le pone el foco', icon: <FolderIcon size={15} aria-hidden="true" />, run: () => openSpace(ctx, id) },
+    { ...base, id: 'x-abrir', title: 'Abrir en el panel activo', subtitle: 'Lo muestra y le pone el foco', icon: <FolderIcon size={15} />, run: () => openSpace(ctx, id) },
     {
       ...base,
       id: 'x-max',
       title: 'Abrir maximizado',
       subtitle: 'Un solo panel con este espacio',
-      icon: <MaximizeIcon size={15} aria-hidden="true" />,
+      icon: <MaximizeIcon size={15} />,
       run: () => {
         ctx.openPane(id)
         ctx.setMaximized(id)
@@ -171,7 +170,7 @@ function spaceActions(ctx: UiCtx, ws: Workspace): Item[] {
       id: 'x-git',
       title: 'Ver cambios',
       subtitle: 'Git del espacio',
-      icon: <ChangesIcon size={15} aria-hidden="true" />,
+      icon: <ChangesIcon size={15} />,
       run: () => {
         ctx.openPane(id)
         runFeatureCommand('git:changes', { ...ctx, focused: id })
@@ -182,7 +181,7 @@ function spaceActions(ctx: UiCtx, ws: Workspace): Item[] {
       id: 'x-code',
       title: `Abrir en ${getSettings().settings.editor === 'Bloc de notas' ? 'carpeta' : getSettings().settings.editor}`,
       subtitle: ws.cwd,
-      icon: <EditorIcon size={15} aria-hidden="true" />,
+      icon: <EditorIcon size={15} />,
       run: () => {
         api.revealWorkspace(id, 'vscode').catch((e) => ctx.notifyError(cleanError(e)))
       }
@@ -193,7 +192,7 @@ function spaceActions(ctx: UiCtx, ws: Workspace): Item[] {
       title: 'Renombrar',
       subtitle: 'Escribís el nombre nuevo en el panel',
       shortcut: 'F2',
-      icon: <PencilSimple size={15} aria-hidden="true" />,
+      icon: <PencilIcon size={15} />,
       run: () => {
         ctx.openPane(id)
         window.dispatchEvent(new CustomEvent(PALETTE_RENAME_EVENT, { detail: id }))
@@ -206,7 +205,7 @@ function spaceActions(ctx: UiCtx, ws: Workspace): Item[] {
       id: 'x-mover',
       title: 'Mover a otra cuenta',
       subtitle: 'La terminal se reinicia con la otra cuenta',
-      icon: <MoveAccountIcon size={15} aria-hidden="true" />,
+      icon: <MoveAccountIcon size={15} />,
       run: () => runFeatureCommand('move-account.focused', { ...ctx, focused: id })
     })
   items.push(
@@ -215,7 +214,7 @@ function spaceActions(ctx: UiCtx, ws: Workspace): Item[] {
       id: 'x-ocultar',
       title: 'Ocultar panel',
       subtitle: 'La terminal sigue corriendo',
-      icon: <CloseIcon size={15} aria-hidden="true" />,
+      icon: <CloseIcon size={15} />,
       run: () => ctx.closePane(id)
     },
     {
@@ -223,7 +222,7 @@ function spaceActions(ctx: UiCtx, ws: Workspace): Item[] {
       id: 'x-quitar',
       title: 'Quitar espacio',
       subtitle: 'Se cierra su terminal',
-      icon: <Trash size={15} aria-hidden="true" />,
+      icon: <TrashIcon size={15} />,
       danger: true,
       run: () => window.dispatchEvent(new CustomEvent(PALETTE_REMOVE_EVENT, { detail: id }))
     }
@@ -460,7 +459,7 @@ export function PaletteBar(): React.JSX.Element {
   return (
     <div ref={wrapRef} className={`pal ${open ? 'open' : ''}`}>
       <label className="pal-field">
-        <SearchIcon size={15} aria-hidden="true" />
+        <SearchIcon size={15} />
         {scoped && (
           <button
             type="button"
@@ -471,7 +470,7 @@ export function PaletteBar(): React.JSX.Element {
             }}
             title="Volver a la búsqueda (Retroceso)"
           >
-            <span className="pal-scope-ico" style={{ background: colorOf(scoped.accountId) }} aria-hidden="true" />
+            <span className="pal-scope-ico" style={{ background: colorOf(scoped.accountId) }} />
             <span className="pal-scope-name">{scoped.name}</span>
           </button>
         )}
@@ -546,7 +545,7 @@ export function PaletteBar(): React.JSX.Element {
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => run(it)}
                     >
-                      <span className="pal-ico" style={it.iconStyle} aria-hidden="true">
+                      <span className="pal-ico" style={it.iconStyle}>
                         {it.icon}
                       </span>
                       <span className="pal-txt">
@@ -562,7 +561,7 @@ export function PaletteBar(): React.JSX.Element {
                       {it.meta && <span className={`pal-meta s-${it.meta.cls}`}>{it.meta.label}</span>}
                       {it.shortcut && !on && <Keys shortcut={it.shortcut} />}
                       {on && (
-                        <span className="pal-enter" aria-hidden="true">
+                        <span className="pal-enter">
                           {it.spaceId && !scoped ? 'Abrir · Tab acciones' : 'Ejecutar'}
                         </span>
                       )}

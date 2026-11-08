@@ -1,20 +1,9 @@
-import {
-  ArrowCounterClockwise,
-  ArrowsInSimple,
-  ArrowsOutSimple,
-  Check,
-  EyeSlash,
-  FolderOpen,
-  Plus,
-  Tag,
-  UserCircle,
-  X
-} from '@phosphor-icons/react'
 import { isLoginPane, loginPaneId } from '../../../../shared/types'
 import { STATE_LABEL, cleanError, shortPath } from '../../format'
 import { toolLabel } from '../../PermissionCard'
 import { decidePermission } from '../permissions/api'
 import type { Command, UiCtx } from '../host'
+import { AccountIcon, ArrowsInIcon, CheckIcon, CloseIcon, FolderIcon, HideIcon, MaximizeIcon, PlusIcon, RestoreIcon, TagIcon } from '../../icons/SlothIcons'
 
 /** Enfoca la terminal de un panel apenas exista (si se acaba de abrir, tarda un par de cuadros). */
 export function focusPaneTerminal(id: string, tries = 10): void {
@@ -38,7 +27,7 @@ export function coreCommands(ctx: UiCtx): Command[] {
       title: `Ir a ${ws.name}`,
       subtitle: [acc?.label ?? 'cuenta borrada', ag ? STATE_LABEL[ag.state] : 'sin abrir', ws.branch ?? shortPath(ws.cwd)].join(' · '),
       group: 'Espacios',
-      icon: <FolderOpen size={16} aria-hidden="true" />,
+      icon: <FolderIcon size={16} />,
       keywords: [ws.ticket, ws.branch, ws.repoPath].filter(Boolean).join(' '),
       run: () => {
         ctx.openPane(ws.id)
@@ -54,7 +43,7 @@ export function coreCommands(ctx: UiCtx): Command[] {
         title: 'Nuevo espacio',
         subtitle: 'Un repo, una cuenta y una PowerShell',
         group: 'General',
-        icon: <Plus size={16} aria-hidden="true" />,
+        icon: <PlusIcon size={16} />,
         keywords: 'crear agregar workspace',
         run: () => ctx.openNewWorkspace('normal')
       },
@@ -63,7 +52,7 @@ export function coreCommands(ctx: UiCtx): Command[] {
         title: 'Espacio desde ticket',
         subtitle: 'Abre Claude con /ticket TCK-…',
         group: 'General',
-        icon: <Tag size={16} aria-hidden="true" />,
+        icon: <TagIcon size={16} />,
         keywords: 'crear tck gruv',
         run: () => ctx.openNewWorkspace('ticket')
       }
@@ -80,7 +69,7 @@ export function coreCommands(ctx: UiCtx): Command[] {
         title: isMax ? 'Restaurar panel (volver a la grilla)' : 'Maximizar panel enfocado',
         subtitle: name,
         group: 'Panel',
-        icon: isMax ? <ArrowsInSimple size={16} aria-hidden="true" /> : <ArrowsOutSimple size={16} aria-hidden="true" />,
+        icon: isMax ? <ArrowsInIcon size={16} /> : <MaximizeIcon size={16} />,
         keywords: 'maximizar restaurar grilla agrandar',
         run: () => ctx.setMaximized(isMax ? null : f)
       },
@@ -89,7 +78,7 @@ export function coreCommands(ctx: UiCtx): Command[] {
         title: 'Reiniciar terminal enfocada',
         subtitle: `${name} · cierra el proceso y abre otra terminal`,
         group: 'Panel',
-        icon: <ArrowCounterClockwise size={16} aria-hidden="true" />,
+        icon: <RestoreIcon size={16} />,
         keywords: 'reiniciar matar kill terminal',
         run: async () => {
           if (ctx.agents[f]?.state === 'working' && !window.confirm(`«${name}» está trabajando. ¿Reiniciar la terminal igual?`)) return
@@ -101,7 +90,7 @@ export function coreCommands(ctx: UiCtx): Command[] {
         title: 'Ocultar panel enfocado',
         subtitle: `${name} · la terminal sigue corriendo`,
         group: 'Panel',
-        icon: <EyeSlash size={16} aria-hidden="true" />,
+        icon: <HideIcon size={16} />,
         keywords: 'cerrar ocultar panel',
         run: () => ctx.closePane(f)
       }
@@ -115,7 +104,7 @@ export function coreCommands(ctx: UiCtx): Command[] {
       title: `Terminal de la cuenta ${acc.label}`,
       subtitle: st?.loggedIn ? (st.email ?? 'Sesión iniciada') : 'Sin sesión: iniciar sesión',
       group: 'Cuentas',
-      icon: <UserCircle size={16} aria-hidden="true" />,
+      icon: <AccountIcon size={16} />,
       keywords: 'login sesion cuenta',
       run: () => {
         const id = loginPaneId(acc.id)
@@ -139,8 +128,8 @@ export function coreCommands(ctx: UiCtx): Command[] {
       }
     }
     cmds.push(
-      { id: 'palette:perm-allow', title: 'Aprobar el permiso más viejo', subtitle: where, group: 'Permisos', icon: <Check size={16} aria-hidden="true" />, keywords: 'permitir aceptar si allow', run: answer('allow') },
-      { id: 'palette:perm-deny', title: 'Rechazar el permiso más viejo', subtitle: where, group: 'Permisos', icon: <X size={16} aria-hidden="true" />, keywords: 'denegar no deny', run: answer('deny') }
+      { id: 'palette:perm-allow', title: 'Aprobar el permiso más viejo', subtitle: where, group: 'Permisos', icon: <CheckIcon size={16} />, keywords: 'permitir aceptar si allow', run: answer('allow') },
+      { id: 'palette:perm-deny', title: 'Rechazar el permiso más viejo', subtitle: where, group: 'Permisos', icon: <CloseIcon size={16} />, keywords: 'denegar no deny', run: answer('deny') }
     )
   }
   return cmds

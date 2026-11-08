@@ -1,8 +1,8 @@
-import { ShieldWarning } from '@phosphor-icons/react'
 import type { AgentState } from '../../../shared/types'
 import { StateIcon } from '../StateIcon'
 import { STATE_LABEL } from '../format'
 import type { ReorderDrag } from './useReorderDrag'
+import { PermissionIcon } from '../icons/SlothIcons'
 
 export interface TabInfo {
   id: string
@@ -82,13 +82,13 @@ export function TabBar({ tabs, active, drag, scope, onSelect, onHide, onPointerD
             }}
             onKeyDown={(e) => onKeyDown(e, i)}
           >
-            <span className="acc-dot" aria-hidden="true" />
+            <span className="acc-dot" />
             <StateIcon state={t.state} size={12} />
-            {t.icon && <span className="pane-tab-icon" aria-hidden="true">{t.icon}</span>}
+            {t.icon && <span className="pane-tab-icon">{t.icon}</span>}
             <span className="pane-tab-title">{t.title}</span>
             {t.perms > 0 && (
-              <span className="pane-tab-perm" aria-hidden="true">
-                <ShieldWarning size={11} weight="fill" />
+              <span className="pane-tab-perm">
+                <PermissionIcon size={11} />
                 {t.perms > 1 ? t.perms : ''}
               </span>
             )}
