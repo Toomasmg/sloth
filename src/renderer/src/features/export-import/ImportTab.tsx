@@ -6,6 +6,7 @@ import {
   type AddRulesResult,
   type Conflicto,
   type ImportChoices,
+  type ImportPlan,
   type ImportPreview,
   type ImportResult,
   type PlanPermiso,
@@ -498,7 +499,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
             disabled={importing}
             name="Apariencia"
             desc="Tema, color de acento, densidad y tamaño del texto."
-            sum="Del archivo"
+            sum={resumenApariencia(plan.aparienciaValores)}
           />
 
           <Group
@@ -600,6 +601,22 @@ function badgeOf(st: PlanSpace['status'], c: Conflicto): { label: string; tone: 
     default:
       return { label: 'Se saltea', tone: 'warn' }
   }
+}
+
+const THEME_NAMES: Record<string, string> = { oscuro: 'Oscuro', noche: 'Más oscuro', claro: 'Claro', sistema: 'Según Windows' }
+const ACCENT_NAMES: Record<string, string> = { cielo: 'Cielo', hoja: 'Hoja', lila: 'Lila', ambar: 'Ámbar' }
+
+/** Resumen de Apariencia como el artboard: «Más oscuro · Lila · Compacta · 14 px» (con «Modo liviano» si está). */
+function resumenApariencia(v: ImportPlan['aparienciaValores']): string {
+  if (!v) return 'Sin valores'
+  const partes = [
+    v.theme ? (THEME_NAMES[v.theme] ?? v.theme) : null,
+    v.accent ? (ACCENT_NAMES[v.accent] ?? v.accent) : null,
+    v.density ? (v.density === 'cómoda' ? 'Cómoda' : 'Compacta') : null,
+    typeof v.uiFontSize === 'number' ? `${v.uiFontSize} px` : null,
+    v.lightMode ? 'Modo liviano' : null
+  ]
+  return partes.filter(Boolean).join(' · ') || 'Sin valores'
 }
 
 function Group(props: {
