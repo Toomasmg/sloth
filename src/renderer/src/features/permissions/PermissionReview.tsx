@@ -1,10 +1,18 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { Account, PermissionPrompt, Workspace } from '../../../../shared/types'
 import { alwaysLabel, changesOf, explanationOf, filesOf, kindOf, titleOf, type FileChange } from '../../../../main/features/permissions-core'
-import { CloseIcon, FolderIcon, PermissionIcon, SpaceIcon, AccountIcon, ChangesIcon } from '../../icons/SlothIcons'
+import { CloseIcon, PermissionIcon } from '../../icons/SlothIcons'
+import { CheckGlyph } from '../git/glyphs'
 import { cleanError } from '../../format'
 import { decidePermission, rejectAndTell } from './api'
-import { openPermissionDecisions } from './store'
+
+/** Nivel de riesgo que muestra la revisión, derivado del tipo de pedido (no es una evaluación de seguridad). */
+function riskOf(kind: ReturnType<typeof kindOf>, nChanges: number): { label: string; cls: string } {
+  if (kind === 'edit') return { label: `Cambia ${nChanges} ${nChanges === 1 ? 'archivo' : 'archivos'} del repo`, cls: 'info' }
+  if (kind === 'net') return { label: 'Accede a internet', cls: 'info' }
+  if (kind === 'cmd') return { label: 'Corre un comando en la carpeta del espacio', cls: 'warn' }
+  return { label: 'Pedido sin clasificar', cls: 'warn' }
+}
 
 interface Props {
   /** Pedidos vivos de todos los espacios, en orden de llegada. */
@@ -160,14 +168,18 @@ export function PermissionReview({ prompts, workspaces, accounts, initialId, onC
           </div>
           {n > 0 && (
             <div className="pr-queue" role="group" aria-label="Cola de pedidos">
-              <button type="button" className="icon-btn" onClick={() => go(-1)} disabled={n < 2} aria-label="Pedido anterior">
-                <span aria-hidden="true">‹</span>
+              <button type="button" className="icon-btn pr-nav" onClick={() => go(-1)} disabled={n < 2} aria-label="Pedido anterior">
+                <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 5l-7 7 7 7" />
+                </svg>
               </button>
               <span className="pr-queue-label" aria-live="polite">
                 {idx + 1} de {n} {n === 1 ? 'pedido' : 'pedidos'}
               </span>
-              <button type="button" className="icon-btn" onClick={() => go(1)} disabled={n < 2} aria-label="Pedido siguiente">
-                <span aria-hidden="true">›</span>
+              <button type="button" className="icon-btn pr-nav" onClick={() => go(1)} disabled={n < 2} aria-label="Pedido siguiente">
+                <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 5l7 7-7 7" />
+                </svg>
               </button>
             </div>
           )}
@@ -179,11 +191,11 @@ export function PermissionReview({ prompts, workspaces, accounts, initialId, onC
         {!p ? (
           <div className="pr-empty">
             <span className="pr-empty-icon" aria-hidden="true">
-              <ChangesIcon size={18} />
+              <CheckGlyph size={18} />
             </span>
             <div className="pr-empty-title">No hay pedidos pendientes</div>
             <div className="pr-empty-sub">Claude no espera nada de vos. Los pedidos nuevos aparecen acá.</div>
-            <button type="button" className="btn sm" onClick={onClose}>
+            <button type="button" className="btn primary" onClick={onClose}>
               Volver a los espacios
             </button>
           </div>
@@ -191,21 +203,15 @@ export function PermissionReview({ prompts, workspaces, accounts, initialId, onC
           <div className="pr-body">
             <dl className="pr-meta">
               <div>
-                <dt>
-                  <SpaceIcon size={13} /> Espacio
-                </dt>
+                <dt>Espacio</dt>
                 <dd>{ws?.name ?? 'Espacio borrado'}</dd>
               </div>
               <div>
-                <dt>
-                  <AccountIcon size={13} /> Cuenta
-                </dt>
+                <dt>Cuenta</dt>
                 <dd>{acc?.label ?? 'Cuenta borrada'}</dd>
               </div>
-              <div className="pr-meta-wide">
-                <dt>
-                  <FolderIcon size={13} /> Carpeta
-                </dt>
+              <div>
+                <dt>Carpeta</dt>
                 <dd className="mono">{ws?.cwd ?? '—'}</dd>
               </div>
             </dl>
@@ -227,9 +233,18 @@ export function PermissionReview({ prompts, workspaces, accounts, initialId, onC
               <p className="pr-expl-text">{explanation ?? 'Claude no dejó una explicación en este pedido.'}</p>
             </section>
 
+            {p && (
+              <div className="pr-risk">
+                <span className="pr-risk-label">Riesgo</span>
+                <span className={`pr-risk-pill ${riskOf(kind, changes.length || files.length).cls}`}>
+                  {riskOf(kind, changes.length || files.length).label}
+                </span>
+              </div>
+            )}
+
             {msgOpen && (
               <label className="pr-msg">
-                <span>Decile a Claude qué hacer en cambio (se escribe en la terminal de {ws?.name ?? 'este espacio'})</span>
+                <span>Decile a Claude qué hacer en cambio</span>
                 <textarea
                   ref={msgRef}
                   rows={2}
@@ -297,14 +312,6 @@ export function PermissionReview({ prompts, workspaces, accounts, initialId, onC
             )}
           </div>
         )}
-
-        <footer className="pr-foot">
-          <span className="pr-foot-hint">← → cambian de pedido · Esc cierra</span>
-          <span className="spacer" />
-          <button type="button" className="btn sm ghost" onClick={openPermissionDecisions}>
-            Ver decisiones y reglas
-          </button>
-        </footer>
       </div>
     </div>
   )
