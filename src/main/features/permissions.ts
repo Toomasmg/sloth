@@ -8,6 +8,7 @@ import type { HookEventPayload } from '../hooks'
 import { currentSettings } from './settings'
 import {
   CHOICES,
+  checkRule,
   decisionFor,
   findRule,
   kindOf,
@@ -47,6 +48,8 @@ interface State {
 const MAX_HISTORY = 300
 const MAX_RULES = 200
 const MAX_MESSAGE = 1000
+/** Tope de reglas que acepta una importación de una vez (el archivo ya viene acotado). */
+const MAX_IMPORT = 500
 
 const file = (): string => join(app.getPath('userData'), 'features', 'permissions.json')
 
@@ -231,6 +234,37 @@ const feature: Feature = {
       if (typeof id !== 'string') throw new Error('Regla inválida.')
       state.rules = state.rules.filter((x) => x.id !== id)
       save()
+    })
+
+    /**
+     * Agrega reglas «Permitir siempre» elegidas al importar un archivo. Cada una se valida con
+     * checkRule (la misma validación de siempre) y se revisa que el espacio exista. Las repetidas
+     * o inválidas se cuentan como omitidas. Nunca toca la configuración de Claude.
+     */
+    ctx.handle('addRules', (payload: unknown) => {
+      const list = (payload as { reglas?: unknown } | null)?.reglas
+      if (!Array.isArray(list) || list.length > MAX_IMPORT) throw new Error('La lista de reglas no es válida.')
+      let agregadas = 0
+      let omitidas = 0
+      for (const item of list) {
+        const wsId = typeof (item as { workspaceId?: unknown })?.workspaceId === 'string' ? (item as { workspaceId: string }).workspaceId : ''
+        const check = checkRule(item)
+        if (!wsId || !ctx.store.workspace(wsId) || !check.ok) {
+          omitidas++
+          continue
+        }
+        const r = check.rule
+        const dup = state.rules.some((x) => x.on && x.workspaceId === wsId && x.kind === r.kind && x.tool === r.tool && x.match === r.match)
+        if (dup || state.rules.length >= MAX_RULES) {
+          omitidas++
+          continue
+        }
+        state.rules = [{ id: randomUUID(), workspaceId: wsId, on: true, createdAt: Date.now(), ...r }, ...state.rules]
+        agregadas++
+      }
+      if (agregadas) save()
+      ctx.log(`reglas importadas: ${agregadas} agregadas, ${omitidas} omitidas`)
+      return { agregadas, omitidas }
     })
 
     /** Deshacer «Permitir siempre»: quita la regla y marca la decisión. Solo sirve para reglas guardadas. */

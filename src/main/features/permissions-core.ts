@@ -31,7 +31,7 @@ export interface PermissionRule {
 }
 
 export const FILE_EDIT_TOOLS: ReadonlySet<string> = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
-const NET_TOOLS: ReadonlySet<string> = new Set(['WebFetch', 'WebSearch'])
+export const NET_TOOLS: ReadonlySet<string> = new Set(['WebFetch', 'WebSearch'])
 
 export const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
 
@@ -174,6 +174,55 @@ export function ruleMatches(rule: PermissionRule, req: PermissionRequestLike): b
 
 export function findRule(rules: readonly PermissionRule[], req: PermissionRequestLike): PermissionRule | undefined {
   return rules.find((r) => ruleMatches(r, req))
+}
+
+/** Regla validada, lista para guardar (sin id, sin espacio, sin estado). */
+export interface RuleDraft {
+  kind: PermissionKind
+  tool: string
+  match: string
+  label: string
+}
+
+export const MAX_RULE_MATCH = 2000
+const TOOL_NAME = /^[A-Za-z][A-Za-z0-9_.:-]{0,119}$/
+const HOST = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::\d{1,5})?$/
+const CONTROL = /[\u0000-\u001f\u007f]/
+
+/**
+ * Valida una regla que llega de afuera (archivo importado, pedido de la interfaz). Es la misma
+ * forma que guarda «Permitir siempre»: el tipo sale de la herramienta, el texto es exacto (comando
+ * o dominio) y nunca hay comodines, salvo «*» en ediciones y en herramientas completas.
+ */
+export function checkRule(raw: unknown): { ok: true; rule: RuleDraft } | { ok: false; motivo: string } {
+  const fail = (motivo: string): { ok: false; motivo: string } => ({ ok: false, motivo })
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return fail('formato inválido')
+  const o = raw as Record<string, unknown>
+  const kind = o.kind
+  if (kind !== 'cmd' && kind !== 'edit' && kind !== 'net' && kind !== 'other') return fail('tipo de regla desconocido')
+  const tool = typeof o.tool === 'string' ? o.tool.trim() : ''
+  const match = typeof o.match === 'string' ? o.match.trim() : ''
+  if (!TOOL_NAME.test(tool)) return fail('nombre de herramienta inválido')
+  if (kindOf(tool) !== kind) return fail('el tipo no corresponde a la herramienta')
+
+  if (kind === 'cmd') {
+    if (!match) return fail('falta el comando')
+    if (match.length > MAX_RULE_MATCH || CONTROL.test(match)) return fail('comando demasiado largo o con caracteres de control')
+    if (match.includes('*')) return fail('Sloth solo guarda comandos exactos, sin comodines')
+    return { ok: true, rule: { kind, tool, match, label: match } }
+  }
+  if (kind === 'net') {
+    if (!NET_TOOLS.has(tool)) return fail('herramienta de red no válida')
+    const host = match.toLowerCase()
+    if (!HOST.test(host)) return fail('el dominio no es válido')
+    return { ok: true, rule: { kind, tool, match: host, label: `Acceder a ${host}` } }
+  }
+  if (kind === 'edit') {
+    if (!FILE_EDIT_TOOLS.has(tool) || match !== '*') return fail('regla de edición no válida')
+    return { ok: true, rule: { kind, tool, match: '*', label: 'Editar archivos' } }
+  }
+  if (match !== '*') return fail('Sloth solo guarda herramientas completas, sin patrón')
+  return { ok: true, rule: { kind, tool, match: '*', label: otherName(tool) } }
 }
 
 /**

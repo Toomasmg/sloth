@@ -349,6 +349,12 @@
   margin-left: auto;
 }
 .f-ei-path.mono,
+/* Reglas de permisos del archivo: el comando o dominio se ve completo (sin cortar palabras). */
+.f-ei-rule-text {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
 .f-ei-sub .f-ei-path {
   padding-left: 19px;
 }
