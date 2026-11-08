@@ -285,12 +285,15 @@ const feature: Feature = {
       await shell.openExternal(link.url)
     })
 
-    // Primera revisión al iniciar (después, la UI pide otra al volver la ventana visible).
-    try {
-      scan()
-    } catch (e) {
-      ctx.log('scan inicial falló', e)
-    }
+    // Primera revisión al iniciar, unos segundos después de mostrar la ventana (lee team.json de cada repo).
+    // Después, la UI pide otra al volver la ventana visible.
+    setTimeout(() => {
+      try {
+        scan()
+      } catch (e) {
+        ctx.log('scan inicial falló', e)
+      }
+    }, 3000).unref()
     ctx.handle('last', () => last)
   }
 }

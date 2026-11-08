@@ -44,6 +44,7 @@ export interface UpdateStatus {
 
 const FIRST_CHECK_MS = 20_000
 const EVERY_MS = 6 * 60 * 60 * 1000
+const HIDDEN_RETRY_MS = 5 * 60 * 1000
 const REPO_API = 'https://api.github.com/repos/Toomasmg/sloth/releases/tags'
 
 let timer: NodeJS.Timeout | null = null
@@ -304,6 +305,9 @@ const feature: Feature = {
     function schedule(ms: number): void {
       if (timer) clearTimeout(timer)
       timer = setTimeout(() => {
+        // Ventana oculta o minimizada (bandeja): no se busca. Se reintenta en 5 min.
+        const w = ctx.window()
+        if (!w || w.isDestroyed() || !w.isVisible() || w.isMinimized()) return schedule(HIDDEN_RETRY_MS)
         void check(false).finally(() => schedule(EVERY_MS))
       }, ms)
       timer.unref()

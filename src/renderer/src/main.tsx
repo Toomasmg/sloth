@@ -1,35 +1,27 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import '@fontsource-variable/inter'
-import '@fontsource-variable/jetbrains-mono'
 import '@xterm/xterm/css/xterm.css'
+import './fonts.css'
 import './styles.css'
 import './theme-a.css'
 import './themes.css'
 import { initSettings } from './features/settings/store'
 import { App } from './App'
 
-// xterm mide el ancho de los caracteres al abrir: la fuente tiene que estar cargada antes.
-const fontsReady = Promise.all([
-  document.fonts.load('13px "Inter Variable"'),
-  document.fonts.load('bold 13px "Inter Variable"'),
-  document.fonts.load('13px "JetBrains Mono Variable"'),
-  document.fonts.load('bold 13px "JetBrains Mono Variable"')
-]).catch(() => undefined)
+// Tema, densidad y letra: lo último conocido (localStorage) se aplica al instante y main lo confirma
+// después. No se espera a main ni a las fuentes: el texto cambia de letra cuando llega la webfont
+// (font-display: swap). Las terminales miden la letra al abrir: ver TerminalView.
+void initSettings()
 
-// Tema, densidad y letra antes del primer render (lo último conocido ya mismo; main lo confirma).
-const settingsReady = initSettings().catch(() => undefined)
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+)
 
-void Promise.all([fontsReady, settingsReady]).then(() => {
-  createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-      <App />
-    </StrictMode>
-  )
-  // Pantalla de carga (index.html): se va después del primer frame con la app.
-  requestAnimationFrame(() => {
-    const s = document.getElementById('splash')
-    s?.classList.add('out')
-    setTimeout(() => s?.remove(), 200)
-  })
+// Pantalla de carga (index.html): se va después del primer frame con la app.
+requestAnimationFrame(() => {
+  const s = document.getElementById('splash')
+  s?.classList.add('out')
+  setTimeout(() => s?.remove(), 200)
 })

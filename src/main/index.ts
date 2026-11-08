@@ -83,6 +83,15 @@ function serveRenderer(): void {
 app.whenReady().then(async () => {
   serveRenderer()
   const store = new Store()
+  // La ventana se crea antes que nada más: el primer render no espera a daemon, escaneos ni registros.
+  // Los handlers de las funciones se registran en este mismo turno (antes de que el renderer pida nada).
+  // Trabajo que no hace falta para pintar (setup de cada cuenta, daemon de terminales) va después de mostrar.
+  createWindow(() =>
+    setTimeout(() => {
+      for (const acc of store.accounts) safe('preparar cuenta', () => prepareAccount(acc))
+      void backend()
+    }, 1500).unref()
+  )
 
   writeHookScript()
   const usage = new UsageScanner()
@@ -177,8 +186,6 @@ app.whenReady().then(async () => {
     }
     return termPromise
   }
-  void backend()
-
   /** Nunca arrancamos una terminal con una cuenta que no sea la elegida. */
   function requireAccount(accountId: string): Account {
     const acc = store.account(accountId)
@@ -253,8 +260,6 @@ app.whenReady().then(async () => {
     }
     return { cwd: ws.cwd, env, claude: claudeCommand(ws, acc) }
   }
-
-  for (const acc of store.accounts) prepareAccount(acc)
 
   ipcMain.handle('state:get', async () => {
     // «Reabrir los espacios»: si está apagado, solo vuelven los paneles cuyas terminales siguen vivas en el daemon.
@@ -502,11 +507,9 @@ app.whenReady().then(async () => {
     quitPrepared = true
     finishQuit(b)
   })
-
-  createWindow()
 })
 
-function createWindow(): void {
+function createWindow(onShown?: () => void): void {
   // Ícono: en el instalado viene en resources/; en desarrollo, en build/.
   const iconPath = [join(process.resourcesPath, 'icon.png'), join(__dirname, '../../build/icon.png')].find((p) =>
     existsSync(p)
@@ -559,6 +562,7 @@ function createWindow(): void {
     if (saved.bounds) win.setBounds(saved.bounds)
     if (saved.maximized) win.maximize()
     win.show()
+    onShown?.()
   })
   trackWindowState(win)
 
