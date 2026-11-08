@@ -1,6 +1,6 @@
 import { useRef, useState, type DragEvent } from 'react'
-import { DoneIcon, FolderIcon, KeyboardIcon, PermissionIcon, TeamIcon, TemplatesIcon, ThemeIcon, ExportIcon } from '../../icons/SlothIcons'
 import type { UiCtx } from '../host'
+import { Ico, P } from './ico'
 import {
   errText,
   type AddRulesResult,
@@ -222,11 +222,11 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
         onDrop={onDrop}
       >
         <span className="f-ei-drop-ico">
-          <ExportIcon size={22} />
+          <Ico d={P.upload} size={22} />
         </span>
         <div className="f-ei-drop-title">Soltá acá un archivo .sloth</div>
         <div className="f-ei-muted">Si no lo tenés a mano, elegilo desde tu PC.</div>
-        <button type="button" className="btn primary" onClick={chooseFile} disabled={busy.current}>
+        <button type="button" className="f-ei-btn primary" onClick={chooseFile} disabled={busy.current}>
           Elegir archivo…
         </button>
         {err && (
@@ -255,7 +255,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
       <div className="f-ei-done" role="region" aria-label="Resultado de la importación">
         <div className="f-ei-done-head">
           <span className="f-ei-done-ico">
-            <DoneIcon size={18} />
+            <Ico d={P.check} size={18} sw={2.2} />
           </span>
           <div>
             <div className="f-ei-done-title">Configuración importada</div>
@@ -265,7 +265,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
             {reglasMsg && <div className="f-ei-muted f-ei-done-msg">{reglasMsg}</div>}
           </div>
         </div>
-        {result.cuentas > 0 && <p className="f-ei-muted">Las cuentas nuevas quedan sin sesión: iniciá sesión en cada una desde Configuración › Cuentas.</p>}
+        {result.cuentas > 0 && <p className="f-ei-muted f-ei-done-note">Las cuentas nuevas quedan sin sesión: iniciá sesión en cada una desde Configuración › Cuentas.</p>}
         {result.saltados.length > 0 && (
           <div className="f-ei-warn">
             <strong>Se saltearon:</strong>
@@ -290,13 +290,12 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
             ))}
           </ul>
         )}
-        <div className="f-ei-foot">
-          <button type="button" className="btn ghost" onClick={cancel}>
-            Importar otro archivo
+        <div className="f-ei-foot f-ei-foot-done">
+          <button type="button" className="f-ei-btn primary" onClick={onClose} autoFocus>
+            Ir a los espacios
           </button>
-          <span className="f-ei-grow" />
-          <button type="button" className="btn primary" onClick={onClose} autoFocus>
-            Listo
+          <button type="button" className="f-ei-btn secondary" onClick={cancel}>
+            Importar otro archivo
           </button>
         </div>
       </div>
@@ -308,7 +307,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
     return (
       <div className="f-ei-drop">
         <span className="f-ei-drop-ico">
-          <PermissionIcon size={22} />
+          <Ico d={P.lock} size={22} />
         </span>
         <div className="f-ei-drop-title">Archivo protegido con contraseña</div>
         <div className="f-ei-muted mono">{pre.file}</div>
@@ -334,11 +333,11 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
             </span>
           )}
           <div className="f-ei-foot">
-            <button type="button" className="btn ghost" onClick={cancel}>
+            <button type="button" className="f-ei-btn ghost" onClick={cancel}>
               Cancelar
             </button>
             <span className="f-ei-grow" />
-            <button type="submit" className="btn primary" disabled={!pwIn}>
+            <button type="submit" className="f-ei-btn primary sm" disabled={!pwIn}>
               Abrir
             </button>
           </div>
@@ -363,31 +362,35 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
   return (
     <div className="f-ei-tab">
       <div className="f-ei-fileRow">
-        <span className="f-ei-drop-ico small">
-          <ExportIcon size={16} />
+        <span className="f-ei-file-ico" aria-hidden="true">
+          <Ico d={P.doc} size={18} />
         </span>
         <div className="f-ei-grow">
           <div className="mono f-ei-fname">{pre.file.split(/[\\/]/).pop()}</div>
           {plan.version !== '?' && <div className="f-ei-muted">Exportado con la v{plan.version}</div>}
         </div>
-        <button type="button" className="btn" onClick={cancel} disabled={importing}>
+        <button type="button" className="f-ei-btn secondary" onClick={cancel} disabled={importing}>
           Elegir otro archivo
         </button>
       </div>
 
       {issues.length > 0 && (
         <div role="status" className="f-ei-warn">
-          Hay {issues.join(' y ')}. Revisalos antes de importar.
+          <Ico d={P.warn} size={16} sw={1.9} />
+          <span>Hay {issues.join(' y ')}. Revisalos antes de importar.</span>
         </div>
       )}
       {issues.length === 0 && (
         <div role="status" className="f-ei-okbox">
-          Todo listo para importar: no hay conflictos ni rutas que falten.
+          <Ico d={P.check} size={16} sw={2.2} />
+          <span>Todo listo para importar: no hay conflictos ni rutas que falten.</span>
         </div>
       )}
 
       <section className="f-ei-sec" aria-labelledby="im-qt">
-        <h3 id="im-qt">Qué trae el archivo</h3>
+        <h2 id="im-qt" className="f-ei-h">
+          Qué trae el archivo
+        </h2>
         <div className="f-ei-card">
           {/* Espacios */}
           <div style={{ boxShadow: LINE }}>
@@ -396,9 +399,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
                 <label className="f-ei-row">
                   <input type="checkbox" checked={choices.grupos.espacios} onChange={() => setChoices((c) => ({ ...c, grupos: { ...c.grupos, espacios: !c.grupos.espacios } }))} disabled={importing} />
                   <span className="f-ei-grow">
-                    <span className="f-ei-name">
-                      <FolderIcon size={14} /> Espacios
-                    </span>
+                    <span className="f-ei-name">Espacios</span>
                     <span className="f-ei-desc">Nombre, ruta, colores y cuenta asignada, más el plan de cada cuenta. Los archivos del proyecto no vienen en el archivo.</span>
                   </span>
                   <span className="f-ei-size">
@@ -408,13 +409,15 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
                 {spaces.map((s) => {
                   const st = statusOf(s)
                   const c = choices.espacios[String(s.index)]?.conflicto ?? 'saltear'
+                  const badge = badgeOf(st, c)
+                  const dim = st === 'saltear' || st === 'ya' || (st === 'conflicto' && c === 'saltear')
                   return (
-                    <div key={s.index} className={`f-ei-sub${st === 'saltear' || st === 'ya' ? ' muted' : ''}`}>
+                    <div key={s.index} className={`f-ei-sub${dim ? ' muted' : ''}`}>
                       <div className="f-ei-sub-head">
                         <span className="f-ei-dot" style={{ background: s.color ?? 'var(--fg-muted)' }} aria-hidden="true" />
                         <span className="f-ei-name">{s.nombre}</span>
                         <span className="f-ei-chip">{s.cuenta}</span>
-                        <span className={`f-ei-badge ${st}`}>{badgeText(st)}</span>
+                        <span className={`f-ei-badge ${badge.tone}`}>{badge.label}</span>
                       </div>
                       <div className="f-ei-path mono" title={s.ruta}>
                         {s.ruta}
@@ -422,7 +425,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
                       {st === 'faltante' && (
                         <div className="f-ei-fix">
                           <span className="f-ei-warnText">La ruta no existe en esta PC.</span>
-                          <button type="button" className="btn sm warn" onClick={() => pickFolder(s.index)} disabled={importing}>
+                          <button type="button" className="f-ei-btn warn sm" onClick={() => pickFolder(s.index)} disabled={importing}>
                             Elegir otra carpeta
                           </button>
                         </div>
@@ -465,7 +468,6 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
             on={choices.grupos.plantillas}
             onToggle={() => setChoices((c) => ({ ...c, grupos: { ...c.grupos, plantillas: !c.grupos.plantillas } }))}
             disabled={importing}
-            icon={<TemplatesIcon size={14} />}
             name="Plantillas"
             desc={
               [
@@ -480,25 +482,23 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
           />
 
           <Group
-            present={plan.apariencia}
-            on={choices.grupos.apariencia}
-            onToggle={() => setChoices((c) => ({ ...c, grupos: { ...c.grupos, apariencia: !c.grupos.apariencia } }))}
-            disabled={importing}
-            icon={<ThemeIcon size={14} />}
-            name="Apariencia"
-            desc="Tema, densidad, tamaño del texto y color de acento que trae el archivo."
-            sum="Del archivo"
-          />
-
-          <Group
             present={plan.atajos > 0}
             on={choices.grupos.atajos}
             onToggle={() => setChoices((c) => ({ ...c, grupos: { ...c.grupos, atajos: !c.grupos.atajos } }))}
             disabled={importing}
-            icon={<KeyboardIcon size={14} />}
             name="Atajos"
             desc="Los atajos que cambió el archivo. Reemplazan los tuyos solo en esas acciones."
-            sum={plural(plan.atajos, 'atajo', 'atajos')}
+            sum={plural(plan.atajos, 'cambiado', 'cambiados')}
+          />
+
+          <Group
+            present={plan.apariencia}
+            on={choices.grupos.apariencia}
+            onToggle={() => setChoices((c) => ({ ...c, grupos: { ...c.grupos, apariencia: !c.grupos.apariencia } }))}
+            disabled={importing}
+            name="Apariencia"
+            desc="Tema, color de acento, densidad y tamaño del texto."
+            sum="Del archivo"
           />
 
           <Group
@@ -506,7 +506,6 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
             on={choices.grupos.equipo}
             onToggle={() => setChoices((c) => ({ ...c, grupos: { ...c.grupos, equipo: !c.grupos.equipo } }))}
             disabled={importing}
-            icon={<TeamIcon size={14} />}
             name="Equipo y chat"
             desc={`Solo la URL del proyecto de Supabase (${plan.equipo ?? ''}). No cambia tu sesión ni tu key: cargala en Equipo.`}
             sum="Solo la URL"
@@ -517,9 +516,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
             <div style={{ boxShadow: LINE }}>
               <div className="f-ei-row">
                 <span className="f-ei-grow">
-                  <span className="f-ei-name">
-                    <PermissionIcon size={14} /> Reglas de permisos
-                  </span>
+                  <span className="f-ei-name">Reglas de permisos</span>
                   <span className="f-ei-desc">
                     Las «Permitir siempre» de Sloth. Vienen destildadas: tildá solo las que quieras agregar. Nunca se escriben en la configuración de Claude.
                   </span>
@@ -577,10 +574,10 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
       )}
       <div className="f-ei-foot">
         <span className="f-ei-grow" />
-        <button type="button" className="btn ghost" onClick={cancel} disabled={importing}>
+        <button type="button" className="f-ei-btn ghost" onClick={cancel} disabled={importing}>
           Cancelar
         </button>
-        <button type="button" className="btn primary" onClick={confirm} disabled={importing} aria-busy={importing}>
+        <button type="button" className="f-ei-btn primary" onClick={confirm} disabled={importing} aria-busy={importing}>
           {importing ? 'Importando…' : 'Importar'}
         </button>
       </div>
@@ -588,18 +585,20 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
   )
 }
 
-function badgeText(st: PlanSpace['status']): string {
+/** Chip de cada espacio (como el artboard): en un conflicto, lo que va a pasar según la elección. */
+function badgeOf(st: PlanSpace['status'], c: Conflicto): { label: string; tone: 'ok' | 'info' | 'warn' | 'muted' } {
   switch (st) {
     case 'ok':
-      return 'Nuevo'
-    case 'conflicto':
-      return 'Conflicto'
     case 'faltante':
-      return 'Falta carpeta'
+      return { label: 'Nuevo', tone: 'ok' }
+    case 'conflicto':
+      if (c === 'reemplazar') return { label: 'Reemplaza al actual', tone: 'info' }
+      if (c === 'dos') return { label: 'Se agrega como copia', tone: 'info' }
+      return { label: 'Se saltea', tone: 'warn' }
     case 'ya':
-      return 'Ya está'
+      return { label: 'Ya está', tone: 'muted' }
     default:
-      return 'Se saltea'
+      return { label: 'Se saltea', tone: 'warn' }
   }
 }
 
@@ -608,7 +607,6 @@ function Group(props: {
   on: boolean
   onToggle: () => void
   disabled: boolean
-  icon: React.ReactNode
   name: string
   desc: string
   sum: string
@@ -626,9 +624,7 @@ function Group(props: {
       <label className="f-ei-row">
         <input type="checkbox" checked={props.on} onChange={props.onToggle} disabled={props.disabled} />
         <span className="f-ei-grow">
-          <span className="f-ei-name">
-            {props.icon} {props.name}
-          </span>
+          <span className="f-ei-name">{props.name}</span>
           <span className="f-ei-desc">{props.desc}</span>
         </span>
         <span className="f-ei-size">{props.sum}</span>

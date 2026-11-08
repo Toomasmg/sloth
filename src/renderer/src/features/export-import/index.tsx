@@ -1,54 +1,63 @@
-import { useEffect, useRef, useState, lazy, Suspense } from 'react'
-import { ExportIcon, CloseIcon } from '../../icons/SlothIcons'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import type { FeatureUi } from '../host'
 import { useUi } from '../host'
+import { PageShell } from '../help/PageShell'
 const ExportTab = lazy(() => import('./ExportTab').then((m) => ({ default: m.ExportTab })))
 const ImportTab = lazy(() => import('./ImportTab').then((m) => ({ default: m.ImportTab })))
 import { onRequest, request } from './bus'
+import { Ico } from './ico'
 import './export-import.css'
 
 type Tab = 'exportar' | 'importar'
 
-/** Exportar / importar la configuración: dos pestañas en un solo diálogo (lo abre la paleta). */
-function EiModal({ initial, onClose }: { initial: Tab; onClose: () => void }): React.JSX.Element {
+/**
+ * Exportar / importar la configuración: página a pantalla completa con dos pestañas (la abre la paleta
+ * o Configuración). Vuelve a Configuración con «‹ Configuración», como en el artboard.
+ */
+function EiPage({ initial, onClose }: { initial: Tab; onClose: () => void }): React.JSX.Element {
   const ui = useUi()
   const [tab, setTab] = useState<Tab>(initial)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    ref.current?.focus()
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
 
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div
-        ref={ref}
-        tabIndex={-1}
-        className="modal f-ei-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="f-ei-title"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <header className="modal-head f-ei-head">
-          <ExportIcon size={18} className="f-ei-head-icon" />
-          <h2 id="f-ei-title">Exportar e importar la configuración</h2>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Cerrar">
-            <CloseIcon size={16} />
-          </button>
-        </header>
-        <p className="f-ei-lead">Pasá Sloth a otra PC o compartí la configuración con un archivo .sloth.</p>
+    <PageShell
+      labelId="f-ei-page-name"
+      title="Exportar e importar"
+      onClose={onClose}
+      className="f-ei-page"
+      backLabel={
+        <>
+          <Ico d="M15 5l-7 7 7 7" size={14} sw={2} />
+          Configuración
+        </>
+      }
+    >
+      <div className="f-ei-wrap">
+        <div className="f-ei-head">
+          <h1 id="f-ei-h1">Exportar e importar la configuración</h1>
+          <p>Pasá Sloth a otra PC o compartí la configuración del equipo con un archivo .sloth.</p>
+        </div>
 
-        <div role="tablist" aria-label="Exportar o importar" className="seg f-ei-tabs">
-          <button type="button" role="tab" id="ei-tab-exp" aria-selected={tab === 'exportar'} aria-controls="ei-panel-exp" aria-pressed={tab === 'exportar'} onClick={() => setTab('exportar')}>
+        <div role="tablist" aria-label="Exportar o importar" className="f-ei-tabs">
+          <button
+            type="button"
+            role="tab"
+            id="ei-tab-exp"
+            aria-selected={tab === 'exportar'}
+            aria-controls="ei-panel-exp"
+            className={tab === 'exportar' ? 'on' : ''}
+            onClick={() => setTab('exportar')}
+          >
             Exportar
           </button>
-          <button type="button" role="tab" id="ei-tab-imp" aria-selected={tab === 'importar'} aria-controls="ei-panel-imp" aria-pressed={tab === 'importar'} onClick={() => setTab('importar')}>
+          <button
+            type="button"
+            role="tab"
+            id="ei-tab-imp"
+            aria-selected={tab === 'importar'}
+            aria-controls="ei-panel-imp"
+            className={tab === 'importar' ? 'on' : ''}
+            onClick={() => setTab('importar')}
+          >
             Importar
           </button>
         </div>
@@ -65,7 +74,7 @@ function EiModal({ initial, onClose }: { initial: Tab; onClose: () => void }): R
           </Suspense>
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }
 
@@ -79,7 +88,7 @@ function Global(): React.JSX.Element | null {
     []
   )
   if (!open) return null
-  return <EiModal initial={open} onClose={() => setOpen(null)} />
+  return <EiPage initial={open} onClose={() => setOpen(null)} />
 }
 
 const ui: FeatureUi = {
