@@ -31,7 +31,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: [['Esc']], what: 'Cerrar ventanas y paletas', group: 'General' },
   { keys: [['F2']], what: 'Renombrar el panel activo (o el espacio enfocado en la lista)', group: 'Paneles', id: 'rename' },
   { keys: [['F1']], what: 'Ver atajos de teclado (esta hoja)', group: 'General', id: 'help' },
-  { keys: [['Ctrl', 'Alt', '1–4']], what: 'Distribución: 1 (uno), 2 (dos), 3 o 4 (cuatro) paneles a la vista', group: 'Paneles' },
+  { keys: [['Ctrl', 'Alt', '1–4']], what: 'Distribución: 1 (uno), 2 (dos), 3 (tres) o 4 (cuatro) paneles a la vista', group: 'Paneles' },
   { keys: [['Ctrl', '1']], what: 'Ir al panel 1 (el primero visible, de izquierda a derecha y de arriba abajo)', group: 'Paneles', id: 'focus1' },
   { keys: [['Ctrl', '2']], what: 'Ir al panel 2', group: 'Paneles', id: 'focus2' },
   { keys: [['Ctrl', '3']], what: 'Ir al panel 3', group: 'Paneles', id: 'focus3' },

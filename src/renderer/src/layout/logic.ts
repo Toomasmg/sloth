@@ -3,10 +3,12 @@
  * persistencia. Sin DOM ni React, para poder probarla con Node.
  */
 
-/** Distribución: cuántos paneles están a la vista (Uno = 1, Dos = 2, Cuatro = 4). El resto queda en pestañas. */
-export type ViewMode = 'uno' | 'dos' | 'cuatro'
-export const LAYOUT_CAP: Record<ViewMode, number> = { uno: 1, dos: 2, cuatro: 4 }
-export const LAYOUT_LABEL: Record<ViewMode, string> = { uno: 'Uno', dos: 'Dos', cuatro: 'Cuatro' }
+/** Distribución: cuántos paneles están a la vista (Uno = 1, Dos = 2, Tres = 3, Cuatro = 4). El resto queda en pestañas. */
+export type ViewMode = 'uno' | 'dos' | 'tres' | 'cuatro'
+export const LAYOUT_CAP: Record<ViewMode, number> = { uno: 1, dos: 2, tres: 3, cuatro: 4 }
+export const LAYOUT_LABEL: Record<ViewMode, string> = { uno: 'Uno', dos: 'Dos', tres: 'Tres', cuatro: 'Cuatro' }
+/** Desde este ancho de ventana (px), Tres pone sus 3 paneles en una fila; por debajo, 2 arriba y 1 abajo. */
+export const TRES_WIDE_PX = 1100
 /** Dónde cae un panel arrastrado respecto del panel de destino. */
 export type DropMode = 'before' | 'after' | 'swap'
 
@@ -39,6 +41,12 @@ export function gridShape(n: number): number[] {
   const base = Math.floor(n / rows)
   const extra = n % rows
   return Array.from({ length: rows }, (_, i) => base + (i < extra ? 1 : 0))
+}
+
+/** Forma de la grilla para la distribución elegida: Tres con 3 paneles en ventana ancha = una fila de 3. */
+export function shapeFor(mode: ViewMode, n: number, wide: boolean): number[] {
+  if (mode === 'tres' && n === 3 && wide) return [3]
+  return gridShape(n)
 }
 
 export function shapeKey(shape: number[]): string {
@@ -281,7 +289,7 @@ export function saveSizes(kv: KV | null, shape: number[], sizes: Sizes): void {
 export function loadMode(kv: KV | null): ViewMode {
   try {
     const v = kv?.getItem(MODE_KEY)
-    if (v === 'uno' || v === 'dos' || v === 'cuatro') return v
+    if (v === 'uno' || v === 'dos' || v === 'tres' || v === 'cuatro') return v
     return v === 'tabs' ? 'uno' : 'cuatro'
   } catch {
     return 'cuatro'

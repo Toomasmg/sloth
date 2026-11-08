@@ -179,6 +179,16 @@ export function TwoPanesIcon(props: SlothIconProps) {
   )
 }
 
+/** Tres paneles */
+export function ThreePanesIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M4 7a1.5 1.5 0 0 1 1.5-1.5h13A1.5 1.5 0 0 1 20 7v10a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17z" />
+      <path d="M9.33 5.5v13M14.67 5.5v13" />
+    </Base>
+  )
+}
+
 /** Cuatro paneles */
 export function FourPanesIcon(props: SlothIconProps) {
   return (
@@ -841,6 +851,7 @@ export const SLOTH_ICONS = {
   DropFolder: DropFolderIcon,
   OnePane: OnePaneIcon,
   TwoPanes: TwoPanesIcon,
+  ThreePanes: ThreePanesIcon,
   FourPanes: FourPanesIcon,
   Maximize: MaximizeIcon,
   Sidebar: SidebarIcon,

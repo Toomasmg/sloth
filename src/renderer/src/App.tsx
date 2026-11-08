@@ -36,10 +36,11 @@ import { setPaneVisible, useDocumentVisible, useVisiblePolling } from './visibil
 import {
   LAYOUT_CAP,
   LAYOUT_LABEL,
+  TRES_WIDE_PX,
   cellRects,
   cycle,
   defaultSizes,
-  gridShape,
+  shapeFor,
   loadSizes,
   locatePane,
   movePane,
@@ -86,6 +87,7 @@ import {
   SettingsIcon,
   SidebarIcon,
   SpaceIcon,
+  ThreePanesIcon,
   TwoPanesIcon,
   UpdateIcon
 } from './icons/SlothIcons'
@@ -124,7 +126,7 @@ function Keys({ id }: { id: ShortcutId }): React.JSX.Element {
 }
 
 /** Distribución por tecla de Ctrl+Alt+1–4. */
-const LAYOUT_BY_DIGIT: Record<string, ViewMode> = { Digit1: 'uno', Digit2: 'dos', Digit3: 'cuatro', Digit4: 'cuatro' }
+const LAYOUT_BY_DIGIT: Record<string, ViewMode> = { Digit1: 'uno', Digit2: 'dos', Digit3: 'tres', Digit4: 'cuatro' }
 
 /** Estado de la barra lateral y de las cuentas plegadas (preferencias de esta PC). */
 const SIDEBAR_KEY = 'sloth.sidebar.shown'
@@ -454,7 +456,7 @@ export function App(): React.JSX.Element {
   const visiblePanes = maxId ? [maxId] : openPanes.slice(winStart, winStart + cap)
   const showTabs = openPanes.length > 0 && (viewMode === 'uno' || openPanes.length > cap)
   const nVisible = visiblePanes.length
-  const shape = useMemo(() => gridShape(nVisible), [nVisible])
+  const shape = useMemo(() => shapeFor(viewMode, nVisible, winW >= TRES_WIDE_PX), [viewMode, nVisible, winW])
   const shapeK = shapeKey(shape)
   const [sizeOverrides, setSizeOverrides] = useState<Record<string, Sizes>>({})
   const sizes = useMemo(() => sizeOverrides[shapeK] ?? loadSizes(safeStorage(), shape), [sizeOverrides, shapeK, shape])
@@ -531,7 +533,7 @@ export function App(): React.JSX.Element {
         setLayoutMsg('Cambiar de fila funciona con los paneles en grilla, sin maximizar.')
         return
       }
-      const shape = gridShape(openPanes.length)
+      const shape = shapeFor(viewMode, openPanes.length, winW >= TRES_WIDE_PX)
       const next = shiftPaneRow(openPanes, id, d, shape)
       if (sameOrder(next, openPanes)) {
         setLayoutMsg(`«${paneName(id)}» no tiene fila ${d < 0 ? 'arriba' : 'abajo'} a donde moverse.`)
@@ -749,7 +751,7 @@ export function App(): React.JSX.Element {
   const chatUnread = useChatSnapshot()?.unreadTotal ?? 0
 
   // Barra de paneles: distribución elegida (se guarda en esta PC). Uno = 1 a la vista; Dos = 2; Cuatro = 4.
-  const layoutPressed = { uno: viewMode === 'uno', dos: viewMode === 'dos', cuatro: viewMode === 'cuatro' }
+  const layoutPressed = { uno: viewMode === 'uno', dos: viewMode === 'dos', tres: viewMode === 'tres', cuatro: viewMode === 'cuatro' }
   const pickLayout = (k: ViewMode): void => {
     setViewMode(k)
     if (maximized) setMaximized(null)
@@ -1099,6 +1101,9 @@ export function App(): React.JSX.Element {
                       </button>
                       <button type="button" aria-pressed={layoutPressed.dos} onClick={() => pickLayout('dos')} title="Dos: hasta 2 paneles a la vista; el resto en pestañas">
                         <TwoPanesIcon size={14} aria-hidden="true" /> Dos
+                      </button>
+                      <button type="button" aria-pressed={layoutPressed.tres} onClick={() => pickLayout('tres')} title="Tres: hasta 3 paneles a la vista; el resto en pestañas">
+                        <ThreePanesIcon size={14} aria-hidden="true" /> Tres
                       </button>
                       <button type="button" aria-pressed={layoutPressed.cuatro} onClick={() => pickLayout('cuatro')} title="Cuatro: hasta 4 paneles a la vista; el resto en pestañas">
                         <FourPanesIcon size={14} aria-hidden="true" /> Cuatro

@@ -6,7 +6,7 @@ import { getViewMode, requestEqualize, setViewMode } from './store'
  * Comandos del layout para la paleta (Ctrl+K). Para que aparezcan hay que sumar esta FeatureUi
  * al registro (`features/registry.ts`).
  */
-const KINDS: ViewMode[] = ['uno', 'dos', 'cuatro']
+const KINDS: ViewMode[] = ['uno', 'dos', 'tres', 'cuatro']
 
 function commands(): Command[] {
   const current = getViewMode()
@@ -15,7 +15,7 @@ function commands(): Command[] {
     title: `Distribución ${LAYOUT_LABEL[k]}${k === current ? ' (actual)' : ''}`,
     subtitle: `${LAYOUT_CAP[k] === 1 ? '1 panel a la vista' : `hasta ${LAYOUT_CAP[k]} paneles a la vista`}, el resto en pestañas`,
     group: 'Paneles',
-    keywords: 'distribucion vista uno dos cuatro grilla pestañas tabs layout',
+    keywords: 'distribucion vista uno dos tres cuatro grilla pestañas tabs layout',
     run: () => setViewMode(k)
   }))
   return [
