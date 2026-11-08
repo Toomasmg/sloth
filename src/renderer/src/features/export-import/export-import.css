@@ -1,111 +1,449 @@
-/* Función «export-import»: vista previa y resultado. */
-.f-export-import-modal {
-  width: min(560px, calc(100vw - 32px));
+/* Función «export-import»: diálogo con dos pestañas (exportar / importar). */
+.f-ei-modal {
+  width: min(760px, calc(100vw - 32px));
   gap: var(--s-3);
 }
-.f-export-import-modal:focus {
+.f-ei-modal:focus {
   outline: none;
 }
 .f-ei-head-icon {
   color: var(--accent);
+  flex: none;
 }
-.f-ei-ok-icon {
-  color: var(--success);
+.f-ei-head h2 {
+  flex: 1;
 }
-.f-ei-file {
-  margin: 0;
-  padding: var(--s-2) var(--s-3);
-  border-radius: var(--r-sm);
-  background: var(--card);
-  font-size: var(--fs-xs);
-  color: var(--fg-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.f-ei-ver {
+.f-ei-lead {
+  margin: calc(var(--s-2) * -1) 0 0;
   color: var(--fg-muted);
+  line-height: 1.5;
+}
+.f-ei-tabs {
+  align-self: flex-start;
+}
+.f-ei-tab,
+.f-ei-tab-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
 }
 .f-ei-sec {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--s-2);
 }
 .f-ei-sec h3 {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
+  margin: 0 0 0 var(--s-1);
   font-size: var(--fs-xs);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   color: var(--fg-muted);
+}
+.f-ei-lock {
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-start;
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  background: var(--warn-soft);
+  box-shadow: inset 0 0 0 1px var(--warn-line);
+  color: var(--fg);
+  line-height: 1.5;
+}
+.f-ei-lock > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--warn);
+}
+.f-ei-card {
+  border-radius: var(--r-md);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.f-ei-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  cursor: pointer;
+  transition: background var(--t-fast);
+}
+.f-ei-row:hover {
+  background: var(--card-hover);
+}
+.f-ei-row.sub {
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 9px var(--s-4) 9px 44px;
+  gap: 4px var(--s-3);
+}
+.f-ei-row.sub > input {
+  margin: 0;
+}
+.f-ei-row.muted,
+.f-ei-sub.muted {
+  color: var(--fg-muted);
+  cursor: default;
+}
+.f-ei-disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.f-ei-disabled:hover {
+  background: transparent;
+}
+.f-ei-row input[type='checkbox'] {
+  accent-color: var(--accent);
+  margin: 2px 0 0;
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.f-ei-row.sub input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+}
+.f-ei-grow {
+  flex: 1;
+  min-width: 0;
+}
+.f-ei-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-weight: 500;
+  color: var(--fg);
+}
+.f-ei-name svg {
+  color: var(--fg-muted);
+}
+.f-ei-desc {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  line-height: 1.5;
+}
+.f-ei-size {
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  white-space: nowrap;
+  text-align: right;
+}
+.f-ei-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+.f-ei-chip {
+  font-size: var(--fs-xs);
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: var(--surface-hover);
+  color: var(--fg-2);
+}
+.f-ei-path {
+  flex: 1 1 100%;
+  padding-left: 24px;
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
+.f-ei-pw {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: var(--s-3);
+  padding: 0 var(--s-4) var(--s-4);
+  box-shadow: var(--shadow-none, none);
+}
+.f-ei-ok-text {
+  color: var(--success);
+}
+.f-ei-hint {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  font-weight: 400;
+}
+.f-ei-preview > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  font-weight: 500;
+  cursor: pointer;
+  list-style: none;
+}
+.f-ei-preview > summary::-webkit-details-marker {
+  display: none;
+}
+.f-ei-preview > summary::before {
+  content: '▸';
+  color: var(--fg-muted);
+}
+.f-ei-preview[open] > summary::before {
+  content: '▾';
+}
+.f-ei-preview pre {
+  margin: 0;
+  padding: var(--s-3) var(--s-4);
+  background: var(--term-bg, #0f1117);
+  box-shadow: inset 0 1px 0 var(--line);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: var(--fg-2);
+  white-space: pre;
+  overflow: auto;
+  max-height: 320px;
+}
+.f-ei-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
+}
+.f-ei-err {
+  font-size: var(--fs-xs);
+  color: var(--danger-fg);
+}
+.f-ei-errors {
+  margin: 0;
+  padding-left: 18px;
+  font-size: var(--fs-xs);
+  color: var(--danger-fg);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.f-ei-saved {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: var(--fs-xs);
+}
+.f-ei-muted {
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+  line-height: 1.5;
 }
 .f-ei-help {
   margin: 0;
   font-size: var(--fs-sm);
   color: var(--fg-muted);
 }
-.f-ei-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+
+/* Importar */
+.f-ei-drop {
   display: flex;
   flex-direction: column;
-  max-height: 240px;
-  overflow-y: auto;
-}
-.f-ei-list li {
-  display: grid;
-  grid-template-columns: auto minmax(0, max-content) minmax(0, 1fr);
   align-items: center;
   gap: var(--s-2);
-  min-height: 28px;
-  padding: 2px var(--s-2);
-  border-radius: var(--r-xs);
+  padding: var(--s-6) var(--s-4);
+  border-radius: 14px;
+  border: 1.5px dashed var(--line-strong);
+  background: var(--input-bg, #111319);
+  text-align: center;
+  transition: background var(--t-fast), border-color var(--t-fast);
+}
+.f-ei-drop.over {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.f-ei-drop-ico {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--info-soft);
+  color: var(--info);
+  margin-bottom: var(--s-1);
+}
+.f-ei-drop-ico.small {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  flex: none;
+}
+.f-ei-drop-title {
+  font-weight: 600;
+  font-size: var(--fs-md);
+}
+.f-ei-pwform {
+  width: min(340px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+  text-align: left;
+}
+.f-ei-fileRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.f-ei-fname {
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+.f-ei-warn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm);
+  background: var(--warn-soft);
+  box-shadow: inset 0 0 0 1px var(--warn-line);
+  color: var(--warn-fg);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+.f-ei-warn ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.f-ei-warnText {
+  color: var(--warn-fg);
+  font-size: var(--fs-xs);
+}
+.f-ei-okbox {
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-sm);
+  background: var(--success-soft);
+  box-shadow: inset 0 0 0 1px rgba(95, 212, 166, 0.3);
+  color: var(--success);
   font-size: var(--fs-sm);
 }
-.f-ei-list li:hover {
-  background: var(--hover);
-}
-.f-ei-list li.skip .f-ei-name {
-  color: var(--fg-muted);
-}
-.f-ei-name {
-  color: var(--fg);
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.f-ei-meta {
-  color: var(--fg-muted);
+.f-ei-okText {
+  color: var(--success);
   font-size: var(--fs-xs);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+.f-ei-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px var(--s-4) 10px 44px;
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.f-ei-sub-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.f-ei-sub-head .f-ei-name {
+  font-weight: 500;
+}
+.f-ei-sub-head .f-ei-badge {
+  margin-left: auto;
+}
+.f-ei-path.mono,
+.f-ei-sub .f-ei-path {
+  padding-left: 19px;
+}
+.f-ei-sub .mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
+.f-ei-fix {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-left: 19px;
+  font-size: var(--fs-xs);
+}
+.f-ei-conflict {
+  gap: 8px 10px;
+}
+.f-ei-conflict select {
+  height: 30px;
+  padding: 0 28px 0 10px;
+  border-radius: 8px;
 }
 .f-ei-badge {
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 10px;
+  font-size: var(--fs-xs);
+  font-weight: 500;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: var(--r-xs);
-  font-size: 10px;
-  font-weight: 700;
+  background: var(--surface-hover);
+  color: var(--fg-2);
   white-space: nowrap;
 }
-.f-ei-badge.add {
-  color: var(--success);
+.f-ei-badge.ok {
   background: var(--success-soft);
+  color: var(--success);
 }
-.f-ei-badge.skip {
-  color: var(--warn);
+.f-ei-badge.conflicto {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.f-ei-badge.faltante {
   background: var(--warn-soft);
+  color: var(--warn-fg);
 }
-.f-ei-errors li {
-  display: block;
-  color: var(--danger-fg);
+.f-ei-badge.ya,
+.f-ei-badge.saltear {
+  color: var(--fg-muted);
+}
+
+/* Resultado */
+.f-ei-done {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-5);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px rgba(95, 212, 166, 0.35);
+}
+.f-ei-done-head {
+  display: flex;
+  gap: var(--s-3);
+  align-items: flex-start;
+}
+.f-ei-done-ico {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--success-soft);
+  color: var(--success);
+}
+.f-ei-done-title {
+  font-weight: 700;
+  font-size: var(--fs-lg);
+}
+.f-ei-done-msg {
+  margin-top: 4px;
+  color: var(--fg-2);
+}
+
+.f-ei-ok-icon {
+  color: var(--success);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .f-ei-row,
+  .f-ei-drop {
+    transition: none;
+  }
 }

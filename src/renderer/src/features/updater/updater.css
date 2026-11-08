@@ -1,37 +1,206 @@
-/* Función «updater»: chip de la barra de título y modal «Acerca de Sloth». */
-.f-updater-chip {
-  cursor: pointer;
-  color: var(--info);
-  background: var(--info-soft);
-  transition: background var(--t-fast) var(--ease);
-}
-.f-updater-chip:hover {
-  background: rgba(103, 216, 239, 0.2);
-}
-.f-updater-chip.ready {
-  color: var(--on-accent);
-  background: var(--accent);
-}
-.f-updater-chip.ready:hover {
-  background: #c2f2fb;
-}
-.f-updater-chip:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-.f-updater-bar {
-  width: 36px;
-  height: 3px;
+/* Función «updater»: aviso en la barra superior, diálogos de novedades / descarga / reinicio y «Acerca de». */
+.f-updater-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 28px;
+  max-width: 100%;
+  padding: 2px 4px 2px 10px;
   border-radius: 999px;
+  background: var(--info-soft);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--fg-2);
+  font-size: var(--fs-xs);
+}
+.f-updater-banner > svg {
+  flex: none;
+  color: var(--info);
+}
+.f-updater-banner-text {
+  min-width: 0;
+  color: var(--fg);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.f-updater-banner .btn.sm {
+  height: 22px;
+  padding: 0 9px;
+  border-radius: 999px;
+}
+
+.f-updater-backdrop {
+  z-index: 60;
+}
+.f-updater-dialog {
+  position: relative;
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(640px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  box-sizing: border-box;
+  padding: var(--s-5);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg), inset 0 0 0 1px var(--line-strong);
+  overflow: hidden;
+}
+.f-updater-dialog:focus {
+  outline: none;
+}
+.f-updater-x {
+  position: absolute;
+  top: var(--s-3);
+  right: var(--s-3);
+}
+.f-updater-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding-right: var(--s-6);
+}
+.f-updater-titles {
+  min-width: 0;
+}
+.f-updater-titles h2 {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.f-updater-titles p {
+  margin: 4px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  line-height: 1.5;
+}
+.f-updater-logo {
+  height: 44px;
+  width: auto;
+  flex: none;
+}
+.f-updater-ico {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--info-soft);
+  color: var(--info);
+}
+.f-updater-ico.round {
+  border-radius: 50%;
+}
+.f-updater-ico.ok {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.f-updater-ico.danger {
+  background: var(--danger-soft);
+  color: var(--danger-fg);
+}
+.f-updater-box {
+  margin: 0;
+  padding: var(--s-3) var(--s-4);
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--fg-2);
+  line-height: 1.55;
+}
+.f-updater-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  max-height: min(420px, 52vh);
+  overflow-y: auto;
+  padding-right: var(--s-1);
+}
+.f-updater-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.f-updater-group h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.f-updater-gdot {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+}
+.f-updater-group ul {
+  margin: 0;
+  padding: 0 0 0 4px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.f-updater-group li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  line-height: 1.5;
+  color: var(--fg);
+}
+.f-updater-bullet {
+  width: 5px;
+  height: 5px;
+  margin-top: 8px;
+  flex: none;
+  border-radius: 50%;
+}
+.f-updater-muted {
+  margin: 0;
+  color: var(--fg-muted);
+}
+.f-updater-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.f-updater-track {
+  height: 8px;
+  border-radius: 4px;
   background: var(--line-2);
   overflow: hidden;
 }
-.f-updater-bar > span {
-  display: block;
+.f-updater-track > div {
   height: 100%;
+  border-radius: 4px;
   background: var(--info);
   transition: width var(--t-med) var(--ease);
 }
+.f-updater-nums {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+}
+.f-updater-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+.f-updater-grow {
+  flex: 1;
+}
+
+/* Modal «Acerca de Sloth» */
 .f-updater-modal {
   width: min(460px, calc(100vw - 32px));
 }
@@ -47,10 +216,6 @@
 .f-updater-name {
   font-size: var(--fs-lg);
   font-weight: 700;
-  background: var(--brand-grad);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
   margin-bottom: 2px;
 }
 .f-updater-status {
@@ -93,14 +258,11 @@
   display: block;
   margin-top: 2px;
 }
-.f-updater-actions {
-  align-items: center;
+.f-updater-modal .hint {
+  margin: 0;
 }
-.f-updater-actions a.btn {
+.f-updater-modal .f-updater-actions a.btn {
   text-decoration: none;
-}
-.f-updater-grow {
-  flex: 1;
 }
 .f-updater-spin {
   animation: f-updater-rot 1s linear infinite;
@@ -114,10 +276,7 @@
   .f-updater-spin {
     animation: none;
   }
-  .f-updater-bar > span {
+  .f-updater-track > div {
     transition: none;
   }
-}
-.f-updater-modal .hint {
-  margin: 0;
 }
