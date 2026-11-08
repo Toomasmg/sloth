@@ -1,17 +1,22 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { GearSix } from '@phosphor-icons/react'
+import { SettingsIcon } from '../../icons/SlothIcons'
 import type { FeatureUi } from '../host'
 import { useUi } from '../host'
+import { bindingOf, matchShortcut, isCapturingShortcut } from '../../shortcuts'
 import { onOpenSettings, openSettings, type SettingsTab } from './bus'
-import { getSettings, updateSettings } from './store'
+import { getSettings } from './store'
 import { SettingsModal } from './SettingsModal'
-import './settings.css'
+import './settings-page.css'
+
+/** «Ctrl Shift K» → «Ctrl+Shift+K» para mostrar. */
+const showCombo = (c: string): string => c.split(' ').join('+')
 
 /** Engranaje en la barra de título. */
 function GearButton(): React.JSX.Element {
+  const label = showCombo(bindingOf('settings'))
   return (
-    <button type="button" className="icon-btn f-settings-gear" onClick={() => openSettings()} aria-label="Configuración" title="Configuración (Ctrl+,)">
-      <GearSix size={16} aria-hidden="true" />
+    <button type="button" className="icon-btn f-settings-gear" onClick={() => openSettings()} aria-label="Configuración" title={`Configuración (${label})`}>
+      <SettingsIcon size={16} />
     </button>
   )
 }
@@ -44,16 +49,14 @@ function useCloseGuard(): void {
 function Global(): React.JSX.Element {
   const [tab, setTab] = useState<SettingsTab | null>(null)
   const prevFocus = useRef<HTMLElement | null>(null)
-  const openRef = useRef(false)
-  openRef.current = tab !== null
   useCloseGuard()
 
   useEffect(() => onOpenSettings((t) => setTab(t ?? 'apariencia')), [])
 
-  // Ctrl+, en captura: anda aunque la terminal tenga el foco.
+  // El atajo de Configuración (por defecto Ctrl+,) en captura: anda aunque la terminal tenga el foco.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (!e.ctrlKey || e.shiftKey || e.altKey || e.metaKey || e.code !== 'Comma') return
+      if (isCapturingShortcut() || !matchShortcut('settings', e)) return
       e.preventDefault()
       e.stopPropagation()
       setTab((t) => (t ? null : 'apariencia'))
@@ -76,53 +79,47 @@ function Global(): React.JSX.Element {
     }
   }, [tab])
 
-  return (
-    <>
-      {tab && <SettingsModal initialTab={tab} onClose={() => setTab(null)} />}
-    </>
-  )
+  return <>{tab && <SettingsModal initialTab={tab} onClose={() => setTab(null)} />}</>
 }
 
 const ui: FeatureUi = {
   name: 'settings',
   Titlebar: GearButton,
   Global,
-  commands: () => {
-    const dark = getSettings().dark
-    return [
-      {
-        id: 'settings:open',
-        title: 'Configuración',
-        subtitle: 'Tema, densidad, terminal, colores de cuenta',
-        group: 'Sloth',
-        keywords: 'settings ajustes preferencias opciones configurar',
-        shortcut: 'Ctrl+,',
-        run: () => openSettings()
-      },
-      {
-        id: 'settings:theme',
-        title: dark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro',
-        group: 'Sloth',
-        keywords: 'tema theme claro oscuro dark light modo',
-        run: () => void updateSettings({ theme: dark ? 'claro' : 'oscuro' }).catch(() => {})
-      },
-      {
-        id: 'settings:terminal',
-        title: 'Configuración de la terminal',
-        subtitle: 'Fuente, tamaño, altura de línea y cursor',
-        group: 'Sloth',
-        keywords: 'terminal fuente font cursor letra',
-        run: () => openSettings('terminal')
-      },
-      {
-        id: 'settings:shortcuts',
-        title: 'Atajos de teclado',
-        group: 'Sloth',
-        keywords: 'atajos teclas shortcuts keyboard',
-        run: () => openSettings('atajos')
-      }
-    ]
-  }
+  commands: () => [
+    {
+      id: 'settings:open',
+      title: 'Configuración',
+      subtitle: 'Tema, cuentas, terminal, atajos y notificaciones',
+      group: 'Sloth',
+      keywords: 'settings ajustes preferencias opciones configurar',
+      shortcut: showCombo(bindingOf('settings')),
+      run: () => openSettings()
+    },
+    {
+      id: 'settings:theme',
+      title: 'Cambiar el tema',
+      subtitle: 'Oscuro, más oscuro o según Windows',
+      group: 'Sloth',
+      keywords: 'tema theme claro oscuro dark light modo',
+      run: () => openSettings('apariencia')
+    },
+    {
+      id: 'settings:terminal',
+      title: 'Configuración de la terminal',
+      subtitle: 'Fuente, tamaño, cursor y shell',
+      group: 'Sloth',
+      keywords: 'terminal fuente font cursor letra shell',
+      run: () => openSettings('terminal')
+    },
+    {
+      id: 'settings:shortcuts',
+      title: 'Atajos de teclado',
+      group: 'Sloth',
+      keywords: 'atajos teclas shortcuts keyboard',
+      run: () => openSettings('atajos')
+    }
+  ]
 }
 
 export default ui

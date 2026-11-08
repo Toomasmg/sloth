@@ -1,14 +1,12 @@
 import { playChime } from './audio'
+import type { SoundName } from './logic'
 import './sound.css'
 
-/** Botón «Probar» de Configuración → Comportamiento. Suena el de «terminó». Apagado si el ajuste está apagado. */
-export function SoundTest({ disabled }: { disabled: boolean }): React.JSX.Element {
+/** Botón «Probar» de Configuración → Notificaciones y sonido. Suena el de «terminó» con el sonido elegido. */
+export function SoundTest({ name, disabled }: { name: SoundName; disabled: boolean }): React.JSX.Element {
   return (
-    <div className="f-sound-test">
-      <button type="button" className="btn sm" disabled={disabled} onClick={() => playChime('done')}>
-        Probar
-      </button>
-      {disabled && <span className="hint">Activá el sonido para probarlo.</span>}
-    </div>
+    <button type="button" className="f-sound-test" disabled={disabled} onClick={() => playChime('done', name)}>
+      Probar
+    </button>
   )
 }

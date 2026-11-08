@@ -1,4 +1,4 @@
-import { app, nativeTheme, type BrowserWindow } from 'electron'
+import { app, dialog, nativeTheme, type BrowserWindow } from 'electron'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
@@ -53,7 +53,8 @@ export function initialChrome(): { bg: string; symbol: string; dark: boolean } {
   return { ...(dark ? CHROME.dark : CHROME.light), dark }
 }
 
-const themeSource = (t: ThemeChoice): 'dark' | 'light' | 'system' => (t === 'oscuro' ? 'dark' : t === 'claro' ? 'light' : 'system')
+/** «Según Windows» sigue al sistema en vivo (evento nativeTheme «updated»); los demás fijan el tema. */
+const themeSource = (t: ThemeChoice): 'dark' | 'light' | 'system' => (t === 'sistema' ? 'system' : t === 'claro' ? 'light' : 'dark')
 
 let settings: SlothSettings
 let ctxRef: FeatureContext | null = null
@@ -62,7 +63,12 @@ let lastDark: boolean | null = null
 const loginSupported = (): boolean => app.isPackaged && process.platform === 'win32'
 
 function payload(): SettingsPayload {
-  return { settings, dark: resolveDark(settings.theme, nativeTheme.shouldUseDarkColors), loginItemSupported: loginSupported() }
+  return {
+    settings,
+    dark: resolveDark(settings.theme, nativeTheme.shouldUseDarkColors),
+    loginItemSupported: loginSupported(),
+    documentsDir: app.getPath('documents')
+  }
 }
 
 function paintWindow(win: BrowserWindow | null, dark: boolean): void {
@@ -135,6 +141,14 @@ const feature: Feature = {
       return commit(applyPatch(settings, patch, { accountExists: (id) => !!ctx.store.account(id) }))
     })
     ctx.handle('reset', (section: unknown) => commit(resetSection(settings, section)))
+    // Carpeta de proyectos: el diálogo nativo lo abre main; la interfaz solo recibe la ruta elegida.
+    ctx.handle('pickProjectsDir', async () => {
+      const win = ctx.window()
+      const opts = { properties: ['openDirectory', 'createDirectory'] as ('openDirectory' | 'createDirectory')[], title: 'Carpeta de proyectos' }
+      const r = win && !win.isDestroyed() ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+      if (r.canceled || !r.filePaths[0]) return payload()
+      return commit(applyPatch(settings, { projectsDir: r.filePaths[0] }))
+    })
   }
 }
 

@@ -98,3 +98,55 @@ export const CHIME_SPEC: Record<Chime, ChimeSpec> = {
     attack: 0.02
   }
 }
+
+/** Sonidos elegibles en Configuración. «Gota» es el de siempre (CHIME_SPEC). */
+export type SoundName = 'Gota' | 'Campana suave' | 'Clic'
+
+const BELL_NOTE = 0.5
+const BELL_GAP = 0.12
+const CLICK_NOTE = 0.045
+
+/** Variantes del sonido: misma forma (dos notas), distinto timbre y duración. */
+export const SOUND_VARIANTS: Record<SoundName, Record<Chime, ChimeSpec>> = {
+  Gota: CHIME_SPEC,
+  'Campana suave': {
+    done: {
+      notes: [
+        { freq: 659.25, start: 0, dur: BELL_NOTE },
+        { freq: 880, start: BELL_GAP, dur: BELL_NOTE }
+      ],
+      total: BELL_GAP + BELL_NOTE,
+      peak: 0.08,
+      attack: 0.04
+    },
+    attention: {
+      notes: [
+        { freq: 880, start: 0, dur: BELL_NOTE },
+        { freq: 659.25, start: BELL_GAP, dur: BELL_NOTE }
+      ],
+      total: BELL_GAP + BELL_NOTE,
+      peak: 0.08,
+      attack: 0.04
+    }
+  },
+  Clic: {
+    done: {
+      notes: [
+        { freq: 1800, start: 0, dur: CLICK_NOTE },
+        { freq: 1400, start: 0.06, dur: CLICK_NOTE }
+      ],
+      total: 0.06 + CLICK_NOTE,
+      peak: 0.1,
+      attack: 0.005
+    },
+    attention: {
+      notes: [
+        { freq: 1400, start: 0, dur: CLICK_NOTE },
+        { freq: 1800, start: 0.06, dur: CLICK_NOTE }
+      ],
+      total: 0.06 + CLICK_NOTE,
+      peak: 0.1,
+      attack: 0.005
+    }
+  }
+}
