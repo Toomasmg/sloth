@@ -1,19 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
-  ArrowClockwise,
-  ArrowsLeftRight,
-  DotsSixVertical,
-  Equals,
-  PencilSimple,
-  Plus,
-  ShieldWarning,
-  SignIn,
-  Smiley,
-  Terminal as TerminalIcon,
-  Trash,
-  WarningCircle
-} from '@phosphor-icons/react'
-import {
   accountIdFromLoginPane,
   isLoginPane,
   loginPaneId,
@@ -30,7 +16,10 @@ import {
 import { api } from './api'
 import { UiContext, type NewWorkspacePreset, type PaneGuard, type UiCtx } from './features/host'
 import { resolveAccountColor, useSettings } from './features/settings/store'
+import { openChat } from './features/chat/store'
 import { colorHex } from './features/templates/catalog'
+import { bindingOf, comboLabel, isCapturingShortcut, matchShortcut } from './shortcuts'
+import type { ShortcutId } from '../../main/features/settings-model'
 import { GlobalSlot, PaneBannerSlot, PaneHeaderSlot, SidebarSlot, TitlebarSlot } from './features/slots'
 import { PaletteBar, PALETTE_REMOVE_EVENT, PALETTE_RENAME_EVENT, runFeatureCommand } from './features/palette'
 import { TerminalView } from './TerminalView'
@@ -43,6 +32,8 @@ import { decidePermission } from './features/permissions/api'
 import { DaemonStatus } from './DaemonStatus'
 import { useDocumentVisible, useVisiblePolling } from './visibility'
 import {
+  LAYOUT_CAP,
+  LAYOUT_LABEL,
   cellRects,
   cycle,
   defaultSizes,
@@ -58,7 +49,8 @@ import {
   sizesAreEqual,
   type DropMode,
   type Rect,
-  type Sizes
+  type Sizes,
+  type ViewMode
 } from './layout/logic'
 import { onEqualize, safeStorage, setViewMode, useViewMode } from './layout/store'
 import { useReorderDrag } from './layout/useReorderDrag'
@@ -72,10 +64,12 @@ import { useFolderDrop } from './useFolderDrop'
 import './workspace.css'
 import { cleanError, fmtTok, shortPath, STATE_LABEL, totalTok, usageTitle } from './format'
 import {
+  AccountIcon,
   BranchIcon,
   BroadcastIcon,
   CloseIcon,
   EditorIcon,
+  ErrorIcon,
   FolderIcon,
   FourPanesIcon,
   MaximizeIcon,
@@ -84,8 +78,46 @@ import {
   SearchIcon,
   SidebarIcon,
   TicketIcon,
-  TwoPanesIcon
+  TwoPanesIcon,
+  UpdateIcon
 } from './icons/SlothIcons'
+
+/* Íconos que SlothIcons todavía no tiene: mismo trazo (grilla 24, 1,6) que el resto. */
+type GlyphProps = { size?: number; weight?: string; 'aria-hidden'?: boolean | 'true' | 'false' }
+function Glyph({ size = 16, children }: GlyphProps & { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" focusable="false" style={{ flex: 'none' }}>
+      {children}
+    </svg>
+  )
+}
+const Plus = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><path d="M12 5v14M5 12h14" /></Glyph>
+const Trash = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></Glyph>
+const PencilSimple = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><path d="M4 20l1-4L16 5l3 3L8 19l-4 1zM14 7l3 3" /></Glyph>
+const Equals = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><path d="M5 9h14M5 15h14" /></Glyph>
+const DotsSixVertical = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" strokeWidth={2.6} /></Glyph>
+const ArrowsLeftRight = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><path d="M4 8h15l-3-3M20 16H5l3 3" /></Glyph>
+const Smiley = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><circle cx="12" cy="12" r="8" /><path d="M9 10h.01M15 10h.01M9 14.5c.9 1 1.9 1.5 3 1.5s2.1-.5 3-1.5" /></Glyph>
+const TerminalIcon = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><rect x="3.5" y="5" width="17" height="14" rx="2" /><path d="M7.5 10l2.5 2-2.5 2M12.5 14.5h4" /></Glyph>
+
+/** Texto de un atajo como teclas («Ctrl + K»), siempre al día con Configuración. */
+function Keys({ id }: { id: ShortcutId }): React.JSX.Element {
+  return (
+    <>
+      {bindingOf(id)
+        .split(' ')
+        .map((k, i) => (
+          <span key={i}>
+            {i > 0 && '+'}
+            <kbd>{k}</kbd>
+          </span>
+        ))}
+    </>
+  )
+}
+
+/** Distribución por tecla de Ctrl+Alt+1–4. */
+const LAYOUT_BY_DIGIT: Record<string, ViewMode> = { Digit1: 'uno', Digit2: 'dos', Digit3: 'cuatro', Digit4: 'cuatro' }
 
 /** Estado de la barra lateral y de las cuentas plegadas (preferencias de esta PC). */
 const SIDEBAR_KEY = 'sloth.sidebar.shown'
@@ -387,17 +419,23 @@ export function App(): React.JSX.Element {
 
   const onTermError = useCallback((m: string) => setError(m), [])
 
-  // ---------- Layout de paneles: vista (grilla/pestañas), proporciones y orden ----------
+  // ---------- Layout de paneles: distribución (Uno/Dos/Cuatro), proporciones y orden ----------
   const viewMode = useViewMode()
+  const cap = LAYOUT_CAP[viewMode]
   const areaRef = useRef<HTMLDivElement>(null)
   const tabsRef = useRef<HTMLDivElement>(null)
   const ghostRef = useRef<HTMLDivElement>(null)
   const [layoutMsg, setLayoutMsg] = useState('')
-  const maxId = maximized && openPanes.includes(maximized) ? maximized : null
-  const activeTab = focused && openPanes.includes(focused) ? focused : (openPanes[0] ?? null)
-  // En pestañas se ve una sola (la maximizada o la activa); las demás quedan montadas con display:none.
-  const shownTab = viewMode === 'tabs' ? (maxId ?? activeTab) : null
-  const visiblePanes = viewMode === 'tabs' ? (shownTab ? [shownTab] : []) : maxId ? [maxId] : openPanes
+  const maxId = maximized && cap > 1 && openPanes.includes(maximized) ? maximized : null
+  // El panel activo siempre está a la vista. Con más paneles que la distribución, se ven `cap` seguidos
+  // que incluyen al activo; los demás quedan en la barra de pestañas (y montados, con display:none).
+  const activeId = maxId ?? (focused && openPanes.includes(focused) ? focused : (openPanes[0] ?? null))
+  const winStart =
+    openPanes.length <= cap || !activeId
+      ? 0
+      : Math.max(0, Math.min(openPanes.indexOf(activeId) - (cap - 1), openPanes.length - cap))
+  const visiblePanes = maxId ? [maxId] : openPanes.slice(winStart, winStart + cap)
+  const showTabs = openPanes.length > 0 && (viewMode === 'uno' || openPanes.length > cap)
   const nVisible = visiblePanes.length
   const shape = useMemo(() => gridShape(nVisible), [nVisible])
   const shapeK = shapeKey(shape)
@@ -449,14 +487,14 @@ export function App(): React.JSX.Element {
   })
   const tabDrag = useReorderDrag({ kind: 'tab', attr: 'data-tab-id', scope: tabsRef, ghost: ghostRef, onDrop: dropPane })
   const dragging = paneDrag.drag ?? tabDrag.drag
-  const canDragPanes = viewMode === 'grid' && nVisible > 1
+  const canDragPanes = cap > 1 && nVisible > 1
 
   const hideTab = async (id: string): Promise<void> => {
     if (!(await allowPaneAction(id, 'hide'))) return
     const i = openPanes.indexOf(id)
     const neighbor = openPanes[i + 1] ?? openPanes[i - 1]
     closePane(id)
-    if (id === shownTab && neighbor) setFocused(neighbor)
+    if (id === activeId && neighbor) setFocused(neighbor)
   }
 
   // Atajos: Ctrl+Tab / Ctrl+Shift+Tab cambian de panel; Ctrl+Alt+← / → mueven el panel enfocado.
@@ -468,7 +506,7 @@ export function App(): React.JSX.Element {
   })
   kbRef.current = {
     shiftRowBy: (id, d) => {
-      if (viewMode !== 'grid' || maxId) {
+      if (cap < 2 || maxId) {
         setLayoutMsg('Cambiar de fila funciona con los paneles en grilla, sin maximizar.')
         return
       }
@@ -485,8 +523,7 @@ export function App(): React.JSX.Element {
     },
     count: openPanes.length,
     cycleBy: (d) => {
-      const cur = viewMode === 'tabs' ? shownTab : (maxId ?? (focused && openPanes.includes(focused) ? focused : null))
-      const next = cycle(openPanes, cur, d)
+      const next = cycle(openPanes, activeId, d)
       if (!next) return
       selectPane(next, true)
       setLayoutMsg(`${paneName(next)}, ${openPanes.indexOf(next) + 1} de ${openPanes.length}.`)
@@ -534,28 +571,62 @@ export function App(): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKey, true)
   }, [])
 
-  // Barra lateral (Ctrl+B) y nuevo espacio (Ctrl+N). Dentro de una terminal esas teclas son de la shell: no se tocan.
+  // Atajos de la ventana, todos configurables (matchShortcut). Dentro de una terminal, esas teclas son de la
+  // shell: solo funcionan fuera de ella (como antes). Ctrl+K y Ctrl+, están en su propio componente.
   const toggleSide = (): void => {
     const next = !sideShown
     setSideShown(next)
     writeStorage(SIDEBAR_KEY, next ? '1' : '0')
   }
-  const toggleSideRef = useRef(toggleSide)
-  toggleSideRef.current = toggleSide
   const accountsRef = useRef(accounts)
   accountsRef.current = accounts
-  const newWsRef = useRef(() => {})
-  newWsRef.current = () => setNewWsMode('normal')
+  const winKeys = useRef({
+    side: () => {},
+    newWs: () => {},
+    rename: (): boolean => false,
+    layout: (_m: ViewMode) => {},
+    chat: () => {}
+  })
+  winKeys.current = {
+    side: toggleSide,
+    newWs: () => setNewWsMode('normal'),
+    rename: () => {
+      // Renombra el panel activo (no un terminal de cuenta ni un espacio ya borrado).
+      if (!focused || isLoginPane(focused) || !wsById.has(focused)) return false
+      setRenaming({ id: focused, from: 'pane' })
+      return true
+    },
+    layout: (m) => pickLayout(m),
+    chat: () => openChat()
+  }
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return
-      if (document.activeElement?.closest('.terminal-host')) return
-      if (e.code === 'KeyB') {
+      if (e.metaKey || isCapturingShortcut()) return
+      const k = winKeys.current
+      const ae = document.activeElement
+      const inTerm = !!ae?.closest('.terminal-host')
+      const typing = !!ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || (ae as HTMLElement).isContentEditable)
+      if (matchShortcut('sidebar', e)) {
+        if (inTerm) return
         e.preventDefault()
-        toggleSideRef.current()
-      } else if (e.code === 'KeyN' && accountsRef.current.length > 0) {
+        k.side()
+      } else if (matchShortcut('new', e)) {
+        if (inTerm || accountsRef.current.length === 0) return
         e.preventDefault()
-        newWsRef.current()
+        k.newWs()
+      } else if (matchShortcut('rename', e)) {
+        // En la lista de espacios, F2 lo maneja la fila (su propio botón). Escribiendo, no se toca.
+        if (inTerm || typing || ae?.closest('.sl-side')) return
+        if (k.rename()) e.preventDefault()
+      } else if (matchShortcut('chat', e)) {
+        if (inTerm) return
+        e.preventDefault()
+        k.chat()
+      } else if (e.ctrlKey && e.altKey && !e.shiftKey && LAYOUT_BY_DIGIT[e.code]) {
+        // Distribución fija (Ctrl+Alt+1–4): no se graba en Configuración.
+        if (inTerm) return
+        e.preventDefault()
+        k.layout(LAYOUT_BY_DIGIT[e.code])
       }
     }
     window.addEventListener('keydown', onKey, true)
@@ -583,7 +654,7 @@ export function App(): React.JSX.Element {
   }, [])
 
   const tabs: TabInfo[] =
-    viewMode === 'tabs'
+    showTabs
       ? openPanes.map((id) => {
           const login = isLoginPane(id)
           const accId = login ? accountIdFromLoginPane(id) : wsById.get(id)?.accountId
@@ -631,20 +702,15 @@ export function App(): React.JSX.Element {
     on: (channel, cb) => api.feat.on(channel, cb)
   }
 
-  // Barra de paneles: qué distribución está activa. Uno = pestañas; Dos y Cuatro = grilla.
-  const layoutPressed = {
-    uno: viewMode === 'tabs',
-    dos: viewMode === 'grid' && nVisible <= 2,
-    cuatro: viewMode === 'grid' && nVisible > 2
-  }
-  const pickLayout = (k: 'uno' | 'dos' | 'cuatro'): void => {
-    if (k === 'uno') {
-      setViewMode('tabs')
-      return
-    }
-    setViewMode('grid')
+  // Barra de paneles: distribución elegida (se guarda en esta PC). Uno = 1 a la vista; Dos = 2; Cuatro = 4.
+  const layoutPressed = { uno: viewMode === 'uno', dos: viewMode === 'dos', cuatro: viewMode === 'cuatro' }
+  const pickLayout = (k: ViewMode): void => {
+    setViewMode(k)
     if (maximized) setMaximized(null)
+    setLayoutMsg(`Distribución ${LAYOUT_LABEL[k]}: hasta ${LAYOUT_CAP[k]} ${LAYOUT_CAP[k] === 1 ? 'panel' : 'paneles'} a la vista. El resto queda en pestañas.`)
   }
+  const editorName = appSettings.settings.editor
+  const editorLabel = editorName === 'Bloc de notas' ? 'carpeta' : editorName
 
   // Ruta «cuenta › espacio» del panel enfocado.
   const focusedAccId = focused ? (isLoginPane(focused) ? accountIdFromLoginPane(focused) : wsById.get(focused)?.accountId) : undefined
@@ -725,7 +791,7 @@ export function App(): React.JSX.Element {
             onClick={toggleSide}
             aria-pressed={sideShown}
             aria-label="Mostrar u ocultar la barra lateral"
-            title="Barra lateral (Ctrl+B)"
+            title={`Barra lateral (${comboLabel('sidebar')})`}
           >
             <SidebarIcon size={17} aria-hidden="true" />
           </button>
@@ -820,7 +886,10 @@ export function App(): React.JSX.Element {
                     <button
                       type="button"
                       className="icon-btn"
-                      onClick={() => setNewWsMode('normal')}
+                      onClick={() => {
+                        setNewWsPreset({ accountId: acc.id })
+                        setNewWsMode('normal')
+                      }}
                       aria-label={`Nuevo espacio en ${acc.label}`}
                       title={`Nuevo espacio en ${acc.label}`}
                     >
@@ -863,7 +932,7 @@ export function App(): React.JSX.Element {
                             aria-label={st?.loggedIn ? `Abrir terminal de ${acc.label}` : `Iniciar sesión en ${acc.label}`}
                             title={st?.loggedIn ? 'Terminal de la cuenta' : 'Iniciar sesión'}
                           >
-                            {st?.loggedIn ? <TerminalIcon size={14} aria-hidden="true" /> : <SignIn size={14} aria-hidden="true" />}
+                            {st?.loggedIn ? <TerminalIcon size={14} aria-hidden="true" /> : <AccountIcon size={14} />}
                             {st?.loggedIn ? 'Terminal' : 'Iniciar sesión'}
                           </button>
                           <button type="button" className="btn sm danger" onClick={() => void removeAccount(acc)} aria-label={`Quitar cuenta ${acc.label}`} title="Quitar cuenta">
@@ -921,7 +990,7 @@ export function App(): React.JSX.Element {
                     <strong>{focused ? paneName(focused) : 'Sloth'}</strong>
                   </nav>
                   <div className="sl-bar-tools">
-                    {viewMode === 'grid' && nVisible > 1 && !sizesAreEqual(sizes) && (
+                    {cap > 1 && nVisible > 1 && !sizesAreEqual(sizes) && (
                       <button
                         type="button"
                         className="icon-btn"
@@ -936,13 +1005,13 @@ export function App(): React.JSX.Element {
                       </button>
                     )}
                     <div className="seg" role="group" aria-label="Distribución de paneles">
-                      <button type="button" aria-pressed={layoutPressed.uno} onClick={() => pickLayout('uno')} title="Uno: una terminal a la vez (pestañas)">
+                      <button type="button" aria-pressed={layoutPressed.uno} onClick={() => pickLayout('uno')} title="Uno: 1 panel a la vista; el resto en pestañas">
                         <OnePaneIcon size={14} aria-hidden="true" /> Uno
                       </button>
-                      <button type="button" aria-pressed={layoutPressed.dos} onClick={() => pickLayout('dos')} title="Dos: paneles en grilla, lado a lado">
+                      <button type="button" aria-pressed={layoutPressed.dos} onClick={() => pickLayout('dos')} title="Dos: hasta 2 paneles a la vista; el resto en pestañas">
                         <TwoPanesIcon size={14} aria-hidden="true" /> Dos
                       </button>
-                      <button type="button" aria-pressed={layoutPressed.cuatro} onClick={() => pickLayout('cuatro')} title="Cuatro: grilla de hasta cuatro por fila">
+                      <button type="button" aria-pressed={layoutPressed.cuatro} onClick={() => pickLayout('cuatro')} title="Cuatro: hasta 4 paneles a la vista; el resto en pestañas">
                         <FourPanesIcon size={14} aria-hidden="true" /> Cuatro
                       </button>
                     </div>
@@ -959,12 +1028,12 @@ export function App(): React.JSX.Element {
                   </div>
                 </div>
 
-                {viewMode === 'tabs' && (
+                {showTabs && (
                   <div className="sl-tabsrow">
-                    <TabBar tabs={tabs} active={shownTab} drag={tabDrag.drag} scope={tabsRef} onSelect={selectPane} onHide={hideTab} onPointerDown={tabDrag.onPointerDown} />
+                    <TabBar tabs={tabs} active={activeId} drag={tabDrag.drag} scope={tabsRef} onSelect={selectPane} onHide={hideTab} onPointerDown={tabDrag.onPointerDown} />
                   </div>
                 )}
-                {viewMode === 'grid' && maxId && (
+                {cap > 1 && maxId && (
                   <div className="sl-maxnote">
                     <MaximizeIcon size={13} aria-hidden="true" />
                     Maximizado: <strong>{paneName(maxId)}</strong>
@@ -999,7 +1068,7 @@ export function App(): React.JSX.Element {
                         },
                         {
                           id: 'vscode',
-                          label: 'Abrir en VS Code',
+                          label: editorLabel === 'carpeta' ? 'Abrir carpeta' : `Abrir en ${editorLabel}`,
                           icon: <EditorIcon size={15} aria-hidden="true" />,
                           onSelect: () => void revealWs(ws, 'vscode')
                         },
@@ -1025,7 +1094,7 @@ export function App(): React.JSX.Element {
                     id: 'restart',
                     label: 'Reiniciar terminal',
                     hint: 'cierra el proceso',
-                    icon: <ArrowClockwise size={15} aria-hidden="true" />,
+                    icon: <UpdateIcon size={15} />,
                     onSelect: () => void requestRestartPane(paneId)
                   },
                   {
@@ -1096,7 +1165,7 @@ export function App(): React.JSX.Element {
                         <button
                           className="icon-btn"
                           onClick={() => setMaximized(maximized === paneId ? null : paneId)}
-                          hidden={viewMode === 'tabs'}
+                          hidden={cap < 2}
                           aria-label={maximized === paneId ? 'Volver a la grilla' : 'Maximizar'}
                           title={maximized === paneId ? 'Volver a la grilla' : 'Maximizar'}
                         >
@@ -1122,7 +1191,7 @@ export function App(): React.JSX.Element {
                   </section>
                 )
               })}
-              {viewMode === 'grid' && nVisible > 1 && (
+              {cap > 1 && nVisible > 1 && (
                 <Separators shape={shape} sizes={sizes} names={visiblePanes.map(paneName)} area={areaRef} onCommit={commitSizes} />
               )}
               {paneDrag.drag?.target && paneDrag.drag.mode && rectOf.has(paneDrag.drag.target) && (
@@ -1153,7 +1222,7 @@ export function App(): React.JSX.Element {
             Terminales activas: {activeTerms}
           </span>
           <span className="sl-status-keys">
-            <kbd>Ctrl</kbd>+<kbd>K</kbd> buscar · <kbd>Ctrl</kbd>+<kbd>B</kbd> barra lateral · <kbd>Ctrl</kbd>+<kbd>N</kbd> nuevo espacio ·{' '}
+            <Keys id="palette" /> buscar · <Keys id="sidebar" /> barra lateral · <Keys id="new" /> nuevo espacio ·{' '}
             <kbd>Ctrl</kbd>+<kbd>Tab</kbd> cambiar de panel
           </span>
         </footer>
@@ -1232,7 +1301,7 @@ export function App(): React.JSX.Element {
 
         {error && (
           <div className="toast" role="alert">
-            <WarningCircle size={18} weight="fill" aria-hidden="true" />
+            <ErrorIcon size={18} />
             <span className="grow-min">{error}</span>
             <button className="icon-btn" onClick={() => setError(null)} aria-label="Cerrar aviso">
               <CloseIcon size={14} aria-hidden="true" />

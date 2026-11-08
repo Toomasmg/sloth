@@ -1,21 +1,25 @@
 import type { Command, FeatureUi } from '../features/host'
+import { LAYOUT_CAP, LAYOUT_LABEL, type ViewMode } from './logic'
 import { getViewMode, requestEqualize, setViewMode } from './store'
 
 /**
  * Comandos del layout para la paleta (Ctrl+K). Para que aparezcan hay que sumar esta FeatureUi
- * al registro (`features/registry.ts`): ver «pedido al núcleo» en el informe de paneles.
+ * al registro (`features/registry.ts`).
  */
+const KINDS: ViewMode[] = ['uno', 'dos', 'cuatro']
+
 function commands(): Command[] {
-  const mode = getViewMode()
+  const current = getViewMode()
+  const distribution: Command[] = KINDS.map((k) => ({
+    id: `layout:${k}`,
+    title: `Distribución ${LAYOUT_LABEL[k]}${k === current ? ' (actual)' : ''}`,
+    subtitle: `${LAYOUT_CAP[k] === 1 ? '1 panel a la vista' : `hasta ${LAYOUT_CAP[k]} paneles a la vista`}, el resto en pestañas`,
+    group: 'Paneles',
+    keywords: 'distribucion vista uno dos cuatro grilla pestañas tabs layout',
+    run: () => setViewMode(k)
+  }))
   return [
-    {
-      id: 'layout:view-toggle',
-      title: mode === 'grid' ? 'Ver paneles en pestañas' : 'Ver paneles en grilla',
-      subtitle: mode === 'grid' ? 'Una terminal a la vez, con barra de pestañas' : 'Todas las terminales a la vista',
-      group: 'Paneles',
-      keywords: 'vista modo grilla pestañas tabs layout',
-      run: () => setViewMode(mode === 'grid' ? 'tabs' : 'grid')
-    },
+    ...distribution,
     {
       id: 'layout:equalize',
       title: 'Repartir los paneles por igual',

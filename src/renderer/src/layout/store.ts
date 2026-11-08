@@ -29,10 +29,6 @@ export function setViewMode(next: ViewMode): void {
   for (const cb of modeSubs) cb()
 }
 
-export function toggleViewMode(): void {
-  setViewMode(mode === 'grid' ? 'tabs' : 'grid')
-}
-
 function subscribe(cb: () => void): () => void {
   modeSubs.add(cb)
   return () => modeSubs.delete(cb)

@@ -3,7 +3,10 @@
  * persistencia. Sin DOM ni React, para poder probarla con Node.
  */
 
-export type ViewMode = 'grid' | 'tabs'
+/** Distribución: cuántos paneles están a la vista (Uno = 1, Dos = 2, Cuatro = 4). El resto queda en pestañas. */
+export type ViewMode = 'uno' | 'dos' | 'cuatro'
+export const LAYOUT_CAP: Record<ViewMode, number> = { uno: 1, dos: 2, cuatro: 4 }
+export const LAYOUT_LABEL: Record<ViewMode, string> = { uno: 'Uno', dos: 'Dos', cuatro: 'Cuatro' }
 /** Dónde cae un panel arrastrado respecto del panel de destino. */
 export type DropMode = 'before' | 'after' | 'swap'
 
@@ -274,11 +277,14 @@ export function saveSizes(kv: KV | null, shape: number[], sizes: Sizes): void {
   }
 }
 
+/** Lee la distribución guardada. Valores de versiones anteriores: «tabs» = Uno, «grid» (o nada) = Cuatro. */
 export function loadMode(kv: KV | null): ViewMode {
   try {
-    return kv?.getItem(MODE_KEY) === 'tabs' ? 'tabs' : 'grid'
+    const v = kv?.getItem(MODE_KEY)
+    if (v === 'uno' || v === 'dos' || v === 'cuatro') return v
+    return v === 'tabs' ? 'uno' : 'cuatro'
   } catch {
-    return 'grid'
+    return 'cuatro'
   }
 }
 
