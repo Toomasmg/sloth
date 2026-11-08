@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { openDrawer } from '../git/store'
 import { BranchIcon, DoneIcon, PlusIcon, SearchIcon } from '../../icons/SlothIcons'
-import { closeRamas, setRamasDialog, useRamas } from './store'
+import { closeRamas, setRamasCandidates, setRamasDialog, useRamas } from './store'
 import '../help/page.css'
 
 // ---------- Tipos (los mismos que devuelve main) ----------
@@ -261,6 +261,12 @@ export function RamasPage(): React.JSX.Element | null {
 
   const allRows = useMemo(() => repos?.flatMap((r) => r.rows) ?? [], [repos])
   const branchRows = useMemo(() => allRows.filter((r) => !r.isMain), [allRows])
+  const cleanCount = useMemo(() => branchRows.filter(cleanable).length, [branchRows])
+
+  // El número del badge de la barra lateral sale de este escaneo (queda guardado al cerrar el panel).
+  useEffect(() => {
+    if (repos) setRamasCandidates(cleanCount)
+  }, [repos, cleanCount])
 
   const qn = norm(q.trim())
   const passes = (repo: RepoView, r: RowView): boolean =>
@@ -371,7 +377,7 @@ export function RamasPage(): React.JSX.Element | null {
               <p className="f-wt-sub">Una rama aparte es una copia de trabajo del mismo repo en otra carpeta, para que dos Claude no se pisen.</p>
             </div>
             <div className="f-wt-head-actions">
-              <button type="button" className="f-wt-btn lg solid" onClick={() => setRamasDialog('limpiar')} disabled={scanning}>
+              <button type="button" className="f-wt-btn lg solid" onClick={() => setRamasDialog('limpiar')}>
                 Limpiar ramas que ya no se usan
               </button>
               <button type="button" className="f-wt-btn lg primary" onClick={() => setRamasDialog('nueva')} disabled={scanning || !repos?.length}>
@@ -589,6 +595,8 @@ export function RamasPage(): React.JSX.Element | null {
           <LimpiarDialog
             candidates={candidates}
             repos={repos ?? []}
+            loading={!repos && !scanErr}
+            scanErr={repos ? '' : scanErr}
             sizes={sizes}
             sizeFailed={sizeFailed}
             onDone={async (msg) => {
@@ -773,6 +781,8 @@ function NuevaDialog({ repos, onDone, onClose }: { repos: RepoView[]; onDone: (m
 function LimpiarDialog({
   candidates,
   repos,
+  loading,
+  scanErr,
   sizes,
   sizeFailed,
   onDone,
@@ -780,6 +790,10 @@ function LimpiarDialog({
 }: {
   candidates: RowView[]
   repos: RepoView[]
+  /** Todavía no llegó el escaneo: el diálogo se abre igual y espera. */
+  loading: boolean
+  /** Si el escaneo falló y no hay datos. */
+  scanErr: string
   sizes: Record<string, SizeVal>
   sizeFailed: boolean
   onDone: (msg: string) => Promise<void> | void
@@ -805,6 +819,27 @@ function LimpiarDialog({
     return `Ya mergeada${base ? ` en ${base}` : ''}`
   }
 
+  const listed = loading ? null : candidates.length > 0 ? (
+    <div role="group" aria-label="Ramas para quitar" className="f-wt-list">
+      {candidates.map((c, i) => (
+        <label key={c.path} className={`f-wt-pick ${i > 0 ? 'sep' : ''}`}>
+          <input type="checkbox" checked={on(c.path)} onChange={() => setSel((s) => ({ ...s, [c.path]: !on(c.path) }))} aria-label={`Quitar ${c.branch ?? c.path}`} />
+          <span className="f-wt-pick-text">
+            <span className="mono">{c.branch}</span>
+            <span className="f-wt-reason" title={c.path}>
+              {reasonOf(c)} · {shortFolder(c.path)}
+            </span>
+            {failed[c.path] && <span className="f-wt-err">{failed[c.path]}</span>}
+          </span>
+          <span className="f-wt-pick-size">{sizeText(sizes[c.path], sizeFailed)}</span>
+        </label>
+      ))}
+    </div>
+  ) : (
+    <p className="f-wt-none">
+      {scanErr ? 'No se pudo revisar las ramas. Cerrá esta ventana y probá de nuevo.' : 'No hay ramas para limpiar. Todas tienen espacio, cambios o commits sin subir.'}
+    </p>
+  )
   const confirm = async (): Promise<void> => {
     if (busy) return
     if (chosen.length === 0) {
@@ -842,24 +877,12 @@ function LimpiarDialog({
             Estas ramas aparte no tienen espacio, no tienen cambios ni commits sin subir, y ya están mergeadas o borradas en origin. Destildá las que quieras conservar.
           </p>
 
-          {candidates.length > 0 ? (
-            <div role="group" aria-label="Ramas para quitar" className="f-wt-list">
-              {candidates.map((c, i) => (
-                <label key={c.path} className={`f-wt-pick ${i > 0 ? 'sep' : ''}`}>
-                  <input type="checkbox" checked={on(c.path)} onChange={() => setSel((s) => ({ ...s, [c.path]: !on(c.path) }))} aria-label={`Quitar ${c.branch ?? c.path}`} />
-                  <span className="f-wt-pick-text">
-                    <span className="mono">{c.branch}</span>
-                    <span className="f-wt-reason" title={c.path}>
-                      {reasonOf(c)} · {shortFolder(c.path)}
-                    </span>
-                    {failed[c.path] && <span className="f-wt-err">{failed[c.path]}</span>}
-                  </span>
-                  <span className="f-wt-pick-size">{sizeText(sizes[c.path], sizeFailed)}</span>
-                </label>
-              ))}
-            </div>
+          {loading ? (
+            <p role="status" className="f-wt-none">
+              Revisando las ramas…
+            </p>
           ) : (
-            <p className="f-wt-none">No hay ramas para limpiar. Todas tienen espacio, cambios o commits sin subir.</p>
+            listed
           )}
 
           {err && (
@@ -869,11 +892,11 @@ function LimpiarDialog({
           )}
 
           <div className="f-wt-form-actions">
-            <span className="f-wt-grow">{chosen.length ? `${freeLabel}` : ''}</span>
+            <span className="f-wt-grow">{!loading && chosen.length ? `${freeLabel}` : ''}</span>
             <button type="button" className="f-wt-btn lg plain" onClick={onClose} disabled={busy}>
-              {candidates.length ? 'Cancelar' : 'Cerrar'}
+              {loading || candidates.length ? 'Cancelar' : 'Cerrar'}
             </button>
-            {candidates.length > 0 && (
+            {!loading && candidates.length > 0 && (
               <button type="button" className="f-wt-btn lg danger" onClick={() => void confirm()} disabled={busy}>
                 {busy ? 'Quitando…' : chosen.length ? `Quitar ${plural(chosen.length, 'rama', 'ramas')}` : 'Quitar ramas'}
               </button>

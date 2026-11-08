@@ -602,7 +602,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  overflow: hidden;
+  /* visible: los menús de cada parte se despliegan debajo de la ruta (ellos mismos truncan su texto). */
+  overflow: visible;
   white-space: nowrap;
   color: var(--fg-muted);
   font-size: var(--fs-md);
@@ -616,6 +617,51 @@
 }
 .sl-crumb svg {
   flex: none;
+}
+/* Partes de la ruta con menú: botón sin marco, chevron chico que dice que se puede tocar. */
+.crumb-menu-wrap {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+}
+.sl-crumb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.sl-crumb-btn:hover,
+.sl-crumb-btn.on {
+  background: var(--hover);
+  color: var(--fg);
+}
+.sl-crumb-btn > svg {
+  opacity: 0.6;
+  transition: transform var(--t-fast) var(--ease);
+}
+.sl-crumb-btn.on > svg {
+  opacity: 1;
+  transform: rotate(180deg);
+}
+.sl-crumb-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sl-crumb-space {
+  color: var(--fg);
+  font-weight: 600;
 }
 .sl-bar-tools {
   display: flex;
@@ -869,6 +915,97 @@
 .pane-menu-hint {
   font-size: var(--fs-xs);
   color: var(--fg-muted);
+}
+
+/* Menú de la ruta «cuenta › espacio»: el mismo panel del menú «más», con grupos por cuenta y filas de espacio. */
+.pane-menu.crumb-menu {
+  left: 0;
+  right: auto;
+  min-width: 280px;
+  max-width: 340px;
+  max-height: min(440px, 70vh);
+  overflow-y: auto;
+  font-weight: 400;
+  white-space: normal;
+}
+.crumb-menu-group + .crumb-menu-group {
+  margin-top: 4px;
+  padding-top: 4px;
+  box-shadow: inset 0 1px 0 var(--line);
+}
+.crumb-menu-title {
+  padding: 6px 9px 4px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.crumb-menu-empty {
+  padding: 6px 9px;
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+}
+.crumb-menu-item {
+  width: 100%;
+  min-height: 40px;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+.crumb-menu-item[aria-current='true'] {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.crumb-menu-item > svg {
+  flex: none;
+  color: var(--accent);
+}
+.crumb-ws-ico {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  /* Color del espacio (ws.color). Sin color: gris neutro. */
+  --ws: var(--fg-muted);
+  color: var(--ws);
+  background: color-mix(in srgb, var(--ws) 18%, transparent);
+}
+.crumb-ws-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.crumb-ws-name {
+  min-width: 0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crumb-ws-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.crumb-ws-branch svg {
+  flex: none;
+}
+.chip.crumb-chip {
+  flex: none;
+  height: 20px;
+  padding: 0 7px;
+  font-size: var(--fs-xs);
 }
 
 /* Foco: el panel activo lleva un anillo de acento (no el color de la cuenta). */

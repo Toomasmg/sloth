@@ -58,6 +58,8 @@ import { onEqualize, safeStorage, setViewMode, useViewMode } from './layout/stor
 import { useReorderDrag } from './layout/useReorderDrag'
 import { Separators } from './layout/Separators'
 import { PaneInput, PaneMenu, type PaneMenuItem } from './layout/PaneMenu'
+import { CrumbMenu, type CrumbGroup, type CrumbItem } from './layout/CrumbMenu'
+import { LimpiarRamasRow } from './features/worktrees/CleanRow'
 import { TabBar, type TabInfo } from './layout/TabBar'
 import './layout/layout.css'
 import './layout/shell.css'
@@ -68,6 +70,7 @@ import { cleanError, fmtTok, shortPath, STATE_LABEL, totalTok, usageTitle } from
 import {
   BranchIcon,
   BroadcastIcon,
+  CheckIcon,
   ChatIcon,
   CloseIcon,
   EditorIcon,
@@ -739,13 +742,20 @@ export function App(): React.JSX.Element {
   const focusedAccId = focused ? (isLoginPane(focused) ? accountIdFromLoginPane(focused) : wsById.get(focused)?.accountId) : undefined
   const crumbAccount = focusedAccId ? (accountById.get(focusedAccId)?.label ?? 'cuenta borrada') : 'Sloth'
 
+  /** Chip de estado de un espacio: el permiso pendiente manda sobre el estado de su terminal. */
+  const chipOf = (ws: Workspace): { cls: string; label: string } | null => {
+    const nPerm = permsByWs.get(ws.id)?.length ?? 0
+    const ag = agents[ws.id]
+    return nPerm > 0 ? { cls: 'chip-perm', label: `Permiso${nPerm > 1 ? ` ×${nPerm}` : ''}` } : ag ? { cls: STATE_CHIP[ag.state], label: STATE_LABEL[ag.state] } : null
+  }
+
   const renderWs = (ws: Workspace): React.JSX.Element => {
     const ag = agents[ws.id]
     const acc = accountById.get(ws.accountId)
     const open = openPanes.includes(ws.id)
     const nPerm = permsByWs.get(ws.id)?.length ?? 0
     const editing = renaming?.id === ws.id && renaming.from === 'side'
-    const chip = nPerm > 0 ? { cls: 'chip-perm', label: `Permiso${nPerm > 1 ? ` ×${nPerm}` : ''}` } : ag ? { cls: STATE_CHIP[ag.state], label: STATE_LABEL[ag.state] } : null
+    const chip = chipOf(ws)
     return (
       <li
         key={ws.id}
@@ -803,6 +813,53 @@ export function App(): React.JSX.Element {
   const q = wsQuery.trim().toLowerCase()
   const matchWs = (ws: Workspace): boolean => !q || (ws.name + ' ' + (ws.branch ?? '')).toLowerCase().includes(q)
   const orphans = workspaces.filter((w) => !accountById.has(w.accountId))
+
+  // Ruta «cuenta › espacio»: cada parte abre su menú. Elegir un espacio = el mismo openPane del sidebar.
+  const spaceItem = (ws: Workspace): CrumbItem => {
+    const chip = chipOf(ws)
+    return {
+      id: ws.id,
+      current: focused === ws.id,
+      onSelect: () => openPane(ws.id),
+      body: (
+        <>
+          <span className={`crumb-ws-ico${ws.color ? '' : ' no-color'}`} style={ws.color ? ({ '--ws': colorHex(ws.color) } as CSSProperties) : undefined} aria-hidden="true">
+            {ws.icon ? ws.icon : <SpaceIcon size={13} aria-hidden="true" />}
+          </span>
+          <span className="crumb-ws-main">
+            <span className="crumb-ws-name">{ws.name}</span>
+            {ws.branch && (
+              <span className="crumb-ws-branch mono">
+                <BranchIcon size={11} aria-hidden="true" />
+                {ws.branch}
+              </span>
+            )}
+          </span>
+          {chip && <span className={`chip crumb-chip ${chip.cls}`}>{chip.label}</span>}
+          {focused === ws.id && <CheckIcon size={13} aria-hidden="true" />}
+        </>
+      )
+    }
+  }
+  const accountGroups: CrumbGroup[] = [
+    ...accounts.map((acc) => ({
+      id: acc.id,
+      title: acc.label,
+      items: workspaces.filter((w) => w.accountId === acc.id).map(spaceItem),
+      empty: 'Sin espacios. Usá + en la barra lateral para crear uno.'
+    })),
+    ...(orphans.length ? [{ id: 'huerfanos', title: 'Cuenta borrada', items: orphans.map(spaceItem), empty: '' }] : [])
+  ]
+  const spaceGroups: CrumbGroup[] = focusedAccId
+    ? [
+        {
+          id: focusedAccId,
+          title: crumbAccount,
+          items: workspaces.filter((w) => w.accountId === focusedAccId).map(spaceItem),
+          empty: 'Sin espacios. Usá + en la barra lateral para crear uno.'
+        }
+      ]
+    : []
 
   return (
     <UiContext.Provider value={uiCtx}>
@@ -966,6 +1023,7 @@ export function App(): React.JSX.Element {
             )}
 
             <div className="sl-foot">
+              <LimpiarRamasRow />
               <button type="button" className="sl-newbtn" disabled={accounts.length === 0} onClick={() => setNewWsMode('normal')}>
                 <Plus size={15} weight="bold" aria-hidden="true" />
                 Nuevo espacio
@@ -980,11 +1038,25 @@ export function App(): React.JSX.Element {
               <>
                 <div className="sl-bar">
                   <nav className="sl-crumb" aria-label="Ubicación">
-                    <span>{crumbAccount}</span>
+                    <CrumbMenu
+                      label={`Elegir cuenta y espacio. Ahora: ${crumbAccount}`}
+                      trigger={crumbAccount}
+                      groups={accountGroups}
+                      emptyText="Todavía no hay cuentas. Agregá una en Configuración."
+                    />
                     <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                       <path d="M9 6l6 6-6 6" />
                     </svg>
-                    <strong>{focused ? paneName(focused) : 'Sloth'}</strong>
+                    {focusedAccId && focused ? (
+                      <CrumbMenu
+                        label={`Elegir espacio de ${crumbAccount}. Ahora: ${paneName(focused)}`}
+                        trigger={<span className="sl-crumb-space">{paneName(focused)}</span>}
+                        groups={spaceGroups}
+                        emptyText=""
+                      />
+                    ) : (
+                      <strong>{focused ? paneName(focused) : 'Sloth'}</strong>
+                    )}
                   </nav>
                   <div className="sl-bar-tools">
                     {cap > 1 && nVisible > 1 && !sizesAreEqual(sizes) && (
