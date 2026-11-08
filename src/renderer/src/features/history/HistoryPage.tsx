@@ -163,6 +163,15 @@ export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Ele
     setHidden(new Set(p.hidden))
   }
 
+  /** Tras borrar: la conversación sale de la lista y se deselecciona. */
+  const onDeleted = (key: string, p: PrefsReply): void => {
+    applyPrefs(p)
+    setRows((cur) => (cur ? cur.filter((r) => rowKey(r) !== key) : cur))
+    setSel(null)
+    setNotice(null)
+    say('Conversación enviada a la Papelera')
+  }
+
   const card = (r: SessionRow): React.ReactNode => {
     const key = rowKey(r)
     const on = key === effSel
@@ -386,6 +395,7 @@ export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Ele
                 status={statusOf(selRow, livePerm)}
                 onPrefs={applyPrefs}
                 onResumed={onClose}
+                onDeleted={(p) => onDeleted(rowKey(selRow), p)}
                 onNotice={setNotice}
                 say={say}
               />

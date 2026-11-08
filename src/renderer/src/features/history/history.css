@@ -439,9 +439,12 @@
 .hd-actions .btn[aria-pressed='true'] {
   background: color-mix(in srgb, var(--accent) 18%, transparent);
 }
-.hd-actions .btn.hd-quit {
+.hd-actions .btn.hd-del {
   color: var(--danger-fg);
   box-shadow: none;
+}
+.hd-actions .btn.hd-del:disabled {
+  opacity: 0.5;
 }
 .hd-box {
   display: flex;
