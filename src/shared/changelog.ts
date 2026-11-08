@@ -11,8 +11,13 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     version: '0.6.3',
     date: '2026-11-08',
-    title: 'Arreglo en el encabezado de los paneles',
-    items: ['El botón «Cambios» del encabezado de cada panel ya no se encima con el número de archivos.']
+    title: 'Ruta clickeable y arreglos en los paneles',
+    items: [
+      'La ruta «cuenta › espacio» de arriba de los paneles se puede tocar: elegí otro espacio y te lleva ahí.',
+      'Vuelve «Limpiar ramas que ya no se usan» a la barra lateral, con la cantidad de ramas para limpiar.',
+      'El botón «Cambios» del encabezado de cada panel ya no se encima con el número de archivos.',
+      'El menú «más» de cada panel se ve completo, sin textos encimados.'
+    ]
   },
   {
     version: '0.6.2',
