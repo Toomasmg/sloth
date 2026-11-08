@@ -57,10 +57,10 @@ export function DecisionsPanel({ onClose }: { onClose: () => void }): React.JSX.
           <span className="pd-title">Decisiones</span>
           <div className="seg" role="group" aria-label="Vista">
             <button type="button" aria-pressed={tab === 'hist'} onClick={() => setTab('hist')}>
-              Historial de hoy
+              Historial
             </button>
             <button type="button" aria-pressed={tab === 'rules'} onClick={() => setTab('rules')}>
-              Reglas · {rules.length}
+              Permitidos siempre · {rules.length}
             </button>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Cerrar">
@@ -71,9 +71,7 @@ export function DecisionsPanel({ onClose }: { onClose: () => void }): React.JSX.
         <label className="pd-dnd">
           <span className="pd-dnd-text">
             No molestar
-            <span className="pd-dnd-sub">
-              Sin avisos de Windows mientras esté activo · se cambia también en Configuración
-            </span>
+            {noMolestar && <span className="pd-dnd-on">No molestar activo</span>}
           </span>
           <span className="switch">
             <input
@@ -115,11 +113,11 @@ export function DecisionsPanel({ onClose }: { onClose: () => void }): React.JSX.
                 </li>
               )
             })}
-            {data && data.history.length === 0 && <li className="pd-empty">Todavía no tomaste decisiones hoy.</li>}
+            {data && data.history.length === 0 && <li className="pd-empty">Todavía no tomaste decisiones en esta sesión.</li>}
           </ol>
         ) : (
           <div className="pd-list" aria-label="Reglas guardadas">
-            <p className="pd-help">Estos pedidos se aprueban sin preguntar, solo en el espacio donde los guardaste. Podés desactivarlos o quitarlos cuando quieras.</p>
+            <p className="pd-help">Estos comandos corren sin preguntar. Podés desactivarlos o quitarlos cuando quieras.</p>
             {rules.map((r: PermissionRule) => (
               <div key={r.id} className="pd-row">
                 <span className="pd-main">
@@ -142,7 +140,7 @@ export function DecisionsPanel({ onClose }: { onClose: () => void }): React.JSX.
                 </button>
               </div>
             ))}
-            {data && rules.length === 0 && <p className="pd-empty">No hay pedidos permitidos siempre.</p>}
+            {data && rules.length === 0 && <p className="pd-empty">No hay comandos permitidos siempre.</p>}
           </div>
         )}
       </aside>

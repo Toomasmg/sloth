@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CloseIcon, BranchIcon } from '../../icons/SlothIcons'
+import { CheckGlyph } from './glyphs'
 import { useUi } from '../host'
 import { isLoginPane } from '../../../../shared/types'
 import { useDocumentVisible } from '../../visibility'
@@ -153,12 +154,12 @@ export function Drawer(): React.JSX.Element | null {
           <span className="g-head-sp" />
           {cur && (
             <span className="g-branch mono" title={`Rama actual: ${cur}`}>
-              <BranchIcon size={13} aria-hidden="true" />
+              <BranchIcon size={14} strokeWidth={1.8} aria-hidden="true" />
               <span className="g-branch-name">{cur}</span>
             </span>
           )}
           <button className="icon-btn" onClick={close} aria-label="Cerrar panel de cambios" title="Cerrar (Esc)">
-            <CloseIcon size={14} aria-hidden="true" />
+            <CloseIcon size={12} aria-hidden="true" />
           </button>
         </header>
 
@@ -189,6 +190,7 @@ export function Drawer(): React.JSX.Element | null {
 
         {toast && (
           <div role="status" className="g-toast">
+            <CheckGlyph size={15} />
             {toast}
           </div>
         )}
