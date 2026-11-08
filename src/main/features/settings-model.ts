@@ -13,7 +13,7 @@ export type EditorChoice = 'VS Code' | 'Cursor' | 'Windsurf' | 'Bloc de notas'
 export type SoundName = 'Gota' | 'Campana suave' | 'Clic'
 export type UpdateChannel = 'estable' | 'beta'
 /** Atajos que se pueden cambiar (ids estables: los usa shortcuts.ts y el main los guarda tal cual). */
-export type ShortcutId = 'palette' | 'new' | 'sidebar' | 'broadcast' | 'layout' | 'settings' | 'chat'
+export type ShortcutId = 'palette' | 'new' | 'sidebar' | 'broadcast' | 'layout' | 'settings' | 'chat' | 'history' | 'rename'
 
 export interface TerminalSettings {
   fontSize: number
@@ -90,7 +90,7 @@ export const SHELLS: readonly ShellChoice[] = ['PowerShell 7', 'Windows PowerShe
 export const EDITORS: readonly EditorChoice[] = ['VS Code', 'Cursor', 'Windsurf', 'Bloc de notas']
 export const SOUND_NAMES: readonly SoundName[] = ['Gota', 'Campana suave', 'Clic']
 export const UPDATE_CHANNELS: readonly UpdateChannel[] = ['estable', 'beta']
-export const SHORTCUT_IDS: readonly ShortcutId[] = ['palette', 'new', 'sidebar', 'broadcast', 'layout', 'settings', 'chat']
+export const SHORTCUT_IDS: readonly ShortcutId[] = ['palette', 'new', 'sidebar', 'broadcast', 'layout', 'settings', 'chat', 'history', 'rename']
 
 export const UI_FONT = { min: 12, max: 16 } as const
 export const TERM_FONT = { min: 11, max: 18 } as const
@@ -177,6 +177,8 @@ export interface ParsedCombo {
 /** Lee «Ctrl Shift k» o «Ctrl Shift K» → partes. null si no es una combinación válida. */
 export function parseCombo(raw: string): ParsedCombo | null {
   const tokens = raw.trim().split(/\s+/).filter(Boolean)
+  // Una tecla de función sola (F2) también es una combinación válida.
+  if (tokens.length === 1 && /^F(?:[1-9]|1[0-2])$/.test(tokens[0])) return { ctrl: false, alt: false, shift: false, key: tokens[0] }
   if (tokens.length < 2) return null
   const key = tokens[tokens.length - 1].length === 1 ? tokens[tokens.length - 1].toUpperCase() : tokens[tokens.length - 1]
   if (!KEY_TOKEN.test(key)) return null

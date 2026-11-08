@@ -15,7 +15,7 @@ import { TEMPLATE_COLOR_KEYS, validBranch } from '../shared/templates-shared'
 import { baseSettingsFor, syncSharedSetup, unshareSetup } from './setup'
 import { UsageScanner } from './usage'
 import { FEATURES } from './features'
-import { initialChrome } from './features/settings'
+import { currentSettings, initialChrome } from './features/settings'
 import { validateWorkspacePatch } from './workspace-patch'
 import { loadWindowState, trackWindowState } from './window-state'
 import type { FeatureContext } from './features/context'
@@ -216,22 +216,21 @@ app.whenReady().then(async () => {
     }
   }
 
-  const psQuote = (s: string): string => `'${s.replace(/[\r\n]+/g, ' ').replace(/'/g, "''")}'`
-
-  function claudeCommand(ws: Workspace, acc: Account): string | undefined {
+  /** argv de Claude para la terminal del espacio (la shell lo quota según su sintaxis en ptys.ts). */
+  function claudeCommand(ws: Workspace, acc: Account): string[] | undefined {
     // Los reemplazos (p. ej. retomar tras mover de cuenta) se aplican aunque el espacio no abra Claude solo.
     for (const o of commandOverrides) {
       let cmd: string | undefined
       safe('override', () => (cmd = o(ws, acc)))
-      if (cmd) return cmd
+      if (cmd) return cmd.trim().split(/\s+/)
     }
     if (!ws.autoStartClaude) return undefined
     if (ws.initialPrompt && !ws.initialPromptUsed) {
       store.updateWorkspace(ws.id, { initialPromptUsed: true })
-      return `claude ${psQuote(ws.initialPrompt)}`
+      return ['claude', ws.initialPrompt.replace(/[\r\n]+/g, ' ')]
     }
-    if (ws.resume !== false && hasPreviousConversation(acc, ws.cwd)) return 'claude --continue'
-    return 'claude'
+    if (ws.resume !== false && hasPreviousConversation(acc, ws.cwd)) return ['claude', '--continue']
+    return ['claude']
   }
 
   function specFor(paneId: string, b: TerminalBackend): PtySpec {
@@ -239,7 +238,7 @@ app.whenReady().then(async () => {
       const acc = requireAccount(accountIdFromLoginPane(paneId))
       prepareAccount(acc)
       // Primer arranque de Claude con esta carpeta: pide tema y login.
-      return { cwd: homedir(), env: accountEnv(acc), args: ['-NoLogo', '-NoExit', '-Command', 'claude'] }
+      return { cwd: homedir(), env: accountEnv(acc), claude: ['claude'] }
     }
     const ws = store.workspace(paneId)
     if (!ws) throw new Error('Ese espacio ya no existe.')
@@ -252,20 +251,20 @@ app.whenReady().then(async () => {
       SLOTH_HOOK_URL: b.hookUrl,
       SLOTH_TOKEN: b.hookToken
     }
-    const args = ['-NoLogo']
-    const cmd = claudeCommand(ws, acc)
-    if (cmd) args.push('-NoExit', '-Command', cmd)
-    return { cwd: ws.cwd, env, args }
+    return { cwd: ws.cwd, env, claude: claudeCommand(ws, acc) }
   }
 
   for (const acc of store.accounts) prepareAccount(acc)
 
-  ipcMain.handle('state:get', () => ({
-    accounts: store.accounts,
-    workspaces: store.workspaces,
-    openPanes: store.openPanes,
-    agents: Object.fromEntries(agents)
-  }))
+  ipcMain.handle('state:get', async () => {
+    // «Reabrir los espacios»: si está apagado, solo vuelven los paneles cuyas terminales siguen vivas en el daemon.
+    let openPanes = store.openPanes
+    if (!currentSettings().reopenSpaces) {
+      const b = await backend().catch(() => undefined)
+      openPanes = b ? openPanes.filter((id) => b.isRunning(id)) : []
+    }
+    return { accounts: store.accounts, workspaces: store.workspaces, openPanes, agents: Object.fromEntries(agents) }
+  })
 
   ipcMain.handle('permission:pending', () =>
     (term?.pendingPermissions() ?? []).filter((r) => store.workspace(r.ws)).map(toPrompt)
@@ -388,9 +387,21 @@ app.whenReady().then(async () => {
       const err = await shell.openPath(ws.cwd)
       if (err) throw new Error(err)
     } else if (t === 'vscode') {
-      // Cada tramo codificado (rutas con #, ?, espacios o acentos); la letra de unidad queda como está.
-      const parts = ws.cwd.split(/[\\/]/).filter(Boolean).map((seg, k) => (k === 0 && /^[A-Za-z]:$/.test(seg) ? seg : encodeURIComponent(seg)))
-      await shell.openExternal(`vscode://file/${parts.join('/')}/`)
+      // Editor de Configuración. Bloc de notas (u otro) abre la carpeta en el Explorador.
+      const editor = currentSettings().editor
+      const scheme = EDITOR_SCHEME[editor]
+      if (!scheme) {
+        const err = await shell.openPath(ws.cwd)
+        if (err) throw new Error(err)
+      } else {
+        // Cada tramo codificado (rutas con #, ?, espacios o acentos); la letra de unidad queda como está.
+        const parts = ws.cwd.split(/[\\/]/).filter(Boolean).map((seg, k) => (k === 0 && /^[A-Za-z]:$/.test(seg) ? seg : encodeURIComponent(seg)))
+        try {
+          await shell.openExternal(`${scheme}://file/${parts.join('/')}/`)
+        } catch {
+          throw new Error(`No se pudo abrir ${editor}. ¿Está instalado?`)
+        }
+      }
     } else throw new Error('Destino inválido.')
   })
 
@@ -406,9 +417,10 @@ app.whenReady().then(async () => {
   ipcMain.handle('pty:start', async (_e, id: string, cols: number, rows: number) => {
     const b = await backend()
     // Si ya corre (siguió viva en el daemon), solo se reconecta: no se rearma la cuenta ni el comando.
+    const shellChoice = currentSettings().terminal.shell
     const spawn = b.isRunning(id)
-      ? toSpawnSpec({ cwd: homedir(), env: {}, args: [] }, cols, rows)
-      : toSpawnSpec(specFor(id, b), cols, rows)
+      ? toSpawnSpec({ cwd: homedir(), env: {} }, cols, rows, shellChoice)
+      : toSpawnSpec(specFor(id, b), cols, rows, shellChoice)
     const result = await b.start(id, spawn)
     if (store.workspace(id) && !agents.has(id)) setAgent(id, { state: 'idle', at: Date.now() })
     return result
@@ -467,10 +479,28 @@ app.whenReady().then(async () => {
     }
   }
 
-  // Al salir solo soltamos la conexión: en modo daemon las terminales siguen trabajando.
-  app.on('before-quit', () => {
+  // Al salir: con «Terminales vivas» la conexión se suelta y el daemon sigue; apagado, se cierran sus terminales.
+  let quitPrepared = false
+  const finishQuit = (b: TerminalBackend | undefined): void => {
     for (const f of FEATURES) safe(f.name, () => f.dispose?.())
-    term?.dispose()
+    b?.dispose()
+  }
+  app.on('before-quit', (e) => {
+    if (quitPrepared) return
+    const b = term
+    if (b && !currentSettings().keepTerminalsAlive) {
+      e.preventDefault()
+      quitPrepared = true
+      void Promise.race([b.shutdown(), new Promise((r) => setTimeout(r, 5000))])
+        .catch(() => undefined)
+        .finally(() => {
+          finishQuit(b)
+          app.quit()
+        })
+      return
+    }
+    quitPrepared = true
+    finishQuit(b)
   })
 
   createWindow()
@@ -550,3 +580,6 @@ app.on('second-instance', () => {
 })
 
 app.on('window-all-closed', () => app.quit())
+
+/** Editores de «Abrir en editor»: protocolo para abrir una carpeta. Bloc de notas no tiene: usa el Explorador. */
+const EDITOR_SCHEME: Record<string, string> = { 'VS Code': 'vscode', Cursor: 'cursor', Windsurf: 'windsurf' }
