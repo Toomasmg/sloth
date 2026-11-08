@@ -1,4 +1,4 @@
-import { Sparkle } from '@phosphor-icons/react'
+import { UpdateIcon } from '../../icons/SlothIcons'
 import type { ChangelogEntry } from '../../../../shared/changelog'
 import { Dialog } from './Dialog'
 
@@ -14,7 +14,7 @@ export function WhatsNewModal({
     <Dialog
       labelId="f-help-whatsnew-title"
       title="Novedades"
-      icon={<Sparkle size={18} aria-hidden="true" />}
+      icon={<UpdateIcon size={18} />}
       onClose={onClose}
       footer={
         <button type="button" className="btn primary" onClick={onClose}>

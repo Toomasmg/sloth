@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowSquareOut, CheckCircle, CircleNotch, GitPullRequest, Warning, X } from '@phosphor-icons/react'
+import { PullRequestIcon, DoneIcon, CloseIcon, ExportIcon } from '../../icons/SlothIcons'
+import { WarnGlyph, SpinGlyph } from './glyphs'
 import { useUi } from '../host'
 import { errText, type PrPrep, type SessionPr } from './util'
 
@@ -107,10 +108,10 @@ export function PrPanel({
   const blocked = !prep || prep.protected || !prep.branch || !prep.pushed || Boolean(existingOpen) || ghMissing
 
   return (
-    <SubDialog title={step === 'confirm' ? 'Confirmar PR' : 'Abrir PR'} icon={<GitPullRequest size={16} aria-hidden="true" />} onClose={onClose} wide>
+    <SubDialog title={step === 'confirm' ? 'Confirmar PR' : 'Abrir PR'} icon={<PullRequestIcon size={16} />} onClose={onClose} wide>
       {ghMissing && (
         <div className="f-git-warn">
-          <Warning size={14} aria-hidden="true" />
+          <WarnGlyph size={14} />
           <span className="grow-min">
             No encuentro <span className="mono">gh</span> (la herramienta de GitHub) en este equipo. Instalala: en una terminal corré{' '}
             <span className="mono">winget install --id GitHub.cli</span> (o bajala de cli.github.com), después <span className="mono">gh auth login</span>, y volvé a intentar.
@@ -122,12 +123,12 @@ export function PrPanel({
         <>
           {existingOpen ? (
             <div className="f-git-existing">
-              <GitPullRequest size={16} aria-hidden="true" />
+              <PullRequestIcon size={16} />
               <span className="grow-min">
                 Ya hay un PR abierto para <span className="mono">{prep.branch}</span>: <strong>#{existingOpen.number}</strong> {existingOpen.title}
               </span>
               <button className="btn sm primary" onClick={() => open(existingOpen.url)}>
-                <ArrowSquareOut size={13} aria-hidden="true" /> Abrir en GitHub
+                <ExportIcon size={13} /> Abrir en GitHub
               </button>
             </div>
           ) : (
@@ -142,17 +143,17 @@ export function PrPanel({
               )}
               {prep.protected && (
                 <p className="form-error">
-                  <Warning size={13} aria-hidden="true" /> Estás en {prep.branch ?? 'un HEAD separado'}: creá una rama nueva para abrir un PR.
+                  <WarnGlyph size={13} /> Estás en {prep.branch ?? 'un HEAD separado'}: creá una rama nueva para abrir un PR.
                 </p>
               )}
               {!prep.protected && !prep.pushed && (
                 <div className="f-git-warn">
-                  <Warning size={14} aria-hidden="true" />
+                  <WarnGlyph size={14} />
                   <span className="grow-min">
                     {prep.upstream ? `Hay ${prep.unpushed} commit${prep.unpushed === 1 ? '' : 's'} sin subir.` : 'La rama todavía no está en origin.'} Subila antes de abrir el PR.
                   </span>
                   <button className="btn sm" onClick={() => void pushThenReload()} disabled={running}>
-                    {running ? <CircleNotch size={13} className="spin" aria-hidden="true" /> : null} Subir
+                    {running ? <SpinGlyph size={13} /> : null} Subir
                   </button>
                 </div>
               )}
@@ -201,10 +202,10 @@ export function PrPanel({
       )}
       {step === 'done' && (
         <div className="f-git-existing">
-          <CheckCircle size={16} aria-hidden="true" />
+          <DoneIcon size={16} />
           <span className="grow-min mono">{url}</span>
           <button className="btn sm primary" onClick={() => open(url)}>
-            <ArrowSquareOut size={13} aria-hidden="true" /> Abrir en GitHub
+            <ExportIcon size={13} /> Abrir en GitHub
           </button>
         </div>
       )}
@@ -216,7 +217,7 @@ export function PrPanel({
               Volver
             </button>
             <button className="btn primary" onClick={() => void create()} disabled={running}>
-              {running ? <CircleNotch size={14} className="spin" aria-hidden="true" /> : <GitPullRequest size={14} aria-hidden="true" />}
+              {running ? <SpinGlyph size={14} /> : <PullRequestIcon size={14} />}
               {running ? 'Creando…' : 'Crear PR'}
             </button>
           </>
@@ -261,7 +262,7 @@ export function SubDialog({
           {icon}
           <h3>{title}</h3>
           <button className="icon-btn" onClick={onClose} aria-label="Cerrar">
-            <X size={14} aria-hidden="true" />
+            <CloseIcon size={14} />
           </button>
         </header>
         <div className="f-git-sub-body">{children}</div>

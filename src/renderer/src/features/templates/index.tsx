@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BookmarkSimple, CaretDown, CaretRight, GitBranch, PencilSimple, Play, Plus, Ticket } from '@phosphor-icons/react'
+import { NewSpaceIcon, TicketIcon, BranchIcon, ChangesIcon, TemplatesIcon } from '../../icons/SlothIcons'
 import { isLoginPane, type Workspace } from '../../../../shared/types'
 import { useUi, type Command, type FeatureUi, type UiCtx } from '../host'
 import { cleanError, shortPath } from '../../format'
@@ -105,12 +105,12 @@ function Sidebar(): React.JSX.Element {
       <div className="section-row">
         <h2 id="f-templates-h" className="section-title">
           <button type="button" className="f-templates-toggle" onClick={toggle} aria-expanded={open} aria-controls="f-templates-body">
-            {open ? <CaretDown size={12} aria-hidden="true" /> : <CaretRight size={12} aria-hidden="true" />}
+            {open ? <span aria-hidden="true">▾</span> : <span aria-hidden="true">▸</span>}
             Plantillas <span className="count">{list.length}</span>
           </button>
         </h2>
         <button className="icon-btn" onClick={() => openDialog({ kind: 'manage' })} aria-label="Administrar plantillas" title="Administrar plantillas">
-          <Plus size={14} weight="bold" aria-hidden="true" />
+          <NewSpaceIcon size={14} />
         </button>
       </div>
       <div id="f-templates-body" hidden={!open}>
@@ -129,7 +129,7 @@ function Sidebar(): React.JSX.Element {
                   title={tk ? 'Crear espacio (pide el ticket)' : t.repoPath ? 'Crear espacio' : 'Crear espacio (elegí la carpeta)'}
                   style={{ color }}
                 >
-                  <Play size={12} weight="fill" aria-hidden="true" />
+                  <NewSpaceIcon size={12} />
                 </button>
                 <span className="grow-min">
                   <span className="item-title">
@@ -140,13 +140,13 @@ function Sidebar(): React.JSX.Element {
                     <span>{accLabel(ctx, t.accountId)}</span>
                     {tk && (
                       <span className="f-templates-meta" title="Pide el ticket">
-                        <Ticket size={12} aria-hidden="true" />
+                        <TicketIcon size={12} />
                         <span className="sr-only">pide ticket</span>
                       </span>
                     )}
                     {t.useWorktree && (
                       <span className="f-templates-meta mono" title={`Rama: ${t.useWorktree.branchPattern}`}>
-                        <GitBranch size={11} aria-hidden="true" />
+                        <BranchIcon size={11} />
                         {t.useWorktree.branchPattern}
                       </span>
                     )}
@@ -155,7 +155,7 @@ function Sidebar(): React.JSX.Element {
                 </span>
                 <span className="f-templates-actions">
                   <button className="icon-btn" onClick={() => openDialog({ kind: 'manage', id: t.id })} aria-label={`Editar plantilla ${t.name}`} title="Editar">
-                    <PencilSimple size={13} aria-hidden="true" />
+                    <ChangesIcon size={13} />
                   </button>
                 </span>
               </li>
@@ -174,7 +174,7 @@ function PaneHeader({ paneId }: { paneId: string }): React.JSX.Element | null {
   if (!ws) return null
   return (
     <button className="icon-btn" onClick={() => void saveFromWorkspace(ctx, ws)} aria-label={`Guardar ${ws.name} como plantilla`} title="Guardar espacio como plantilla">
-      <BookmarkSimple size={15} aria-hidden="true" />
+      <TemplatesIcon size={15} />
     </button>
   )
 }
@@ -193,7 +193,7 @@ const ui: FeatureUi = {
         .join(' · '),
       group: 'Plantillas',
       keywords: `plantilla template ${t.repoPath ?? ''}`,
-      icon: <BookmarkSimple size={16} aria-hidden="true" />,
+      icon: <TemplatesIcon size={16} />,
       run: () => void createFrom(ctx, t)
     }))
     cmds.push({

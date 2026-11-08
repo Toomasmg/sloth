@@ -1,25 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  ArrowClockwise,
-  ArrowLeft,
-  ArrowRight,
-  ArrowSquareOut,
-  CheckCircle,
-  Circle,
-  Command as CommandIcon,
-  Copy,
-  FolderOpen,
-  Info,
-  Plus,
-  ShieldCheck,
-  SignIn,
-  Terminal as TerminalIcon,
-  Ticket,
-  UsersThree,
-  Warning,
-  X,
-  XCircle
-} from '@phosphor-icons/react'
+import { DoneIcon, ErrorIcon, ChangesIcon, ExportIcon, AccountIcon, AddAccountIcon, HelpIcon, IdleIcon, FolderIcon, TeamIcon, EditorIcon, TicketIcon, CloseIcon, KeyboardIcon, PermissionIcon, NewSpaceIcon, UpdateIcon } from '../../icons/SlothIcons'
 import { loginPaneId, type AccountStatus, type Workspace } from '../../../../shared/types'
 import { useUi, type Command, type FeatureUi } from '../host'
 import { LogoMark } from '../../Logo'
@@ -61,18 +41,18 @@ function StateBadge({ s, optional }: { s: CheckState; optional?: boolean }): Rea
   if (s === 'ok')
     return (
       <span className="f-onboarding-badge ok">
-        <CheckCircle size={14} weight="fill" aria-hidden="true" /> Listo
+        <DoneIcon size={14} /> Listo
       </span>
     )
   if (s === 'warn')
     return (
       <span className="f-onboarding-badge warn">
-        <Warning size={14} weight="fill" aria-hidden="true" /> {optional ? 'Opcional' : 'Revisar'}
+        <ErrorIcon size={14} /> {optional ? 'Opcional' : 'Revisar'}
       </span>
     )
   return (
     <span className="f-onboarding-badge missing">
-      <XCircle size={14} weight="fill" aria-hidden="true" /> Falta
+      <ErrorIcon size={14} /> Falta
     </span>
   )
 }
@@ -120,12 +100,12 @@ function EnvStep(): React.JSX.Element {
                   )}
                   {it.command && (
                     <button type="button" className="icon-btn" onClick={() => copy(it.command!)} aria-label={`Copiar «${it.command}»`} title="Copiar">
-                      {copied === it.command ? <CheckCircle size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                      {copied === it.command ? <DoneIcon size={14} /> : <ChangesIcon size={14} />}
                     </button>
                   )}
                   {it.doc && (
                     <button type="button" className="btn sm ghost" onClick={() => void ui.invoke('feat:onboarding:openDoc', it.doc).catch((e) => ui.notifyError(cleanMsg(e)))}>
-                      Guía oficial <ArrowSquareOut size={12} aria-hidden="true" />
+                      Guía oficial <ExportIcon size={12} />
                     </button>
                   )}
                 </div>
@@ -136,7 +116,7 @@ function EnvStep(): React.JSX.Element {
         {!items && <li className="f-onboarding-loading">Revisando tu PC…</li>}
       </ul>
       <button type="button" className="btn sm ghost" disabled={busy} onClick={run}>
-        <ArrowClockwise size={13} aria-hidden="true" className={busy ? 'spin' : ''} /> {busy ? 'Revisando…' : 'Volver a revisar'}
+        <UpdateIcon size={13} className={busy ? 'spin' : ''} /> {busy ? 'Revisando…' : 'Volver a revisar'}
       </button>
     </>
   )
@@ -191,11 +171,11 @@ function AccountsStep({ onLogin, statuses }: { onLogin: (id: string) => void; st
                 </span>
                 {s?.loggedIn ? (
                   <span className="f-onboarding-badge ok">
-                    <CheckCircle size={14} weight="fill" aria-hidden="true" /> Sesión iniciada
+                    <DoneIcon size={14} /> Sesión iniciada
                   </span>
                 ) : (
                   <button type="button" className="btn sm" onClick={() => onLogin(a.id)}>
-                    <SignIn size={13} aria-hidden="true" /> Iniciar sesión
+                    <AccountIcon size={13} /> Iniciar sesión
                   </button>
                 )}
               </li>
@@ -215,11 +195,11 @@ function AccountsStep({ onLogin, statuses }: { onLogin: (id: string) => void; st
         </label>
         <input id="f-ob-acc" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} placeholder="Nombre: Trabajo, Personal…" />
         <button type="submit" className="btn primary" disabled={!label.trim() || busy}>
-          <Plus size={13} weight="bold" aria-hidden="true" /> {ui.accounts.length ? 'Agregar otra cuenta' : 'Agregar cuenta'}
+          <AddAccountIcon size={13} /> {ui.accounts.length ? 'Agregar otra cuenta' : 'Agregar cuenta'}
         </button>
       </form>
       <div className="f-onboarding-note">
-        <Info size={15} aria-hidden="true" />
+        <HelpIcon size={15} />
         <p>
           Se abre una terminal con Claude: elegí iniciar sesión y se abre el navegador. <strong>Para la segunda cuenta</strong>, el navegador ya tiene la primera
           iniciada: copiá el link que muestra la terminal y pegalo en una <strong>ventana de incógnito</strong> (Ctrl+Shift+N), así entrás con la otra.
@@ -248,7 +228,7 @@ function LoginDock({ accountId, statuses, onBack }: { accountId: string; statuse
       </div>
       {st?.loggedIn ? (
         <p className="f-onboarding-dock-ok">
-          <CheckCircle size={16} weight="fill" aria-hidden="true" /> Sesión iniciada{st.email ? ` como ${st.email}` : ''}. Volviendo al asistente…
+          <DoneIcon size={16} /> Sesión iniciada{st.email ? ` como ${st.email}` : ''}. Volviendo al asistente…
         </p>
       ) : (
         <ol className="f-onboarding-dock-steps">
@@ -260,7 +240,7 @@ function LoginDock({ accountId, statuses, onBack }: { accountId: string; statuse
       <div className="f-onboarding-dock-foot">
         {!st?.loggedIn && (
           <span className="f-onboarding-wait">
-            <Circle size={10} weight="fill" aria-hidden="true" className="f-onboarding-pulse" /> Esperando…
+            <IdleIcon size={10} className="f-onboarding-pulse" /> Esperando…
           </span>
         )}
         <button type="button" className="btn sm" onClick={onBack}>
@@ -347,7 +327,7 @@ function RepoStep({ repo, setRepo }: { repo: string; setRepo: (p: string) => voi
       <div className="f-onboarding-repos" role="radiogroup" aria-label="Repos encontrados">
         {list.map((p) => (
           <button key={p} type="button" role="radio" aria-checked={repo === p} className={`f-onboarding-repo ${repo === p ? 'on' : ''}`} onClick={() => setRepo(p)}>
-            {repo === p ? <CheckCircle size={15} weight="fill" aria-hidden="true" /> : <Circle size={15} aria-hidden="true" />}
+            {repo === p ? <DoneIcon size={15} /> : <IdleIcon size={15} />}
             <span className="grow-min">
               <span className="item-title">{repoName(p)}</span>
               <span className="item-sub mono">{p}</span>
@@ -363,23 +343,23 @@ function RepoStep({ repo, setRepo }: { repo: string; setRepo: (p: string) => voi
       <div className="input-row">
         <input aria-label="Carpeta del repo" className="mono" value={repo} onChange={(e) => setRepo(e.target.value)} placeholder={preferred} />
         <button type="button" className="btn" onClick={() => void pick()}>
-          <FolderOpen size={15} aria-hidden="true" /> Elegir
+          <FolderIcon size={15} /> Elegir
         </button>
       </div>
       {info && !info.isGit && (
         <p className="f-onboarding-warn">
-          <Warning size={14} weight="fill" aria-hidden="true" /> Esa carpeta no parece un repo de git (no tiene .git). Igual podés usarla.
+          <ErrorIcon size={14} /> Esa carpeta no parece un repo de git (no tiene .git). Igual podés usarla.
         </p>
       )}
       {team?.state === 'invalid' && (
         <p className="f-onboarding-warn">
-          <Warning size={14} weight="fill" aria-hidden="true" /> Este repo trae .sloth/team.json pero tiene un error: {team.error}
+          <ErrorIcon size={14} /> Este repo trae .sloth/team.json pero tiene un error: {team.error}
         </p>
       )}
       {team?.state === 'ok' && (
         <div className="f-onboarding-team">
           <div className="f-onboarding-team-head">
-            <UsersThree size={18} weight="duotone" aria-hidden="true" />
+            <TeamIcon size={18} />
             <span className="grow-min">
               <strong>Configuración del equipo «{team.equipo}»</strong>
               <span className="item-sub">
@@ -392,7 +372,7 @@ function RepoStep({ repo, setRepo }: { repo: string; setRepo: (p: string) => voi
             <ul className="f-onboarding-team-list">
               {plan.items.map((i) => (
                 <li key={i.key}>
-                  {i.error ? <Warning size={12} aria-hidden="true" /> : <CheckCircle size={12} aria-hidden="true" />} {i.savedName}
+                  {i.error ? <ErrorIcon size={12} /> : <DoneIcon size={12} />} {i.savedName}
                   {i.error ? ` — ${i.error}` : ''}
                 </li>
               ))}
@@ -409,7 +389,7 @@ function RepoStep({ repo, setRepo }: { repo: string; setRepo: (p: string) => voi
           )}
           {done ? (
             <p className="f-onboarding-okline" role="status">
-              <CheckCircle size={14} weight="fill" aria-hidden="true" /> {done}
+              <DoneIcon size={14} /> {done}
             </p>
           ) : (
             <button type="button" className="btn primary sm" disabled={busy || !plan || (todo === 0 && !(withSettings && team.settingsPending))} onClick={() => void load()}>
@@ -466,10 +446,10 @@ function SpaceStep({ repo, statuses, onCreated }: { repo: string; statuses: Reco
       </p>
       <div className="f-onboarding-seg" role="radiogroup" aria-label="Tipo de espacio">
         <button type="button" role="radio" aria-checked={mode === 'normal'} className={mode === 'normal' ? 'on' : ''} onClick={() => setMode('normal')}>
-          <TerminalIcon size={15} aria-hidden="true" /> Normal
+          <EditorIcon size={15} /> Normal
         </button>
         <button type="button" role="radio" aria-checked={mode === 'ticket'} className={mode === 'ticket' ? 'on' : ''} onClick={() => setMode('ticket')}>
-          <Ticket size={15} aria-hidden="true" /> Desde ticket
+          <TicketIcon size={15} /> Desde ticket
         </button>
       </div>
       {mode === 'ticket' && (
@@ -500,16 +480,16 @@ function SpaceStep({ repo, statuses, onCreated }: { repo: string; statuses: Reco
       </div>
       {err && <p className="form-error">{err}</p>}
       <button type="button" className="btn primary" disabled={!can || busy} onClick={() => void create()}>
-        <Plus size={13} weight="bold" aria-hidden="true" /> {busy ? 'Creando…' : 'Crear espacio'}
+        <NewSpaceIcon size={13} /> {busy ? 'Creando…' : 'Crear espacio'}
       </button>
     </>
   )
 }
 
 const TIPS = [
-  { icon: CommandIcon, title: 'Ctrl+K para todo', text: 'La paleta busca espacios, plantillas y acciones. También reabre este asistente.' },
-  { icon: ShieldCheck, title: 'Permisos desde la app', text: 'Cuando Claude pide usar una herramienta, aparece una tarjeta en su panel: permitir, siempre o negar.' },
-  { icon: TerminalIcon, title: 'Las terminales siguen vivas', text: 'Si cerrás Sloth, Claude sigue trabajando. Al volver a abrir, cada panel se reconecta donde estaba.' }
+  { icon: KeyboardIcon, title: 'Ctrl+K para todo', text: 'La paleta busca espacios, plantillas y acciones. También reabre este asistente.' },
+  { icon: PermissionIcon, title: 'Permisos desde la app', text: 'Cuando Claude pide usar una herramienta, aparece una tarjeta en su panel: permitir, siempre o negar.' },
+  { icon: EditorIcon, title: 'Las terminales siguen vivas', text: 'Si cerrás Sloth, Claude sigue trabajando. Al volver a abrir, cada panel se reconecta donde estaba.' }
 ]
 
 function Tour(): React.JSX.Element {
@@ -520,7 +500,7 @@ function Tour(): React.JSX.Element {
         {TIPS.map((t, i) => (
           <li key={t.title}>
             <span className="f-onboarding-tip-ic" aria-hidden="true">
-              <t.icon size={18} weight="duotone" />
+              <t.icon size={18} />
             </span>
             <span>
               <strong>
@@ -597,7 +577,7 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
     <footer className="f-onboarding-foot">
       {step > 0 && (
         <button type="button" className="btn ghost" onClick={() => (tour ? setTour(false) : setStep(step - 1))}>
-          <ArrowLeft size={14} aria-hidden="true" /> Atrás
+          <span aria-hidden="true">←</span> Atrás
         </button>
       )}
       <span className="spacer" />
@@ -615,7 +595,7 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
             Saltar paso
           </button>
           <button type="button" className="btn primary" onClick={() => setStep(step + 1)}>
-            Siguiente <ArrowRight size={14} aria-hidden="true" />
+            Siguiente <span aria-hidden="true">→</span>
           </button>
         </>
       )}
@@ -645,7 +625,7 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
                 <span style={{ width: `${((step + (tour ? 1 : 0.5)) / STEPS.length) * 100}%` }} />
               </div>
               <button type="button" className="icon-btn" onClick={() => onClose(false)} aria-label="Cerrar el asistente (seguís después desde Ctrl+K)" title="Cerrar (Esc)">
-                <X size={16} aria-hidden="true" />
+                <CloseIcon size={16} />
               </button>
             </div>
             <h2 className="f-onboarding-section">Empezá en cuatro pasos</h2>
@@ -674,7 +654,7 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
                 <li key={s.title} className="f-onboarding-step">
                   <button type="button" className={`f-onboarding-step-btn ${done ? 'is-done' : ''}`} onClick={() => setStep(i)}>
                     <span className={`f-onboarding-n ${done ? 'ok' : ''}`} aria-hidden="true">
-                      {done ? <CheckCircle size={14} weight="bold" /> : i + 1}
+                      {done ? <DoneIcon size={14} /> : i + 1}
                     </span>
                     <span className="grow-min">
                       <span className="item-title">{s.title}</span>
