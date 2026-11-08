@@ -19,8 +19,10 @@
   gap: 8px;
   height: 48px;
   min-width: 0;
-  /* Windows dibuja sus botones a la derecha (~140 px): se deja lugar. */
-  padding: 0 148px 0 10px;
+  /* Tres columnas iguales a los lados: el buscador queda centrado en la ventana. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 520px) minmax(0, 1fr);
+  padding: 0;
   background: var(--surface);
   box-shadow: inset 0 -1px 0 var(--line);
   -webkit-app-region: drag;
@@ -55,11 +57,50 @@
   letter-spacing: -0.01em;
   color: var(--fg);
 }
+.sl-top-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-left: 10px;
+}
+/* Chips, aviso de actualización y herramientas a la derecha; Windows dibuja sus botones (~140 px) ahí. */
+.sl-top-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  padding-right: 148px;
+}
 .sl-top-search {
-  flex: 1 1 240px;
   min-width: 0;
   display: flex;
   justify-content: center;
+}
+/* Aviso de actualización: píldora verde (solo aparece si hay versión disponible). */
+.sl-upd:empty {
+  display: none;
+}
+.sl-upd:not(:empty) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  min-height: 30px;
+  padding: 3px 4px 3px 10px;
+  border-radius: 15px;
+  background: var(--success-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 28%, transparent);
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  max-width: 100%;
+}
+.sl-upd .btn {
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 12px;
+  font-size: var(--fs-sm);
 }
 .sl-top-status {
   display: flex;
@@ -113,7 +154,7 @@
   padding: 0 4px;
   border-radius: 8px;
   background: var(--team);
-  color: #140f24;
+  color: var(--team-on);
   font-size: 9px;
   font-weight: 700;
   display: grid;
@@ -328,6 +369,20 @@
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   color: var(--fg-2);
+}
+/* Menú «más» de una fila de cuenta en Configuración: el interruptor y «Quitar» debajo de la fila. */
+.f-set-acc-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 2px 0 8px 46px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--card-hover);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.f-set-acc-menu .btn.danger {
+  align-self: flex-start;
 }
 .sl-acc-actions {
   display: flex;

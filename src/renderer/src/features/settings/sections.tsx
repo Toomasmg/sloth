@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { api } from '../../api'
 import { useUi } from '../host'
-import { AddAccountIcon, TeamIcon, UpdateIcon } from '../../icons/SlothIcons'
+import { AddAccountIcon, MoreIcon, TeamIcon, UpdateIcon } from '../../icons/SlothIcons'
+import { fmtTok, totalTok, usageTitle } from '../../format'
 import { LogoMark } from '../../Logo'
 import { loginPaneId, type Account } from '../../../../shared/types'
 import type { ChatConfigView, ChatSnapshot } from '../../../../shared/chat'
@@ -109,6 +110,16 @@ export function AccountsSection({ onClose }: { onClose(): void }): React.JSX.Ele
   const [name, setName] = useState('')
   const [nameErr, setNameErr] = useState(false)
   const [confirm, setConfirm] = useState<string | null>(null)
+  /** Fila con el menú «más» abierto (usar mi setup, quitar). */
+  const [menu, setMenu] = useState<string | null>(null)
+
+  /** «Usar mi setup de ~/.claude» de una cuenta: guarda y recarga la lista. */
+  const toggleShare = (acc: Account): void => {
+    save(async () => {
+      await api.setShareSetup(acc.id, acc.shareSetup === false)
+      await ui.reload()
+    })
+  }
 
   const addAccount = (e: FormEvent): void => {
     e.preventDefault()
@@ -182,6 +193,7 @@ export function AccountsSection({ onClose }: { onClose(): void }): React.JSX.Ele
           const custom = p.settings.accountColors[a.id]
           const spaces = ui.workspaces.filter((w) => w.accountId === a.id).length
           const busy = confirm === a.id
+          const u = ui.usage[a.id]
           return (
             <div key={a.id} className="f-set-acc" style={{ '--acc': color } as React.CSSProperties}>
               <div className="f-set-row">
@@ -194,6 +206,22 @@ export function AccountsSection({ onClose }: { onClose(): void }): React.JSX.Ele
                     {spaces === 1 ? '1 espacio' : `${spaces} espacios`}
                     {logged && st?.email ? ` · ${st.email}` : ''}
                   </span>
+                  {u && (
+                    <dl className="sl-usage" title={usageTitle(u)}>
+                      <div>
+                        <dt>5 h</dt>
+                        <dd>{fmtTok(totalTok(u.last5h))}</dd>
+                      </div>
+                      <div>
+                        <dt>Hoy</dt>
+                        <dd>{fmtTok(totalTok(u.today))}</dd>
+                      </div>
+                      <div>
+                        <dt>7 días</dt>
+                        <dd>{fmtTok(totalTok(u.last7d))}</dd>
+                      </div>
+                    </dl>
+                  )}
                 </div>
                 <PlanField key={`${a.id}-${p.settings.accountPlans[a.id] ?? ''}`} label={a.label} value={p.settings.accountPlans[a.id] ?? ''} onCommit={(plan) => save({ accountPlans: { [a.id]: plan || null } })} />
                 <span className={`f-set-state ${logged ? 'ok' : 'warn'}`}>
@@ -212,7 +240,19 @@ export function AccountsSection({ onClose }: { onClose(): void }): React.JSX.Ele
                     </>
                   ) : (
                     <>
-                      {!logged && (
+                      {logged ? (
+                        <button
+                          type="button"
+                          className="btn sm"
+                          aria-label={`Abrir terminal de ${a.label}`}
+                          onClick={() => {
+                            onClose()
+                            ui.openPane(loginPaneId(a.id))
+                          }}
+                        >
+                          Terminal
+                        </button>
+                      ) : (
                         <button
                           type="button"
                           className="btn primary sm"
@@ -224,13 +264,43 @@ export function AccountsSection({ onClose }: { onClose(): void }): React.JSX.Ele
                           Iniciar sesión
                         </button>
                       )}
-                      <button type="button" className="btn ghost sm" aria-label={`Quitar la cuenta ${a.label}`} onClick={() => setConfirm(a.id)}>
-                        Quitar
+                      <button
+                        type="button"
+                        className="btn ghost sm icon-only"
+                        aria-haspopup="menu"
+                        aria-expanded={menu === a.id}
+                        aria-label={`Más acciones de ${a.label}`}
+                        title="Más"
+                        onClick={() => setMenu(menu === a.id ? null : a.id)}
+                      >
+                        <MoreIcon size={15} aria-hidden="true" />
                       </button>
                     </>
                   )}
                 </div>
               </div>
+              {menu === a.id && !busy && (
+                <div className="f-set-acc-menu" role="menu" aria-label={`Acciones de ${a.label}`}>
+                  <label className="switch" role="menuitem" title="Enlaza tus skills, agents, hooks, plugins, settings y MCP de ~/.claude">
+                    <span className="switch-text">
+                      Usar mi setup de <span className="mono">~/.claude</span>
+                    </span>
+                    <input type="checkbox" role="switch" checked={a.shareSetup !== false} onChange={() => toggleShare(a)} />
+                    <span className="switch-track" aria-hidden="true" />
+                  </label>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="btn sm danger"
+                    onClick={() => {
+                      setMenu(null)
+                      setConfirm(a.id)
+                    }}
+                  >
+                    Quitar cuenta
+                  </button>
+                </div>
+              )}
               <AccountSwatches acc={a} index={i} custom={custom} onPick={(hex) => save({ accountColors: { [a.id]: hex } })} onAuto={() => save({ accountColors: { [a.id]: null } })} />
             </div>
           )

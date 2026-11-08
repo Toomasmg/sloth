@@ -21,7 +21,8 @@ import { openSettings } from './features/settings/bus'
 import { colorHex } from './features/templates/catalog'
 import { bindingOf, comboLabel, isCapturingShortcut, matchShortcut } from './shortcuts'
 import type { ShortcutId } from '../../main/features/settings-model'
-import { GlobalSlot, PaneBannerSlot, PaneHeaderSlot } from './features/slots'
+import { GlobalSlot, PaneBannerSlot, PaneHeaderSlot, TitlebarOnly } from './features/slots'
+import { openPermissionReview } from './features/permissions/store'
 import { PaletteBar, PALETTE_REMOVE_EVENT, PALETTE_RENAME_EVENT, runFeatureCommand } from './features/palette'
 import { TerminalView } from './TerminalView'
 import { NewWorkspaceDialog } from './NewWorkspaceDialog'
@@ -75,6 +76,7 @@ import {
   MaximizeIcon,
   MoveAccountIcon,
   OnePaneIcon,
+  PermissionIcon,
   SearchIcon,
   SettingsIcon,
   SidebarIcon,
@@ -668,6 +670,8 @@ export function App(): React.JSX.Element {
   const needsYou = countBy('waiting')
   const working = countBy('working')
   const done = countBy('done')
+  /** Pedidos de permiso vivos (uno o más por espacio). El chip del resumen los cuenta; no se repiten en otro lado. */
+  const pendingPerms = [...permsByWs.values()].reduce((n, q) => n + q.length, 0)
   const activeTerms = workspaces.filter((w) => agents[w.id] && agents[w.id].state !== 'exited').length
   /** Primer espacio con ese estado (para ir al tocar un resumen). */
   const firstWs = (s: AgentStatus['state']): Workspace | undefined => workspaces.find((w) => agents[w.id]?.state === s)
@@ -783,56 +787,69 @@ export function App(): React.JSX.Element {
     <UiContext.Provider value={uiCtx}>
       <div className={`sl-shell ${docVisible ? '' : 'doc-hidden'}`}>
         <header className="sl-top">
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={toggleSide}
-            aria-pressed={sideShown}
-            aria-label="Mostrar u ocultar la barra lateral"
-            title={`Barra lateral (${comboLabel('sidebar')})`}
-          >
-            <SidebarIcon size={17} aria-hidden="true" />
-          </button>
-          <div className="sl-top-brand">
-            <LogoMark size={34} />
-            <span className="sl-top-name">Sloth</span>
+          <div className="sl-top-left">
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={toggleSide}
+              aria-pressed={sideShown}
+              aria-label="Mostrar u ocultar la barra lateral"
+              title={`Barra lateral (${comboLabel('sidebar')})`}
+            >
+              <SidebarIcon size={17} aria-hidden="true" />
+            </button>
+            <div className="sl-top-brand">
+              <LogoMark size={34} />
+              <span className="sl-top-name">Sloth</span>
+            </div>
           </div>
           <div className="sl-top-search">
             <PaletteBar />
           </div>
-          <div className="sl-top-status" role="status" aria-live="polite">
-            {working > 0 && (
-              <button type="button" className="chip chip-working" onClick={() => { const w = firstWs('working'); if (w) openPane(w.id) }} title="Ir al primero que está trabajando">
-                <StateIcon state="working" size={12} />
-                {working} trabajando
-              </button>
-            )}
-            {needsYou > 0 && (
-              <button type="button" className="chip chip-waiting" onClick={() => { const w = firstWs('waiting'); if (w) openPane(w.id) }} title="Ir al que te espera">
-                <StateIcon state="waiting" size={12} />
-                {needsYou} te {needsYou === 1 ? 'espera' : 'esperan'}
-              </button>
-            )}
-            {done > 0 && (
-              <button type="button" className="chip chip-done" onClick={() => { const w = firstWs('done'); if (w) openPane(w.id) }} title="Ir al que terminó">
-                <StateIcon state="done" size={12} />
-                {done} {done === 1 ? 'listo' : 'listos'}
-              </button>
-            )}
-          </div>
-          <div className="sl-top-tools">
-            <span className="sl-top-sep" aria-hidden="true" />
-            <button type="button" className="sl-tool" onClick={() => openChat()} aria-label={chatUnread > 0 ? `Chat del equipo, ${chatUnread} sin leer` : 'Chat del equipo'} title="Chat del equipo">
-              <ChatIcon size={17} aria-hidden="true" />
-              {chatUnread > 0 && (
-                <span className="sl-tool-badge" aria-hidden="true">
-                  {chatUnread > 99 ? '99+' : chatUnread}
-                </span>
+          <div className="sl-top-right">
+            <div className="sl-top-status" role="status" aria-live="polite">
+              {working > 0 && (
+                <button type="button" className="chip chip-working" onClick={() => { const w = firstWs('working'); if (w) openPane(w.id) }} title="Ir al primero que está trabajando">
+                  <StateIcon state="working" size={12} />
+                  {working} trabajando
+                </button>
               )}
-            </button>
-            <button type="button" className="sl-tool" onClick={() => openSettings()} aria-label="Configuración" title={`Configuración (${comboLabel('settings')})`}>
-              <SettingsIcon size={17} aria-hidden="true" />
-            </button>
+              {needsYou > 0 && (
+                <button type="button" className="chip chip-waiting" onClick={() => { const w = firstWs('waiting'); if (w) openPane(w.id) }} title="Ir al que te espera">
+                  <StateIcon state="waiting" size={12} />
+                  {needsYou} te {needsYou === 1 ? 'espera' : 'esperan'}
+                </button>
+              )}
+              {done > 0 && (
+                <button type="button" className="chip chip-done" onClick={() => { const w = firstWs('done'); if (w) openPane(w.id) }} title="Ir al que terminó">
+                  <StateIcon state="done" size={12} />
+                  {done} {done === 1 ? 'listo' : 'listos'}
+                </button>
+              )}
+              {pendingPerms > 0 && (
+                <button type="button" className="chip chip-perm" onClick={() => openPermissionReview()} title="Revisar los pedidos de permiso">
+                  <PermissionIcon size={12} strokeWidth={2.2} />
+                  {pendingPerms === 1 ? '1 pide permiso' : `${pendingPerms} piden permiso`}
+                </button>
+              )}
+            </div>
+            <div className="sl-upd">
+              <TitlebarOnly name="updater" />
+            </div>
+            <div className="sl-top-tools">
+              <span className="sl-top-sep" aria-hidden="true" />
+              <button type="button" className="sl-tool" onClick={() => openChat()} aria-label={chatUnread > 0 ? `Chat del equipo, ${chatUnread} sin leer` : 'Chat del equipo'} title="Chat del equipo">
+                <ChatIcon size={17} aria-hidden="true" />
+                {chatUnread > 0 && (
+                  <span className="sl-tool-badge" aria-hidden="true">
+                    {chatUnread > 99 ? '99+' : chatUnread}
+                  </span>
+                )}
+              </button>
+              <button type="button" className="sl-tool" onClick={() => openSettings()} aria-label="Configuración" title={`Configuración (${comboLabel('settings')})`}>
+                <SettingsIcon size={17} aria-hidden="true" />
+              </button>
+            </div>
           </div>
           <div className="sr-only" role="alert">
             {announced
@@ -1177,7 +1194,7 @@ export function App(): React.JSX.Element {
           </span>
           <span className="sl-status-persist">Siguen corriendo aunque cierres la ventana</span>
           <span className="sl-status-keys">
-            {comboLabel('palette')} buscar · {comboLabel('new')} nuevo · Ctrl 1–4 ir a un panel
+            {comboLabel('palette')} buscar · {comboLabel('new')} nuevo · {bindingOf('layout')} distribución
           </span>
         </footer>
 

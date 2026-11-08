@@ -37,6 +37,8 @@
   --search-bg: #171a22;
   --newbtn-bg: #191c25;
   --seg-on: #3a4152;
+  --perm-bg: #1a1d26;
+  --team-on: #140f24;
 }
 
 /* ---------- Tamaño de letra de la interfaz (12–15 px) ---------- */
@@ -97,6 +99,9 @@ html[data-theme='light'] {
   --search-bg: #ebebe7;
   --newbtn-bg: #ffffff;
   --seg-on: #ffffff;
+  --perm-bg: #fdf7ec;
+  /* Texto sobre --team (claro: lila oscuro #6f4fd6, con blanco 5,8:1). */
+  --team-on: #ffffff;
 
   /* Superficies y bordes. */
   --bg: #f6f6f4; /* fondo */

@@ -30,6 +30,18 @@ export function TitlebarSlot(): React.JSX.Element {
   )
 }
 
+/** Un Titlebar concreto (por nombre de función), para ponerlo en un lugar fijo de la barra. Sin nada si no hay que mostrar. */
+export function TitlebarOnly({ name }: { name: string }): React.JSX.Element | null {
+  const f = FEATURE_UIS.find((x) => x.name === name)
+  if (!f?.Titlebar) return null
+  const C = f.Titlebar
+  return (
+    <Guard name={name}>
+      <C />
+    </Guard>
+  )
+}
+
 export function SidebarSlot(): React.JSX.Element {
   return (
     <>
