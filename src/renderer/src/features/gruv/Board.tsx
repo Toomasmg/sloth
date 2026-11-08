@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
-import { resolveAccountColor } from '../settings/store'
 import { SPACE_CHIP, SPACE_LABEL, spaceStatus } from '../broadcast/state'
 import { CloseIcon, SearchIcon, SpaceIcon } from '../../icons/SlothIcons'
 import type { Workspace } from '../../../../shared/types'
@@ -13,13 +12,16 @@ import {
   setSnapshot,
   timeAgo,
   useSnapshot,
+  type Accion,
+  type DetView,
+  type GruvDetalle,
   type GruvEstado,
   type Snapshot,
-  type Ticket
+  type Ticket,
+  type WriteOpt
 } from './model'
-
-/** Lo que se escribe en Gruv: esta app solo lee Gruv, así que estas acciones van deshabilitadas. */
-const WHERE = 'Se hace desde Gruv'
+import { Av, PrioGlyph, estadoKind, prioTone } from './parts'
+import { Detail } from './Detail'
 
 type Tab = 'mios' | 'equipo' | 'sin'
 const TABS: { id: Tab; name: string }[] = [
@@ -39,46 +41,20 @@ interface TemplateLite {
 const usesTicket = (t: TemplateLite): boolean =>
   [t.namePattern, t.initialPrompt, t.useWorktree?.branchPattern].some((s) => Boolean(s && /\{ticket(min)?\}/.test(s)))
 
-const PRIO_PATH = {
-  0: 'M12 5v9M12 18h.01',
-  1: 'M6 14.5l6-6 6 6',
-  2: 'M5 9.5h14M5 14.5h14',
-  3: 'M6 9.5l6 6 6-6'
-} as const
-const prioPath = (p?: string): string => PRIO_PATH[(Math.min(prioRank(p), 3) as keyof typeof PRIO_PATH)]
-/** Color del texto de prioridad, como en el artboard: urgente coral, alta ámbar, media gris claro, baja gris. */
-const prioTone = (p?: string): string =>
-  prioRank(p) === 0 ? 'var(--danger-fg)' : prioRank(p) === 1 ? 'var(--warn-fg)' : prioRank(p) === 2 ? 'var(--g-c9)' : 'var(--fg-2)'
-
-/** Clase de color por estado de Gruv (`f-gruv-st-*`). El texto va siempre: el color solo no alcanza. */
-function estadoKind(k?: string): 'todo' | 'doing' | 'review' | 'error' {
-  if (k === 'en_curso') return 'doing'
-  if (k === 'en_revision' || k === 'en_qa' || k === 'pre_rtd') return 'review'
-  if (k === 'bloqueado' || k === 'rechazado') return 'error'
-  return 'todo'
+/** Mensaje del toast al terminar una escritura. */
+const DONE: Record<Accion, string> = {
+  estado: 'Estado actualizado en Gruv',
+  tomar: 'Ticket tomado',
+  soltar: 'Ticket soltado',
+  comentar: 'Comentario publicado',
+  criterio: 'Criterio actualizado',
+  horas: 'Horas sumadas'
 }
-
-const initials = (name: string): string =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]!.toUpperCase())
-    .join('') || '?'
 
 const byIdDesc = (a: Ticket, b: Ticket): number => {
   const na = Number(a.id.split('-').pop())
   const nb = Number(b.id.split('-').pop())
   return nb - na
-}
-
-/** Icono de prioridad (trazo, con texto al lado). */
-function PrioGlyph({ p, size = 12 }: { p?: string; size?: number }): React.JSX.Element {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}>
-      <path d={prioPath(p)} />
-    </svg>
-  )
 }
 
 function BackGlyph(): React.JSX.Element {
@@ -97,14 +73,6 @@ function RefreshGlyph(): React.JSX.Element {
   )
 }
 
-function ExternalGlyph(): React.JSX.Element {
-  return (
-    <svg width={14} height={14} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 4h6v6M20 4l-8 8M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" />
-    </svg>
-  )
-}
-
 export function Board(): React.JSX.Element {
   const ui = useUi()
   const snap = useSnapshot()
@@ -118,6 +86,16 @@ export function Board(): React.JSX.Element {
   const [err, setErr] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [tpls, setTpls] = useState<TemplateLite[]>([])
+  /** Detalle por ticket (criterios, comentarios, horas) leído al abrirlo. */
+  const [det, setDet] = useState<Record<string, DetView>>({})
+  /** Cambios optimistas en curso, por ticket: se muestran ya y se revierten si Gruv no los acepta. */
+  const [over, setOver] = useState<Record<string, Partial<Ticket>>>({})
+  /** Escritura en curso por ticket (una por ticket). */
+  const [wbusy, setWbusy] = useState<Record<string, Accion>>({})
+  const [toast, setToast] = useState<string | null>(null)
+  const [detTick, setDetTick] = useState(0)
+  /** Candado sincrónico: evita dos escrituras en el mismo ticket aunque se clickee rápido. */
+  const lock = useRef(new Set<string>())
   const backRef = useRef<HTMLButtonElement>(null)
 
   const close = (): void => setBoardOpen(false)
@@ -145,8 +123,15 @@ export function Board(): React.JSX.Element {
     return () => document.removeEventListener('keydown', onKey)
   }, [confirming])
 
+  useEffect(() => {
+    if (toast === null) return
+    const t = setTimeout(() => setToast(null), 3200)
+    return () => clearTimeout(t)
+  }, [toast])
+
   const running = Boolean(snap?.running) || busy === 'refresh'
-  const tickets = snap?.tickets ?? []
+  // Lo que se ve: la lista de Gruv con los cambios optimistas encima.
+  const tickets = (snap?.tickets ?? []).map((t) => (over[t.id] ? { ...t, ...over[t.id] } : t))
   const me = snap?.me
   const estados = snap?.estados ?? []
   const estadoName = (k?: string): string => estados.find((e) => e.clave === k)?.nombre ?? (k ? k.replace(/_/g, ' ') : 'Sin estado')
@@ -173,6 +158,26 @@ export function Board(): React.JSX.Element {
     )
     .sort(byIdDesc)
   const current = visible.find((t) => t.id === selId) ?? visible[0] ?? null
+  const curId = current?.id
+
+  // Detalle del ticket abierto: se pide al abrirlo (no en la lista).
+  useEffect(() => {
+    if (!curId) return
+    let alive = true
+    setDet((d) => ({ ...d, [curId]: { ...d[curId], loading: true, error: undefined } }))
+    ui.invoke<GruvDetalle>('feat:gruv:detail', curId).then(
+      (data) => {
+        if (alive) setDet((d) => ({ ...d, [curId]: { data } }))
+      },
+      (e: unknown) => {
+        if (alive) setDet((d) => ({ ...d, [curId]: { error: cleanError(e) } }))
+      }
+    )
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curId, detTick])
 
   // Chips de estado: los del flujo de Gruv que tienen tickets (y los que no estén en el flujo).
   const estadoKeys = [
@@ -206,6 +211,42 @@ export function Board(): React.JSX.Element {
   const askRefresh = (): void => {
     if (snap?.config.confirmRefresh) setConfirming(true)
     else void refresh()
+  }
+
+  /**
+   * Una escritura en Gruv, pedida por un clic sobre un ticket. Aplica el cambio optimista, espera a
+   * Gruv y, si no lo acepta, lo revierte con el error. Devuelve si salió bien.
+   */
+  const write = async (id: string, a: Accion, payload: Record<string, unknown>, opt: WriteOpt): Promise<boolean> => {
+    if (lock.current.has(id)) return false
+    lock.current.add(id)
+    const prev = det[id]?.data
+    setErr(null)
+    setWbusy((b) => ({ ...b, [id]: a }))
+    if (opt.ticket) setOver((o) => ({ ...o, [id]: { ...o[id], ...opt.ticket } }))
+    if (opt.det && prev) setDet((d) => ({ ...d, [id]: { data: opt.det!(prev) } }))
+    try {
+      const r = await ui.invoke<{ detail: GruvDetalle | null }>('feat:gruv:accion', a, id, payload)
+      if (r?.detail) setDet((d) => ({ ...d, [id]: { data: r.detail! } }))
+      setToast(DONE[a])
+      return true
+    } catch (e) {
+      if (opt.det && prev) setDet((d) => ({ ...d, [id]: { data: prev } }))
+      setErr(cleanError(e))
+      return false
+    } finally {
+      lock.current.delete(id)
+      setOver((o) => {
+        const n = { ...o }
+        delete n[id]
+        return n
+      })
+      setWbusy((b) => {
+        const n = { ...b }
+        delete n[id]
+        return n
+      })
+    }
   }
 
   /** «Empezar en Sloth»: con la plantilla de ticket si existe; si no, el flujo de siempre (`/ticket`). */
@@ -517,9 +558,7 @@ export function Board(): React.JSX.Element {
                             )}
                             {t.responsable ? (
                               <span className="f-gruv-who">
-                                <span className="f-gruv-av sm" aria-hidden="true" data-mine={mine ? 'true' : undefined}>
-                                  {initials(t.responsable)}
-                                </span>
+                                <Av name={t.responsable} size="sm" />
                                 {mine ? 'Vos' : t.responsable}
                               </span>
                             ) : (
@@ -562,226 +601,31 @@ export function Board(): React.JSX.Element {
                 t={current}
                 ws={wsOf(current.id)}
                 mine={isMineT(current)}
-                meName={me?.nombre}
+                me={me}
                 estados={estados}
                 estadoName={estadoName}
-                busy={busy === `start:${current.id}`}
+                view={det[current.id]}
+                wbusy={wbusy[current.id]}
+                noDisp={snap?.noDisponible ?? {}}
+                sinCuenta={!snap?.config.queryAccountId}
+                startBusy={busy === `start:${current.id}`}
                 disabledAll={Boolean(busy)}
                 tplName={tpls.find((x) => usesTicket(x) && /gruv/i.test(x.name))?.name ?? tpls.find(usesTicket)?.name}
                 onStart={() => void start(current)}
                 onOpenSpace={openSpace}
+                onWrite={(a, payload, opt) => write(current.id, a, payload, opt)}
+                onReload={() => setDetTick((n) => n + 1)}
               />
             )}
           </section>
         </div>
       </main>
-    </div>
-  )
-}
 
-function Detail(props: {
-  t: Ticket
-  ws?: Workspace
-  mine: boolean
-  meName?: string
-  estados: GruvEstado[]
-  estadoName: (k?: string) => string
-  busy: boolean
-  disabledAll: boolean
-  tplName?: string
-  onStart: () => void
-  onOpenSpace: (ws: Workspace) => void
-}): React.JSX.Element {
-  const ui = useUi()
-  const { t, ws, mine, estados } = props
-  const st = ws ? spaceStatus(ws.id, ui.agents, ui.permissions) : null
-  const resp = t.responsable
-  const avBg = mine ? 'var(--accent-soft)' : resp ? 'var(--team-soft)' : 'var(--btn-2)'
-  const avFg = mine ? 'var(--info)' : resp ? 'var(--team-fg)' : 'var(--fg-muted)'
-  const wsAcc = ws ? ui.accounts.findIndex((a) => a.id === ws.accountId) : -1
-  const crit = t.criterios ?? []
-  const done = crit.filter((c) => c.hecho).length
-  const selectOpts = estados.some((e) => e.clave === t.estado) || !t.estado
-    ? estados
-    : [...estados, { clave: t.estado, nombre: props.estadoName(t.estado) }]
-
-  return (
-    <>
-      <div className="f-gruv-det-head">
-        <span className="f-gruv-code mono f-gruv-code-lg">{t.id}</span>
-        <h2 id="f-gruv-det-t" className="f-gruv-det-title">
-          {t.titulo}
-        </h2>
-        <div className="f-gruv-fields">
-          <div className="f-gruv-field">
-            <label htmlFor="f-gruv-estado">Estado</label>
-            <select id="f-gruv-estado" value={t.estado ?? ''} disabled aria-describedby="f-gruv-w-estado">
-              {!t.estado && <option value="">Sin estado</option>}
-              {selectOpts.map((e) => (
-                <option key={e.clave} value={e.clave}>
-                  {e.nombre}
-                </option>
-              ))}
-            </select>
-            <span id="f-gruv-w-estado" className="f-gruv-why">
-              {WHERE}
-            </span>
-          </div>
-          <div className="f-gruv-field">
-            <span className="f-gruv-lbl">Prioridad</span>
-            <span className="f-gruv-prio-val" style={{ color: prioTone(t.prioridad) }}>
-              <PrioGlyph p={t.prioridad} size={13} />
-              {t.prioridad ?? 'Sin prioridad'}
-            </span>
-          </div>
+      {toast && (
+        <div className="f-gruv-toast" role="status">
+          {toast}
         </div>
-      </div>
-
-      <div className="f-gruv-assign">
-        <span className="f-gruv-av lg" style={{ background: avBg, color: avFg }} aria-hidden="true">
-          {resp ? initials(resp) : '?'}
-        </span>
-        <div className="f-gruv-assign-text">
-          <div className="f-gruv-muted">Asignado a</div>
-          <div className="f-gruv-strong">{resp ? (mine ? `${resp} (vos)` : resp) : 'Sin asignar'}</div>
-        </div>
-        {!resp && (
-          <>
-            <button type="button" className="f-gruv-b f-gruv-b--md f-gruv-b--pri" disabled aria-describedby="f-gruv-w-take">
-              Tomarlo
-            </button>
-            <span id="f-gruv-w-take" className="f-gruv-why">
-              {WHERE}
-            </span>
-          </>
-        )}
-        {mine && (
-          <>
-            <button type="button" className="f-gruv-b f-gruv-b--md" disabled aria-describedby="f-gruv-w-drop">
-              Soltar
-            </button>
-            <span id="f-gruv-w-drop" className="f-gruv-why">
-              {WHERE}
-            </span>
-          </>
-        )}
-        {resp && !mine && <span className="f-gruv-owner">Lo tiene {resp}</span>}
-      </div>
-
-      <div className="f-gruv-actions">
-        <div className="f-gruv-actions-row">
-          {ws && st ? (
-            <>
-              <span className={`chip ${SPACE_CHIP[st]} f-gruv-space-lg`}>
-                <span className="f-gruv-ellipsis">
-                  {ws.name} · {SPACE_LABEL[st]}
-                </span>
-              </span>
-              <button type="button" className="f-gruv-b f-gruv-b--pri" onClick={() => props.onOpenSpace(ws)}>
-                Abrir espacio
-              </button>
-            </>
-          ) : (
-            <button type="button" className="f-gruv-b f-gruv-b--pri" onClick={props.onStart} disabled={props.busy || props.disabledAll}>
-              <SpaceIcon size={14} strokeWidth={2} />
-              {props.busy ? 'Creando…' : 'Empezar en Sloth'}
-            </button>
-          )}
-          {t.url ? (
-            <a className="f-gruv-b" href={t.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${t.id} en Gruv`}>
-              <ExternalGlyph />
-              Abrir en Gruv
-            </a>
-          ) : (
-            <button type="button" className="f-gruv-b" disabled title="Gruv no dio el link de este ticket">
-              <ExternalGlyph />
-              Abrir en Gruv
-            </button>
-          )}
-          {ws && wsAcc >= 0 && (
-            <span className="f-gruv-acc">
-              <span className="f-gruv-dot" style={{ background: resolveAccountColor(ws.accountId, wsAcc) }} aria-hidden="true" />
-              {ui.accounts[wsAcc].label}
-            </span>
-          )}
-        </div>
-        {!(ws && st) && (
-          <p className="f-gruv-help">
-            {props.tplName
-              ? `Crea un espacio con la plantilla «${props.tplName}».`
-              : `Crea el espacio ${t.id} y arranca Claude con /ticket ${t.id}.`}
-          </p>
-        )}
-      </div>
-
-      <section className="f-gruv-sec" aria-labelledby="f-gruv-d-t">
-        <h3 id="f-gruv-d-t">Descripción</h3>
-        <p className="f-gruv-desc">{t.descripcion ?? 'Gruv no trajo la descripción de este ticket.'}</p>
-      </section>
-
-      {crit.length > 0 && (
-        <section className="f-gruv-sec" aria-labelledby="f-gruv-c-t">
-          <div className="f-gruv-sec-head">
-            <h3 id="f-gruv-c-t">Criterios de aceptación</h3>
-            <span className="f-gruv-prog-label">
-              {done} de {crit.length}
-            </span>
-          </div>
-          <div className="f-gruv-progress" role="progressbar" aria-label="Criterios cumplidos" aria-valuemin={0} aria-valuemax={crit.length} aria-valuenow={done}>
-            <span style={{ width: `${Math.round((done / crit.length) * 100)}%` }} />
-          </div>
-          <ul className="f-gruv-crit">
-            {crit.map((c, i) => (
-              <li key={i}>
-                <label>
-                  <input type="checkbox" checked={c.hecho} disabled aria-describedby="f-gruv-w-crit" />
-                  <span>{c.texto}</span>
-                </label>
-              </li>
-            ))}
-          </ul>
-          <span id="f-gruv-w-crit" className="f-gruv-why">
-            {WHERE}
-          </span>
-        </section>
       )}
-
-      <section className="f-gruv-sec" aria-labelledby="f-gruv-co-t">
-        <h3 id="f-gruv-co-t">Comentarios</h3>
-        <div className="f-gruv-inline">
-          <input className="f-gruv-input" disabled placeholder="Escribí un comentario" aria-label={`Comentar en ${t.id}`} aria-describedby="f-gruv-w-com" />
-          <button type="button" className="f-gruv-b" disabled>
-            Publicar
-          </button>
-        </div>
-        <span id="f-gruv-w-com" className="f-gruv-why">
-          {WHERE}
-        </span>
-      </section>
-
-      <section className="f-gruv-sec" aria-labelledby="f-gruv-h-t">
-        <h3 id="f-gruv-h-t">Horas cargadas</h3>
-        <div className="f-gruv-hours">
-          <label className="f-gruv-hours-field">
-            <span>Horas a sumar</span>
-            <input
-              className="f-gruv-input narrow"
-              disabled
-              inputMode="decimal"
-              placeholder="Ej.: 2 o 1,5"
-              aria-label={`Horas a sumar en ${t.id}`}
-              aria-describedby="f-gruv-w-hr"
-            />
-          </label>
-          <button type="button" className="f-gruv-b" disabled>
-            Sumar horas
-          </button>
-        </div>
-        <p className="f-gruv-muted f-gruv-hours-help">Más de 0 y hasta 12 horas por carga. Podés usar coma o punto.</p>
-        <span id="f-gruv-w-hr" className="f-gruv-why">
-          {WHERE}
-        </span>
-      </section>
-    </>
+    </div>
   )
 }
