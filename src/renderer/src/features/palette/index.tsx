@@ -1,35 +1,35 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { Command as CommandIcon, MagnifyingGlass } from '@phosphor-icons/react'
-import { useUi, type Command, type FeatureUi, type UiCtx } from '../host'
-import { cleanError } from '../../format'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { PencilSimple, Trash } from '@phosphor-icons/react'
+import type { Workspace } from '../../../../shared/types'
+import { api } from '../../api'
+import { cleanError, shortPath, STATE_LABEL } from '../../format'
+import { ChangesIcon, CloseIcon, EditorIcon, FolderIcon, MaximizeIcon, MoveAccountIcon, SearchIcon } from '../../icons/SlothIcons'
+import { resolveAccountColor, useSettings } from '../settings/store'
 import { FEATURE_UIS } from '../registry'
+import { useUi, type Command, type FeatureUi, type UiCtx } from '../host'
 import { fuzzyFilter, splitHighlight, type FuzzyMatch } from './fuzzy'
-import { coreCommands } from './core-commands'
+import { coreCommands, focusPaneTerminal } from './core-commands'
 import './palette.css'
 
-// ---------- Estado abierto/cerrado (lo comparten el botón del titlebar y el modal) ----------
-let isOpen = false
-const subs = new Set<() => void>()
-const setOpen = (v: boolean): void => {
-  if (isOpen === v) return
-  isOpen = v
-  subs.forEach((f) => f())
-}
-const useOpen = (): boolean =>
-  useSyncExternalStore(
-    (cb) => {
-      subs.add(cb)
-      return () => subs.delete(cb)
-    },
-    () => isOpen
-  )
-/** Para que otras funciones puedan abrir la paleta si lo necesitan. */
-export const openPalette = (): void => setOpen(true)
+/**
+ * Buscador de la barra superior. Es la paleta de comandos: Ctrl+K enfoca este mismo campo y la lista
+ * se despliega debajo. Los comandos son los que ya registra cada función (FEATURE_UIS), más los
+ * comandos de cada espacio (Tab sobre un resultado).
+ */
 
-// ---------- Recientes ----------
+/** Evento para que App abra el renombrado de un espacio (el panel ya está abierto). */
+export const PALETTE_RENAME_EVENT = 'sloth:palette-rename'
+/** Evento para que App pida quitar un espacio (con confirmación, como el botón de la barra lateral). */
+export const PALETTE_REMOVE_EVENT = 'sloth:palette-remove'
+
+/** Abre el buscador y le pone el foco. */
+let focusField: (() => void) | null = null
+export const openPalette = (): void => focusField?.()
+
+// ---------- Recientes (preferencia de esta PC) ----------
 const RECENT_KEY = 'sloth.palette.recent'
 const MAX_RECENT = 5
-const MAX_RENDER = 50
+const MAX_RENDER = 60
 function readRecent(): string[] {
   try {
     const v = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]')
@@ -47,12 +47,36 @@ function pushRecent(id: string): void {
   }
 }
 
-/** Todos los comandos: los de cada función del registro (se lee en runtime: evita el import circular). */
+/**
+ * Ejecuta un comando de una función por su id, con un contexto propio (por ejemplo, con otro espacio
+ * enfocado). Así App y la paleta reutilizan los comandos reales en vez de duplicar la lógica.
+ */
+export function runFeatureCommand(id: string, ctx: UiCtx): void {
+  for (const f of FEATURE_UIS) {
+    if (!f.commands) continue
+    let cmd: Command | undefined
+    try {
+      cmd = f.commands(ctx).find((c) => c.id === id)
+    } catch (e) {
+      console.error(`[paleta] comandos de ${f.name}:`, e)
+      continue
+    }
+    if (!cmd) continue
+    try {
+      const r = cmd.run()
+      if (r && typeof (r as Promise<void>).catch === 'function') (r as Promise<void>).catch((e) => ctx.notifyError(cleanError(e)))
+    } catch (e) {
+      ctx.notifyError(cleanError(e))
+    }
+    return
+  }
+}
+
+/** Todos los comandos de las funciones (cada función registra los suyos). */
 function allCommands(ctx: UiCtx): Command[] {
   const out: Command[] = []
   const seen = new Set<string>()
-  const list: FeatureUi[] = FEATURE_UIS ?? []
-  for (const f of list) {
+  for (const f of FEATURE_UIS) {
     if (!f.commands) continue
     try {
       for (const c of f.commands(ctx)) {
@@ -67,41 +91,180 @@ function allCommands(ctx: UiCtx): Command[] {
   return out
 }
 
-interface Row {
-  cmd: Command
-  match?: FuzzyMatch
-  group: string
+// ---------- Elementos ----------
+type Section = 'espacios' | 'acciones' | 'equipo'
+type Filter = 'todo' | Section
+
+interface Meta {
+  label: string
+  cls: string
 }
 
-function buildRows(cmds: Command[], query: string): Row[] {
-  if (!query.trim()) {
-    const byId = new Map(cmds.map((c) => [c.id, c]))
-    const recent = readRecent()
-      .map((id) => byId.get(id))
-      .filter((c): c is Command => Boolean(c))
-    const recentIds = new Set(recent.map((c) => c.id))
-    const rows: Row[] = recent.map((cmd) => ({ cmd, group: 'Recientes' }))
-    // Resto agrupado por grupo, en el orden en que aparecen.
-    const groups = new Map<string, Command[]>()
-    for (const c of cmds) {
-      if (recentIds.has(c.id)) continue
-      const g = groups.get(c.group)
-      if (g) g.push(c)
-      else groups.set(c.group, [c])
+interface Item {
+  id: string
+  section: Section
+  /** Encabezado de grupo en la lista. */
+  group: string
+  title: string
+  subtitle?: string
+  keywords?: string
+  icon?: ReactNode
+  iconStyle?: CSSProperties
+  meta?: Meta
+  shortcut?: string
+  danger?: boolean
+  /** Si es un espacio: Tab abre sus acciones. */
+  spaceId?: string
+  run(): void
+}
+
+function stateMeta(ctx: UiCtx, ws: Workspace): Meta | undefined {
+  const now = Date.now()
+  if (ctx.permissions.some((p) => p.workspaceId === ws.id && p.expiresAt > now)) return { label: 'Pide permiso', cls: 'perm' }
+  const ag = ctx.agents[ws.id]
+  if (!ag) return undefined
+  return { label: STATE_LABEL[ag.state], cls: ag.state }
+}
+
+function openSpace(ctx: UiCtx, id: string): void {
+  ctx.openPane(id)
+  focusPaneTerminal(id)
+}
+
+function spaceItem(ctx: UiCtx, ws: Workspace, colorOf: (accountId: string) => string): Item {
+  const acc = ctx.accounts.find((a) => a.id === ws.accountId)
+  return {
+    id: `palette:go:${ws.id}`,
+    section: 'espacios',
+    group: 'Espacios',
+    title: ws.name,
+    subtitle: `${acc?.label ?? 'cuenta borrada'} · ${ws.branch ?? shortPath(ws.cwd)}`,
+    keywords: [ws.ticket, ws.branch, ws.repoPath].filter(Boolean).join(' '),
+    icon: <FolderIcon size={15} aria-hidden="true" />,
+    iconStyle: { color: colorOf(ws.accountId), background: `color-mix(in srgb, ${colorOf(ws.accountId)} 16%, transparent)` },
+    meta: stateMeta(ctx, ws),
+    spaceId: ws.id,
+    run: () => openSpace(ctx, ws.id)
+  }
+}
+
+/** Acciones de un espacio (Tab sobre un resultado de espacio). */
+function spaceActions(ctx: UiCtx, ws: Workspace): Item[] {
+  const id = ws.id
+  const base = { section: 'acciones' as const, group: ws.name }
+  const items: Item[] = [
+    { ...base, id: 'x-abrir', title: 'Abrir en el panel activo', subtitle: 'Lo muestra y le pone el foco', icon: <FolderIcon size={15} aria-hidden="true" />, run: () => openSpace(ctx, id) },
+    {
+      ...base,
+      id: 'x-max',
+      title: 'Abrir maximizado',
+      subtitle: 'Un solo panel con este espacio',
+      icon: <MaximizeIcon size={15} aria-hidden="true" />,
+      run: () => {
+        ctx.openPane(id)
+        ctx.setMaximized(id)
+      }
+    },
+    {
+      ...base,
+      id: 'x-git',
+      title: 'Ver cambios',
+      subtitle: 'Git del espacio',
+      icon: <ChangesIcon size={15} aria-hidden="true" />,
+      run: () => {
+        ctx.openPane(id)
+        runFeatureCommand('git:changes', { ...ctx, focused: id })
+      }
+    },
+    {
+      ...base,
+      id: 'x-code',
+      title: 'Abrir en VS Code',
+      subtitle: ws.cwd,
+      icon: <EditorIcon size={15} aria-hidden="true" />,
+      run: () => {
+        api.revealWorkspace(id, 'vscode').catch((e) => ctx.notifyError(cleanError(e)))
+      }
+    },
+    {
+      ...base,
+      id: 'x-ren',
+      title: 'Renombrar',
+      subtitle: 'Escribís el nombre nuevo en el panel',
+      shortcut: 'F2',
+      icon: <PencilSimple size={15} aria-hidden="true" />,
+      run: () => {
+        ctx.openPane(id)
+        window.dispatchEvent(new CustomEvent(PALETTE_RENAME_EVENT, { detail: id }))
+      }
     }
-    for (const [group, list] of groups) for (const cmd of list) rows.push({ cmd, group })
-    return rows.slice(0, MAX_RENDER)
+  ]
+  if (ctx.accounts.length >= 2)
+    items.push({
+      ...base,
+      id: 'x-mover',
+      title: 'Mover a otra cuenta',
+      subtitle: 'La terminal se reinicia con la otra cuenta',
+      icon: <MoveAccountIcon size={15} aria-hidden="true" />,
+      run: () => runFeatureCommand('move-account.focused', { ...ctx, focused: id })
+    })
+  items.push(
+    {
+      ...base,
+      id: 'x-ocultar',
+      title: 'Ocultar panel',
+      subtitle: 'La terminal sigue corriendo',
+      icon: <CloseIcon size={15} aria-hidden="true" />,
+      run: () => ctx.closePane(id)
+    },
+    {
+      ...base,
+      id: 'x-quitar',
+      title: 'Quitar espacio',
+      subtitle: 'Se cierra su terminal',
+      icon: <Trash size={15} aria-hidden="true" />,
+      danger: true,
+      run: () => window.dispatchEvent(new CustomEvent(PALETTE_REMOVE_EVENT, { detail: id }))
+    }
+  )
+  return items
+}
+
+function buildItems(ctx: UiCtx, colorOf: (accountId: string) => string): Item[] {
+  const out: Item[] = ctx.workspaces.map((ws) => spaceItem(ctx, ws, colorOf))
+  for (const c of allCommands(ctx)) {
+    if (c.id.startsWith('palette:go:')) continue
+    const section: Section = c.group === 'Espacios' ? 'espacios' : c.group === 'Equipo' ? 'equipo' : 'acciones'
+    out.push({
+      id: c.id,
+      section,
+      group: c.group,
+      title: c.title,
+      subtitle: c.subtitle,
+      keywords: c.keywords,
+      icon: c.icon,
+      shortcut: c.shortcut,
+      run: () => {
+        void Promise.resolve()
+          .then(() => c.run())
+          .catch((e) => ctx.notifyError(cleanError(e)))
+      }
+    })
   }
-  const found = fuzzyFilter(cmds, query)
-  // Agrupar manteniendo el orden por puntaje: los grupos salen en el orden de su mejor resultado.
-  const groups = new Map<string, Row[]>()
-  for (const { item, match } of found) {
-    const g = groups.get(item.group)
-    const row = { cmd: item, match, group: item.group }
-    if (g) g.push(row)
-    else groups.set(item.group, [row])
-  }
-  return [...groups.values()].flat().slice(0, MAX_RENDER)
+  return out
+}
+
+const SECTION_LABEL: Record<Section, string> = { espacios: 'Espacios', acciones: 'Acciones', equipo: 'Equipo' }
+const FILTERS: { id: Filter; label: string; prefix: string }[] = [
+  { id: 'todo', label: 'Todo', prefix: '' },
+  { id: 'espacios', label: 'Espacios', prefix: '' },
+  { id: 'acciones', label: 'Acciones', prefix: '>' },
+  { id: 'equipo', label: 'Equipo', prefix: '@' }
+]
+
+interface Row {
+  item: Item
+  match: FuzzyMatch
 }
 
 function Highlight({ text, pos }: { text: string; pos?: number[] }): React.JSX.Element {
@@ -109,7 +272,7 @@ function Highlight({ text, pos }: { text: string; pos?: number[] }): React.JSX.E
     <>
       {splitHighlight(text, pos ?? []).map((p, i) =>
         p.hl ? (
-          <mark key={i} className="f-palette-hl">
+          <mark key={i} className="pal-hl">
             {p.text}
           </mark>
         ) : (
@@ -120,9 +283,10 @@ function Highlight({ text, pos }: { text: string; pos?: number[] }): React.JSX.E
   )
 }
 
+/** Atajo como teclas («Ctrl+K» → Ctrl K). */
 function Keys({ shortcut }: { shortcut: string }): React.JSX.Element {
   return (
-    <span className="f-palette-keys" aria-label={`Atajo ${shortcut}`}>
+    <span className="pal-keys" aria-label={`Atajo ${shortcut}`}>
       {shortcut.split('+').map((k, i) => (
         <kbd key={i}>{k.trim()}</kbd>
       ))}
@@ -130,154 +294,38 @@ function Keys({ shortcut }: { shortcut: string }): React.JSX.Element {
   )
 }
 
-function Palette({ onClose }: { onClose: (restore: boolean) => void }): React.JSX.Element {
+/**
+ * Buscador de la barra superior (siempre montado). Maneja Ctrl+K y Ctrl+Shift+P y la lista desplegable.
+ */
+export function PaletteBar(): React.JSX.Element {
   const ctx = useUi()
+  const settings = useSettings()
+  const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<Filter>('todo')
+  const [scope, setScope] = useState<string | null>(null)
   const [active, setActive] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
-  const listRef = useRef<HTMLDivElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
   const ctxRef = useRef(ctx)
   ctxRef.current = ctx
 
-  // Los comandos se arman al abrir y cuando cambia el estado de la app (no en cada tecla).
-  const cmds = useMemo(
-    () => allCommands(ctx),
+  const accountIndex = useMemo(() => new Map(ctx.accounts.map((a, i) => [a.id, i])), [ctx.accounts])
+  const colorOf = (accountId: string): string => resolveAccountColor(accountId, accountIndex.get(accountId) ?? 0, settings)
+
+  // Los elementos se arman al abrir y cuando cambia el estado de la app (no en cada tecla).
+  const items = useMemo(
+    () => (open ? buildItems(ctx, colorOf) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ctx.accounts, ctx.workspaces, ctx.statuses, ctx.agents, ctx.permissions, ctx.openPanes, ctx.focused, ctx.maximized]
+    [open, ctx.accounts, ctx.workspaces, ctx.statuses, ctx.agents, ctx.permissions, ctx.openPanes, ctx.focused, ctx.maximized, settings]
   )
-  const rows = useMemo(() => buildRows(cmds, query), [cmds, query])
-  const safeActive = rows.length ? Math.min(active, rows.length - 1) : -1
 
-  useEffect(() => setActive(0), [query])
-  useEffect(() => inputRef.current?.focus(), [])
-
-  useLayoutEffect(() => {
-    if (safeActive < 0) return
-    listRef.current?.querySelector(`#f-palette-opt-${safeActive}`)?.scrollIntoView({ block: 'nearest' })
-  }, [safeActive])
-
-  const run = (row: Row | undefined): void => {
-    if (!row) return
-    pushRecent(row.cmd.id)
-    onClose(true)
-    // Después de cerrar y devolver el foco: el comando puede mover el foco a otro lado.
-    setTimeout(() => {
-      try {
-        const r = row.cmd.run()
-        if (r && typeof (r as Promise<void>).catch === 'function')
-          (r as Promise<void>).catch((e) => ctxRef.current.notifyError(cleanError(e)))
-      } catch (e) {
-        ctxRef.current.notifyError(cleanError(e))
-      }
-    }, 0)
-  }
-
-  const onKey = (e: React.KeyboardEvent): void => {
-    const n = rows.length
-    const move = (d: number): void => {
-      e.preventDefault()
-      if (n) setActive((a) => (Math.min(a, n - 1) + d + n) % n)
-    }
-    if (e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey)) move(1)
-    else if (e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey)) move(-1)
-    else if (e.key === 'PageDown') move(Math.min(8, Math.max(1, n - 1 - safeActive)))
-    else if (e.key === 'PageUp') move(-Math.min(8, Math.max(1, safeActive)))
-    else if (e.key === 'Enter') {
-      e.preventDefault()
-      run(rows[safeActive])
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      e.stopPropagation()
-      onClose(true)
-    }
-  }
-
-  let lastGroup = ''
-  return (
-    <div className="f-palette-backdrop" onMouseDown={() => onClose(true)}>
-      <div className="f-palette" role="dialog" aria-modal="true" aria-label="Paleta de comandos" onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKey}>
-        <div className="f-palette-search">
-          <MagnifyingGlass size={16} aria-hidden="true" />
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscá un comando, un espacio, una plantilla…"
-            role="combobox"
-            aria-expanded="true"
-            aria-controls="f-palette-list"
-            aria-autocomplete="list"
-            aria-activedescendant={safeActive >= 0 ? `f-palette-opt-${safeActive}` : undefined}
-            aria-label="Buscar comando"
-            spellCheck={false}
-            autoComplete="off"
-          />
-          <kbd className="f-palette-esc">Esc</kbd>
-        </div>
-        <div className="f-palette-list" id="f-palette-list" role="listbox" ref={listRef} aria-label="Comandos">
-          {rows.length === 0 && <p className="f-palette-empty">Nada coincide con «{query}».</p>}
-          {rows.map((row, i) => {
-            const head = row.group !== lastGroup ? row.group : null
-            lastGroup = row.group
-            return (
-              <div key={`${row.group}:${row.cmd.id}`} role="presentation">
-                {head && (
-                  <div className="f-palette-group" role="presentation">
-                    {head}
-                  </div>
-                )}
-                <div
-                  id={`f-palette-opt-${i}`}
-                  role="option"
-                  aria-selected={i === safeActive}
-                  className={`f-palette-item ${i === safeActive ? 'active' : ''}`}
-                  onMouseMove={() => i !== safeActive && setActive(i)}
-                  onClick={() => run(row)}
-                >
-                  {row.cmd.icon && (
-                    <span className="f-palette-ico" aria-hidden="true">
-                      {row.cmd.icon}
-                    </span>
-                  )}
-                  <span className="f-palette-text">
-                    <span className="f-palette-title">
-                      <Highlight text={row.cmd.title} pos={row.match?.title} />
-                    </span>
-                    {row.cmd.subtitle && (
-                      <span className="f-palette-sub">
-                        <Highlight text={row.cmd.subtitle} pos={row.match?.subtitle} />
-                      </span>
-                    )}
-                  </span>
-                  {row.cmd.shortcut && <Keys shortcut={row.cmd.shortcut} />}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-        <footer className="f-palette-foot" aria-hidden="true">
-          <span>
-            <kbd>↑</kbd>
-            <kbd>↓</kbd> moverse
-          </span>
-          <span>
-            <kbd>Enter</kbd> ejecutar
-          </span>
-          <span>
-            <kbd>Esc</kbd> cerrar
-          </span>
-        </footer>
-      </div>
-    </div>
-  )
-}
-
-function Global(): React.JSX.Element | null {
-  const open = useOpen()
-  const prevFocus = useRef<HTMLElement | null>(null)
-
-  // Fase de captura en window: funciona aunque xterm tenga el foco. Solo Ctrl+K y Ctrl+Shift+P.
+  // Foco desde fuera (Ctrl+K, openPalette) y atajos globales.
   useEffect(() => {
+    focusField = () => {
+      setOpen(true)
+      inputRef.current?.focus()
+    }
     const onKey = (e: KeyboardEvent): void => {
       if (!e.ctrlKey || e.altKey || e.metaKey) return
       const k = e.code === 'KeyK' && !e.shiftKey
@@ -285,43 +333,292 @@ function Global(): React.JSX.Element | null {
       if (!k && !p) return
       e.preventDefault()
       e.stopPropagation()
-      setOpen(!isOpen)
+      focusField?.()
     }
     window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
+    return () => {
+      focusField = null
+      window.removeEventListener('keydown', onKey, true)
+    }
   }, [])
 
-  useLayoutEffect(() => {
-    if (open) {
-      const a = document.activeElement
-      prevFocus.current = a instanceof HTMLElement && a !== document.body ? a : null
-    } else {
-      const el = prevFocus.current
-      prevFocus.current = null
-      if (el && el.isConnected) el.focus()
+  const close = (blur: boolean): void => {
+    setOpen(false)
+    setQuery('')
+    setScope(null)
+    setFilter('todo')
+    setActive(0)
+    if (blur) inputRef.current?.blur()
+  }
+
+  // Clic afuera cierra la lista.
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: PointerEvent): void => {
+      if (!wrapRef.current?.contains(e.target as Node)) close(false)
     }
+    document.addEventListener('pointerdown', onDown, true)
+    return () => document.removeEventListener('pointerdown', onDown, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  if (!open) return null
-  return <Palette onClose={() => setOpen(false)} />
-}
+  // ---------- Filtrado ----------
+  const scoped = scope ? ctx.workspaces.find((w) => w.id === scope) : undefined
+  let kind: Filter = filter
+  let q = query
+  if (!scoped) {
+    if (q.startsWith('>')) {
+      kind = 'acciones'
+      q = q.slice(1)
+    } else if (q.startsWith('@')) {
+      kind = 'equipo'
+      q = q.slice(1)
+    }
+  }
+  const nq = q.trim()
+  const pool = scoped ? spaceActions(ctx, scoped) : items.filter((it) => kind === 'todo' || it.section === kind)
+  const found = open ? fuzzyFilter(pool, nq) : []
+  const byId = new Map(items.map((it) => [it.id, it]))
+  // Recientes solo en la vista general, sin texto.
+  const showRecent = !scoped && !nq && kind === 'todo'
+  const recentRows: Row[] = showRecent
+    ? readRecent()
+        .map((id) => byId.get(id))
+        .filter((it): it is Item => Boolean(it))
+        .map((item) => ({ item, match: { score: 0, title: [], subtitle: [] } }))
+    : []
+  const recentIds = new Set(recentRows.map((r) => r.item.id))
+  const rows: Row[] = found.map(({ item, match }) => ({ item, match })).filter((r) => !recentIds.has(r.item.id))
+  const all: Row[] = [...recentRows, ...rows].slice(0, MAX_RENDER)
+  // Grupos en el orden de aparición (Recientes primero).
+  const groups: { label: string; rows: { row: Row; index: number }[] }[] = []
+  all.forEach((row, index) => {
+    const g = showRecent && recentIds.has(row.item.id) ? 'Recientes' : row.item.group
+    let grp = groups.find((x) => x.label === g)
+    if (!grp) groups.push((grp = { label: g, rows: [] }))
+    grp.rows.push({ row, index })
+  })
+  if (showRecent) {
+    // Recientes primero siempre, aunque el resto tenga otro orden.
+    groups.sort((a, b) => (a.label === 'Recientes' ? -1 : b.label === 'Recientes' ? 1 : 0))
+  }
 
-function Titlebar(): React.JSX.Element {
+  const safeActive = all.length ? Math.min(active, all.length - 1) : -1
+  const sel = safeActive >= 0 ? all[safeActive].item : undefined
+
+  useEffect(() => setActive(0), [query, filter, scope])
+
+  useEffect(() => {
+    if (safeActive < 0) return
+    document.getElementById(`pal-opt-${safeActive}`)?.scrollIntoView({ block: 'nearest' })
+  }, [safeActive])
+
+  const run = (item: Item | undefined): void => {
+    if (!item) return
+    pushRecent(item.id)
+    close(true)
+    setTimeout(() => {
+      try {
+        item.run()
+      } catch (e) {
+        ctxRef.current.notifyError(cleanError(e))
+      }
+    }, 0)
+  }
+
+  const onKey = (e: React.KeyboardEvent<HTMLInputElement>): void => {
+    const n = all.length
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (!open) setOpen(true)
+      if (n) setActive((a) => (Math.min(a, n - 1) + (e.key === 'ArrowDown' ? 1 : -1) + n) % n)
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      run(sel)
+    } else if (e.key === 'Tab') {
+      e.preventDefault()
+      if (!e.shiftKey && sel?.spaceId && !scoped) {
+        setScope(sel.spaceId)
+        setQuery('')
+        setFilter('todo')
+        setActive(0)
+      }
+    } else if (e.key === 'Backspace' && !e.currentTarget.value && scoped) {
+      setScope(null)
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      if (scoped) setScope(null)
+      else close(true)
+    }
+  }
+
+  const placeholder = scoped ? `Acción para ${scoped.name}…` : 'Buscar espacio, acción o persona'
+  const count = all.length === 1 ? '1 resultado' : `${all.length} resultados`
+
   return (
-    <button type="button" className="f-palette-tb" onClick={() => setOpen(true)} title="Paleta de comandos (Ctrl+K)" aria-label="Abrir paleta de comandos (Ctrl+K)">
-      <CommandIcon size={13} aria-hidden="true" />
-      <span className="f-palette-tb-label">Buscar o ejecutar…</span>
-      <span className="f-palette-tb-keys" aria-hidden="true">
-        Ctrl K
-      </span>
-    </button>
+    <div ref={wrapRef} className={`pal ${open ? 'open' : ''}`}>
+      <label className="pal-field">
+        <SearchIcon size={15} aria-hidden="true" />
+        {scoped && (
+          <button
+            type="button"
+            className="pal-scope"
+            onClick={() => {
+              setScope(null)
+              inputRef.current?.focus()
+            }}
+            title="Volver a la búsqueda (Retroceso)"
+          >
+            <span className="pal-scope-ico" style={{ background: colorOf(scoped.accountId) }} aria-hidden="true" />
+            <span className="pal-scope-name">{scoped.name}</span>
+          </button>
+        )}
+        <input
+          ref={inputRef}
+          className="pal-input"
+          type="text"
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            setOpen(true)
+          }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={onKey}
+          placeholder={placeholder}
+          role="combobox"
+          aria-label="Buscar espacio, acción o persona"
+          aria-expanded={open}
+          aria-controls="pal-list"
+          aria-autocomplete="list"
+          aria-activedescendant={safeActive >= 0 ? `pal-opt-${safeActive}` : undefined}
+          spellCheck={false}
+          autoComplete="off"
+        />
+        <kbd className="pal-hint">{open ? 'Esc' : 'Ctrl K'}</kbd>
+      </label>
+
+      {open && (
+        <div className="pal-pop" role="dialog" aria-label="Resultados de la búsqueda">
+          {!scoped && (
+            <div className="pal-filters" role="group" aria-label="Filtrar por tipo">
+              {FILTERS.map((f) => {
+                const on = kind === f.id
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    className="pal-filter"
+                    aria-pressed={on}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setFilter(f.id)
+                      inputRef.current?.focus()
+                    }}
+                  >
+                    {f.label}
+                    {f.prefix && <span className="pal-prefix">{f.prefix}</span>}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          <div id="pal-list" className="pal-list" role="listbox" aria-label="Resultados">
+            {groups.map((g) => (
+              <div key={g.label} role="group" aria-label={g.label}>
+                <div className="pal-group" role="presentation">
+                  {g.label}
+                  <span className="pal-group-n">{nq ? g.rows.length : ''}</span>
+                </div>
+                {g.rows.map(({ row, index }) => {
+                  const it = row.item
+                  const on = index === safeActive
+                  return (
+                    <div
+                      key={`${g.label}:${it.id}`}
+                      id={`pal-opt-${index}`}
+                      role="option"
+                      aria-selected={on}
+                      className={`pal-item ${on ? 'on' : ''} ${it.danger ? 'danger' : ''}`}
+                      onMouseMove={() => !on && setActive(index)}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => run(it)}
+                    >
+                      <span className="pal-ico" style={it.iconStyle} aria-hidden="true">
+                        {it.icon}
+                      </span>
+                      <span className="pal-txt">
+                        <span className="pal-title">
+                          <Highlight text={it.title} pos={row.match.title} />
+                        </span>
+                        {it.subtitle && (
+                          <span className="pal-sub">
+                            <Highlight text={it.subtitle} pos={row.match.subtitle} />
+                          </span>
+                        )}
+                      </span>
+                      {it.meta && <span className={`pal-meta s-${it.meta.cls}`}>{it.meta.label}</span>}
+                      {it.shortcut && !on && <Keys shortcut={it.shortcut} />}
+                      {on && (
+                        <span className="pal-enter" aria-hidden="true">
+                          {it.spaceId && !scoped ? 'Abrir · Tab acciones' : 'Ejecutar'}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+            {all.length === 0 && (
+              <div className="pal-empty">
+                <span className="pal-empty-title">
+                  Nada coincide con «{nq}»
+                </span>
+                {nq && !scoped && (
+                  <>
+                    <span className="pal-empty-sub">Probá con otra palabra o creá un espacio con ese nombre.</span>
+                    <button
+                      type="button"
+                      className="btn sm primary"
+                      onClick={() => {
+                        close(true)
+                        ctx.openNewWorkspace('normal', { name: nq.slice(0, 80) })
+                      }}
+                    >
+                      Crear espacio «{nq.slice(0, 40)}»
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="pal-foot">
+            <span>
+              <kbd>↑</kbd> <kbd>↓</kbd> moverse
+            </span>
+            <span>
+              <kbd>Enter</kbd> abrir
+            </span>
+            {!scoped && (
+              <span>
+                <kbd>Tab</kbd> acciones del espacio
+              </span>
+            )}
+            <span>
+              <kbd>Esc</kbd> cerrar
+            </span>
+            <span className="pal-foot-n">{count}</span>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
 const ui: FeatureUi = {
   name: 'palette',
-  Titlebar,
-  Global,
   commands: coreCommands
 }
 

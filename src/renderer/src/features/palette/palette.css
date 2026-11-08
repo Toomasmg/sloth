@@ -1,209 +1,335 @@
-/* Paleta de comandos (Ctrl+K): modal arriba al centro, estilo Linear/VS Code. */
-.f-palette-tb {
+/* Buscador de la barra superior = paleta de comandos. La lista se despliega debajo del campo. */
+
+.pal {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  -webkit-app-region: no-drag;
+}
+
+.pal-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 6px 0 10px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--fg-muted);
+  box-shadow: inset 0 0 0 1px var(--line);
+  cursor: text;
+  transition: box-shadow var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+.pal-field:hover {
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.pal.open .pal-field {
+  background: var(--input-bg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent), 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.pal-field svg {
+  flex: none;
+}
+
+.pal-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  font-size: var(--fs-md);
+  box-shadow: none;
+}
+.pal-input::placeholder {
+  color: var(--placeholder);
+}
+.pal-input:focus,
+.pal-input:hover {
+  border: 0;
+  box-shadow: none;
+  outline: none;
+}
+
+.pal-hint {
+  flex: none;
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--btn-2);
+  color: var(--fg-2);
+  box-shadow: none;
+}
+
+/* Espacio enfocado para sus acciones (Tab). */
+.pal-scope {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: var(--h-xs);
-  padding: 0 8px;
+  flex: none;
+  max-width: 45%;
+  height: 22px;
+  padding: 0 8px 0 4px;
   border: 0;
-  border-radius: var(--r-sm);
-  background: transparent;
-  color: var(--fg-muted);
-  font: inherit;
-  font-size: var(--fs-xs);
+  border-radius: 6px;
+  background: var(--btn-2);
+  color: var(--fg);
+  font-size: var(--fs-sm);
   font-weight: 600;
   cursor: pointer;
-  -webkit-app-region: no-drag;
-  transition: background var(--t-fast) var(--ease), color var(--t-fast);
 }
-.f-palette-tb:hover {
-  background: var(--hover);
-  color: var(--fg);
+.pal-scope:hover {
+  background: var(--surface-hover);
 }
-.f-palette-tb:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 1px;
+.pal-scope-ico {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border-radius: 4px;
 }
-.f-palette-tb-label {
-  flex: 1;
+.pal-scope-name {
   min-width: 0;
-  text-align: left;
-  white-space: nowrap;
   overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
 }
-.f-palette-tb-keys {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 500;
-  padding: 1px 5px;
-  border-radius: var(--r-xs);
-  background: var(--hover);
-  box-shadow: inset 0 0 0 1px var(--line-2);
-}
 
-.f-palette-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding-top: 12vh;
-  background: var(--backdrop-soft);
-  animation: fade var(--t-fast) var(--ease);
-}
-.f-palette {
-  width: min(620px, calc(100vw - 32px));
-  max-height: min(520px, 76vh);
+.pal-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  width: min(640px, calc(100vw - 24px));
   display: flex;
   flex-direction: column;
-  background: var(--surface);
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-lg);
+  border-radius: 12px;
+  background: var(--card-hover);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 0 0 1px var(--line-strong);
   overflow: hidden;
-  animation: rise var(--t-med) var(--ease);
+  animation: pal-in var(--t-fast) var(--ease);
 }
-.f-palette-search {
+@keyframes pal-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+}
+
+.pal-filters {
   display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  padding: 0 var(--s-3) 0 var(--s-4);
-  height: 48px;
-  flex: none;
-  border-bottom: 1px solid var(--line);
-  color: var(--fg-muted);
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px 4px;
 }
-.f-palette-search input {
-  flex: 1;
-  height: 100%;
+.pal-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
   border: 0;
-  background: transparent;
-  padding: 0;
-  font-size: var(--fs-lg);
+  border-radius: 13px;
+  background: var(--btn-2);
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+.pal-filter:hover {
   color: var(--fg);
 }
-.f-palette-search input:focus,
-.f-palette-search input:hover {
-  border: 0;
-  box-shadow: none;
+.pal-filter[aria-pressed='true'] {
+  background: #3a4152;
+  color: #ffffff;
 }
-.f-palette kbd {
+.pal-prefix {
   font-family: var(--font-mono);
-  font-size: 10.5px;
-  line-height: 16px;
-  min-width: 18px;
-  text-align: center;
-  padding: 0 5px;
-  border-radius: var(--r-xs);
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--line-2);
-  color: var(--fg-2);
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
 }
-.f-palette-list {
+
+.pal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px 8px;
+  max-height: min(440px, 62vh);
   overflow-y: auto;
-  padding: var(--s-1) var(--s-2) var(--s-2);
-  flex: 1;
-  min-height: 0;
 }
-.f-palette-group {
-  padding: var(--s-3) var(--s-2) var(--s-1);
+.pal-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 4px;
   font-size: var(--fs-xs);
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--fg-muted);
 }
-.f-palette-item {
+.pal-group-n {
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--placeholder);
+}
+
+.pal-item {
   display: flex;
   align-items: center;
-  gap: var(--s-3);
-  min-height: 36px;
-  padding: 5px var(--s-2) 5px var(--s-3);
-  border-radius: var(--r-sm);
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 9px;
   cursor: pointer;
-  position: relative;
+  color: var(--fg);
 }
-.f-palette-item.active {
-  background: var(--card);
+.pal-item.on {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
 }
-.f-palette-item.active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 8px;
-  bottom: 8px;
-  width: 2px;
-  border-radius: 2px;
-  background: var(--accent);
-}
-.f-palette-ico {
-  display: inline-flex;
+.pal-ico {
+  width: 28px;
+  height: 28px;
   flex: none;
-  width: 18px;
-  justify-content: center;
-  color: var(--fg-muted);
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--btn-2);
+  color: var(--fg-2);
 }
-.f-palette-item.active .f-palette-ico {
-  color: var(--accent);
-}
-.f-palette-text {
+.pal-txt {
   flex: 1;
   min-width: 0;
   display: flex;
-  align-items: baseline;
-  gap: var(--s-2);
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 0;
 }
-.f-palette-title {
-  color: var(--fg);
+.pal-title {
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: none;
-  max-width: 62%;
 }
-.f-palette-sub {
-  color: var(--fg-muted);
+.pal-sub {
   font-size: var(--fs-sm);
+  color: var(--fg-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-width: 0;
 }
-.f-palette-hl {
+.pal-item.danger .pal-title {
+  color: var(--danger-fg);
+}
+.pal-hl {
   background: transparent;
-  color: var(--accent);
+  color: #ffffff;
   font-weight: 700;
-  text-decoration: underline;
-  text-decoration-color: rgba(159, 234, 249, 0.45);
-  text-underline-offset: 2px;
 }
-.f-palette-keys {
-  display: inline-flex;
-  gap: 3px;
+.pal-item.on .pal-hl {
+  color: var(--accent);
+}
+
+.pal-meta {
   flex: none;
-}
-.f-palette-empty {
-  margin: 0;
-  padding: var(--s-5) var(--s-3);
-  text-align: center;
-  color: var(--fg-muted);
-}
-.f-palette-esc {
-  flex: none;
-}
-.f-palette-foot {
-  display: flex;
-  gap: var(--s-4);
-  flex: none;
-  padding: 7px var(--s-4);
-  border-top: 1px solid var(--line);
-  color: var(--fg-muted);
-  font-size: var(--fs-xs);
-}
-.f-palette-foot span {
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 10px;
   display: inline-flex;
   align-items: center;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--fg-2);
+  background: rgba(255, 255, 255, 0.05);
+}
+.pal-meta.s-working {
+  color: var(--info);
+  background: var(--info-soft);
+}
+.pal-meta.s-perm {
+  color: #ffd699;
+  background: rgba(240, 180, 90, 0.2);
+}
+.pal-meta.s-waiting {
+  color: var(--warn-fg);
+  background: var(--warn-soft);
+}
+.pal-meta.s-done {
+  color: var(--success-fg);
+  background: var(--success-soft);
+}
+.pal-meta.s-exited {
+  color: var(--danger-fg);
+  background: var(--danger-soft);
+}
+
+.pal-keys {
+  display: inline-flex;
   gap: 3px;
+  flex: none;
+}
+.pal-keys kbd,
+.pal-foot kbd,
+.pal-empty kbd {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--btn-2);
+  color: var(--fg-2);
+}
+.pal-enter {
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+
+.pal-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 16px 20px;
+  text-align: center;
+}
+.pal-empty-title {
+  font-weight: 600;
+  color: var(--fg);
+}
+.pal-empty-sub {
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+}
+
+.pal-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 9px 14px;
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+  box-shadow: inset 0 1px 0 var(--line);
+}
+.pal-foot > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pal-foot-n {
+  margin-left: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pal-pop {
+    animation: none;
+  }
 }

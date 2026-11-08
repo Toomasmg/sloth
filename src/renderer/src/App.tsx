@@ -1,26 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
   ArrowClockwise,
-  ArrowsIn,
   ArrowsLeftRight,
-  ArrowsOut,
-  Code,
   DotsSixVertical,
   Equals,
-  FolderOpen,
-  GridFour,
-  EyeSlash,
   PencilSimple,
   Plus,
   ShieldWarning,
   SignIn,
   Smiley,
-  Tabs as TabsIcon,
   Terminal as TerminalIcon,
-  Ticket,
   Trash,
-  WarningCircle,
-  X
+  WarningCircle
 } from '@phosphor-icons/react'
 import {
   accountIdFromLoginPane,
@@ -40,9 +31,10 @@ import { api } from './api'
 import { UiContext, type NewWorkspacePreset, type PaneGuard, type UiCtx } from './features/host'
 import { resolveAccountColor, useSettings } from './features/settings/store'
 import { GlobalSlot, PaneBannerSlot, PaneHeaderSlot, SidebarSlot, TitlebarSlot } from './features/slots'
+import { PaletteBar, PALETTE_REMOVE_EVENT, PALETTE_RENAME_EVENT, runFeatureCommand } from './features/palette'
 import { TerminalView } from './TerminalView'
 import { NewWorkspaceDialog } from './NewWorkspaceDialog'
-import { Wordmark } from './Logo'
+import { LogoMark } from './Logo'
 import { EmptyState } from './EmptyState'
 import { StateIcon, StatePill } from './StateIcon'
 import { PermissionCard, toolLabel } from './PermissionCard'
@@ -69,13 +61,55 @@ import {
 import { onEqualize, safeStorage, setViewMode, useViewMode } from './layout/store'
 import { useReorderDrag } from './layout/useReorderDrag'
 import { Separators } from './layout/Separators'
-import { PaneMore } from './layout/PaneMore'
+import { PaneInput, PaneMenu, type PaneMenuItem } from './layout/PaneMenu'
 import { TabBar, type TabInfo } from './layout/TabBar'
 import './layout/layout.css'
+import './layout/shell.css'
 import { WorkspaceIconPicker } from './WorkspaceIconPicker'
 import { useFolderDrop } from './useFolderDrop'
 import './workspace.css'
 import { cleanError, fmtTok, shortPath, STATE_LABEL, totalTok, usageTitle } from './format'
+import {
+  BranchIcon,
+  BroadcastIcon,
+  CloseIcon,
+  EditorIcon,
+  FolderIcon,
+  FourPanesIcon,
+  MaximizeIcon,
+  MoveAccountIcon,
+  OnePaneIcon,
+  SearchIcon,
+  SidebarIcon,
+  TicketIcon,
+  TwoPanesIcon
+} from './icons/SlothIcons'
+
+/** Estado de la barra lateral y de las cuentas plegadas (preferencias de esta PC). */
+const SIDEBAR_KEY = 'sloth.sidebar.shown'
+const COLLAPSED_KEY = 'sloth.sidebar.collapsed'
+function readStorage(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+function writeStorage(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value)
+  } catch {
+    /* sin espacio o bloqueado: la preferencia se pierde, nada más */
+  }
+}
+
+const STATE_CHIP: Record<AgentStatus['state'], string> = {
+  working: 'chip-working',
+  waiting: 'chip-waiting',
+  done: 'chip-done',
+  exited: 'chip-error',
+  idle: 'chip-idle'
+}
 
 export function App(): React.JSX.Element {
   const [accounts, setAccounts] = useState<Account[]>([])
@@ -99,7 +133,20 @@ export function App(): React.JSX.Element {
   // Picker de ícono: `back` devuelve el foco a quien lo abrió. Menú chico del sidebar (clic derecho).
   const [iconPick, setIconPick] = useState<{ wsId: string; x: number; y: number; back: () => void } | null>(null)
   const [wsMenu, setWsMenu] = useState<{ wsId: string; x: number; y: number } | null>(null)
+  // Barra lateral: visible o no, cuentas plegadas y filtro de espacios.
+  const [sideShown, setSideShown] = useState(() => readStorage(SIDEBAR_KEY) !== '0')
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+    try {
+      const v = JSON.parse(readStorage(COLLAPSED_KEY) ?? '{}') as unknown
+      return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, boolean>) : {}
+    } catch {
+      return {}
+    }
+  })
+  const [wsQuery, setWsQuery] = useState('')
   const docVisible = useDocumentVisible()
+
+  useEffect(() => writeStorage(COLLAPSED_KEY, JSON.stringify(collapsed)), [collapsed])
 
   const refreshStatuses = useCallback(() => void api.accountStatuses().then(setStatuses), [])
 
@@ -485,6 +532,54 @@ export function App(): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKey, true)
   }, [])
 
+  // Barra lateral (Ctrl+B) y nuevo espacio (Ctrl+N). Dentro de una terminal esas teclas son de la shell: no se tocan.
+  const toggleSide = (): void => {
+    const next = !sideShown
+    setSideShown(next)
+    writeStorage(SIDEBAR_KEY, next ? '1' : '0')
+  }
+  const toggleSideRef = useRef(toggleSide)
+  toggleSideRef.current = toggleSide
+  const accountsRef = useRef(accounts)
+  accountsRef.current = accounts
+  const newWsRef = useRef(() => {})
+  newWsRef.current = () => setNewWsMode('normal')
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return
+      if (document.activeElement?.closest('.terminal-host')) return
+      if (e.code === 'KeyB') {
+        e.preventDefault()
+        toggleSideRef.current()
+      } else if (e.code === 'KeyN' && accountsRef.current.length > 0) {
+        e.preventDefault()
+        newWsRef.current()
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
+  // Pedidos desde la paleta: renombrar o quitar un espacio (la lógica vive acá, con su confirmación).
+  const latestRef = useRef({ wsById, removeWorkspace })
+  latestRef.current = { wsById, removeWorkspace }
+  useEffect(() => {
+    const onRename = (e: Event): void => {
+      const id = (e as CustomEvent<string>).detail
+      if (typeof id === 'string' && latestRef.current.wsById.has(id)) setRenaming({ id, from: 'pane' })
+    }
+    const onRemove = (e: Event): void => {
+      const ws = latestRef.current.wsById.get((e as CustomEvent<string>).detail)
+      if (ws) void latestRef.current.removeWorkspace(ws)
+    }
+    window.addEventListener(PALETTE_RENAME_EVENT, onRename)
+    window.addEventListener(PALETTE_REMOVE_EVENT, onRemove)
+    return () => {
+      window.removeEventListener(PALETTE_RENAME_EVENT, onRename)
+      window.removeEventListener(PALETTE_REMOVE_EVENT, onRemove)
+    }
+  }, [])
+
   const tabs: TabInfo[] =
     viewMode === 'tabs'
       ? openPanes.map((id) => {
@@ -505,6 +600,9 @@ export function App(): React.JSX.Element {
   const needsYou = countBy('waiting')
   const working = countBy('working')
   const done = countBy('done')
+  const activeTerms = workspaces.filter((w) => agents[w.id] && agents[w.id].state !== 'exited').length
+  /** Primer espacio con ese estado (para ir al tocar un resumen). */
+  const firstWs = (s: AgentStatus['state']): Workspace | undefined => workspaces.find((w) => agents[w.id]?.state === s)
 
   const uiCtx: UiCtx = {
     accounts,
@@ -531,517 +629,628 @@ export function App(): React.JSX.Element {
     on: (channel, cb) => api.feat.on(channel, cb)
   }
 
+  // Barra de paneles: qué distribución está activa. Uno = pestañas; Dos y Cuatro = grilla.
+  const layoutPressed = {
+    uno: viewMode === 'tabs',
+    dos: viewMode === 'grid' && nVisible <= 2,
+    cuatro: viewMode === 'grid' && nVisible > 2
+  }
+  const pickLayout = (k: 'uno' | 'dos' | 'cuatro'): void => {
+    if (k === 'uno') {
+      setViewMode('tabs')
+      return
+    }
+    setViewMode('grid')
+    if (maximized) setMaximized(null)
+  }
+
+  // Ruta «cuenta › espacio» del panel enfocado.
+  const focusedAccId = focused ? (isLoginPane(focused) ? accountIdFromLoginPane(focused) : wsById.get(focused)?.accountId) : undefined
+  const crumbAccount = focusedAccId ? (accountById.get(focusedAccId)?.label ?? 'cuenta borrada') : 'Sloth'
+
+  const renderWs = (ws: Workspace): React.JSX.Element => {
+    const ag = agents[ws.id]
+    const acc = accountById.get(ws.accountId)
+    const open = openPanes.includes(ws.id)
+    const nPerm = permsByWs.get(ws.id)?.length ?? 0
+    const editing = renaming?.id === ws.id && renaming.from === 'side'
+    const chip = nPerm > 0 ? { cls: 'chip-perm', label: `Permiso${nPerm > 1 ? ` ×${nPerm}` : ''}` } : ag ? { cls: STATE_CHIP[ag.state], label: STATE_LABEL[ag.state] } : null
+    return (
+      <li
+        key={ws.id}
+        className="sl-li"
+        data-account-id={ws.accountId}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          setWsMenu({ wsId: ws.id, x: e.clientX, y: e.clientY })
+        }}
+      >
+        {editing ? (
+          <div className="ws-edit">
+            <StateIcon state={ag?.state} />
+            <RenameInput className="ws-rename" initial={ws.name} label={`Nuevo nombre del espacio ${ws.name}`} onDone={(next) => endRename(ws, 'side', next)} />
+          </div>
+        ) : (
+          <button
+            type="button"
+            className={`sl-row ${open ? 'open' : ''} ${focused === ws.id ? 'focused' : ''}`}
+            style={{ '--acc': colorOf(ws.accountId) } as CSSProperties}
+            data-ws-btn={ws.id}
+            onClick={() => openPane(ws.id)}
+            onDoubleClick={() => setRenaming({ id: ws.id, from: 'side' })}
+            onKeyDown={(e) => {
+              if (e.key !== 'F2') return
+              e.preventDefault()
+              setRenaming({ id: ws.id, from: 'side' })
+            }}
+            aria-label={`${ws.icon ? `${ws.icon} ` : ''}${ws.name}, ${acc?.label ?? 'cuenta borrada'}, ${ag ? STATE_LABEL[ag.state] : 'sin abrir'}${nPerm ? `, ${nPerm === 1 ? 'permiso pendiente' : `${nPerm} permisos pendientes`}` : ''}`}
+            title="Doble clic o F2 para renombrar · clic derecho para más opciones"
+          >
+            <span className="sl-ico" aria-hidden="true">
+              {ws.icon ? ws.icon : <FolderIcon size={14} />}
+            </span>
+            <span className="sl-txt">
+              <span className="sl-name">
+                <span className="sl-name-text">{ws.name}</span>
+                {ws.ticket && <span className="tag">{ws.ticket}</span>}
+              </span>
+              <span className="sl-sub">
+                <BranchIcon size={11} aria-hidden="true" />
+                <span className="mono">{ws.branch ?? shortPath(ws.cwd)}</span>
+              </span>
+            </span>
+            {chip && <span className={`chip sl-state ${chip.cls}`}>{chip.label}</span>}
+          </button>
+        )}
+        <button type="button" className="icon-btn danger sl-del" onClick={() => void removeWorkspace(ws)} aria-label={`Quitar espacio ${ws.name}`} title="Quitar espacio">
+          <Trash size={14} aria-hidden="true" />
+        </button>
+      </li>
+    )
+  }
+
+  const q = wsQuery.trim().toLowerCase()
+  const matchWs = (ws: Workspace): boolean => !q || (ws.name + ' ' + (ws.branch ?? '')).toLowerCase().includes(q)
+  const orphans = workspaces.filter((w) => !accountById.has(w.accountId))
+
   return (
     <UiContext.Provider value={uiCtx}>
-    <div className={`shell ${docVisible ? '' : 'doc-hidden'}`}>
-      <header className="titlebar">
-        <div className="titlebar-brand">
-          <Wordmark />
-        </div>
-        <div className="titlebar-status" role="status" aria-live="polite">
-          {working > 0 && (
-            <span className="tb-chip tb-working">
-              <StateIcon state="working" size={12} /> {working} trabajando
-            </span>
-          )}
-          {needsYou > 0 && (
-            <span className="tb-chip tb-waiting">
-              <StateIcon state="waiting" size={12} /> {needsYou} te {needsYou === 1 ? 'necesita' : 'necesitan'}
-            </span>
-          )}
-          {livePerms.length > 0 && (
-            <button
-              type="button"
-              className="tb-chip tb-perm"
-              onClick={() => openPane(livePerms[0].workspaceId)}
-              title={`Ir a «${wsById.get(livePerms[0].workspaceId)?.name ?? ''}»`}
-            >
-              <ShieldWarning size={12} weight="fill" aria-hidden="true" />
-              {livePerms.length} {livePerms.length === 1 ? 'permiso' : 'permisos'}
-            </button>
-          )}
-          {done > 0 && (
-            <span className="tb-chip tb-done">
-              <StateIcon state="done" size={12} /> {done} {done === 1 ? 'terminó' : 'terminaron'}
-            </span>
-          )}
-        </div>
-        <div className="titlebar-right">
-          <TitlebarSlot />
-          <DaemonStatus />
-        </div>
-        <div className="sr-only" role="alert">
-          {announced
-            ? `${wsById.get(announced.workspaceId)?.name ?? 'Un espacio'}: Claude quiere usar ${toolLabel(announced.tool)}. Respondé en su panel.`
-            : ''}
-        </div>
-      </header>
-    <div className="app">
-      <aside className="sidebar" aria-label="Cuentas y espacios">
-        <section className="section" aria-labelledby="h-accounts">
-          <h2 id="h-accounts" className="section-title">
-            Cuentas de Claude <span className="count">{accounts.length}</span>
-          </h2>
-          {accounts.length === 0 && <p className="hint">Agregá una cuenta para empezar.</p>}
-          <ul className="list">
+      <div className={`sl-shell ${docVisible ? '' : 'doc-hidden'}`}>
+        <header className="sl-top">
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={toggleSide}
+            aria-pressed={sideShown}
+            aria-label="Mostrar u ocultar la barra lateral"
+            title="Barra lateral (Ctrl+B)"
+          >
+            <SidebarIcon size={17} aria-hidden="true" />
+          </button>
+          <div className="sl-top-brand">
+            <LogoMark size={22} />
+            <span className="sl-top-name">Sloth</span>
+          </div>
+          <div className="sl-top-search">
+            <PaletteBar />
+          </div>
+          <div className="sl-top-status" role="status" aria-live="polite">
+            {working > 0 && (
+              <button type="button" className="chip chip-working" onClick={() => { const w = firstWs('working'); if (w) openPane(w.id) }} title="Ir al primero que está trabajando">
+                <StateIcon state="working" size={12} />
+                {working} trabajando
+              </button>
+            )}
+            {livePerms.length > 0 && (
+              <button type="button" className="chip chip-perm" onClick={() => openPane(livePerms[0].workspaceId)} title={`Ir a «${wsById.get(livePerms[0].workspaceId)?.name ?? ''}»`}>
+                <ShieldWarning size={12} weight="fill" aria-hidden="true" />
+                {livePerms.length} pide {livePerms.length === 1 ? 'permiso' : 'permisos'}
+              </button>
+            )}
+            {needsYou > 0 && (
+              <button type="button" className="chip chip-waiting" onClick={() => { const w = firstWs('waiting'); if (w) openPane(w.id) }} title="Ir al que te espera">
+                <StateIcon state="waiting" size={12} />
+                {needsYou} te {needsYou === 1 ? 'espera' : 'esperan'}
+              </button>
+            )}
+            {done > 0 && (
+              <button type="button" className="chip chip-done" onClick={() => { const w = firstWs('done'); if (w) openPane(w.id) }} title="Ir al que terminó">
+                <StateIcon state="done" size={12} />
+                {done} {done === 1 ? 'listo' : 'listos'}
+              </button>
+            )}
+          </div>
+          <div className="sl-top-tools">
+            <span className="sl-top-sep" aria-hidden="true" />
+            <TitlebarSlot />
+            <DaemonStatus />
+          </div>
+          <div className="sr-only" role="alert">
+            {announced
+              ? `${wsById.get(announced.workspaceId)?.name ?? 'Un espacio'}: Claude quiere usar ${toolLabel(announced.tool)}. Respondé en su panel.`
+              : ''}
+          </div>
+        </header>
+
+        <div className={`sl-body ${sideShown ? '' : 'no-side'}`}>
+          <aside className="sl-side" aria-label="Cuentas y espacios">
+            <label className="sl-filter">
+              <SearchIcon size={14} aria-hidden="true" />
+              <input
+                type="search"
+                value={wsQuery}
+                onChange={(e) => setWsQuery(e.target.value)}
+                placeholder="Filtrar espacios"
+                aria-label="Filtrar espacios"
+                spellCheck={false}
+              />
+            </label>
+
+            {accounts.length === 0 && <p className="sl-hint">Agregá una cuenta para empezar.</p>}
+
             {accounts.map((acc) => {
               const st = statuses[acc.id]
               const u = usage[acc.id]
+              const mine = workspaces.filter((w) => w.accountId === acc.id)
+              const shown = mine.filter(matchWs)
+              const open = !collapsed[acc.id] || !!q
+              const bodyId = `acc-body-${acc.id}`
               return (
-                <li key={acc.id} className="account" data-account-id={acc.id} style={{ '--acc': colorOf(acc.id) } as React.CSSProperties}>
-                  <div className="account-top">
-                    <span className="acc-chip" aria-hidden="true">
-                      {acc.label.slice(0, 1).toUpperCase()}
-                    </span>
-                    <div className="grow-min">
-                      <div className="item-title">{acc.label}</div>
-                      <div className={`item-sub ${st?.loggedIn ? '' : 'warn'}`} title={st?.email}>
-                        {st?.loggedIn ? st.email ?? 'Sesión iniciada' : 'Sin sesión'}
-                      </div>
-                    </div>
-                    <button
-                      className="icon-btn"
-                      onClick={() => openPane(loginPaneId(acc.id))}
-                      aria-label={st?.loggedIn ? `Abrir terminal de ${acc.label}` : `Iniciar sesión en ${acc.label}`}
-                      title={st?.loggedIn ? 'Terminal de la cuenta' : 'Iniciar sesión'}
-                    >
-                      {st?.loggedIn ? <TerminalIcon size={16} aria-hidden="true" /> : <SignIn size={16} aria-hidden="true" />}
-                    </button>
-                    <button className="icon-btn danger" onClick={() => void removeAccount(acc)} aria-label={`Quitar cuenta ${acc.label}`} title="Quitar cuenta">
-                      <Trash size={15} aria-hidden="true" />
-                    </button>
-                  </div>
-                  {u && (
-                    <dl className="usage" title={usageTitle(u)}>
-                      <div>
-                        <dt>5 h</dt>
-                        <dd>{fmtTok(totalTok(u.last5h))}</dd>
-                      </div>
-                      <div>
-                        <dt>Hoy</dt>
-                        <dd>{fmtTok(totalTok(u.today))}</dd>
-                      </div>
-                      <div>
-                        <dt>7 días</dt>
-                        <dd>{fmtTok(totalTok(u.last7d))}</dd>
-                      </div>
-                    </dl>
-                  )}
-                  <label className="switch" title="Enlaza tus skills, agents, hooks, plugins, settings y MCP de ~/.claude">
-                    <span className="switch-text">
-                      Usar mi setup de <span className="mono">~/.claude</span>
-                    </span>
-                    <input type="checkbox" role="switch" checked={acc.shareSetup !== false} onChange={() => void toggleShare(acc)} />
-                    <span className="switch-track" aria-hidden="true" />
-                  </label>
-                </li>
-              )
-            })}
-          </ul>
-          <AddAccount onAdd={addAccount} />
-        </section>
-
-        <section className="section grow" aria-labelledby="h-ws">
-          <div className="section-row">
-            <h2 id="h-ws" className="section-title">
-              Espacios <span className="count">{workspaces.length}</span>
-            </h2>
-            <div className="btn-group">
-              <button className="btn sm" disabled={accounts.length === 0} onClick={() => setNewWsMode('ticket')} title="Abre Claude con /ticket TCK-…">
-                <Ticket size={14} aria-hidden="true" /> Ticket
-              </button>
-              <button className="btn sm primary" disabled={accounts.length === 0} onClick={() => setNewWsMode('normal')}>
-                <Plus size={14} weight="bold" aria-hidden="true" /> Nuevo
-              </button>
-            </div>
-          </div>
-          {workspaces.length === 0 && <p className="hint">Un espacio = un repo + una cuenta + una PowerShell.</p>}
-          <ul className="list">
-            {workspaces.map((ws) => {
-              const ag = agents[ws.id]
-              const acc = accountById.get(ws.accountId)
-              const open = openPanes.includes(ws.id)
-              const nPerm = permsByWs.get(ws.id)?.length ?? 0
-              const editing = renaming?.id === ws.id && renaming.from === 'side'
-              return (
-                <li
-                  key={ws.id}
-                  className="ws-li"
-                  data-account-id={ws.accountId}
-                  style={{ '--acc': colorOf(ws.accountId) } as React.CSSProperties}
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                    setWsMenu({ wsId: ws.id, x: e.clientX, y: e.clientY })
-                  }}
-                >
-                  {editing ? (
-                    <div className="ws-edit">
-                      <StateIcon state={ag?.state} />
-                      <RenameInput
-                        className="ws-rename"
-                        initial={ws.name}
-                        label={`Nuevo nombre del espacio ${ws.name}`}
-                        onDone={(next) => endRename(ws, 'side', next)}
-                      />
-                    </div>
-                  ) : (
-                    <button
-                      className={`ws ${open ? 'open' : ''} ${focused === ws.id ? 'focused' : ''} ${ag?.state === 'waiting' || nPerm ? 'waiting' : ''}`}
-                      data-ws-btn={ws.id}
-                      onClick={() => openPane(ws.id)}
-                      onDoubleClick={() => setRenaming({ id: ws.id, from: 'side' })}
-                      onKeyDown={(e) => {
-                        if (e.key !== 'F2') return
-                        e.preventDefault()
-                        setRenaming({ id: ws.id, from: 'side' })
-                      }}
-                      aria-label={`${ws.icon ? `${ws.icon} ` : ''}${ws.name}, ${acc?.label ?? 'cuenta borrada'}, ${ag ? STATE_LABEL[ag.state] : 'sin abrir'}${nPerm ? `, ${nPerm === 1 ? 'permiso pendiente' : `${nPerm} permisos pendientes`}` : ''}`}
-                      title="Doble clic o F2 para renombrar · clic derecho para más opciones"
-                    >
-                      <StateIcon state={ag?.state} />
-                      <span className="grow-min">
-                        <span className="item-title">
-                          {ws.icon && (
-                            <span className="ws-icon" aria-hidden="true">
-                              {ws.icon}
-                            </span>
-                          )}
-                          <span className="ws-name">{ws.name}</span>
-                          {nPerm > 0 && (
-                            <span className="perm-tag">
-                              <ShieldWarning size={11} weight="fill" aria-hidden="true" />
-                              Permiso{nPerm > 1 ? ` ×${nPerm}` : ''}
-                            </span>
-                          )}
-                        </span>
-                        <span className="item-sub">
-                          <span className="acc-dot" aria-hidden="true" />
-                          <span className="ws-acc">{acc?.label ?? 'cuenta borrada'}</span>
-                          {ws.ticket && <span className="tag">{ws.ticket}</span>}
-                          <span className="mono ws-where">{ws.branch ?? shortPath(ws.cwd)}</span>
-                        </span>
-                      </span>
-                    </button>
-                  )}
-                  <button className="icon-btn danger ws-del" onClick={() => void removeWorkspace(ws)} aria-label={`Quitar espacio ${ws.name}`} title="Quitar espacio">
-                    <Trash size={14} aria-hidden="true" />
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-        <SidebarSlot />
-      </aside>
-
-      <main className={`panes view-${viewMode} ${openPanes.length === 0 ? 'is-empty' : ''}`} aria-label="Paneles">
-        {loaded && openPanes.length === 0 && <EmptyState hasAccounts={accounts.length > 0} hasWs={workspaces.length > 0} />}
-        {openPanes.length > 0 && (
-          <div className="panes-bar">
-            {viewMode === 'tabs' ? (
-              <TabBar
-                tabs={tabs}
-                active={shownTab}
-                drag={tabDrag.drag}
-                scope={tabsRef}
-                onSelect={selectPane}
-                onHide={hideTab}
-                onPointerDown={tabDrag.onPointerDown}
-              />
-            ) : maxId ? (
-              <div className="panes-bar-info">
-                <span className="panes-bar-max">
-                  <ArrowsOut size={13} aria-hidden="true" /> Maximizado: <strong>{paneName(maxId)}</strong>
-                </span>
-                <button type="button" className="panes-bar-link" onClick={() => setMaximized(null)}>
-                  Volver a la grilla
-                </button>
-              </div>
-            ) : (
-              <div className="panes-bar-info">
-                <span className="panes-bar-count">
-                  {openPanes.length} {openPanes.length === 1 ? 'panel' : 'paneles'}
-                </span>
-                {openPanes.length > 1 && (
-                  <span className="panes-bar-hint">
-                    Arrastrá un panel por su barra para moverlo · <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>←</kbd>/<kbd>→</kbd> columna · <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> fila · <kbd>Ctrl</kbd>+<kbd>Tab</kbd> cambia
-                  </span>
-                )}
-              </div>
-            )}
-            <div className="panes-bar-tools">
-              {viewMode === 'grid' && nVisible > 1 && !sizesAreEqual(sizes) && (
-                <button
-                  type="button"
-                  className="icon-btn"
-                  onClick={() => {
-                    commitSizes(defaultSizes(shape))
-                    setLayoutMsg('Paneles repartidos por igual.')
-                  }}
-                  aria-label="Repartir los paneles por igual"
-                  title="Repartir por igual (o doble clic en un separador)"
-                >
-                  <Equals size={14} aria-hidden="true" />
-                </button>
-              )}
-              <div className="panes-seg" role="group" aria-label="Vista de los paneles">
-                <button
-                  type="button"
-                  className="panes-seg-btn"
-                  aria-pressed={viewMode === 'grid'}
-                  onClick={() => setViewMode('grid')}
-                  title="Grilla: todas las terminales a la vista"
-                >
-                  <GridFour size={13} aria-hidden="true" />
-                  <span>Grilla</span>
-                </button>
-                <button
-                  type="button"
-                  className="panes-seg-btn"
-                  aria-pressed={viewMode === 'tabs'}
-                  onClick={() => setViewMode('tabs')}
-                  title="Pestañas: una terminal a la vez (Ctrl+Tab cambia, clic del medio oculta)"
-                >
-                  <TabsIcon size={13} aria-hidden="true" />
-                  <span>Pestañas</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        <div ref={areaRef} className="panes-area">
-        {openPanes.map((paneId) => {
-          const login = isLoginPane(paneId)
-          const ws = login ? undefined : wsById.get(paneId)
-          const accId = login ? accountIdFromLoginPane(paneId) : ws?.accountId
-          const acc = accId ? accountById.get(accId) : undefined
-          const ag = ws ? agents[ws.id] : undefined
-          const email = acc ? statuses[acc.id]?.email : undefined
-          const rect = rectOf.get(paneId)
-          const hidden = !rect
-          const paneQueue = ws ? permsByWs.get(ws.id) : undefined
-          const perm = paneQueue?.[0]
-          return (
-            <section
-              key={paneId}
-              data-pane-id={paneId}
-              data-account-id={accId}
-              className={`pane ${focused === paneId ? 'focused' : ''} ${ag ? `pane-${ag.state}` : ''} ${perm ? 'pane-perm' : ''} ${hidden ? 'hidden' : ''} ${paneDrag.drag?.id === paneId ? 'dragging' : ''}`}
-              style={{ '--acc': colorOf(accId), ...rectVars(rect) } as React.CSSProperties}
-              onMouseDown={() => setFocused(paneId)}
-              onFocus={() => setFocused(paneId)}
-              aria-describedby={canDragPanes ? 'pane-move-hint' : undefined}
-              aria-label={login ? `Terminal de la cuenta ${acc?.label}` : `${ws?.name} con ${acc?.label}`}
-            >
-              <header
-                className={`pane-head ${canDragPanes ? 'draggable' : ''}`}
-                onPointerDown={canDragPanes ? (e) => paneDrag.onPointerDown(e, paneId) : undefined}
-              >
-                <span className="pane-id">
-                  <span className="acc-dot pane-dot" aria-hidden="true" />
-                  {ws && (
+                <section key={acc.id} className="sl-acc" data-account-id={acc.id} aria-label={`Cuenta ${acc.label}`} style={{ '--acc': colorOf(acc.id) } as CSSProperties}>
+                  <div className="sl-acc-head">
                     <button
                       type="button"
-                      className="icon-btn pane-icon-btn"
-                      onClick={(e) => {
-                        const btn = e.currentTarget
-                        const r = btn.getBoundingClientRect()
-                        openIconPicker(ws.id, r.left, r.bottom + 6, () => btn.focus())
-                      }}
-                      aria-label={`Elegir ícono de ${ws.name}`}
-                      title="Elegir ícono"
+                      className="sl-acc-toggle"
+                      aria-expanded={open}
+                      aria-controls={bodyId}
+                      aria-label={`Mostrar u ocultar los espacios de ${acc.label}`}
+                      onClick={() => setCollapsed((c) => ({ ...c, [acc.id]: open }))}
                     >
-                      {ws.icon ? <span aria-hidden="true">{ws.icon}</span> : <Smiley size={14} aria-hidden="true" />}
-                    </button>
-                  )}
-                  {ws && renaming?.id === ws.id && renaming.from === 'pane' ? (
-                    <RenameInput
-                      className="pane-title-input"
-                      initial={ws.name}
-                      label={`Nuevo nombre de ${ws.name}`}
-                      onDone={(next) => endRename(ws, 'pane', next)}
-                    />
-                  ) : (
-                    <span
-                      className="pane-title"
-                      title={login ? undefined : ws?.name}
-                      onDoubleClick={ws ? () => setRenaming({ id: ws.id, from: 'pane' }) : undefined}
-                    >
-                      {login ? 'Terminal de cuenta' : ws?.name}
-                    </span>
-                  )}
-                  {ws?.ticket && <span className="tag">{ws.ticket}</span>}
-                  <span className="pane-meta">
-                    <span className="acc-badge" title={email}>
-                      {acc?.label ?? '?'}
-                    </span>
-                    {!login && ws && (
-                      <span className="pane-path mono" title={ws.cwd}>
-                        {shortPath(ws.cwd)}
+                      <span className="sl-avatar" aria-hidden="true">
+                        {acc.label.slice(0, 1).toUpperCase()}
+                        <span className={`sl-dot ${st?.loggedIn ? 'on' : ''}`} />
                       </span>
-                    )}
-                  </span>
-                </span>
-                {ag && <StatePill state={ag.state} detail={ag.detail} />}
-                <span className="pane-actions">
-                {/* Secundarios (VS Code, carpeta y los de las funciones): en paneles angostos van a «Más». */}
-                {ws ? (
-                  <PaneMore>
-                    <button type="button" className="icon-btn" onClick={() => void revealWs(ws, 'vscode')} aria-label="Abrir en VS Code" title="Abrir en VS Code">
-                      <Code size={15} aria-hidden="true" />
+                      <span className="sl-acc-meta">
+                        <span className="sl-acc-name">{acc.label}</span>
+                        <span className={`sl-acc-sub ${st?.loggedIn ? '' : 'warn'}`} title={st?.email}>
+                          {mine.length === 1 ? '1 espacio' : `${mine.length} espacios`} · {st?.loggedIn ? 'Sesión iniciada' : 'Sin sesión'}
+                        </span>
+                      </span>
+                      <svg className="sl-chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
                     </button>
-                    <button type="button" className="icon-btn" onClick={() => void revealWs(ws, 'folder')} aria-label="Abrir carpeta" title="Abrir carpeta">
-                      <FolderOpen size={15} aria-hidden="true" />
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      onClick={() => setNewWsMode('normal')}
+                      aria-label={`Nuevo espacio en ${acc.label}`}
+                      title={`Nuevo espacio en ${acc.label}`}
+                    >
+                      <Plus size={15} weight="bold" aria-hidden="true" />
                     </button>
-                    <PaneHeaderSlot paneId={paneId} />
-                  </PaneMore>
-                ) : (
-                  <PaneHeaderSlot paneId={paneId} />
-                )}
+                  </div>
+                  {open && (
+                    <div id={bodyId} className="sl-acc-body">
+                      {shown.length > 0 && <ul className="sl-list">{shown.map(renderWs)}</ul>}
+                      {shown.length === 0 && <p className="sl-acc-empty">{mine.length ? 'Ningún espacio coincide.' : 'Sin espacios. Usá + para crear uno.'}</p>}
+                      <div className="sl-acc-tools">
+                        {u && (
+                          <dl className="sl-usage" title={usageTitle(u)}>
+                            <div>
+                              <dt>5 h</dt>
+                              <dd>{fmtTok(totalTok(u.last5h))}</dd>
+                            </div>
+                            <div>
+                              <dt>Hoy</dt>
+                              <dd>{fmtTok(totalTok(u.today))}</dd>
+                            </div>
+                            <div>
+                              <dt>7 días</dt>
+                              <dd>{fmtTok(totalTok(u.last7d))}</dd>
+                            </div>
+                          </dl>
+                        )}
+                        <label className="switch" title="Enlaza tus skills, agents, hooks, plugins, settings y MCP de ~/.claude">
+                          <span className="switch-text">
+                            Usar mi setup de <span className="mono">~/.claude</span>
+                          </span>
+                          <input type="checkbox" role="switch" checked={acc.shareSetup !== false} onChange={() => void toggleShare(acc)} />
+                          <span className="switch-track" aria-hidden="true" />
+                        </label>
+                        <div className="sl-acc-actions">
+                          <button
+                            type="button"
+                            className="btn sm"
+                            onClick={() => openPane(loginPaneId(acc.id))}
+                            aria-label={st?.loggedIn ? `Abrir terminal de ${acc.label}` : `Iniciar sesión en ${acc.label}`}
+                            title={st?.loggedIn ? 'Terminal de la cuenta' : 'Iniciar sesión'}
+                          >
+                            {st?.loggedIn ? <TerminalIcon size={14} aria-hidden="true" /> : <SignIn size={14} aria-hidden="true" />}
+                            {st?.loggedIn ? 'Terminal' : 'Iniciar sesión'}
+                          </button>
+                          <button type="button" className="btn sm danger" onClick={() => void removeAccount(acc)} aria-label={`Quitar cuenta ${acc.label}`} title="Quitar cuenta">
+                            <Trash size={14} aria-hidden="true" />
+                            Quitar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              )
+            })}
+
+            {orphans.length > 0 && (
+              <section className="sl-acc" aria-label="Espacios de una cuenta borrada">
+                <p className="sl-acc-empty">Cuenta borrada</p>
+                <ul className="sl-list">{orphans.filter(matchWs).map(renderWs)}</ul>
+              </section>
+            )}
+
+            <SidebarSlot />
+
+            <div className="sl-foot">
+              <AddAccount onAdd={addAccount} />
+              <div className="sl-new">
+                <button type="button" className="btn primary" disabled={accounts.length === 0} onClick={() => setNewWsMode('normal')}>
+                  <Plus size={14} weight="bold" aria-hidden="true" />
+                  Nuevo espacio
+                </button>
                 <button
-                  className="icon-btn"
-                  onClick={() => setMaximized(maximized === paneId ? null : paneId)}
-                  hidden={viewMode === 'tabs'}
-                  aria-label={maximized === paneId ? 'Volver a la grilla' : 'Maximizar'}
-                  title={maximized === paneId ? 'Volver a la grilla' : 'Maximizar'}
+                  type="button"
+                  className="btn icon-only"
+                  disabled={accounts.length === 0}
+                  onClick={() => setNewWsMode('ticket')}
+                  aria-label="Espacio desde un ticket"
+                  title="Abre Claude con /ticket TCK-…"
                 >
-                  {maximized === paneId ? <ArrowsIn size={15} aria-hidden="true" /> : <ArrowsOut size={15} aria-hidden="true" />}
+                  <TicketIcon size={15} aria-hidden="true" />
                 </button>
-                <button className="icon-btn" onClick={() => void requestRestartPane(paneId)} aria-label="Reiniciar terminal" title="Cerrar el proceso y abrir otra terminal">
-                  <ArrowClockwise size={15} aria-hidden="true" />
-                </button>
-                <button className="icon-btn" onClick={() => void requestHidePane(paneId)} aria-label="Ocultar panel" title="Ocultar (la terminal sigue corriendo)">
-                  <EyeSlash size={15} aria-hidden="true" />
-                </button>
-                </span>
-              </header>
-              {perm && (
-                <PermissionCard
-                  key={perm.id}
-                  prompt={perm}
-                  queued={(paneQueue?.length ?? 1) - 1}
-                  now={now}
-                  onAnswer={(answer, message) => answerPermission(perm, answer, message)}
-                />
-              )}
-              <PaneBannerSlot paneId={paneId} />
-              <TerminalView id={paneId} generation={generations[paneId] ?? 0} onError={onTermError} />
-            </section>
-          )
-        })}
-          {viewMode === 'grid' && nVisible > 1 && (
-            <Separators shape={shape} sizes={sizes} names={visiblePanes.map(paneName)} area={areaRef} onCommit={commitSizes} />
-          )}
-          {paneDrag.drag?.target && paneDrag.drag.mode && rectOf.has(paneDrag.drag.target) && (
-            <div
-              className={`pane-drop ${paneDrag.drag.mode}`}
-              style={rectVars(rectOf.get(paneDrag.drag.target)) as React.CSSProperties}
-              aria-hidden="true"
-            >
-              <span className="pane-drop-label">
-                <ArrowsLeftRight size={14} aria-hidden="true" />
-                {paneDrag.drag.mode === 'swap' ? 'Intercambiar' : paneDrag.drag.mode === 'before' ? 'Mover antes' : 'Mover después'}
-              </span>
+              </div>
             </div>
-          )}
+          </aside>
+
+          <main className={`panes sl-main view-${viewMode} ${openPanes.length === 0 ? 'is-empty' : ''}`} aria-label="Paneles">
+            {loaded && openPanes.length === 0 && <EmptyState hasAccounts={accounts.length > 0} hasWs={workspaces.length > 0} />}
+            {openPanes.length > 0 && (
+              <>
+                <div className="sl-bar">
+                  <nav className="sl-crumb" aria-label="Ubicación">
+                    <span>{crumbAccount}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M9 6l6 6-6 6" />
+                    </svg>
+                    <strong>{focused ? paneName(focused) : 'Sloth'}</strong>
+                  </nav>
+                  <div className="sl-bar-tools">
+                    {viewMode === 'grid' && nVisible > 1 && !sizesAreEqual(sizes) && (
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => {
+                          commitSizes(defaultSizes(shape))
+                          setLayoutMsg('Paneles repartidos por igual.')
+                        }}
+                        aria-label="Repartir los paneles por igual"
+                        title="Repartir por igual (o doble clic en un separador)"
+                      >
+                        <Equals size={14} aria-hidden="true" />
+                      </button>
+                    )}
+                    <div className="seg" role="group" aria-label="Distribución de paneles">
+                      <button type="button" aria-pressed={layoutPressed.uno} onClick={() => pickLayout('uno')} title="Uno: una terminal a la vez (pestañas)">
+                        <OnePaneIcon size={14} aria-hidden="true" /> Uno
+                      </button>
+                      <button type="button" aria-pressed={layoutPressed.dos} onClick={() => pickLayout('dos')} title="Dos: paneles en grilla, lado a lado">
+                        <TwoPanesIcon size={14} aria-hidden="true" /> Dos
+                      </button>
+                      <button type="button" aria-pressed={layoutPressed.cuatro} onClick={() => pickLayout('cuatro')} title="Cuatro: grilla de hasta cuatro por fila">
+                        <FourPanesIcon size={14} aria-hidden="true" /> Cuatro
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn sm"
+                      disabled={workspaces.length === 0}
+                      onClick={() => runFeatureCommand('broadcast:open', uiCtx)}
+                      title="Mandar un mensaje a los espacios con terminal"
+                    >
+                      <BroadcastIcon size={14} aria-hidden="true" />
+                      Enviar a todos
+                    </button>
+                  </div>
+                </div>
+
+                {viewMode === 'tabs' && (
+                  <div className="sl-tabsrow">
+                    <TabBar tabs={tabs} active={shownTab} drag={tabDrag.drag} scope={tabsRef} onSelect={selectPane} onHide={hideTab} onPointerDown={tabDrag.onPointerDown} />
+                  </div>
+                )}
+                {viewMode === 'grid' && maxId && (
+                  <div className="sl-maxnote">
+                    <MaximizeIcon size={13} aria-hidden="true" />
+                    Maximizado: <strong>{paneName(maxId)}</strong>
+                    <button type="button" onClick={() => setMaximized(null)}>
+                      Volver a la grilla
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+            <div ref={areaRef} className="panes-area">
+              {openPanes.map((paneId) => {
+                const login = isLoginPane(paneId)
+                const ws = login ? undefined : wsById.get(paneId)
+                const accId = login ? accountIdFromLoginPane(paneId) : ws?.accountId
+                const acc = accId ? accountById.get(accId) : undefined
+                const ag = ws ? agents[ws.id] : undefined
+                const email = acc ? statuses[acc.id]?.email : undefined
+                const rect = rectOf.get(paneId)
+                const hidden = !rect
+                const paneQueue = ws ? permsByWs.get(ws.id) : undefined
+                const perm = paneQueue?.[0]
+                const menuItems: PaneMenuItem[] = [
+                  ...(ws
+                    ? [
+                        {
+                          id: 'rename',
+                          label: 'Renombrar',
+                          hint: 'F2',
+                          icon: <PencilSimple size={15} aria-hidden="true" />,
+                          onSelect: () => setRenaming({ id: ws.id, from: 'pane' })
+                        },
+                        {
+                          id: 'vscode',
+                          label: 'Abrir en VS Code',
+                          icon: <EditorIcon size={15} aria-hidden="true" />,
+                          onSelect: () => void revealWs(ws, 'vscode')
+                        },
+                        {
+                          id: 'folder',
+                          label: 'Abrir carpeta',
+                          icon: <FolderIcon size={15} aria-hidden="true" />,
+                          onSelect: () => void revealWs(ws, 'folder')
+                        }
+                      ]
+                    : []),
+                  ...(ws && accounts.length >= 2
+                    ? [
+                        {
+                          id: 'move',
+                          label: 'Mover a otra cuenta',
+                          icon: <MoveAccountIcon size={15} aria-hidden="true" />,
+                          onSelect: () => runFeatureCommand('move-account.focused', { ...uiCtx, focused: paneId })
+                        }
+                      ]
+                    : []),
+                  {
+                    id: 'restart',
+                    label: 'Reiniciar terminal',
+                    hint: 'cierra el proceso',
+                    icon: <ArrowClockwise size={15} aria-hidden="true" />,
+                    onSelect: () => void requestRestartPane(paneId)
+                  },
+                  {
+                    id: 'hide',
+                    label: 'Cerrar panel',
+                    hint: 'la terminal sigue',
+                    icon: <CloseIcon size={15} aria-hidden="true" />,
+                    danger: true,
+                    onSelect: () => void requestHidePane(paneId)
+                  }
+                ]
+                const title = login ? 'Terminal de cuenta' : (ws?.name ?? '')
+                return (
+                  <section
+                    key={paneId}
+                    data-pane-id={paneId}
+                    data-account-id={accId}
+                    className={`pane ${focused === paneId ? 'focused' : ''} ${ag ? `pane-${ag.state}` : ''} ${perm ? 'pane-perm' : ''} ${hidden ? 'hidden' : ''} ${paneDrag.drag?.id === paneId ? 'dragging' : ''}`}
+                    style={{ '--acc': colorOf(accId), ...rectVars(rect) } as CSSProperties}
+                    onMouseDown={() => setFocused(paneId)}
+                    onFocus={() => setFocused(paneId)}
+                    aria-describedby={canDragPanes ? 'pane-move-hint' : undefined}
+                    aria-label={login ? `Terminal de la cuenta ${acc?.label}` : `${ws?.name} con ${acc?.label}`}
+                  >
+                    <header
+                      className={`pane-head ${canDragPanes ? 'draggable' : ''}`}
+                      onPointerDown={canDragPanes ? (e) => paneDrag.onPointerDown(e, paneId) : undefined}
+                    >
+                      <span className="pane-id">
+                        {ws && (
+                          <button
+                            type="button"
+                            className="icon-btn pane-icon-btn"
+                            onClick={(e) => {
+                              const btn = e.currentTarget
+                              const r = btn.getBoundingClientRect()
+                              openIconPicker(ws.id, r.left, r.bottom + 6, () => btn.focus())
+                            }}
+                            aria-label={`Elegir ícono de ${ws.name}`}
+                            title="Elegir ícono"
+                          >
+                            {ws.icon ? <span aria-hidden="true">{ws.icon}</span> : <Smiley size={14} aria-hidden="true" />}
+                          </button>
+                        )}
+                        {ws && renaming?.id === ws.id && renaming.from === 'pane' ? (
+                          <RenameInput className="pane-title-input" initial={ws.name} label={`Nuevo nombre de ${ws.name}`} onDone={(next) => endRename(ws, 'pane', next)} />
+                        ) : (
+                          <span className="pane-title" title={login ? undefined : ws?.name} onDoubleClick={ws ? () => setRenaming({ id: ws.id, from: 'pane' }) : undefined}>
+                            {title}
+                          </span>
+                        )}
+                        {ws?.ticket && <span className="tag">{ws.ticket}</span>}
+                        {ws?.branch && (
+                          <span className="pane-branch" title={`Rama ${ws.branch}`}>
+                            <BranchIcon size={12} aria-hidden="true" />
+                            {ws.branch}
+                          </span>
+                        )}
+                        <span className="pane-meta">
+                          <span className="acc-badge" title={email}>
+                            {acc?.label ?? '?'}
+                          </span>
+                        </span>
+                      </span>
+                      {ag && <StatePill state={ag.state} detail={ag.detail} />}
+                      <span className="pane-actions">
+                        <PaneHeaderSlot paneId={paneId} />
+                        <button
+                          className="icon-btn"
+                          onClick={() => setMaximized(maximized === paneId ? null : paneId)}
+                          hidden={viewMode === 'tabs'}
+                          aria-label={maximized === paneId ? 'Volver a la grilla' : 'Maximizar'}
+                          title={maximized === paneId ? 'Volver a la grilla' : 'Maximizar'}
+                        >
+                          {maximized === paneId ? <ArrowsInIcon /> : <MaximizeIcon size={15} aria-hidden="true" />}
+                        </button>
+                        <PaneMenu label={`Más acciones de ${title}`} items={menuItems} />
+                      </span>
+                    </header>
+                    {perm && (
+                      <PermissionCard
+                        key={perm.id}
+                        prompt={perm}
+                        queued={(paneQueue?.length ?? 1) - 1}
+                        now={now}
+                        onAnswer={(answer, message) => answerPermission(perm, answer, message)}
+                      />
+                    )}
+                    <PaneBannerSlot paneId={paneId} />
+                    <TerminalView id={paneId} generation={generations[paneId] ?? 0} onError={onTermError} />
+                    {ws && <PaneInput paneId={paneId} name={ws.name} onError={onTermError} />}
+                  </section>
+                )
+              })}
+              {viewMode === 'grid' && nVisible > 1 && (
+                <Separators shape={shape} sizes={sizes} names={visiblePanes.map(paneName)} area={areaRef} onCommit={commitSizes} />
+              )}
+              {paneDrag.drag?.target && paneDrag.drag.mode && rectOf.has(paneDrag.drag.target) && (
+                <div className={`pane-drop ${paneDrag.drag.mode}`} style={rectVars(rectOf.get(paneDrag.drag.target)) as CSSProperties} aria-hidden="true">
+                  <span className="pane-drop-label">
+                    <ArrowsLeftRight size={14} aria-hidden="true" />
+                    {paneDrag.drag.mode === 'swap' ? 'Intercambiar' : paneDrag.drag.mode === 'before' ? 'Mover antes' : 'Mover después'}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div ref={ghostRef} className="drag-ghost" hidden={!dragging} aria-hidden="true">
+              <DotsSixVertical size={14} aria-hidden="true" />
+              {dragging && <span>{paneName(dragging.id)}</span>}
+            </div>
+            <span id="pane-move-hint" className="sr-only">
+              Ctrl+Alt+flecha izquierda o derecha mueve este panel de lugar. Ctrl+Alt+flecha arriba o abajo lo pasa a otra fila. Ctrl+Tab pasa al siguiente.
+            </span>
+            <div className="sr-only" role="status" aria-live="polite">
+              {layoutMsg}
+            </div>
+          </main>
         </div>
-        <div ref={ghostRef} className="drag-ghost" hidden={!dragging} aria-hidden="true">
-          <DotsSixVertical size={14} aria-hidden="true" />
-          {dragging && <span>{paneName(dragging.id)}</span>}
-        </div>
-        <span id="pane-move-hint" className="sr-only">
-          Ctrl+Alt+flecha izquierda o derecha mueve este panel de lugar. Ctrl+Alt+flecha arriba o abajo lo pasa a otra fila. Ctrl+Tab pasa al siguiente.
-        </span>
-        <div className="sr-only" role="status" aria-live="polite">
-          {layoutMsg}
-        </div>
-      </main>
 
+        <footer className="sl-status" aria-label="Estado">
+          <span className="sl-status-count">
+            <span className="sl-status-dot" aria-hidden="true" />
+            Terminales activas: {activeTerms}
+          </span>
+          <span className="sl-status-keys">
+            <kbd>Ctrl</kbd>+<kbd>K</kbd> buscar · <kbd>Ctrl</kbd>+<kbd>B</kbd> barra lateral · <kbd>Ctrl</kbd>+<kbd>N</kbd> nuevo espacio ·{' '}
+            <kbd>Ctrl</kbd>+<kbd>Tab</kbd> cambiar de panel
+          </span>
+        </footer>
 
-      <GlobalSlot />
+        <GlobalSlot />
 
-      {newWsMode && (
-        <NewWorkspaceDialog
-          mode={newWsMode}
-          accounts={accounts}
-          statuses={statuses}
-          usage={usage}
-          defaultRepo={newWsPreset?.repoPath ?? workspaces[workspaces.length - 1]?.repoPath ?? ''}
-          preset={newWsPreset}
-          onClose={() => {
-            setNewWsMode(null)
-            setNewWsPreset(undefined)
-          }}
-          onCreated={(ws) => {
-            setWorkspaces((w) => [...w, ws])
-            setNewWsMode(null)
-            setNewWsPreset(undefined)
-            openPane(ws.id)
-          }}
-        />
-      )}
+        {newWsMode && (
+          <NewWorkspaceDialog
+            mode={newWsMode}
+            accounts={accounts}
+            statuses={statuses}
+            usage={usage}
+            defaultRepo={newWsPreset?.repoPath ?? workspaces[workspaces.length - 1]?.repoPath ?? ''}
+            preset={newWsPreset}
+            onClose={() => {
+              setNewWsMode(null)
+              setNewWsPreset(undefined)
+            }}
+            onCreated={(ws) => {
+              setWorkspaces((w) => [...w, ws])
+              setNewWsMode(null)
+              setNewWsPreset(undefined)
+              openPane(ws.id)
+            }}
+          />
+        )}
 
-      {dropActive && (
-        <div className="folder-drop" role="status" aria-live="polite">
-          <div className="folder-drop-card">Soltá la carpeta para crear un espacio</div>
-        </div>
-      )}
+        {dropActive && (
+          <div className="folder-drop" role="status" aria-live="polite">
+            <div className="folder-drop-card">Soltá la carpeta para crear un espacio</div>
+          </div>
+        )}
 
-      {wsMenu && wsById.get(wsMenu.wsId) && (
-        <WsMenu
-          x={wsMenu.x}
-          y={wsMenu.y}
-          onClose={() => {
-            setWsMenu(null)
-            requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-ws-btn="${CSS.escape(wsMenu.wsId)}"]`)?.focus())
-          }}
-          onRename={() => {
-            const id = wsMenu.wsId
-            setWsMenu(null)
-            setRenaming({ id, from: 'side' })
-          }}
-          onIcon={() => {
-            const id = wsMenu.wsId
-            const { x, y } = wsMenu
-            setWsMenu(null)
-            openIconPicker(id, x, y, () => document.querySelector<HTMLElement>(`[data-ws-btn="${CSS.escape(id)}"]`)?.focus())
-          }}
-        />
-      )}
+        {wsMenu && wsById.get(wsMenu.wsId) && (
+          <WsMenu
+            x={wsMenu.x}
+            y={wsMenu.y}
+            onClose={() => {
+              setWsMenu(null)
+              requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-ws-btn="${CSS.escape(wsMenu.wsId)}"]`)?.focus())
+            }}
+            onRename={() => {
+              const id = wsMenu.wsId
+              setWsMenu(null)
+              setRenaming({ id, from: 'side' })
+            }}
+            onIcon={() => {
+              const id = wsMenu.wsId
+              const { x, y } = wsMenu
+              setWsMenu(null)
+              openIconPicker(id, x, y, () => document.querySelector<HTMLElement>(`[data-ws-btn="${CSS.escape(id)}"]`)?.focus())
+            }}
+          />
+        )}
 
-      {iconPick && wsById.get(iconPick.wsId) && (
-        <WorkspaceIconPicker
-          name={wsById.get(iconPick.wsId)!.name}
-          current={wsById.get(iconPick.wsId)!.icon}
-          x={iconPick.x}
-          y={iconPick.y}
-          onClose={() => {
-            const back = iconPick.back
-            setIconPick(null)
-            requestAnimationFrame(back)
-          }}
-          onPick={(icon) => {
-            const ws = wsById.get(iconPick.wsId)!
-            const back = iconPick.back
-            setIconPick(null)
-            requestAnimationFrame(back)
-            void patchWorkspace(ws, { icon })
-          }}
-        />
-      )}
+        {iconPick && wsById.get(iconPick.wsId) && (
+          <WorkspaceIconPicker
+            name={wsById.get(iconPick.wsId)!.name}
+            current={wsById.get(iconPick.wsId)!.icon}
+            x={iconPick.x}
+            y={iconPick.y}
+            onClose={() => {
+              const back = iconPick.back
+              setIconPick(null)
+              requestAnimationFrame(back)
+            }}
+            onPick={(icon) => {
+              const ws = wsById.get(iconPick.wsId)!
+              const back = iconPick.back
+              setIconPick(null)
+              requestAnimationFrame(back)
+              void patchWorkspace(ws, { icon })
+            }}
+          />
+        )}
 
-      {error && (
-        <div className="toast" role="alert">
-          <WarningCircle size={18} weight="fill" aria-hidden="true" />
-          <span className="grow-min">{error}</span>
-          <button className="icon-btn" onClick={() => setError(null)} aria-label="Cerrar aviso">
-            <X size={14} aria-hidden="true" />
-          </button>
-        </div>
-      )}
-    </div>
-    </div>
+        {error && (
+          <div className="toast" role="alert">
+            <WarningCircle size={18} weight="fill" aria-hidden="true" />
+            <span className="grow-min">{error}</span>
+            <button className="icon-btn" onClick={() => setError(null)} aria-label="Cerrar aviso">
+              <CloseIcon size={14} aria-hidden="true" />
+            </button>
+          </div>
+        )}
+      </div>
     </UiContext.Provider>
+  )
+}
+
+/** Ícono de «maximizado → volver» (flechas hacia adentro). */
+function ArrowsInIcon(): React.JSX.Element {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 4v5H4M15 20v-5h5M4 9l5-5M20 15l-5 5" />
+    </svg>
   )
 }
 
