@@ -17,6 +17,22 @@ export function WarnGlyph({ size = 14 }: { size?: number }): React.JSX.Element {
   )
 }
 
+export function ArrowUpGlyph({ size = 13 }: { size?: number }): React.JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}>
+      <path d="M12 16V5M7.5 9.5L12 5l4.5 4.5M5 19h14" />
+    </svg>
+  )
+}
+
+export function ArrowDownGlyph({ size = 13 }: { size?: number }): React.JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}>
+      <path d="M12 5v11M7.5 11.5L12 16l4.5-4.5M5 19h14" />
+    </svg>
+  )
+}
+
 export function SpinGlyph({ size = 14 }: { size?: number }): React.JSX.Element {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" className="spin" style={{ flex: 'none' }}>

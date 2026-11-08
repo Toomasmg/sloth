@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useUi } from '../host'
-import { CommitIcon, PullRequestIcon } from '../../icons/SlothIcons'
 import { CheckGlyph, SpinGlyph } from './glyphs'
 import { DiffView } from './DiffView'
 import { KIND, TITLE_MAX, errText, plural, splitPath, suggestMessage, type FileChange, type GitShared, type StatusRes, type SyncRes } from './util'
@@ -271,7 +270,6 @@ export function Cambios({ g, st, sync, onOpenPr }: Props): React.JSX.Element {
             }
           }}
           aria-describedby="g-commit-hints"
-          placeholder="Qué cambiaste y por qué (Ctrl+Enter confirma)"
           maxLength={10000}
         />
         <div id="g-commit-hints" className="g-hints">
@@ -289,10 +287,10 @@ export function Cambios({ g, st, sync, onOpenPr }: Props): React.JSX.Element {
           </button>
           <span className="g-spacer" />
           <button type="button" className="g-btn-plain" onClick={() => void doCommit(true)} disabled={busy !== ''}>
-            <PullRequestIcon size={13} /> Confirmar y abrir PR
+            Confirmar y abrir PR
           </button>
           <button type="submit" className="g-btn-solid" disabled={busy !== ''}>
-            {busy === 'commit' ? <SpinGlyph /> : <CommitIcon size={13} />}
+            {busy === 'commit' ? <SpinGlyph /> : null}
             Confirmar {plural(staged.length, 'archivo', 'archivos')}
           </button>
         </div>

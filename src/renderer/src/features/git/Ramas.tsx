@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useUi } from '../host'
 import { BranchIcon } from '../../icons/SlothIcons'
-import { CheckGlyph, SpinGlyph, WarnGlyph } from './glyphs'
+import { ArrowDownGlyph, ArrowUpGlyph, CheckGlyph, SpinGlyph } from './glyphs'
 import { errText, plural, type BranchesRes, type GitShared, type StashRes, type StatusRes, type SyncRes } from './util'
 
 interface Props {
@@ -174,7 +174,6 @@ export function Ramas({ g, st, sync, stash, branches, onGoCambios }: Props): Rea
               </button>
             </div>
           </div>
-          <WarnGlyph />
         </div>
       )}
 
@@ -199,7 +198,7 @@ export function Ramas({ g, st, sync, stash, branches, onGoCambios }: Props): Rea
         </h2>
         <div className="g-current">
           <span className="g-current-ico" aria-hidden="true">
-            <BranchIcon size={18} />
+            <BranchIcon size={18} strokeWidth={1.8} />
           </span>
           <div className="g-current-body">
             <div className="g-current-name">
@@ -212,11 +211,11 @@ export function Ramas({ g, st, sync, stash, branches, onGoCambios }: Props): Rea
           </div>
           <div className="g-current-actions">
             <button type="button" className="g-btn-plain" onClick={push} disabled={bsy || !curName}>
-              {busy === 'push' ? <SpinGlyph /> : null}
+              {busy === 'push' ? <SpinGlyph /> : <ArrowUpGlyph />}
               Subir
             </button>
             <button type="button" className="g-btn-plain" onClick={pull} disabled={bsy || !curName}>
-              {busy === 'pull' ? <SpinGlyph /> : null}
+              {busy === 'pull' ? <SpinGlyph /> : <ArrowDownGlyph />}
               Traer
             </button>
           </div>
