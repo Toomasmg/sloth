@@ -186,8 +186,9 @@
 
 /* ---------- Cuerpo: barra lateral + paneles ---------- */
 .sl-body {
+  position: relative;
   display: grid;
-  grid-template-columns: 264px minmax(0, 1fr);
+  grid-template-columns: var(--side-w, 264px) minmax(0, 1fr);
   min-height: 0;
   min-width: 0;
 }
@@ -196,6 +197,46 @@
 }
 .sl-body.no-side > .sl-side {
   display: none;
+}
+
+/* Tirador del borde derecho de la barra lateral: zona de 6 px, línea de 1 px (acento al usarlo). */
+.sl-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--side-w, 264px) - 3px);
+  width: 6px;
+  z-index: 3;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+.sl-resize::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--line);
+  transition: background var(--t-fast) var(--ease);
+}
+.sl-resize:hover::before,
+.sl-resize:focus-visible::before {
+  background: var(--accent);
+}
+body.is-resizing-side .sl-resize::before {
+  background: var(--accent);
+}
+body.is-resizing-side,
+body.is-resizing-side * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+/* Mientras se arrastra, los paneles no reciben el mouse (el arrastre sigue en el tirador). */
+body.is-resizing-side .panes {
+  pointer-events: none;
 }
 
 /* ---------- Barra lateral ---------- */
@@ -1102,6 +1143,9 @@
     box-shadow: inset 0 -1px 0 var(--line);
   }
   .sl-body.no-side > .sl-side {
+    display: none;
+  }
+  .sl-resize {
     display: none;
   }
   .sl-top-search {

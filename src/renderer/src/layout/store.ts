@@ -38,6 +38,13 @@ export function useViewMode(): ViewMode {
   return useSyncExternalStore(subscribe, getViewMode)
 }
 
+/** Evento de ventana: las terminales visibles re-ajustan su tamaño (una sola vez, tras un cambio grande). */
+export const PANES_FIT_EVENT = 'sloth:panes-fit'
+
+export function requestPanesFit(): void {
+  window.dispatchEvent(new Event(PANES_FIT_EVENT))
+}
+
 /** Pide repartir por igual las proporciones del layout actual. */
 export function requestEqualize(): void {
   for (const cb of equalizeSubs) cb()

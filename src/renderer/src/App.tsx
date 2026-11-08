@@ -57,6 +57,7 @@ import {
 import { onEqualize, safeStorage, setViewMode, useViewMode } from './layout/store'
 import { useReorderDrag } from './layout/useReorderDrag'
 import { Separators } from './layout/Separators'
+import { SIDE_DEFAULT, SideResizer, clampSide, sideMax } from './layout/SideResizer'
 import { PaneInput, PaneMenu, type PaneMenuItem } from './layout/PaneMenu'
 import { CrumbMenu, type CrumbGroup, type CrumbItem } from './layout/CrumbMenu'
 import { LimpiarRamasRow } from './features/worktrees/CleanRow'
@@ -128,6 +129,7 @@ const LAYOUT_BY_DIGIT: Record<string, ViewMode> = { Digit1: 'uno', Digit2: 'dos'
 /** Estado de la barra lateral y de las cuentas plegadas (preferencias de esta PC). */
 const SIDEBAR_KEY = 'sloth.sidebar.shown'
 const COLLAPSED_KEY = 'sloth.sidebar.collapsed'
+const SIDE_W_KEY = 'sloth.sidebar.width'
 function readStorage(key: string): string | null {
   try {
     return window.localStorage.getItem(key)
@@ -184,6 +186,24 @@ export function App(): React.JSX.Element {
     }
   })
   const [wsQuery, setWsQuery] = useState('')
+  // Ancho de la barra lateral (tirador): lo guardado o el por defecto; se acota a la ventana al mostrarlo.
+  const [sideW, setSideW] = useState(() => {
+    const n = Number.parseInt(readStorage(SIDE_W_KEY) ?? '', 10)
+    return Number.isFinite(n) ? n : SIDE_DEFAULT
+  })
+  const [winW, setWinW] = useState(() => window.innerWidth)
+  useEffect(() => {
+    const onResize = (): void => setWinW(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  const sideWidth = clampSide(sideW, winW)
+  const sideBodyRef = useRef<HTMLDivElement>(null)
+  const setSideWidth = (w: number): void => {
+    const v = clampSide(w, window.innerWidth)
+    setSideW(v)
+    writeStorage(SIDE_W_KEY, String(v))
+  }
   const docVisible = useDocumentVisible()
 
   useEffect(() => writeStorage(COLLAPSED_KEY, JSON.stringify(collapsed)), [collapsed])
@@ -936,7 +956,7 @@ export function App(): React.JSX.Element {
           </div>
         </header>
 
-        <div className={`sl-body ${sideShown ? '' : 'no-side'}`}>
+        <div ref={sideBodyRef} className={`sl-body ${sideShown ? '' : 'no-side'}`} style={{ '--side-w': `${sideWidth}px` } as CSSProperties}>
           <aside className="sl-side" aria-label="Cuentas y espacios">
             <label className="sl-filter">
               <SearchIcon size={14} aria-hidden="true" />
@@ -1278,6 +1298,7 @@ export function App(): React.JSX.Element {
               {layoutMsg}
             </div>
           </main>
+          {sideShown && <SideResizer width={sideWidth} max={sideMax(winW)} bodyRef={sideBodyRef} onChange={setSideWidth} />}
         </div>
 
         <footer className="sl-status" aria-label="Estado">

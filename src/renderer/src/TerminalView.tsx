@@ -5,6 +5,7 @@ import type { PtyChunk } from '../../shared/types'
 import { api, onPtyData, onPtyExit } from './api'
 import { subscribeSettings, termOptions } from './features/settings/store'
 import { usePaneVisible } from './visibility'
+import { PANES_FIT_EVENT } from './layout/store'
 
 interface Props {
   id: string
@@ -127,6 +128,8 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
       if (raf) return
       raf = requestAnimationFrame(() => {
         raf = 0
+        // Durante el arrastre de la barra lateral no se ajusta: el fit llega al soltar (PANES_FIT_EVENT).
+        if (document.body.classList.contains('is-resizing-side')) return
         if (disposed || el.offsetParent === null || el.clientWidth === 0 || el.clientHeight === 0) return
         try {
           fit.fit()
@@ -136,6 +139,15 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
       })
     })
     ro.observe(el)
+    const onPanesFit = (): void => {
+      if (disposed || el.offsetParent === null || el.clientWidth === 0 || el.clientHeight === 0) return
+      try {
+        fit.fit()
+      } catch {
+        /* sin tamaño todavía */
+      }
+    }
+    window.addEventListener(PANES_FIT_EVENT, onPanesFit)
 
     // Sin parpadeo de cursor (timer por terminal) mientras la ventana no se ve.
     const onVis = (): void => {
@@ -170,6 +182,7 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
       live.current = null
       if (raf) cancelAnimationFrame(raf)
       ro.disconnect()
+      window.removeEventListener(PANES_FIT_EVENT, onPanesFit)
       document.removeEventListener('visibilitychange', onVis)
       offSettings()
       el.removeEventListener('contextmenu', onContext)
