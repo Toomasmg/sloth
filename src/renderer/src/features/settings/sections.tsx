@@ -14,7 +14,7 @@ import { useUpdateDot } from '../updater/useUpdateStatus'
 import { SoundTest } from '../sound/SoundTest'
 import { resolveAccountColor, pickProjectsDir, projectsDirOf, useSettings } from './store'
 import { errText, Group, Row, Seg, Slider, ToggleRow, useSave, SectionHint } from './ui'
-import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, EDITORS, LINE_HEIGHT, PLAN_SUGGESTIONS, SHELLS, TERM_FONTS, TERM_FONT, UI_FONT, UPDATE_CHANNELS, type AccentChoice, type CursorShape, type Density, type EditorChoice, type ShellChoice, type ShortcutId, type SoundName, type TermFont, type ThemeChoice, type UpdateChannel } from '../../../../main/features/settings-model'
+import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, EDITORS, LINE_HEIGHT, PLAN_SUGGESTIONS, SCROLLBACK, SHELLS, TERM_FONTS, TERM_FONT, UI_FONT, UPDATE_CHANNELS, type AccentChoice, type CursorShape, type Density, type EditorChoice, type ShellChoice, type ShortcutId, type SoundName, type TermFont, type ThemeChoice, type UpdateChannel } from '../../../../main/features/settings-model'
 
 /* ---------- General ---------- */
 
@@ -455,6 +455,18 @@ export function TerminalSection(): React.JSX.Element {
           <Seg<CursorShape> label="Forma del cursor" value={t.cursorStyle} options={CURSOR_ORDER.map((c) => ({ value: c, label: CURSOR_LABEL[c] }))} onPick={(cursorStyle) => save({ terminal: { cursorStyle } })} />
         </Row>
         <ToggleRow title="Cursor que parpadea" checked={t.cursorBlink} onChange={(cursorBlink) => save({ terminal: { cursorBlink } })} />
+        <Row title={<label htmlFor="f-set-tscroll">Historial</label>} hint="Líneas que se guardan para subir con la rueda. Más líneas, más memoria.">
+          <Slider
+            id="f-set-tscroll"
+            label="Líneas de historial de la terminal"
+            value={t.scrollback}
+            min={SCROLLBACK.min}
+            max={SCROLLBACK.max}
+            step={SCROLLBACK.step}
+            format={(v) => `${v.toLocaleString('es-AR')} líneas`}
+            onChange={(scrollback) => save({ terminal: { scrollback } })}
+          />
+        </Row>
         <Row title={<label htmlFor="f-set-shell">Shell</label>} hint="Se aplica a los espacios nuevos.">
           <select id="f-set-shell" className="f-set-select" value={t.shell} onChange={(e) => save({ terminal: { shell: e.target.value as ShellChoice } })}>
             {SHELLS.map((x) => (

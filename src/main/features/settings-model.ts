@@ -23,6 +23,8 @@ export interface TerminalSettings {
   cursorBlink: boolean
   /** Shell de los espacios nuevos. */
   shell: ShellChoice
+  /** Líneas de historial por terminal (scrollback de xterm). */
+  scrollback: number
 }
 
 /** Qué avisa Sloth. «No molestar» es `SlothSettings.noMolestar`. */
@@ -95,6 +97,7 @@ export const SHORTCUT_IDS: readonly ShortcutId[] = ['palette', 'new', 'sidebar',
 export const UI_FONT = { min: 12, max: 16 } as const
 export const TERM_FONT = { min: 11, max: 18 } as const
 export const LINE_HEIGHT = { min: 1, max: 1.4, step: 0.05 } as const
+export const SCROLLBACK = { min: 1000, max: 20000, step: 500, default: 5000 } as const
 
 /**
  * Colores de cuenta elegibles: tonos medios que superan 3:1 (contraste de elementos gráficos)
@@ -131,7 +134,8 @@ export const DEFAULT_SETTINGS: SlothSettings = {
     lineHeight: 1.15,
     cursorStyle: 'barra',
     cursorBlink: true,
-    shell: 'PowerShell 7'
+    shell: 'PowerShell 7',
+    scrollback: SCROLLBACK.default
   },
   accountColors: {},
   accountPlans: {},
@@ -283,13 +287,14 @@ export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOp
   if ('terminal' in patch) {
     const t = patch.terminal
     if (!isObj(t)) throw new Error('terminal tiene que ser un objeto.')
-    checkKeys(t, ['fontSize', 'fontFamily', 'lineHeight', 'cursorStyle', 'cursorBlink', 'shell'], 'terminal.')
+    checkKeys(t, ['fontSize', 'fontFamily', 'lineHeight', 'cursorStyle', 'cursorBlink', 'shell', 'scrollback'], 'terminal.')
     if ('fontSize' in t) next.terminal.fontSize = intIn(t.fontSize, TERM_FONT.min, TERM_FONT.max, 'El tamaño de la terminal')
     if ('fontFamily' in t) next.terminal.fontFamily = oneOf(t.fontFamily, TERM_FONTS, 'La fuente')
     if ('lineHeight' in t) next.terminal.lineHeight = lineHeight(t.lineHeight)
     if ('cursorStyle' in t) next.terminal.cursorStyle = oneOf(t.cursorStyle, CURSORS, 'El cursor')
     if ('cursorBlink' in t) next.terminal.cursorBlink = bool(t.cursorBlink, 'El parpadeo')
     if ('shell' in t) next.terminal.shell = oneOf(t.shell, SHELLS, 'El shell')
+    if ('scrollback' in t) next.terminal.scrollback = intIn(t.scrollback, SCROLLBACK.min, SCROLLBACK.max, 'El historial de la terminal')
   }
   if ('notify' in patch) {
     const n = patch.notify

@@ -3,7 +3,7 @@ import { ChangesIcon } from '../../icons/SlothIcons'
 import type { FeatureUi } from '../host'
 import { useUi } from '../host'
 import { isLoginPane } from '../../../../shared/types'
-import { useDocumentVisible } from '../../visibility'
+import { useDocumentVisible, usePaneVisible } from '../../visibility'
 import { closeDrawer, onRefresh, openDrawer, requestRefresh, useDrawer } from './store'
 import './git.css'
 
@@ -29,6 +29,10 @@ function ChangesButton({ paneId }: { paneId: string }): React.JSX.Element | null
   const wsId = ws?.id
   const [count, setCount] = useState<number | null>(null)
   const visible = useDocumentVisible()
+  // Espacio en una pestaña (oculto): no se consulta git hasta que vuelva a verse.
+  const paneVisible = usePaneVisible(paneId)
+  const paneVisibleRef = useRef(paneVisible)
+  paneVisibleRef.current = paneVisible
   const pending = useRef(false)
 
   const refresh = useCallback(() => {
@@ -41,10 +45,10 @@ function ChangesButton({ paneId }: { paneId: string }): React.JSX.Element | null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsId])
 
-  // Al abrir el panel y cada vez que la ventana vuelve a verse.
+  // Al abrir el panel y cada vez que la ventana (o el espacio) vuelve a verse.
   useEffect(() => {
-    if (visible) refresh()
-  }, [visible, refresh])
+    if (visible && paneVisible) refresh()
+  }, [visible, paneVisible, refresh])
 
   // Cuando Claude termina un turno en este espacio (hook Stop) o después de una operación de git.
   useEffect(() => {
@@ -54,7 +58,7 @@ function ChangesButton({ paneId }: { paneId: string }): React.JSX.Element | null
       if (id !== wsId) return
       clearTimeout(t)
       t = setTimeout(() => {
-        if (document.visibilityState === 'visible') refresh()
+        if (document.visibilityState === 'visible' && paneVisibleRef.current) refresh()
       }, 400)
     }
     const off1 = ui.on('feat:git:changed', later)

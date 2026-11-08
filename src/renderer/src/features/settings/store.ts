@@ -232,6 +232,8 @@ export interface TermOptions {
   theme: ITheme
   /** En claro, xterm sube el contraste de colores pensados para fondo oscuro (p. ej. los de Claude). */
   minimumContrastRatio: number
+  /** Líneas de historial de cada terminal. */
+  scrollback: number
 }
 
 /**
@@ -272,7 +274,8 @@ export function termOptions(p: SettingsPayload = state): TermOptions {
     cursorStyle: CURSOR[t.cursorStyle],
     cursorBlink: t.cursorBlink,
     theme: termTheme(p.dark),
-    minimumContrastRatio: p.dark ? 1 : 4.5
+    minimumContrastRatio: p.dark ? 1 : 4.5,
+    scrollback: t.scrollback
   }
 }
 

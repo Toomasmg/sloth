@@ -30,7 +30,7 @@ import { StateIcon, StatePill } from './StateIcon'
 import { PermissionCard, toolLabel } from './PermissionCard'
 import { decidePermission } from './features/permissions/api'
 import { DaemonStatus } from './DaemonStatus'
-import { useDocumentVisible, useVisiblePolling } from './visibility'
+import { setPaneVisible, useDocumentVisible, useVisiblePolling } from './visibility'
 import {
   LAYOUT_CAP,
   LAYOUT_LABEL,
@@ -443,6 +443,10 @@ export function App(): React.JSX.Element {
   const sizes = useMemo(() => sizeOverrides[shapeK] ?? loadSizes(safeStorage(), shape), [sizeOverrides, shapeK, shape])
   const rects = useMemo(() => cellRects(shape, sizes), [shape, sizes])
   const rectOf = new Map(visiblePanes.map((id, i) => [id, rects[i]]))
+  // Qué paneles se ven en la grilla (los de pestañas quedan ocultos): lo miran terminales y el botón de Git.
+  useEffect(() => {
+    for (const id of openPanes) setPaneVisible(id, rectOf.has(id))
+  })
   const commitSizes = useCallback(
     (next: Sizes) => {
       setSizeOverrides((o) => ({ ...o, [shapeK]: next }))
