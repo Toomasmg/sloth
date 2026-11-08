@@ -9,6 +9,12 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.3',
+    date: '2026-11-08',
+    title: 'Arreglo en el encabezado de los paneles',
+    items: ['El botón «Cambios» del encabezado de cada panel ya no se encima con el número de archivos.']
+  },
+  {
     version: '0.6.2',
     date: '2026-11-08',
     title: 'Todo lo del diseño, funcionando',
