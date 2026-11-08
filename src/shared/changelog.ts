@@ -9,6 +9,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.1',
+    date: '2026-11-08',
+    title: 'Igual al diseño',
+    items: [
+      'Toda la app ajustada al diseño: barra superior limpia con el buscador centrado, barra lateral por cuenta y área vacía nueva.',
+      'Las opciones de cada cuenta (usar mi setup, iniciar sesión, quitar, uso) pasaron a Configuración › Cuentas.',
+      'Git queda acoplado a la derecha y la terminal sigue a la vista.',
+      'Bienvenida, Nuevo espacio, Plantillas, Ramas aparte, Historial, Tickets, Permisos, Enviar a varios, Actualizaciones, Ayuda, Reportar y Exportar con las medidas, textos y colores del diseño.',
+      'Colores ajustados en oscuro y en claro.'
+    ]
+  },
+  {
     version: '0.6.0',
     date: '2026-11-08',
     title: 'Rediseño completo estilo Mac',
