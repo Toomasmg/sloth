@@ -6,6 +6,7 @@ import { shortPath } from '../../format'
 import { CloseIcon, DoneIcon, WaitingIcon, PermissionIcon, IdleIcon, WorkingIcon, TerminalIcon } from '../../icons/SlothIcons'
 import { cancelQueued, startBatch, useBatches, type Batch } from './store'
 import { canReceive, isReady, SPACE_CHIP, SPACE_LABEL, spaceStatus, type SpaceStatus } from './state'
+import { colorHex } from '../templates/catalog'
 
 const CONFIRM_OVER = 3
 /** Lo mismo que el diseño: se corta en 2000 caracteres. */
@@ -33,6 +34,8 @@ export interface Target {
   accIndex: number
   status: SpaceStatus
   ticket?: string
+  /** Color del espacio (clave de TEMPLATE_COLOR_KEYS). Sin color: ícono neutro. */
+  color?: string
   hidden: boolean
 }
 
@@ -55,6 +58,7 @@ function targetsOf(ctx: UiCtx): Target[] {
       accIndex: accIdx.get(ws.accountId) ?? 0,
       status: spaceStatus(ws.id, ctx.agents, ctx.permissions),
       ticket: ws.ticket,
+      color: ws.color,
       hidden: !isOpenPane
     })
   }
@@ -334,7 +338,18 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
                               onChange={() => toggle(t.id)}
                               aria-describedby={hint ? hintId : undefined}
                             />
-                            <span className="f-broadcast-ico" aria-hidden="true">
+                            <span
+                              className={`f-broadcast-ico${t.color ? ' has-color' : ''}`}
+                              aria-hidden="true"
+                              style={
+                                t.color
+                                  ? {
+                                      color: colorHex(t.color),
+                                      background: `color-mix(in srgb, ${colorHex(t.color)} 17%, transparent)`
+                                    }
+                                  : undefined
+                              }
+                            >
                               <TerminalIcon size={14} />
                             </span>
                             <span className="f-broadcast-main">

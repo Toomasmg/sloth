@@ -132,6 +132,9 @@
 .f-broadcast-row.on {
   background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
+.f-broadcast-row:hover {
+  background: var(--row-hover, rgba(255, 255, 255, 0.045));
+}
 .f-broadcast-group-count {
   margin-left: auto;
   font-weight: 400;

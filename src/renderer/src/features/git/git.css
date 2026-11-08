@@ -56,7 +56,7 @@
   right: 0;
   bottom: 0;
   z-index: 9;
-  width: min(580px, 100vw);
+  width: min(600px, 100vw);
   display: flex;
   flex-direction: column;
   background: var(--surface-2);
@@ -121,7 +121,7 @@
   color: var(--fg);
 }
 .g-tab[aria-selected='true'] {
-  background: var(--muted);
+  background: var(--seg-on, #3a4152);
   color: var(--fg);
 }
 .g-tab-n {
@@ -360,7 +360,7 @@
   font-weight: 500;
 }
 .g-seg button[aria-pressed='true'] {
-  background: var(--muted);
+  background: var(--seg-on, #3a4152);
   color: var(--fg);
 }
 
@@ -408,7 +408,7 @@
   border-radius: 8px;
 }
 .g-row:hover {
-  background: var(--hover);
+  background: var(--row-hover, rgba(255, 255, 255, 0.045));
 }
 .g-row.sel {
   background: var(--accent-soft);
@@ -648,7 +648,7 @@
   height: 32px;
   padding: 0 10px;
   border-radius: 8px;
-  background: var(--card);
+  background: var(--search-bg, #171a22);
   color: var(--fg-3);
   box-shadow: inset 0 0 0 1px var(--border-strong);
 }
@@ -690,7 +690,7 @@
   cursor: pointer;
 }
 .g-commit-row:hover {
-  background: var(--hover);
+  background: var(--row-hover, rgba(255, 255, 255, 0.045));
 }
 .g-hash {
   flex: none;
@@ -900,7 +900,7 @@
   box-shadow: inset 0 1px 0 var(--line);
 }
 .g-trow:hover {
-  background: var(--hover);
+  background: var(--row-hover, rgba(255, 255, 255, 0.045));
 }
 .g-trow-body {
   flex: 1 1 200px;
@@ -1081,6 +1081,13 @@
 }
 .f-git-half-empty {
   background: var(--hover);
+}
+
+/* Panel acoplado a la derecha: en pantallas anchas no oscurece ni cierra al tocar afuera; la terminal sigue usable. */
+@media (min-width: 1000px) {
+  .f-git-backdrop {
+    display: none;
+  }
 }
 
 /* ---------- Diálogo de PR y sub-diálogos ---------- */

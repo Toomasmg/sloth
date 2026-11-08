@@ -488,6 +488,12 @@
   width: 32px;
   height: 18px;
 }
+.pd-modal .switch input:not(:checked) + .switch-track {
+  background: var(--seg-on, #3a4152);
+}
+.pd-head .seg > button[aria-pressed='true'] {
+  background: var(--seg-on, #3a4152);
+}
 .pd-dnd .switch-track::after {
   width: 14px;
   height: 14px;
@@ -578,7 +584,7 @@
   border-radius: var(--r-sm);
 }
 .pd-row:hover {
-  background: var(--hover);
+  background: var(--row-hover, rgba(255, 255, 255, 0.045));
 }
 .pd-time {
   flex: none;
