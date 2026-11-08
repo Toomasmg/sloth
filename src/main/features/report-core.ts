@@ -2,15 +2,25 @@ import fs from 'node:fs'
 
 /**
  * «Reportar un problema» (lógica pura, sin Electron): filtro de datos personales, armado del cuerpo,
- * URL del issue (host fijo) y lectura solo del final del registro. Pruebas: S\v5-report\test.mts.
+ * URL del issue (host fijo) y lectura solo del final del registro.
  */
 
 export const REPORT_ISSUE_URL = 'https://github.com/Toomasmg/sloth/issues/new'
+export const TITLE_MIN = 8
 export const TITLE_MAX = 200
 export const BODY_MAX = 6000
 /** Tope de la URL prellenada. Por encima, el navegador o GitHub la pueden truncar. */
 export const URL_MAX = 8000
-export const LOG_LINES = 50
+/** Límites del formulario (para que el cuerpo entre en BODY_MAX aun sin registro). */
+export const WHAT_MAX = 1500
+export const EXPECT_MAX = 800
+export const STEP_MAX = 200
+export const STEPS_MAX = 8
+/** Registro: últimos minutos y tope de líneas. */
+export const LOG_MINUTES = 30
+export const LOG_KEEP = 40
+/** Cuántas líneas (y bytes) del final del registro se leen antes de filtrar por tiempo. */
+export const LOG_READ_LINES = 400
 export const LOG_MAX_BYTES = 64 * 1024
 
 export interface SanitizeContext {
@@ -94,7 +104,19 @@ export function sanitize(text: string, ctx: SanitizeContext): string {
   return s
 }
 
-export interface ReportFacts {
+export type ReportType = 'error' | 'idea' | 'otra'
+export const REPORT_TYPES: Record<ReportType, string> = { error: 'Error', idea: 'Idea', otra: 'Otra cosa' }
+
+export interface ReportForm {
+  type: ReportType
+  title: string
+  what: string
+  expect: string
+  steps: string[]
+}
+
+/** Datos del sistema, uno por línea (ya sin sanitizar: el llamador pasa todo por sanitize). */
+export function systemLines(f: {
   sloth: string
   windows: string
   arch: string
@@ -102,32 +124,45 @@ export interface ReportFacts {
   daemon: string
   accounts: number
   workspaces: number
+}): string[] {
+  return [
+    `Sloth ${f.sloth}`,
+    `Windows ${f.windows} · ${f.arch}`,
+    `Electron ${f.electron}`,
+    `Daemon: ${f.daemon}`,
+    `Cuentas: ${f.accounts} · Espacios: ${f.workspaces}`
+  ]
 }
 
-/** Cuerpo del issue (markdown). El bloque de registro va al final, en un bloque ``` (ver fitBody). */
-export function composeBody(f: ReportFacts, logLines: readonly string[]): string {
-  return [
-    `**Sloth:** ${f.sloth}`,
-    `**Windows:** ${f.windows}`,
-    `**Arquitectura:** ${f.arch}`,
-    `**Electron:** ${f.electron}`,
-    `**Daemon:** ${f.daemon}`,
-    `**Cuentas:** ${f.accounts} · **Espacios:** ${f.workspaces}`,
+/**
+ * Cuerpo del issue (markdown). `sys` y `logs` son null si el usuario no los quiere incluir. El bloque
+ * de registro va al final, en un bloque ``` (ver fitBody).
+ */
+export function composeBody(f: ReportForm, sys: readonly string[] | null, logs: readonly string[] | null): string {
+  const steps = f.steps.map((s) => s.trim()).filter(Boolean)
+  const out: string[] = [
+    `**Tipo:** ${REPORT_TYPES[f.type]}`,
     '',
     '## Qué pasó',
+    f.what.trim() || '(sin completar)',
     '',
-    '(Contá qué estabas haciendo y qué esperabas que pasara.)',
+    '## Qué esperaba',
+    f.expect.trim() || '(sin completar)',
     '',
-    `## Registro (últimas ${logLines.length} líneas)`,
-    '```',
-    ...logLines,
-    '```',
-    ''
-  ].join('\n')
+    '## Pasos para reproducirlo',
+    ...(steps.length ? steps.map((s, i) => `${i + 1}. ${s}`) : ['(sin pasos)'])
+  ]
+  if (sys) out.push('', '## Sistema', ...sys.map((l) => `- ${l}`))
+  if (logs) {
+    out.push('', `## Registro (últimos ${LOG_MINUTES} minutos)`)
+    if (logs.length) out.push('```', ...logs, '```')
+    else out.push('(sin registros recientes)')
+  }
+  return out.join('\n') + '\n'
 }
 
-/** Encabezado + apertura del bloque (1), líneas del registro (2) y cierre del bloque (3). */
-const LOG_BLOCK = /(^## Registro[^\n]*\n```[^\n]*\n)([\s\S]*?)(\n```)/m
+/** Abre el bloque del registro (1), sus líneas (2) y cierra (3). */
+const LOG_BLOCK = /(^## Registro[^\n]*\n```\n)([\s\S]*?)(\n```)/m
 
 /**
  * Deja el cuerpo en `max` caracteres recortando SOLO las líneas más viejas del registro.
@@ -153,11 +188,29 @@ export function buildIssueUrl(title: string, body: string): string {
   return `${REPORT_ISSUE_URL}?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`
 }
 
+const TS_RE = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)\s/
+
+/**
+ * Líneas de los últimos `minutes` minutos (según la marca de tiempo al inicio de cada línea del
+ * registro del daemon), como mucho `keep` líneas. Las líneas sin marca siguen a la anterior.
+ */
+export function recentLines(lines: readonly string[], now: number, minutes = LOG_MINUTES, keep = LOG_KEEP): string[] {
+  const since = now - minutes * 60_000
+  const out: string[] = []
+  let inWindow = false
+  for (const l of lines) {
+    const m = TS_RE.exec(l)
+    if (m) inWindow = Date.parse(m[1]) >= since
+    if (inWindow) out.push(l)
+  }
+  return out.slice(-keep)
+}
+
 /**
  * Últimas `lines` líneas de un archivo, leyendo desde el final por bloques (nunca el archivo entero).
  * Como mucho `maxBytes` del final. Tolerante: si no se puede leer, devuelve [].
  */
-export function readLogTail(file: string, lines = LOG_LINES, maxBytes = LOG_MAX_BYTES): string[] {
+export function readLogTail(file: string, lines = LOG_READ_LINES, maxBytes = LOG_MAX_BYTES): string[] {
   let fd: number
   try {
     fd = fs.openSync(file, 'r')

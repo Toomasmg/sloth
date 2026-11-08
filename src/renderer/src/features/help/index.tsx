@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bug, Keyboard, Question, Sparkle, UserPlus } from '@phosphor-icons/react'
 import type { ChangelogEntry } from '../../../../shared/changelog'
 import { CHANGELOG } from '../../../../shared/changelog'
+import { HelpIcon, InviteIcon, KeyboardIcon, ReportIcon, UpdateIcon } from '../../icons/SlothIcons'
 import type { Command, FeatureUi } from '../host'
 import { useUi } from '../host'
 import { onHelp, openHelp, type HelpAction } from './bus'
 import { openReport } from '../report/bus'
-import { ShortcutsSheet } from './ShortcutsSheet'
+import { AyudaPage } from './AyudaPage'
 import { WhatsNewModal } from './WhatsNew'
 import { InviteModal } from './Invite'
 import './help.css'
@@ -19,7 +19,7 @@ interface WhatsNewReply {
 }
 
 type Dialog =
-  | { kind: 'shortcuts' }
+  | { kind: 'ayuda' }
   | { kind: 'invite' }
   /** `seen`: versión a marcar como vista al cerrar (solo en la apertura automática). */
   | { kind: 'whatsnew'; entries: ChangelogEntry[]; seen?: string }
@@ -33,10 +33,10 @@ interface MenuItem {
 }
 
 const MENU: MenuItem[] = [
-  { id: 'shortcuts', label: 'Atajos de teclado', icon: <Keyboard size={16} aria-hidden="true" />, hint: '?', run: () => openHelp('shortcuts') },
-  { id: 'whatsnew', label: 'Novedades', icon: <Sparkle size={16} aria-hidden="true" />, run: () => openHelp('whatsnew') },
-  { id: 'invite', label: 'Invitar a un compañero', icon: <UserPlus size={16} aria-hidden="true" />, run: () => openHelp('invite') },
-  { id: 'report', label: 'Reportar un problema', icon: <Bug size={16} aria-hidden="true" />, run: () => openReport() }
+  { id: 'ayuda', label: 'Ayuda y atajos', icon: <KeyboardIcon size={16} />, hint: '?', run: () => openHelp('ayuda') },
+  { id: 'whatsnew', label: 'Novedades', icon: <UpdateIcon size={16} />, run: () => openHelp('whatsnew') },
+  { id: 'invite', label: 'Invitar a un compañero', icon: <InviteIcon size={16} />, run: () => openHelp('invite') },
+  { id: 'report', label: 'Reportar un problema', icon: <ReportIcon size={16} />, run: () => openReport() }
 ]
 
 /** Botón «Ayuda» de la barra de título, con su menú chico (role=menu, flechas, Escape). */
@@ -115,7 +115,7 @@ function HelpButton(): React.JSX.Element {
         title="Ayuda"
         onClick={() => setOpen((o) => !o)}
       >
-        <Question size={16} aria-hidden="true" />
+        <HelpIcon size={16} />
       </button>
       {open && (
         <div role="menu" aria-label="Ayuda" className="f-help-menu" onKeyDown={onMenuKey}>
@@ -143,8 +143,8 @@ function HelpButton(): React.JSX.Element {
 }
 
 /**
- * Piezas que se montan una sola vez: la hoja de atajos («?»), Novedades (al arrancar, si hay algo
- * nuevo) e Invitar. Las abre `openHelp` desde el menú, la paleta o Configuración.
+ * Piezas que se montan una sola vez: la página de Ayuda y atajos («?»), Novedades (al arrancar, si
+ * hay algo nuevo) e Invitar. Las abre `openHelp` desde el menú, la paleta o Configuración.
  */
 function HelpGlobal(): React.JSX.Element {
   const ui = useUi()
@@ -172,7 +172,7 @@ function HelpGlobal(): React.JSX.Element {
   useEffect(
     () =>
       onHelp((a: HelpAction) => {
-        if (a === 'shortcuts') setDialog({ kind: 'shortcuts' })
+        if (a === 'ayuda' || a === 'shortcuts') setDialog({ kind: 'ayuda' })
         else if (a === 'invite') setDialog({ kind: 'invite' })
         // Desde el menú se muestra siempre la última entrada, sin marcar nada como visto.
         else setDialog({ kind: 'whatsnew', entries: CHANGELOG.slice(0, 1) })
@@ -180,7 +180,7 @@ function HelpGlobal(): React.JSX.Element {
     []
   )
 
-  // «?» abre la hoja de atajos, salvo que se esté escribiendo, con la terminal enfocada o con otro modal.
+  // «?» abre la página de ayuda, salvo que se esté escribiendo, con la terminal enfocada o con otro modal.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== '?' || e.ctrlKey || e.altKey || e.metaKey) return
@@ -188,7 +188,7 @@ function HelpGlobal(): React.JSX.Element {
       if (a instanceof HTMLElement && (a.matches('input, textarea, select, [contenteditable]') || a.closest('.xterm'))) return
       if (document.querySelector('[aria-modal="true"]')) return
       e.preventDefault()
-      setDialog((cur) => cur ?? { kind: 'shortcuts' })
+      setDialog((cur) => cur ?? { kind: 'ayuda' })
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -201,7 +201,7 @@ function HelpGlobal(): React.JSX.Element {
   }
 
   if (!dialog) return <></>
-  if (dialog.kind === 'shortcuts') return <ShortcutsSheet onClose={close} />
+  if (dialog.kind === 'ayuda') return <AyudaPage onClose={close} />
   if (dialog.kind === 'invite') return <InviteModal onClose={close} />
   return <WhatsNewModal entries={dialog.entries} onClose={close} />
 }
@@ -212,14 +212,14 @@ const ui: FeatureUi = {
   Global: HelpGlobal,
   commands: (): Command[] => [
     {
-      id: 'help:shortcuts',
-      title: 'Atajos de teclado',
-      subtitle: 'Hoja rápida (tecla ?)',
+      id: 'help:ayuda',
+      title: 'Ayuda y atajos',
+      subtitle: 'Primeros pasos, atajos de teclado y preguntas frecuentes',
       group: 'Sloth',
-      keywords: 'atajos teclas shortcuts ayuda hoja ?',
+      keywords: 'ayuda atajos teclas shortcuts hoja ? faq preguntas tutorial',
       shortcut: '?',
-      icon: <Keyboard size={16} aria-hidden="true" />,
-      run: () => openHelp('shortcuts')
+      icon: <KeyboardIcon size={16} />,
+      run: () => openHelp('ayuda')
     },
     {
       id: 'help:whatsnew',
@@ -227,7 +227,7 @@ const ui: FeatureUi = {
       subtitle: 'Qué cambió en la última versión',
       group: 'Sloth',
       keywords: 'novedades cambios changelog versión release',
-      icon: <Sparkle size={16} aria-hidden="true" />,
+      icon: <UpdateIcon size={16} />,
       run: () => openHelp('whatsnew')
     },
     {
@@ -236,7 +236,7 @@ const ui: FeatureUi = {
       subtitle: 'Copiar el mensaje con el link de descarga',
       group: 'Sloth',
       keywords: 'invitar compañero amigo compartir descargar link',
-      icon: <UserPlus size={16} aria-hidden="true" />,
+      icon: <InviteIcon size={16} />,
       run: () => openHelp('invite')
     }
   ]

@@ -1,0 +1,327 @@
+/* Página de Ayuda y atajos (AyudaPage). */
+
+.ay-wrap {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 36px) clamp(16px, 4vw, 40px) 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.ay-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ay-head h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.ay-head p {
+  margin: 0;
+  color: var(--fg-2);
+  line-height: 1.5;
+}
+
+.ay-search-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ay-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 42px;
+  box-sizing: border-box;
+  padding: 0 8px 0 14px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--fg-muted);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.ay-search:focus-within {
+  box-shadow: inset 0 0 0 1px var(--ring), 0 0 0 3px var(--accent-soft);
+}
+.ay-search input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+.ay-search input::placeholder {
+  color: var(--placeholder);
+}
+.ay-count {
+  margin: 0 4px;
+  min-height: 16px;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+
+.ay-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 20px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+  text-align: center;
+}
+.ay-empty-title {
+  font-weight: 600;
+}
+.ay-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.ay-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.ay-nav {
+  flex: 0 1 200px;
+  min-width: 0;
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ay-nav-item {
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--fg-2);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ay-nav-item:hover {
+  background: var(--hover);
+}
+.ay-nav-item[aria-current] {
+  background: var(--accent-soft);
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.ay-main {
+  flex: 999 1 520px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+.ay-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scroll-margin-top: 16px;
+}
+.ay-sec h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.ay-sec-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* Primeros pasos */
+.ay-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 10px;
+  align-items: start;
+}
+.ay-card {
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.ay-card-btn,
+.ay-faq-btn {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ay-card-btn:hover,
+.ay-faq-btn:hover {
+  background: var(--hover);
+}
+.ay-card-ico {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-md);
+  background: var(--accent-soft);
+  color: var(--accent-fg);
+}
+.ay-card-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ay-card-title {
+  font-weight: 600;
+}
+.ay-card-sum {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  line-height: 1.5;
+}
+.ay-steps {
+  margin: 0;
+  padding: 0 16px 14px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--fg-2);
+  line-height: 1.5;
+}
+
+.ay-chev {
+  flex: none;
+  margin-top: 4px;
+  color: var(--fg-muted);
+  transform: rotate(0deg);
+  transition: transform var(--t-fast) var(--ease);
+}
+.ay-chev.on {
+  transform: rotate(180deg);
+}
+
+/* Atajos */
+.ay-group + .ay-group {
+  border-top: 1px solid var(--line);
+}
+.ay-group-name {
+  padding: 12px 16px 6px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--fg-2);
+}
+.ay-key-row {
+  flex-wrap: wrap;
+}
+.ay-key-what {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.ay-keys {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.ay-plus,
+.ay-or {
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+  padding: 0 2px;
+}
+.ay-mark {
+  background: var(--accent-soft);
+  color: inherit;
+  border-radius: 3px;
+}
+
+/* Preguntas frecuentes */
+.ay-faq + .ay-faq {
+  border-top: 1px solid var(--line);
+}
+.ay-faq-q {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+}
+.ay-faq-a {
+  padding: 0 16px 16px;
+  color: var(--fg-2);
+  line-height: 1.6;
+}
+
+/* Más ayuda */
+.ay-more {
+  flex-wrap: wrap;
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
+  padding: 16px;
+}
+.ay-more-text {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ay-more-title {
+  font-weight: 600;
+}
+.ay-more-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ay-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 20;
+  max-width: calc(100% - 36px);
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--fg);
+  box-shadow: var(--shadow-lg);
+}
+
+@media (max-width: 760px) {
+  .ay-nav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+}
