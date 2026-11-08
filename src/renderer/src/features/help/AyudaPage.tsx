@@ -1,78 +1,92 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { SHORTCUTS, shortcutKeys, type Shortcut } from '../../shortcuts'
-import { AccountIcon, BranchIcon, ChatIcon, FolderIcon, PermissionIcon, ReportIcon, SearchIcon } from '../../icons/SlothIcons'
+import { SearchIcon } from '../../icons/SlothIcons'
 import { openSettings } from '../settings/bus'
 import { openReport } from '../report/bus'
 import { PageShell } from './PageShell'
 import { marks, matchesAll, wordsOf } from './text'
 import './ayuda.css'
 
-/** Primeros pasos: lo que hace la app de verdad (etiquetas tal cual aparecen en Sloth). */
-const CARDS: { id: string; title: string; sum: string; icon: React.ReactNode; steps: string[] }[] = [
+/** Ícono de trazo con el path del artboard. */
+function PathIcon({ d, size, sw = 1.8 }: { d: string; size: number; sw?: number }): React.JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+  )
+}
+
+/** Primeros pasos (texto y íconos del artboard «Ayuda»). */
+const CARDS: { id: string; title: string; sum: string; icon: string; steps: string[] }[] = [
   {
     id: 'espacio',
     title: 'Crear un espacio',
     sum: 'Un espacio junta una carpeta del proyecto, una cuenta de Claude y una terminal.',
-    icon: <FolderIcon size={15} />,
+    icon: 'M4 7a1.5 1.5 0 0 1 1.5-1.5h13A1.5 1.5 0 0 1 20 7v10a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17zM7.5 10l2.5 2.5-2.5 2.5M12.5 15h4',
     steps: [
-      'Tocá «Nuevo espacio» en la barra lateral o buscalo en la paleta (Ctrl K).',
-      'Elegí la carpeta del proyecto. También podés arrastrarla a la ventana.',
+      'Tocá «Nuevo espacio» en la barra lateral o apretá Ctrl N.',
+      'Elegí la carpeta del proyecto, por ejemplo la carpeta front de Cosmos-Ai.',
       'Elegí la cuenta de Claude con la que va a trabajar.',
-      'Ponele un nombre corto y confirmá. La terminal abre en esa carpeta.'
+      'Ponele un nombre corto y confirmá. La terminal abre ya en esa carpeta.'
     ]
   },
   {
     id: 'cuentas',
     title: 'Usar varias cuentas',
     sum: 'Cada cuenta tiene su sesión y sus propios espacios.',
-    icon: <AccountIcon size={15} />,
+    icon: 'M8.5 9a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0M5 19.5c1.2-3 3.9-4.5 7-4.5s5.8 1.5 7 4.5',
     steps: [
-      'En Configuración, sección Cuentas, agregá una cuenta y ponele un nombre.',
-      'Abrí su terminal desde la barra lateral. Si todavía no entraste, tocá «Iniciar sesión».',
-      'Para pasar un espacio a otra cuenta, usá «Mover a otra cuenta» en la cabecera del panel.'
+      'En Configuración › Cuentas, tocá «Agregar cuenta» y ponele un nombre.',
+      'Tocá «Iniciar sesión». Se abre el navegador para entrar con esa cuenta de Claude.',
+      'En la barra lateral, cada cuenta muestra sus espacios debajo.',
+      'Para pasar un espacio a otra cuenta, usá «Mover a…» en su menú.'
     ]
   },
   {
     id: 'permisos',
     title: 'Pedidos de permiso',
-    sum: 'Claude pide permiso antes de hacer cosas que lo necesitan, como correr un comando.',
-    icon: <PermissionIcon size={15} />,
+    sum: 'Claude pide permiso antes de correr comandos que lo necesitan.',
+    icon: 'M12 3.5l7 3v5c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9v-5z',
     steps: [
-      'Cuando Claude necesita permiso, aparece una tarjeta con el detalle de lo que quiere hacer.',
-      'Aprobar lo deja seguir. «Aprobar siempre» lo deja permitido para ese espacio.',
-      '«Rechazar» le avisa a Claude que pruebe otra cosa. Podés escribir un motivo.',
-      'Si no contestás a tiempo, el pedido vence y el espacio queda esperando.'
+      'Cuando Claude quiere correr un comando, aparece un recuadro naranja con ese comando.',
+      '«Permitir una vez» deja correr ese comando solamente.',
+      '«Permitir siempre aquí» lo deja permitido para ese espacio.',
+      '«Rechazar» le avisa a Claude que pruebe otra cosa.',
+      'Si no contestás, el espacio queda como «Pide permiso» en la barra lateral.'
     ]
   },
   {
     id: 'ramas',
     title: 'Ramas aparte',
-    sum: 'Un espacio puede trabajar en su propia rama, así varios cambios no se pisan.',
-    icon: <BranchIcon size={15} />,
+    sum: 'Cada espacio trabaja en su propia rama, así varios cambios no se pisan.',
+    icon: 'M7 4v16M7 15c0-4 3-5.5 7-6M14 9c1.5-2.5 4-3.5 6.5-3.5-.3 2.6-1.8 4.6-4.4 5.2-1 .2-1.6-.6-2.1-1.7z',
     steps: [
-      'Al crear el espacio podés elegir una rama. Sloth prepara una copia de trabajo para esa rama.',
-      'La rama de cada espacio aparece debajo de su nombre.',
-      'Antes de mergear, revisá los cambios desde el panel de Git del espacio.'
+      'La rama de cada espacio aparece debajo de su nombre, por ejemplo feat/filtros.',
+      'Para empezar una rama nueva, pedile a Claude en ese espacio: «creá la rama fix/horas».',
+      'Tocá el ícono de cambios del panel para ver qué tocó Claude en esa rama.',
+      'Antes de mergear, revisá los cambios. Cuando el espacio ya no hace falta, cerralo.'
     ]
   },
   {
     id: 'chat',
     title: 'Chat del equipo',
     sum: 'Hablá con tu equipo sin salir de Sloth.',
-    icon: <ChatIcon size={15} />,
+    icon: 'M4 7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v6.5a3 3 0 0 1-3 3h-6l-4.5 3.5v-3.5A3 3 0 0 1 4 13.5z',
     steps: [
-      'Abrilo con el botón Chat de la barra de título.',
-      'Los canales y los mensajes directos están en el mismo panel.',
+      'Abrilo con Ctrl Shift M o con el ícono de Equipo arriba a la derecha.',
+      'En #general y #deploys ves lo que se habla. Para hablar con alguien, usá mensajes directos.',
+      'Para escribirle rápido a una persona, apretá Ctrl K, escribí @ y el nombre.',
       'Si tenés «No molestar» activo, no te avisa, pero los mensajes quedan esperando.'
     ]
   }
 ]
 
+/** Preguntas frecuentes (texto del artboard «Ayuda»). */
 const FAQS: { id: string; q: string; a: string }[] = [
   {
     id: 'bloqueo',
     q: '¿Puede Anthropic bloquearme por usar Sloth?',
-    a: 'Sloth usa Claude Code con tus propias cuentas y no las comparte. No detecta límites ni cambia de cuenta sola. Igual, el uso de tus cuentas sigue las condiciones de Anthropic. Si tenés dudas sobre tu caso, consultalo directamente con Anthropic.'
+    a: 'Sloth usa Claude Code tal cual, con tus propias cuentas y sin compartirlas. Igual, el uso de tus cuentas sigue sujeto a las condiciones de Anthropic. Si tenés dudas sobre tu caso, consultalo directamente con Anthropic.'
   },
   {
     id: 'contrasenas',
@@ -80,33 +94,29 @@ const FAQS: { id: string; q: string; a: string }[] = [
     a: 'No. Sloth no pide, no guarda y no lee contraseñas ni tokens. El inicio de sesión pasa por el navegador.'
   },
   {
-    id: 'historial',
-    q: '¿Cómo retomo una conversación de antes?',
-    a: 'Abrí el historial (Ctrl Shift F), elegí la conversación y tocá «Retomar». Sloth abre el espacio de esa carpeta con Claude en esa conversación.'
-  },
-  {
-    id: 'quitar',
-    q: '¿Quitar una conversación de la lista borra algo?',
-    a: 'No. «Quitar de la lista» solo la oculta en Sloth. Los archivos de Claude no se tocan, y podés volver a mostrarla desde el historial.'
-  },
-  {
     id: 'ventana',
     q: '¿Qué pasa si cierro la ventana?',
-    a: 'Claude sigue trabajando en segundo plano. Al volver a abrir Sloth, cada panel se reconecta donde estaba.'
+    a: 'Las terminales siguen corriendo en segundo plano, si dejaste activada la opción «Dejar las terminales vivas al cerrar la ventana» (Configuración › General). Al volver a abrir Sloth, los espacios vuelven si tenés activado «Reabrir los espacios de la última vez».'
   },
   {
     id: 'mover',
     q: '¿Cómo muevo un espacio a otra cuenta?',
-    a: 'Usá «Mover a otra cuenta» en la cabecera del panel. Antes de moverlo, guardá lo que estés haciendo en la terminal.'
+    a: 'Abrí el menú del espacio (los tres puntos) y tocá «Mover a…» con la otra cuenta. También lo encontrás en la paleta (Ctrl K). La terminal se reinicia con la cuenta nueva, así que guardá antes lo que estés haciendo.'
   },
   {
     id: 'actualizar',
     q: '¿Cómo actualizo?',
-    a: 'Sloth busca actualizaciones sola. Para revisar ya, buscá «Buscar actualizaciones» en la paleta (Ctrl K).'
+    a: 'Sloth busca actualizaciones solo. Para revisar ya mismo, andá a Configuración › Actualizaciones y tocá «Buscar ahora». Si querés probar novedades antes, elegí el canal Beta. El Estable es el recomendado.'
   }
 ]
 
-const GROUPS = ['General', 'Paneles', 'Chat', 'Terminal'] as const
+/** Grupos de atajos: la clave es el grupo de SHORTCUTS; la etiqueta es la del artboard. */
+const GROUPS: { key: string; label: string }[] = [
+  { key: 'General', label: 'General' },
+  { key: 'Paneles', label: 'Espacios y paneles' },
+  { key: 'Terminal', label: 'Terminal' },
+  { key: 'Chat', label: 'Chat' }
+]
 const SECTIONS = [
   { id: 'ay-primeros', label: 'Primeros pasos' },
   { id: 'ay-atajos', label: 'Atajos de teclado' },
@@ -137,8 +147,8 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
   const cards = CARDS.filter((c) => matchesAll(`${c.title} ${c.sum} ${c.steps.join(' ')}`, words))
   const faqs = FAQS.filter((f) => matchesAll(`${f.q} ${f.a}`, words))
   const groups = GROUPS.map((g) => ({
-    name: g,
-    rows: SHORTCUTS.filter((s) => (s.group ?? 'General') === g).filter((s) => matchesAll(`${g} ${s.what} ${comboText(s)}`, words))
+    name: g.label,
+    rows: SHORTCUTS.filter((s) => (s.group ?? 'General') === g.key).filter((s) => matchesAll(`${g.label} ${s.what} ${comboText(s)}`, words))
   })).filter((g) => g.rows.length > 0)
   const nShortcuts = groups.reduce((n, g) => n + g.rows.length, 0)
   const total = cards.length + nShortcuts + faqs.length
@@ -191,7 +201,7 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
               aria-label="Buscar en la ayuda"
             />
             {hasQ && (
-              <button type="button" className="btn sm ghost" onClick={() => setQ('')}>
+              <button type="button" className="ay-btn ay-btn-secondary ay-btn-sm" onClick={() => setQ('')}>
                 Limpiar
               </button>
             )}
@@ -204,20 +214,19 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
         {noResults && (
           <div className="ay-empty">
             <span className="ay-empty-title">Nada coincide con «{q.trim()}»</span>
-            <span className="hint">Probá con otra palabra, por ejemplo «permiso», «cuenta» o «Ctrl K». Si el tema no aparece acá, contanos.</span>
+            <span className="ay-empty-text">Probá con otra palabra, por ejemplo «permiso», «cuenta» o «Ctrl K». Si el tema no aparece acá, contanos.</span>
             <div className="ay-empty-actions">
-              <button type="button" className="btn sm" onClick={() => setQ('')}>
+              <button type="button" className="ay-btn ay-btn-secondary" onClick={() => setQ('')}>
                 Limpiar búsqueda
               </button>
               <button
                 type="button"
-                className="btn sm primary"
+                className="ay-btn ay-btn-primary"
                 onClick={() => {
                   onClose()
                   openReport()
                 }}
               >
-                <ReportIcon size={14} />
                 Reportar un problema
               </button>
             </div>
@@ -254,7 +263,9 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
                           aria-expanded={on}
                           onClick={() => setOpen((o) => ({ ...o, [c.id]: !on }))}
                         >
-                          <span className="ay-card-ico">{c.icon}</span>
+                          <span className="ay-card-ico">
+                            <PathIcon d={c.icon} size={15} />
+                          </span>
                           <span className="ay-card-text">
                             <span className="ay-card-title">{hl(c.title)}</span>
                             <span className="ay-card-sum">{hl(c.sum)}</span>
@@ -294,7 +305,7 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
                   <h2 id="ay-h-atajos">Atajos de teclado</h2>
                   <button
                     type="button"
-                    className="btn sm"
+                    className="ay-btn ay-btn-secondary"
                     onClick={() => {
                       onClose()
                       openSettings('atajos')
@@ -303,12 +314,12 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
                     Cambiar atajos
                   </button>
                 </div>
-                <div className="group">
+                <div className="ay-card-box">
                   {groups.map((g) => (
                     <div key={g.name} className="ay-group">
                       <div className="ay-group-name">{g.name}</div>
                       {g.rows.map((r) => (
-                        <div key={r.what} className="group-row ay-key-row">
+                        <div key={r.what} className="ay-key-row">
                           <span className="ay-key-what">{hl(r.what)}</span>
                           <span className="ay-keys">
                             {shortcutKeys(r).map((combo, i) => (
@@ -325,7 +336,7 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
                           </span>
                           <button
                             type="button"
-                            className="btn sm ghost"
+                            className="ay-btn ay-btn-copy"
                             onClick={() => copy(comboText(r))}
                             aria-label={`Copiar el atajo de ${r.what}`}
                           >
@@ -336,14 +347,14 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
                     </div>
                   ))}
                 </div>
-                <p className="hint">Para cambiar uno, buscalo en Configuración › Atajos de teclado y apretá la combinación nueva.</p>
+                <p className="ay-note">Para cambiar uno, tocá su tecla en Configuración y apretá la combinación nueva.</p>
               </section>
             )}
 
             {faqs.length > 0 && (
               <section id="ay-faq" className="ay-sec" aria-labelledby="ay-h-faq">
                 <h2 id="ay-h-faq">Preguntas frecuentes</h2>
-                <div className="group">
+                <div className="ay-card-box">
                   {faqs.map((f) => {
                     const on = !!open[f.id]
                     return (
@@ -380,24 +391,23 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
 
             <section id="ay-mas" className="ay-sec" aria-labelledby="ay-h-mas">
               <h2 id="ay-h-mas">¿Necesitás más ayuda?</h2>
-              <div className="ay-more group-row">
+              <div className="ay-more">
                 <div className="ay-more-text">
                   <span className="ay-more-title">Si algo no funciona, contanos qué pasó</span>
-                  <span className="hint">Se abre un issue en GitHub con lo que nos cuentes. Podés adjuntar la información del sistema.</span>
+                  <span className="ay-more-hint">Se abre GitHub con el reporte listo para enviar, y podés adjuntar la información del sistema.</span>
                 </div>
                 <div className="ay-more-actions">
                   <button
                     type="button"
-                    className="btn primary"
+                    className="ay-btn ay-btn-primary"
                     onClick={() => {
                       onClose()
                       openReport()
                     }}
                   >
-                    <ReportIcon size={14} />
                     Reportar un problema
                   </button>
-                  <a className="btn" href="https://github.com/Toomasmg/sloth" target="_blank" rel="noopener noreferrer">
+                  <a className="ay-btn ay-btn-secondary" href="https://github.com/Toomasmg/sloth" target="_blank" rel="noopener noreferrer">
                     Repositorio en GitHub
                   </a>
                 </div>
@@ -409,7 +419,8 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
 
       {note && (
         <div className="ay-toast" role="status">
-          {note}
+          <PathIcon d="M5 12.5l4.5 4.5L19 7.5" size={15} sw={2.2} />
+          <span>{note}</span>
         </div>
       )}
     </PageShell>

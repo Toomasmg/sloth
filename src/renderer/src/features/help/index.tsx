@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import type { ChangelogEntry } from '../../../../shared/changelog'
 import { CHANGELOG } from '../../../../shared/changelog'
-import { HelpIcon, InviteIcon, KeyboardIcon, ReportIcon, UpdateIcon } from '../../icons/SlothIcons'
+import { InviteIcon, KeyboardIcon, UpdateIcon } from '../../icons/SlothIcons'
 import type { Command, FeatureUi } from '../host'
 import { useUi } from '../host'
 import { onHelp, openHelp, type HelpAction } from './bus'
-import { openReport } from '../report/bus'
 const AyudaPage = lazy(() => import('./AyudaPage').then((m) => ({ default: m.AyudaPage })))
 const WhatsNewModal = lazy(() => import('./WhatsNew').then((m) => ({ default: m.WhatsNewModal })))
 const InviteModal = lazy(() => import('./Invite').then((m) => ({ default: m.InviteModal })))
@@ -24,127 +23,10 @@ type Dialog =
   /** `seen`: versión a marcar como vista al cerrar (solo en la apertura automática). */
   | { kind: 'whatsnew'; entries: ChangelogEntry[]; seen?: string }
 
-interface MenuItem {
-  id: string
-  label: string
-  icon: React.ReactNode
-  hint?: string
-  run: () => void
-}
-
-const MENU: MenuItem[] = [
-  { id: 'ayuda', label: 'Ayuda y atajos', icon: <KeyboardIcon size={16} />, hint: '?', run: () => openHelp('ayuda') },
-  { id: 'whatsnew', label: 'Novedades', icon: <UpdateIcon size={16} />, run: () => openHelp('whatsnew') },
-  { id: 'invite', label: 'Invitar a un compañero', icon: <InviteIcon size={16} />, run: () => openHelp('invite') },
-  { id: 'report', label: 'Reportar un problema', icon: <ReportIcon size={16} />, run: () => openReport() }
-]
-
-/** Botón «Ayuda» de la barra de título, con su menú chico (role=menu, flechas, Escape). */
-function HelpButton(): React.JSX.Element {
-  const [open, setOpen] = useState(false)
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const btnRef = useRef<HTMLButtonElement>(null)
-  const itemsRef = useRef<(HTMLButtonElement | null)[]>([])
-
-  const close = (restoreFocus: boolean): void => {
-    setOpen(false)
-    if (restoreFocus) btnRef.current?.focus()
-  }
-
-  useEffect(() => {
-    if (!open) return
-    itemsRef.current[0]?.focus()
-    const onDown = (e: MouseEvent): void => {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
-    }
-    window.addEventListener('mousedown', onDown)
-    return () => window.removeEventListener('mousedown', onDown)
-  }, [open])
-
-  const focusItem = (i: number): void => {
-    const n = MENU.length
-    itemsRef.current[(i + n) % n]?.focus()
-  }
-
-  const onMenuKey = (e: React.KeyboardEvent): void => {
-    const idx = itemsRef.current.indexOf(document.activeElement as HTMLButtonElement)
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault()
-        focusItem(idx + 1)
-        break
-      case 'ArrowUp':
-        e.preventDefault()
-        focusItem(idx - 1)
-        break
-      case 'Home':
-        e.preventDefault()
-        focusItem(0)
-        break
-      case 'End':
-        e.preventDefault()
-        focusItem(MENU.length - 1)
-        break
-      case 'Escape':
-        e.preventDefault()
-        e.stopPropagation()
-        close(true)
-        break
-      case 'Tab':
-        e.preventDefault()
-        close(true)
-        break
-    }
-  }
-
-  const pick = (item: MenuItem): void => {
-    // Antes de abrir la pieza, el foco vuelve al botón: así la pieza lo recuerda al cerrarse.
-    close(true)
-    item.run()
-  }
-
-  return (
-    <div className="f-help-wrap" ref={wrapRef}>
-      <button
-        ref={btnRef}
-        type="button"
-        className="icon-btn f-help-btn"
-        aria-label="Ayuda"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        title="Ayuda"
-        onClick={() => setOpen((o) => !o)}
-      >
-        <HelpIcon size={16} />
-      </button>
-      {open && (
-        <div role="menu" aria-label="Ayuda" className="f-help-menu" onKeyDown={onMenuKey}>
-          {MENU.map((item, i) => (
-            <button
-              key={item.id}
-              ref={(el) => {
-                itemsRef.current[i] = el
-              }}
-              type="button"
-              role="menuitem"
-              tabIndex={-1}
-              className="f-help-item"
-              onClick={() => pick(item)}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-              {item.hint && <kbd>{item.hint}</kbd>}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 /**
  * Piezas que se montan una sola vez: la página de Ayuda y atajos («?»), Novedades (al arrancar, si
- * hay algo nuevo) e Invitar. Las abre `openHelp` desde el menú, la paleta o Configuración.
+ * hay algo nuevo) e Invitar. Las abre `openHelp` desde la paleta o Configuración. No hay botón de
+ * ayuda en la barra de título: el artboard no lo tiene.
  */
 function HelpGlobal(): React.JSX.Element {
   const ui = useUi()
@@ -216,7 +98,6 @@ function HelpGlobal(): React.JSX.Element {
 
 const ui: FeatureUi = {
   name: 'help',
-  Titlebar: HelpButton,
   Global: HelpGlobal,
   commands: (): Command[] => [
     {

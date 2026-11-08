@@ -1,4 +1,4 @@
-/* Página de Ayuda y atajos (AyudaPage). */
+/* Página de Ayuda y atajos (AyudaPage). Medidas y colores según el artboard «Ayuda». */
 
 .ay-wrap {
   max-width: 1040px;
@@ -26,10 +26,60 @@
   line-height: 1.5;
 }
 
+/* Botones de la página (34 px; los chicos, 28–30 px). */
+.ay-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-size: var(--fs-md);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ay-btn:hover {
+  filter: brightness(1.12);
+}
+.ay-btn-primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+.ay-btn-secondary {
+  background: var(--btn-2);
+  color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.ay-btn-sm {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 7px;
+  font-size: var(--fs-sm);
+}
+.ay-btn-copy {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.ay-btn-copy:hover {
+  background: var(--surface-hover);
+  color: var(--fg);
+  filter: none;
+}
+
 .ay-search-box {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 .ay-search {
   display: flex;
@@ -38,8 +88,8 @@
   height: 42px;
   box-sizing: border-box;
   padding: 0 8px 0 14px;
-  border-radius: var(--r-lg);
-  background: var(--surface);
+  border-radius: 10px;
+  background: var(--card);
   color: var(--fg-muted);
   box-shadow: inset 0 0 0 1px var(--line-strong);
 }
@@ -73,13 +123,18 @@
   align-items: center;
   gap: 8px;
   padding: 28px 20px;
-  border-radius: var(--r-lg);
-  background: var(--surface);
+  border-radius: 12px;
+  background: var(--card);
   box-shadow: inset 0 0 0 1px var(--line);
   text-align: center;
 }
 .ay-empty-title {
   font-weight: 600;
+}
+.ay-empty-text {
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+  line-height: 1.5;
 }
 .ay-empty-actions {
   display: flex;
@@ -87,6 +142,10 @@
   justify-content: center;
   gap: 8px;
   margin-top: 6px;
+}
+.ay-empty-actions .ay-btn {
+  height: 30px;
+  padding: 0 12px;
 }
 
 .ay-layout {
@@ -152,6 +211,19 @@
   justify-content: space-between;
   gap: 10px;
 }
+.ay-sec-head .ay-btn-secondary {
+  height: 30px;
+  padding: 0 12px;
+  font-weight: 500;
+}
+
+/* Contenedor de listas (atajos y preguntas): tarjeta con borde interno. */
+.ay-card-box {
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
 
 /* Primeros pasos */
 .ay-cards {
@@ -161,7 +233,7 @@
   align-items: start;
 }
 .ay-card {
-  border-radius: var(--r-lg);
+  border-radius: 12px;
   background: var(--card);
   box-shadow: inset 0 0 0 1px var(--line);
   overflow: hidden;
@@ -191,8 +263,8 @@
   display: grid;
   place-items: center;
   border-radius: var(--r-md);
-  background: var(--accent-soft);
-  color: var(--accent-fg);
+  background: var(--info-soft);
+  color: var(--info);
 }
 .ay-card-text {
   flex: 1;
@@ -241,7 +313,14 @@
   color: var(--fg-2);
 }
 .ay-key-row {
+  display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 16px;
+}
+.ay-key-row + .ay-key-row {
+  box-shadow: inset 0 1px 0 var(--line);
 }
 .ay-key-what {
   flex: 1 1 200px;
@@ -253,11 +332,28 @@
   align-items: center;
   gap: 4px;
 }
+.ay-keys kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--btn-2);
+  color: var(--fg);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
 .ay-plus,
 .ay-or {
   font-size: var(--fs-sm);
   color: var(--fg-muted);
   padding: 0 2px;
+}
+.ay-note {
+  margin: 0 4px;
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+  line-height: 1.5;
 }
 .ay-mark {
   background: var(--accent-soft);
@@ -282,8 +378,11 @@
 
 /* Más ayuda */
 .ay-more {
+  display: flex;
   flex-wrap: wrap;
-  border-radius: var(--r-lg);
+  align-items: center;
+  gap: 14px;
+  border-radius: 12px;
   background: var(--card);
   box-shadow: inset 0 0 0 1px var(--line);
   padding: 16px;
@@ -298,6 +397,11 @@
 .ay-more-title {
   font-weight: 600;
 }
+.ay-more-hint {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  line-height: 1.5;
+}
 .ay-more-actions {
   display: flex;
   flex-wrap: wrap;
@@ -310,11 +414,18 @@
   bottom: 18px;
   z-index: 20;
   max-width: calc(100% - 36px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 10px 14px;
-  border-radius: var(--r-md);
-  background: var(--surface-2);
+  border-radius: 10px;
+  background: var(--toast-bg);
   color: var(--fg);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-md), inset 0 0 0 1px var(--line-strong);
+}
+.ay-toast > svg {
+  flex: none;
+  color: var(--success-fg);
 }
 
 @media (max-width: 760px) {
