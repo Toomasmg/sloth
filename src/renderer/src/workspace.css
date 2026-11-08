@@ -1,16 +1,12 @@
 /* v0.5 · espacios: ícono, renombrar, abrir en VS Code / carpeta, soltar carpeta. Solo clases propias. */
 
 /* Ícono del espacio (sidebar, pestañas y header). Nunca solo color: es un emoji. */
-.ws-icon,
 .pane-tab-icon {
   flex: none;
   font-size: 13px;
   line-height: 1;
   min-width: 1.2em;
   text-align: center;
-}
-.ws-icon {
-  margin-right: 5px;
 }
 .pane-tab-icon {
   margin-right: 2px;

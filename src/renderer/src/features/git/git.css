@@ -226,10 +226,6 @@
   padding: 18px 8px;
   text-align: center;
 }
-.g-hint-block {
-  font-size: 12px;
-  color: var(--fg-3);
-}
 .g-spacer {
   flex: 1;
 }
@@ -1164,13 +1160,6 @@
   padding: 0;
   cursor: pointer;
   text-decoration: underline;
-}
-.f-git-ok {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ok-fg, var(--success));
-  font-size: 12.5px;
 }
 .f-git-err {
   margin: 8px 12px;

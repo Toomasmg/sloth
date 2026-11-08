@@ -164,54 +164,7 @@ textarea {
 }
 
 /* ---------- Barra de título (Windows dibuja los botones a la derecha, ~140px) ---------- */
-.titlebar {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  padding: 0 148px 0 0;
-  background: var(--bg);
-  border-bottom: 1px solid var(--line);
-  -webkit-app-region: drag;
-  user-select: none;
-}
-.titlebar-brand {
-  width: 296px;
-  height: 100%;
-  flex: none;
-  display: flex;
-  align-items: center;
-  padding: 0 var(--s-4);
-  background: var(--surface);
-  border-right: 1px solid var(--line);
-}
 /* En la barra el wordmark va en una sola línea: «Sloth  multi-cuenta · v0.3». */
-.titlebar-brand .wordmark {
-  gap: 10px;
-}
-.titlebar-brand .wordmark > div {
-  display: flex;
-  align-items: baseline;
-  gap: var(--s-2);
-}
-.titlebar-brand svg {
-  width: 20px;
-  height: 20px;
-}
-.titlebar-brand .wordmark-name {
-  font-size: 14px;
-  line-height: 1;
-}
-.titlebar-brand .wordmark-tag {
-  font-size: 10.5px;
-}
-.titlebar-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  padding-left: var(--s-1);
-}
 .tb-chip {
   display: inline-flex;
   align-items: center;
@@ -225,18 +178,6 @@ textarea {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   -webkit-app-region: no-drag;
-}
-.tb-working {
-  color: var(--info);
-  background: var(--info-soft);
-}
-.tb-waiting {
-  color: var(--warn);
-  background: var(--warn-soft);
-}
-.tb-done {
-  color: var(--success);
-  background: var(--success-soft);
 }
 
 /* ---------- Sidebar ---------- */
@@ -370,23 +311,6 @@ textarea {
 .list:has(> .account) {
   gap: var(--s-2);
 }
-.account-top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-.account-top .grow-min {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.account-top .item-sub {
-  display: block;
-}
-.account-top .icon-btn {
-  color: var(--fg-muted);
-}
 .acc-chip {
   width: 28px;
   height: 28px;
@@ -508,9 +432,6 @@ textarea {
 }
 
 /* Espacio: fila de navegación (hover y activo por fondo; nada de bordes). */
-.ws-li {
-  position: relative;
-}
 .ws {
   position: relative;
   width: 100%;
@@ -543,9 +464,6 @@ textarea {
 .ws.open:hover {
   background: var(--hover);
 }
-.ws.open .ws-name {
-  color: var(--fg);
-}
 .ws.focused,
 .ws.focused:hover {
   background: var(--card);
@@ -568,33 +486,11 @@ textarea {
 .ws .item-title {
   overflow: visible;
 }
-.ws-name {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--fg-2);
-}
 .ws .item-sub {
   overflow: hidden;
 }
-.ws-acc {
-  flex: none;
-}
 .ws .item-sub .tag {
   line-height: 16px;
-}
-.ws-where {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ws-acc + .ws-where::before {
-  content: '·';
-  margin-right: 6px;
-  font-family: var(--font-ui);
 }
 .acc-dot {
   width: 6px;
@@ -602,17 +498,6 @@ textarea {
   flex: none;
   border-radius: 50%;
   background: var(--acc);
-}
-.ws-del {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  opacity: 0;
-}
-.ws-li:hover .ws-del,
-.ws-del:focus-visible {
-  opacity: 1;
 }
 .tag {
   flex: none;
@@ -745,10 +630,6 @@ textarea {
   opacity: 0.45;
   cursor: not-allowed;
 }
-.btn-group {
-  display: flex;
-  gap: 6px;
-}
 /* Botón de solo ícono: 30 × 30, radio 7, hover #222734. */
 .icon-btn {
   display: inline-grid;
@@ -813,13 +694,13 @@ textarea:disabled {
   opacity: 0.5;
 }
 
-/* ---------- Segmentado (contenedor #191c25; opción activa #3a4152 con sombra) ---------- */
+/* ---------- Segmentado (contenedor --card-hover; opción activa --muted con sombra) ---------- */
 .seg {
   display: inline-flex;
   padding: 2px;
   gap: 1px;
   border-radius: var(--radius);
-  background: #191c25;
+  background: var(--card-hover);
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .seg > button {
@@ -839,8 +720,8 @@ textarea:disabled {
 }
 .seg > button[aria-pressed='true'],
 .seg > button.on {
-  background: #3a4152;
-  color: #ffffff;
+  background: var(--muted);
+  color: var(--fg);
   font-weight: 500;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
@@ -866,23 +747,23 @@ textarea:disabled {
 }
 .chip-working {
   background: rgba(138, 180, 255, 0.14);
-  color: #a9c7ff;
+  color: var(--info);
 }
 .chip-perm {
   background: rgba(240, 180, 90, 0.22);
-  color: #ffd699;
+  color: var(--warn-fg);
 }
 .chip-waiting {
   background: rgba(240, 180, 90, 0.14);
-  color: #f5c77e;
+  color: var(--warn-fg);
 }
 .chip-done {
   background: rgba(95, 212, 166, 0.14);
-  color: #7fe0b9;
+  color: var(--success-fg);
 }
 .chip-error {
   background: rgba(255, 122, 122, 0.14);
-  color: #ff9a9a;
+  color: var(--danger-fg);
 }
 .chip-idle {
   background: rgba(255, 255, 255, 0.06);
@@ -1034,36 +915,12 @@ kbd,
   font-size: var(--fs-sm);
   color: var(--fg-muted);
 }
-.pane-dot {
-  align-self: center;
-  width: 8px;
-  height: 8px;
-}
 .acc-badge {
   flex: none;
   font-size: var(--fs-sm);
   font-weight: 600;
   color: color-mix(in srgb, var(--acc) 80%, var(--fg));
   white-space: nowrap;
-}
-.pane-path {
-  flex: 0 1 auto;
-  min-width: 0;
-  color: var(--fg-muted);
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.pane-path::before {
-  content: '·';
-  margin-right: var(--s-2);
-  font-family: var(--font-ui);
-}
-@container pane-meta (max-width: 150px) {
-  .pane-path {
-    display: none;
-  }
 }
 @container pane-meta (max-width: 56px) {
   .acc-badge {
@@ -1271,9 +1128,6 @@ kbd,
   font-size: var(--fs-lg);
   font-weight: 600;
 }
-.modal-icon {
-  color: var(--warn);
-}
 .field {
   display: flex;
   flex-direction: column;
@@ -1413,141 +1267,12 @@ kbd,
 }
 
 /* ---------- Permisos de Claude ---------- */
-.tb-perm {
-  color: var(--warn);
-  background: var(--warn-soft);
-  box-shadow: inset 0 0 0 1px var(--warn-ring);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  transition: background var(--t-fast) var(--ease);
-}
-.tb-perm:hover {
-  background: rgba(240, 180, 90, 0.22);
-}
-.perm-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  flex: none;
-  font-size: 10.5px;
-  font-weight: 700;
-  line-height: 18px;
-  color: var(--warn);
-  background: var(--warn-soft);
-  border-radius: var(--r-xs);
-  padding: 0 5px;
-  white-space: nowrap;
-}
 /* Tarjeta de permiso: una franja bajo el header (sin marco), con tinte ámbar suave. */
-.perm-card {
-  flex: none;
-  /* Nunca tapa la terminal: como mucho la mitad del panel, con scroll interno. */
-  max-height: 55%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: var(--s-3);
-  background: linear-gradient(var(--warn-tint), var(--warn-tint)), var(--surface);
-  border-bottom: 1px solid var(--warn-line);
-  animation: perm-in 180ms var(--ease);
-}
 @keyframes perm-in {
   from {
     opacity: 0;
   }
 }
-.perm-head {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  min-width: 0;
-  min-height: 24px;
-}
-.perm-icon {
-  color: var(--warn);
-  flex: none;
-}
-.perm-title {
-  margin: 0;
-  font-size: var(--fs-md);
-  font-weight: 600;
-  color: var(--fg);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-.perm-title code {
-  color: var(--brand-1);
-  background: var(--accent-soft);
-  border-radius: var(--r-xs);
-  padding: 1px 6px;
-}
-.perm-queue {
-  flex: none;
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  line-height: 20px;
-  color: var(--fg-2);
-  background: var(--hover);
-  border-radius: 999px;
-  padding: 0 8px;
-  font-variant-numeric: tabular-nums;
-}
-.perm-timer {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  font-variant-numeric: tabular-nums;
-  color: var(--fg-muted);
-}
-.perm-timer.urgent {
-  color: var(--warn);
-  font-weight: 700;
-}
-.perm-body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-  padding-left: 26px;
-}
-.perm-desc {
-  margin: 0;
-  color: var(--fg-2);
-  font-size: var(--fs-sm);
-}
-.perm-code {
-  margin: 0;
-  max-height: 120px;
-  overflow: auto;
-  padding: var(--s-2) 10px;
-  background: var(--term-bg);
-  border-radius: var(--r-sm);
-  color: var(--fg);
-  font-size: var(--fs-sm);
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-.perm-link {
-  align-self: flex-start;
-  background: none;
-  border: none;
-  padding: 2px 0;
-  color: var(--brand-1);
-  font-size: var(--fs-sm);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-.perm-actions,
 .perm-deny {
   display: flex;
   align-items: center;
@@ -1572,12 +1297,6 @@ kbd,
 }
 
 /* ---------- Estado de las terminales (daemon) ---------- */
-.titlebar-right {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  -webkit-app-region: no-drag;
-}
 .daemon {
   position: relative;
 }
