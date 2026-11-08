@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import type { PtyChunk } from '../../shared/types'
 import { api, onPtyData, onPtyExit } from './api'
 import { subscribeSettings, termOptions } from './features/settings/store'
+import { usePaneVisible } from './visibility'
 
 interface Props {
   id: string
@@ -18,6 +19,10 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
   // onError por ref: la terminal solo se recrea si cambian id o generation.
   const onErrorRef = useRef(onError)
   onErrorRef.current = onError
+  // Terminal y ajuste vivos (para cuando el panel vuelve a verse).
+  const live = useRef<{ term: Terminal; fit: FitAddon } | null>(null)
+  // Panel en pestaña (oculto): no dibuja, no mide y no parpadea el cursor.
+  const shown = usePaneVisible(id)
 
   useEffect(() => {
     const el = host.current
@@ -28,7 +33,6 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
     const term = new Terminal({
       ...opts,
       cursorBlink: opts.cursorBlink && document.visibilityState === 'visible',
-      scrollback: 3000,
       allowProposedApi: true
     })
     const fit = new FitAddon()
@@ -38,6 +42,26 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
       fit.fit()
     } catch {
       /* el panel todavía no tiene tamaño */
+    }
+    live.current = { term, fit }
+    // xterm mide la letra al abrir: si la webfont todavía no llegó, se vuelve a medir cuando carga.
+    if (!document.fonts.check(`${opts.fontSize}px "JetBrains Mono Variable"`)) {
+      void document.fonts.load(`${opts.fontSize}px "JetBrains Mono Variable"`).then(
+        () => {
+          if (disposed) return
+          // Cambiar la fuente (aunque sea el mismo nombre) hace que xterm vuelva a medir.
+          term.options.fontFamily = `${opts.fontFamily}, monospace`
+          term.options.fontFamily = opts.fontFamily
+          if (el.offsetParent !== null) {
+            try {
+              fit.fit()
+            } catch {
+              /* sin tamaño todavía */
+            }
+          }
+        },
+        () => undefined
+      )
     }
 
     // Lo que llega antes de recibir el buffer se encola, y se descarta lo ya incluido en el buffer.
@@ -115,7 +139,7 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
 
     // Sin parpadeo de cursor (timer por terminal) mientras la ventana no se ve.
     const onVis = (): void => {
-      term.options.cursorBlink = termOptions().cursorBlink && document.visibilityState === 'visible'
+      term.options.cursorBlink = termOptions().cursorBlink && document.visibilityState === 'visible' && shownRef.current
     }
     document.addEventListener('visibilitychange', onVis)
 
@@ -130,6 +154,7 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
       if (o.theme !== last.theme) term.options.theme = o.theme
       if (o.minimumContrastRatio !== last.minimumContrastRatio) term.options.minimumContrastRatio = o.minimumContrastRatio
       if (o.cursorBlink !== last.cursorBlink) onVis()
+      if (o.scrollback !== last.scrollback) term.options.scrollback = o.scrollback
       const metrics = o.fontFamily !== last.fontFamily || o.fontSize !== last.fontSize || o.lineHeight !== last.lineHeight
       last = o
       if (!metrics || disposed || el.offsetParent === null || el.clientWidth === 0) return
@@ -142,6 +167,7 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
 
     return () => {
       disposed = true
+      live.current = null
       if (raf) cancelAnimationFrame(raf)
       ro.disconnect()
       document.removeEventListener('visibilitychange', onVis)
@@ -152,6 +178,22 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
       term.dispose()
     }
   }, [id, generation])
+
+  // Cambia la visibilidad: oculta, sin parpadeo; visible otra vez, ajusta y repinta lo que hubo mientras tanto.
+  const shownRef = useRef(shown)
+  shownRef.current = shown
+  useEffect(() => {
+    const l = live.current
+    if (!l) return
+    l.term.options.cursorBlink = termOptions().cursorBlink && shown && document.visibilityState === 'visible'
+    if (!shown || host.current?.offsetParent == null) return
+    try {
+      l.fit.fit()
+    } catch {
+      /* sin tamaño todavía */
+    }
+    l.term.refresh(0, l.term.rows - 1)
+  }, [shown])
 
   return <div className="terminal-host" ref={host} />
 })

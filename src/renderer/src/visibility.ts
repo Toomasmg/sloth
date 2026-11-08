@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useSettings } from './features/settings/store'
 
 const isVisible = (): boolean => document.visibilityState === 'visible'
 
@@ -15,17 +16,43 @@ export function useDocumentVisible(): boolean {
 
 /**
  * Corre `fn` al montar y cada `ms`, pero solo con la ventana visible:
- * se pausa al ocultarse y refresca una vez al volver.
+ * se pausa al ocultarse y refresca una vez al volver. En modo liviano, el intervalo es el doble.
  */
 export function useVisiblePolling(fn: () => void, ms: number, deps: unknown[] = []): void {
   const visible = useDocumentVisible()
+  const lite = useSettings().settings.lightMode
+  const every = lite ? ms * 2 : ms
   const fnRef = useRef(fn)
   fnRef.current = fn
   useEffect(() => {
     if (!visible) return
     fnRef.current()
-    const t = setInterval(() => fnRef.current(), ms)
+    const t = setInterval(() => fnRef.current(), every)
     return () => clearInterval(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, ms, ...deps])
+  }, [visible, every, ...deps])
+}
+
+/* ---------- Paneles visibles ----------
+ * App dice qué paneles se ven (los que están en pestañas quedan ocultos). Terminales y el botón de
+ * Git miran esto: lo oculto no dibuja, no mide y no consulta nada. Por defecto, visible.
+ */
+const paneVisible = new Map<string, boolean>()
+const paneListeners = new Set<() => void>()
+
+export function setPaneVisible(id: string, visible: boolean): void {
+  if (paneVisible.has(id) && paneVisible.get(id) === visible) return
+  paneVisible.set(id, visible)
+  for (const l of paneListeners) l()
+}
+
+/** true si el panel se ve en la grilla (o si todavía no se sabe). */
+export function usePaneVisible(id: string): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      paneListeners.add(cb)
+      return () => paneListeners.delete(cb)
+    },
+    () => paneVisible.get(id) ?? true
+  )
 }

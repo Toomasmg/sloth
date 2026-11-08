@@ -68,7 +68,7 @@
 }
 
 /* Ventana oculta o minimizada: la animación se pausa (App pone .doc-hidden en .shell). */
-.shell.doc-hidden .empty-orbits * {
+.sl-shell.doc-hidden .empty-orbits * {
   animation-play-state: paused;
 }
 

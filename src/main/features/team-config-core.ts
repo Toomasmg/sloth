@@ -8,6 +8,7 @@ import { createHash } from 'node:crypto'
 import { closeSync, existsSync, openSync, readSync, statSync } from 'node:fs'
 import { isAbsolute, join, normalize, relative, resolve, sep } from 'node:path'
 import { applyVars, SUGGESTED, today, validBranch, varsIn } from './templates-core'
+import { BRANCH_VARS, TEMPLATE_VARS } from '../../shared/templates-shared'
 import { parseChatServerConfig, type ChatServerConfig } from './chat-config'
 
 export const TEAM_FORMAT = 'sloth-team'
@@ -17,7 +18,6 @@ export const TEAM_FILE = 'team.json'
 export const MAX_TEAM_BYTES = 256 * 1024
 const MAX_TEMPLATES = 50
 const MAX_LINKS = 12
-const VARS = ['ticket', 'ticketmin', 'fecha', 'n', 'plantilla']
 
 /** Los mismos valores que la Configuración de Sloth (settings-model.ts). */
 export type Density = 'compacta' | 'cómoda'
@@ -91,8 +91,8 @@ function bool(v: unknown, where: string, def: boolean): boolean {
   return v as boolean
 }
 
-function checkVars(s: string | undefined, where: string): void {
-  for (const v of varsIn(s)) if (!VARS.includes(v)) fail(`${where}: variable desconocida {${v}}. Usá {ticket}, {ticketmin}, {fecha}, {n} o {plantilla}.`)
+function checkVars(s: string | undefined, where: string, allowed: readonly string[] = TEMPLATE_VARS): void {
+  for (const v of varsIn(s)) if (!allowed.includes(v)) fail(`${where}: variable desconocida {${v}}. Usá ${allowed.map((x) => `{${x}}`).join(', ')}.`)
 }
 
 /** Ruta relativa segura dentro del repo: «.», «apps/web»; nunca absoluta ni con «..». */
@@ -136,7 +136,7 @@ function parseTemplate(raw: unknown, i: number): TeamTemplate {
     const w = raw.useWorktree as Record<string, unknown>
     onlyKeys(w, ['branchPattern'], `${label}: useWorktree`)
     const bp = text(w.branchPattern, 200, `${label}: branchPattern`, true)!
-    checkVars(bp, `${label}: branchPattern`)
+    checkVars(bp, `${label}: branchPattern`, BRANCH_VARS)
     const sample = applyVars(bp, { ticket: 'TCK-1', fecha: today(), n: 1, plantilla: name })
     if (!validBranch(sample)) fail(`${label}: la rama «${sample}» no es un nombre válido para git.`)
     useWorktree = { branchPattern: bp }

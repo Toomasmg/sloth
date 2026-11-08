@@ -2,13 +2,25 @@ import { useEffect, useState } from 'react'
 import { useUi } from '../host'
 
 export type UpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error'
+export interface NoteGroup {
+  id: string
+  label: string
+  items: string[]
+}
 export interface UpdateStatus {
   state: UpdateState
   version?: string
+  releaseDate?: string
+  notes?: NoteGroup[]
   percent?: number
+  transferred?: number
+  total?: number
   error?: string
   checkedAt?: number
   upToDate?: boolean
+  later?: boolean
+  queued?: boolean
+  channel: 'estable' | 'beta'
   enabled: boolean
   current: string
 }
@@ -28,4 +40,13 @@ export function useUpdateStatus(): UpdateStatus | null {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   return st
+}
+
+/**
+ * Punto del acceso a Configuración: «Más tarde» dejó una versión pendiente. Lo usa quien monta la
+ * barra superior (el integrador): `<UpdateDot />` o este hook para pintarlo donde corresponda.
+ */
+export function useUpdateDot(): boolean {
+  const st = useUpdateStatus()
+  return !!st && !!st.later && (st.state === 'available' || st.state === 'downloading' || st.state === 'ready')
 }

@@ -1,37 +1,26 @@
-import { useEffect } from 'react'
-import { Ticket } from '@phosphor-icons/react'
-import type { FeatureUi } from '../host'
-import { useUi } from '../host'
-import { Board } from './Board'
-import { setBoardOpen, setSnapshot, useBoardOpen, useSnapshot, type Snapshot } from './model'
+import { useEffect, lazy, Suspense } from 'react'
+import { useUi, type FeatureUi } from '../host'
+import { TicketIcon } from '../../icons/SlothIcons'
+const Board = lazy(() => import('./Board').then((m) => ({ default: m.Board })))
+import { isMine, setBoardOpen, setSnapshot, useBoardOpen, useSnapshot, type Snapshot } from './model'
 import './gruv.css'
 
-/** Chip «Tickets» en la barra de título, con cuántos tickets hay en el tablero (Gruv no trae los cerrados). */
+/** Chip «Tickets» en la barra de título, con cuántos tickets son míos (los que Gruv trajo). */
 function TitlebarChip(): React.JSX.Element {
   const snap = useSnapshot()
   const open = useBoardOpen()
-  const ui = useUi()
-  let count = 0
-  if (snap) {
-    const ids = new Set<string>()
-    for (const t of [...snap.tickets, ...snap.manual]) {
-      if (ids.has(t.id)) continue
-      ids.add(t.id)
-      count++
-    }
-    for (const w of ui.workspaces) if (w.ticket && !ids.has(w.ticket.toUpperCase())) count++
-  }
+  const mine = snap ? snap.tickets.filter((t) => isMine(t, snap.me)).length : 0
   return (
     <button
       type="button"
       className="tb-chip f-gruv-chip-tb"
       aria-pressed={open}
       onClick={() => setBoardOpen(!open)}
-      title="Tablero de tickets de Gruv"
+      title="Tickets de Gruv"
     >
-      <Ticket size={12} weight="bold" aria-hidden="true" />
+      <TicketIcon size={12} />
       Tickets
-      {count > 0 && <span className="f-gruv-chip-n">{count}</span>}
+      {mine > 0 && <span className="f-gruv-chip-n">{mine}</span>}
     </button>
   )
 }
@@ -50,7 +39,11 @@ function Global(): React.JSX.Element | null {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  return open ? <Board /> : null
+  return open ? (
+    <Suspense fallback={null}>
+      <Board />
+    </Suspense>
+  ) : null
 }
 
 const ui: FeatureUi = {
@@ -60,10 +53,10 @@ const ui: FeatureUi = {
   commands: () => [
     {
       id: 'gruv:board',
-      title: 'Tablero de tickets',
-      subtitle: 'Tickets de Gruv: empezar uno crea su espacio con /ticket',
+      title: 'Tickets de Gruv',
+      subtitle: 'Tus tickets y los del equipo: empezar uno crea su espacio',
       group: 'Tickets',
-      keywords: 'gruv kanban tck tickets tablero',
+      keywords: 'gruv kanban tck tickets tablero lista',
       run: () => setBoardOpen(true)
     }
   ]

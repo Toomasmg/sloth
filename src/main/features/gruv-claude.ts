@@ -10,6 +10,12 @@ import { homedir } from 'node:os'
  * para poder probarlo con Node solo.
  */
 
+/** Criterio de aceptación de un ticket (si Gruv lo trae). */
+export interface GruvCriterio {
+  texto: string
+  hecho: boolean
+}
+
 export interface GruvTicket {
   id: string
   titulo: string
@@ -17,6 +23,12 @@ export interface GruvTicket {
   prioridad?: string
   proyecto?: string
   url?: string
+  /** Nombre de quien tiene el ticket asignado (si lo tiene). */
+  responsable?: string
+  responsableId?: string
+  /** Descripción recortada (la pide la consulta; si Gruv no la trae, no viene). */
+  descripcion?: string
+  criterios?: GruvCriterio[]
 }
 
 /** Una columna del tablero de Gruv (de `ver_flujo_tickets`). */
@@ -25,10 +37,17 @@ export interface GruvEstado {
   nombre: string
 }
 
+/** La persona dueña de la cuenta que consultó Gruv (de `ver_mi_inicio`). */
+export interface GruvYo {
+  id?: string
+  nombre: string
+}
+
 export interface RunResult {
   tickets: GruvTicket[]
   /** Estados en el orden de las columnas, si Claude los pudo leer. */
   estados?: GruvEstado[]
+  me?: GruvYo
   costUsd?: number
   tokens?: number
   durationMs?: number
@@ -36,7 +55,8 @@ export interface RunResult {
 
 export const TICKET_RE = /^[A-Z][A-Z0-9]*-\d{1,7}$/
 export const RUN_TIMEOUT_MS = 120_000
-const MAX_TICKETS = 500
+const MAX_TICKETS = 250
+const MAX_CRITERIOS = 5
 const MAX_STDOUT = 4 * 1024 * 1024
 
 /** Solo lectura: lo único que se le permite usar a Claude en la consulta. */
@@ -106,6 +126,11 @@ export const OUTPUT_SCHEMA = {
         required: ['clave', 'nombre']
       }
     },
+    yo: {
+      type: 'object',
+      properties: { id: { type: 'string' }, nombre: { type: 'string' } },
+      required: ['nombre']
+    },
     tickets: {
       type: 'array',
       items: {
@@ -116,7 +141,18 @@ export const OUTPUT_SCHEMA = {
           estado: { type: 'string' },
           prioridad: { type: 'string' },
           proyecto: { type: 'string' },
-          url: { type: 'string' }
+          url: { type: 'string' },
+          responsable: { type: 'string' },
+          responsable_id: { type: 'string' },
+          descripcion: { type: 'string' },
+          criterios: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: { texto: { type: 'string' }, hecho: { type: 'boolean' } },
+              required: ['texto', 'hecho']
+            }
+          }
         },
         required: ['id', 'titulo', 'estado']
       }
@@ -125,16 +161,22 @@ export const OUTPUT_SCHEMA = {
   required: ['tickets']
 }
 
+/**
+ * Lee los tickets de TODO el equipo (no solo los de la cuenta) para que la app pueda separar
+ * «Míos», «Del equipo» y «Sin asignar». `assigneeId` fija quién sos si ya se configuró.
+ */
 export function buildPrompt(assigneeId: string): string {
-  const who = assigneeId
-    ? `asignado: "${assigneeId}"`
-    : 'asignado: <el id de la persona dueña de esta cuenta, que sacás de buscar_persona o ver_mi_inicio>'
+  const yo = assigneeId
+    ? `Tu id en Gruv es "${assigneeId}": usalo en yo.id.`
+    : 'Tu id y tu nombre en Gruv los sacás de ver_mi_inicio.'
   return [
-    'Tarea de solo lectura. No modifiques nada en Gruv: no comentes, no muevas, no tildes nada.',
-    `1. Llamá a la herramienta de Gruv listar_tickets con ${who} y limite: 100, sin filtrar por estado. Si vuelven 100, seguí con desplazamiento: 100, 200… hasta traer todos (como máximo 300).`,
-    '2. Llamá a ver_flujo_tickets (sin tipo) y armá la lista de estados en el orden de las columnas del tablero, sin repetir claves, con la clave y el nombre que se ve.',
+    'Tarea de solo lectura. No modifiques nada en Gruv: no comentes, no muevas, no asignes, no tildes nada.',
+    `1. Armá "yo" con tu id y tu nombre en Gruv. ${yo}`,
+    '2. Llamá a la herramienta de Gruv listar_tickets SIN filtrar por estado ni por asignado (quiero los tickets de todo el equipo), con limite: 100. Si vuelven 100, seguí con desplazamiento: 100, 200… hasta traer todos (como máximo 250).',
+    '3. Llamá a ver_flujo_tickets (sin tipo) y armá "estados" con las columnas en su orden, sin repetir claves, con la clave y el nombre que se ven.',
+    '"responsable" es el nombre de quien tiene asignado el ticket y "responsable_id" su id; si nadie lo tiene, no pongas ninguno de los dos. "descripcion" es el texto de la descripción en una línea, recortado a 200 caracteres, si la trae. "criterios" son hasta 5 criterios de aceptación, con "texto" (máx. 120 caracteres) y "hecho" (true o false), si los trae.',
     'Respondé SOLO con un JSON, sin texto antes ni después y sin bloque de código, con esta forma:',
-    '{"estados":[{"clave":"abierto","nombre":"Abierto"}],"tickets":[{"id":"TCK-1234","titulo":"…","estado":"<clave del estado, p. ej. en_revision>","prioridad":"<severidad, si la da>","proyecto":"<espacio o proyecto, si lo da>","url":"<link al ticket, si lo da>"}]}',
+    '{"yo":{"id":"<tu id>","nombre":"<tu nombre>"},"estados":[{"clave":"abierto","nombre":"Abierto"}],"tickets":[{"id":"TCK-1234","titulo":"…","estado":"<clave del estado, p. ej. en_revision>","prioridad":"<severidad, si la da>","proyecto":"<espacio o proyecto, si lo da>","url":"<link al ticket, si lo da>","responsable":"<nombre>","responsable_id":"<id>","descripcion":"…","criterios":[{"texto":"…","hecho":false}]}]}',
     'Si un campo opcional no viene, no lo pongas. Si no hay tickets, devolvé "tickets":[].',
     `Si no tenés ninguna herramienta de Gruv disponible, respondé exactamente {"error":"${NO_GRUV}","tickets":[]}.`
   ].join('\n')
@@ -221,10 +263,47 @@ export function normalizeTickets(raw: unknown): GruvTicket[] {
     const proyecto = str(o.proyecto ?? o.project, 80)
     if (proyecto) t.proyecto = proyecto
     if (url && /^https?:\/\//i.test(url)) t.url = url
+    const resp = o.responsable
+    const respName = typeof resp === 'object' && resp ? str((resp as Record<string, unknown>).nombre, 100) : str(resp, 100)
+    const respId = str(o.responsable_id ?? o.responsableId ?? (typeof resp === 'object' && resp ? (resp as Record<string, unknown>).id : undefined), 64)
+    if (respName && !/^(sin asignar|sin_asignar|nadie|-)$/i.test(respName)) t.responsable = respName
+    if (respId && /^[A-Za-z0-9-]{1,64}$/.test(respId) && t.responsable) t.responsableId = respId
+    const desc = str(o.descripcion ?? o.description, 400)
+    if (desc) t.descripcion = desc
+    const criterios = normCriterios(o.criterios)
+    if (criterios.length) t.criterios = criterios
     out.set(id, t)
     if (out.size >= MAX_TICKETS) break
   }
   return [...out.values()]
+}
+
+/** Criterios de aceptación: máximo 5; un texto suelto cuenta como pendiente. */
+export function normCriterios(raw: unknown): GruvCriterio[] {
+  if (!Array.isArray(raw)) return []
+  const out: GruvCriterio[] = []
+  for (const c of raw) {
+    if (out.length >= MAX_CRITERIOS) break
+    if (typeof c === 'string') {
+      const texto = str(c, 160)
+      if (texto) out.push({ texto, hecho: false })
+    } else if (c && typeof c === 'object') {
+      const o = c as Record<string, unknown>
+      const texto = str(o.texto ?? o.text ?? o.titulo, 160)
+      if (texto) out.push({ texto, hecho: o.hecho === true || o.done === true })
+    }
+  }
+  return out
+}
+
+/** «yo»: quién es la persona dueña de la cuenta en Gruv. */
+export function normYo(raw: unknown): GruvYo | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const o = raw as Record<string, unknown>
+  const nombre = str(o.nombre ?? o.name, 100)
+  if (!nombre) return undefined
+  const id = str(o.id, 64)
+  return id && /^[A-Za-z0-9-]{1,64}$/.test(id) ? { id, nombre } : { nombre }
 }
 
 /** Saca el primer JSON (objeto o lista) de un texto, aunque venga con ```json o texto alrededor. */
@@ -311,6 +390,7 @@ export function parseClaudeOutput(stdout: string): RunResult {
     throw new Error('Claude no pudo usar las herramientas de Gruv (permiso negado). Probá de nuevo.')
   }
   const estados = normalizeEstados((data as { estados?: unknown })?.estados)
+  const me = normYo((data as { yo?: unknown })?.yo)
   const usage = env.usage as Record<string, number> | undefined
   const tokens = usage
     ? ['input_tokens', 'output_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens'].reduce(
@@ -321,6 +401,7 @@ export function parseClaudeOutput(stdout: string): RunResult {
   return {
     tickets,
     estados,
+    me,
     costUsd: typeof env.total_cost_usd === 'number' ? env.total_cost_usd : undefined,
     tokens,
     durationMs: typeof env.duration_ms === 'number' ? env.duration_ms : undefined

@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { createReadStream, existsSync, openSync, readSync, closeSync, statSync } from 'node:fs'
+import { createReadStream, existsSync, openSync, readSync, closeSync, statSync, unlinkSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { git, gitRaw, GitError, PROTECTED, readable, run, validBranchName } from './git-run'
 
@@ -41,6 +41,8 @@ export interface FileChange {
   del?: number
   binary?: boolean
   huge?: boolean
+  /** Tiene cambios en el índice (preparado para el próximo commit). */
+  staged?: boolean
 }
 
 /** Parsea `git status --porcelain=v1 -z`. */
@@ -152,6 +154,7 @@ export async function status(cwd: string): Promise<StatusResult> {
   let files = parsePorcelain(st)
   const truncated = files.length > MAX_FILES
   if (truncated) files = files.slice(0, MAX_FILES)
+  for (const f of files) f.staged = f.xy[0] !== ' ' && f.xy[0] !== '?' && f.xy[0] !== '!'
   // Las rutas de status son relativas al top del repo; numstat también si se corre desde el top.
   const num = await gitRaw(info.top, ['diff', info.hasHead ? 'HEAD' : EMPTY_TREE, '--numstat', '-z', '-M', '--no-ext-diff'], {
     timeoutMs: 20000
@@ -415,23 +418,282 @@ export function isProtected(branch: string | null | undefined): boolean {
   return !branch || PROTECTED.has(branch)
 }
 
-export async function commitAll(cwd: string, message: string): Promise<string> {
+/** Commit de lo que está preparado (índice). Nunca agrega archivos por su cuenta. */
+export async function commitStaged(cwd: string, message: string): Promise<string> {
   const info = await repoInfo(cwd)
-  if (!info.isRepo) throw new GitError('La carpeta no es un repositorio git.')
+  if (!info.isRepo || !info.top) throw new GitError('La carpeta no es un repositorio git.')
   if (info.branch === null) throw new GitError('HEAD está separado (detached): creá una rama antes de commitear.')
   if (isProtected(info.branch)) throw new GitError(`No se commitea directo en ${info.branch}. Creá una rama nueva.`)
-  const n = await changeCount(cwd)
-  if (!n) throw new GitError('No hay cambios para commitear.')
-  await git(info.top!, ['add', '-A'], { timeoutMs: 60000 })
-  const r = await gitRaw(info.top!, ['commit', '-F', '-'], { timeoutMs: 120000, input: message })
+  const staged = await git(info.top, ['diff', '--cached', '--name-only', '-z'], { timeoutMs: 20000 })
+  if (!staged.replace(/\0/g, '').trim()) throw new GitError('No hay archivos preparados. Marcá al menos uno para confirmarlo.')
+  const r = await gitRaw(info.top, ['commit', '-F', '-'], { timeoutMs: 120000, input: message })
   if (r.code !== 0) throw new GitError(readable(r, 'git commit'))
-  return (await git(cwd, ['rev-parse', '--short', 'HEAD'])).trim()
+  return (await git(info.top, ['rev-parse', '--short', 'HEAD'])).trim()
 }
 
-export async function createBranch(cwd: string, name: string): Promise<void> {
+export async function createBranch(cwd: string, name: string, base?: string): Promise<void> {
   if (!validBranchName(name) || name.startsWith('+')) throw new GitError('Nombre de rama inválido.')
   if (await hasRef(cwd, `refs/heads/${name}`)) throw new GitError(`Ya existe la rama ${name}.`)
+  if (base !== undefined) {
+    if (!validBranchName(base) || base.startsWith('+')) throw new GitError('Rama base inválida.')
+    if (!(await hasRef(cwd, `refs/heads/${base}`))) throw new GitError(`No encuentro la rama local ${base}.`)
+    await git(cwd, ['switch', '-c', name, base], { timeoutMs: 30000 })
+    return
+  }
   await git(cwd, ['switch', '-c', name], { timeoutMs: 30000 })
+}
+
+// ---------- Preparar, sacar y descartar ----------
+
+/** Rutas de un cambio: la original también cuenta cuando es un renombrado. */
+function pathsOf(f: FileChange): string[] {
+  return f.orig ? [f.orig, f.path] : [f.path]
+}
+
+/** Prepara el archivo (incluye su cambio en el árbol: `git add -A -- ruta`). */
+export async function stageFile(top: string, f: FileChange): Promise<void> {
+  await git(top, ['add', '-A', '--', ...pathsOf(f)], { timeoutMs: 60000 })
+}
+
+/** Saca el archivo del índice sin tocar el árbol (`git reset -q -- ruta`). Funciona también sin commits. */
+export async function unstageFile(top: string, f: FileChange): Promise<void> {
+  await git(top, ['reset', '-q', '--', ...pathsOf(f)], { timeoutMs: 30000 })
+}
+
+export async function stageAll(top: string): Promise<void> {
+  await git(top, ['add', '-A'], { timeoutMs: 120000 })
+}
+
+export async function unstageAll(top: string): Promise<void> {
+  await git(top, ['reset', '-q'], { timeoutMs: 60000 })
+}
+
+/**
+ * Descarta los cambios de un archivo. Para no trackeados borra el archivo (la UI pide confirmación reforzada).
+ * Nunca toca nada fuera del repo.
+ */
+export async function discardFile(top: string, f: FileChange, hasHead: boolean): Promise<void> {
+  const abs = insideRepo(top, f.path)
+  if (!abs) throw new GitError('Ruta fuera del repositorio.')
+  if (f.code === '??') {
+    try {
+      if (!statSync(abs).isFile()) throw new GitError('Solo se pueden borrar archivos sueltos.')
+    } catch (e) {
+      if (e instanceof GitError) throw e
+      throw new GitError('El archivo ya no existe.')
+    }
+    unlinkSync(abs)
+    return
+  }
+  if (!hasHead || f.code === 'A') {
+    await git(top, ['rm', '-f', '-q', '--', f.path], { timeoutMs: 60000 })
+    return
+  }
+  if (f.orig) {
+    await git(top, ['restore', '--source=HEAD', '--staged', '--worktree', '--', f.orig], { timeoutMs: 60000 })
+    await git(top, ['rm', '-f', '-q', '--', f.path], { timeoutMs: 60000 })
+    return
+  }
+  await git(top, ['restore', '--source=HEAD', '--staged', '--worktree', '--', f.path], { timeoutMs: 60000 })
+}
+
+// ---------- Historial ----------
+
+export interface LogEntry {
+  hash: string
+  short: string
+  title: string
+  author: string
+  /** Fecha ISO del autor. */
+  date: string
+  pushed: boolean
+}
+
+/** Hashes de commits que todavía no están en el remoto (tope 1000). */
+export async function unpushedHashes(cwd: string): Promise<Set<string>> {
+  if (!(await hasRef(cwd, 'HEAD'))) return new Set()
+  const up = await upstream(cwd)
+  const args = up ? ['rev-list', '-n', '1000', `${up}..HEAD`] : ['rev-list', '-n', '1000', 'HEAD', '--not', '--remotes']
+  const out = await git(cwd, args, { timeoutMs: 15000 })
+  return new Set(out.split('\n').map((s) => s.trim()).filter(Boolean))
+}
+
+export async function logBranch(cwd: string, limit = 300): Promise<LogEntry[]> {
+  if (!(await hasRef(cwd, 'HEAD'))) return []
+  const SEP = '\x1f'
+  const REC = '\x1e'
+  const out = await git(cwd, ['log', '-n', String(limit), `--format=%H${SEP}%h${SEP}%an${SEP}%aI${SEP}%s${REC}`], { timeoutMs: 20000 })
+  const pending = await unpushedHashes(cwd)
+  return out
+    .split(REC)
+    .map((r) => r.replace(/^\n+/, ''))
+    .filter(Boolean)
+    .map((r) => {
+      const [hash, short, author, date, ...title] = r.split(SEP)
+      return { hash, short, author, date, title: title.join(SEP), pushed: !pending.has(hash) }
+    })
+}
+
+const SHA = /^[0-9a-f]{7,40}$/
+
+export interface CommitFile {
+  path: string
+  add?: number
+  del?: number
+  binary: boolean
+}
+
+export async function commitFiles(cwd: string, sha: string): Promise<CommitFile[]> {
+  if (!SHA.test(sha)) throw new GitError('Commit inválido.')
+  const out = await git(cwd, ['show', '--numstat', '-z', '--format=', '-M', '--no-ext-diff', sha], { timeoutMs: 20000 })
+  return [...parseNumstat(out)].map(([path, s]) => ({ path, add: s.add, del: s.del, binary: s.binary }))
+}
+
+// ---------- Subir, traer y ramas ----------
+
+export interface SyncInfo {
+  upstream: string | null
+  /** Commits que faltan subir. */
+  ahead: number
+  /** Commits que faltan bajar. */
+  behind: number
+}
+
+export async function syncInfo(cwd: string): Promise<SyncInfo> {
+  const up = await upstream(cwd)
+  if (!up) {
+    const ahead = (await hasRef(cwd, 'HEAD')) ? (await unpushedHashes(cwd)).size : 0
+    return { upstream: null, ahead, behind: 0 }
+  }
+  const r = await gitRaw(cwd, ['rev-list', '--left-right', '--count', `HEAD...${up}`], { timeoutMs: 15000 })
+  if (r.code !== 0) return { upstream: up, ahead: 0, behind: 0 }
+  const [a, b] = r.stdout.trim().split(/\s+/).map((n) => Number(n) || 0)
+  return { upstream: up, ahead: a ?? 0, behind: b ?? 0 }
+}
+
+/** Trae el remoto solo si avanza limpio (`git pull --ff-only`). Nunca combina ni reescribe. */
+export async function pullFF(cwd: string): Promise<string> {
+  const info = await repoInfo(cwd)
+  if (!info.isRepo || !info.top) throw new GitError('No es un repositorio git.')
+  if (info.branch === null) throw new GitError('HEAD está separado: no hay rama que traer.')
+  if (!(await upstream(info.top))) throw new GitError('La rama no tiene remoto asociado. Subila primero con «Subir».')
+  const r = await gitRaw(info.top, ['pull', '--ff-only'], { timeoutMs: 120000 })
+  if (r.code !== 0) throw new GitError(readable(r, 'git pull'))
+  return (r.stdout + r.stderr).trim()
+}
+
+export interface LocalBranch {
+  name: string
+  current: boolean
+  upstream: string | null
+  subject: string
+}
+
+export interface RemoteBranch {
+  name: string
+  subject: string
+  hasLocal: boolean
+}
+
+export async function localBranches(cwd: string): Promise<LocalBranch[]> {
+  const out = await git(cwd, ['for-each-ref', '--format=%(HEAD)%09%(refname)%09%(upstream:short)%09%(contents:subject)', 'refs/heads/'], { timeoutMs: 15000 })
+  return out
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => {
+      const [head, ref, up, subject] = l.split('\t')
+      return { name: ref.replace(/^refs\/heads\//, ''), current: head === '*', upstream: up || null, subject: subject ?? '' }
+    })
+}
+
+export async function remoteBranches(cwd: string, locals: LocalBranch[]): Promise<RemoteBranch[]> {
+  const out = await git(cwd, ['for-each-ref', '--format=%(refname)%09%(contents:subject)', 'refs/remotes/origin/'], { timeoutMs: 15000 })
+  const have = new Set(locals.map((l) => l.name))
+  return out
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => {
+      const [ref, subject] = l.split('\t')
+      return { name: ref.replace(/^refs\/remotes\/origin\//, ''), subject: subject ?? '' }
+    })
+    .filter((b) => b.name !== 'HEAD')
+    .map((b) => ({ ...b, hasLocal: have.has(b.name) }))
+}
+
+/** Cambia de rama. Si es remota sin copia local, crea la local siguiendo origin. */
+export async function switchBranch(cwd: string, name: string, remote: boolean): Promise<void> {
+  if (!validBranchName(name) || name.startsWith('+')) throw new GitError('Nombre de rama inválido.')
+  const info = await repoInfo(cwd)
+  if (!info.isRepo || !info.top) throw new GitError('No es un repositorio git.')
+  if (info.branch === name) return
+  if (!remote || (await hasRef(info.top, `refs/heads/${name}`))) {
+    await git(info.top, ['switch', name], { timeoutMs: 60000 })
+    return
+  }
+  if (!(await hasRef(info.top, `refs/remotes/origin/${name}`))) throw new GitError(`No encuentro la rama ${name} en origin.`)
+  await git(info.top, ['switch', '-c', name, '--track', `origin/${name}`], { timeoutMs: 60000 })
+}
+
+// ---------- Stash (solo el que crea Sloth) ----------
+
+const STASH_TAG = 'sloth-stash|'
+
+export interface StashEntry {
+  sha: string
+  ref: string
+  branch: string
+  files: number
+}
+
+/** El stash que guardó Sloth (si hay): se reconoce por su mensaje, así sobrevive a reiniciar la app. */
+export async function findStash(cwd: string): Promise<StashEntry | null> {
+  if (!(await hasRef(cwd, 'refs/stash'))) return null
+  const out = await git(cwd, ['stash', 'list', '--format=%H%x09%gd%x09%gs'], { timeoutMs: 15000 })
+  for (const line of out.split('\n')) {
+    const [sha, ref, subject = ''] = line.split('\t')
+    if (!sha || !subject.includes(STASH_TAG)) continue
+    const m = /sloth-stash\|([^|]*)\|/.exec(subject)
+    const tracked = await git(cwd, ['stash', 'show', '--name-only', sha], { timeoutMs: 15000 })
+    let untracked = 0
+    if (await hasRef(cwd, `${sha}^3`)) {
+      untracked = (await git(cwd, ['ls-tree', '-r', '--name-only', `${sha}^3`], { timeoutMs: 15000 })).split('\n').filter(Boolean).length
+    }
+    return { sha, ref, branch: m?.[1] ?? '', files: tracked.split('\n').filter(Boolean).length + untracked }
+  }
+  return null
+}
+
+export async function stashPush(cwd: string): Promise<void> {
+  const info = await repoInfo(cwd)
+  if (!info.isRepo || !info.top) throw new GitError('No es un repositorio git.')
+  if (await findStash(info.top)) throw new GitError('Ya hay cambios guardados en el stash. Restauralos antes de guardar otros.')
+  const branch = info.branch ?? 'HEAD separado'
+  await git(info.top, ['stash', 'push', '-u', '-m', `${STASH_TAG}${branch}|${new Date().toISOString()}`], { timeoutMs: 60000 })
+  if (!(await findStash(info.top))) throw new GitError('No había cambios para guardar.')
+}
+
+/** Aplica el stash de Sloth y solo lo borra si se aplicó sin conflictos. */
+export async function stashRestore(cwd: string): Promise<void> {
+  const info = await repoInfo(cwd)
+  if (!info.isRepo || !info.top) throw new GitError('No es un repositorio git.')
+  const s = await findStash(info.top)
+  if (!s) throw new GitError('No hay cambios guardados en el stash.')
+  const r = await gitRaw(info.top, ['stash', 'apply', s.sha], { timeoutMs: 120000 })
+  if (r.code !== 0) throw new GitError(`${readable(r, 'git stash apply')} El stash sigue guardado.`)
+  const again = await findStash(info.top)
+  if (again) await git(info.top, ['stash', 'drop', again.ref], { timeoutMs: 30000 })
+}
+
+// ---------- gh ----------
+
+export async function ghStatus(): Promise<{ installed: boolean; version: string }> {
+  try {
+    const r = await run('gh', ['--version'], { timeoutMs: 8000 })
+    if (r.code !== 0) return { installed: false, version: '' }
+    return { installed: true, version: r.stdout.split('\n')[0]?.trim() ?? '' }
+  } catch {
+    return { installed: false, version: '' }
+  }
 }
 
 /** Argumentos exactos del push (sin --force nunca). */

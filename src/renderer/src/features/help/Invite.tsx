@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, Copy, UserPlus } from '@phosphor-icons/react'
+import { AddAccountIcon, ChangesIcon, DoneIcon } from '../../icons/SlothIcons'
 import { api } from '../../api'
 import { Dialog } from './Dialog'
 
@@ -27,14 +27,14 @@ export function InviteModal({ onClose }: { onClose: () => void }): React.JSX.Ele
     <Dialog
       labelId="f-help-invite-title"
       title="Invitar a un compañero"
-      icon={<UserPlus size={18} aria-hidden="true" />}
+      icon={<AddAccountIcon size={18} />}
       onClose={onClose}
       footer={
         <>
           <span className="f-help-copied" role="status">
             {copied && (
               <>
-                <Check size={14} aria-hidden="true" /> Copiado
+                <DoneIcon size={14} /> Copiado
               </>
             )}
           </span>
@@ -42,7 +42,7 @@ export function InviteModal({ onClose }: { onClose: () => void }): React.JSX.Ele
             Cerrar
           </button>
           <button type="button" className="btn primary" onClick={copy}>
-            <Copy size={14} aria-hidden="true" /> Copiar texto
+            <ChangesIcon size={14} /> Copiar texto
           </button>
         </>
       }

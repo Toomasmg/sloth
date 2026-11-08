@@ -1,133 +1,162 @@
-/* Función «onboarding»: asistente de bienvenida a pantalla completa (debajo de la barra de título). */
+/* Función «onboarding»: asistente de bienvenida a pantalla completa (debajo de la barra de título).
+   Siempre oscuro, aunque la app esté en tema claro: la paleta va scoped acá y también en la tarjeta del login (dock). */
+.f-onboarding,
+.f-onboarding-dock {
+  --bg: #0c0e13;
+  --surface: #111319;
+  --card: #151821;
+  --card-hover: #1b1f2a;
+  --card-on: #171b25;
+  --muted: #262b37;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --line: rgba(255, 255, 255, 0.07);
+  --line-2: rgba(255, 255, 255, 0.11);
+  --hover: rgba(255, 255, 255, 0.05);
+  --press: rgba(255, 255, 255, 0.09);
+  --fg: #ececf0;
+  --fg-2: #a6abb8;
+  --fg-muted: #8b909c;
+  --accent: #8ab4ff;
+  --brand-1: #8ab4ff;
+  --brand-grad: #8ab4ff;
+  --on-accent: #0b1020;
+  --ring: #8ab4ff;
+  --term-bg: #0f1117;
+  --info: #8ab4ff;
+  --info-soft: rgba(138, 180, 255, 0.12);
+  --success: #5fd4a6;
+  --success-soft: rgba(95, 212, 166, 0.12);
+  --warn: #f0b45a;
+  --warn-soft: rgba(240, 180, 90, 0.12);
+  --danger: #ff7a7a;
+  --danger-fg: #ff9a9a;
+  --danger-soft: rgba(255, 122, 122, 0.12);
+  --placeholder: #6f7587;
+  color-scheme: dark;
+}
+
 .f-onboarding {
   position: fixed;
   inset: 40px 0 0 0;
   z-index: 9;
   display: grid;
   place-items: center;
-  padding: var(--s-5);
-  background:
-    radial-gradient(ellipse 60% 50% at 30% 20%, rgba(159, 234, 249, 0.06), transparent 70%),
-    radial-gradient(ellipse 50% 50% at 80% 90%, rgba(71, 132, 143, 0.08), transparent 70%),
-    var(--bg);
+  padding: 16px;
+  background: rgba(4, 5, 8, 0.7);
   animation: fade var(--t-med) var(--ease);
   overflow: auto;
 }
+/* 100vh menos la barra de título (40 px) y el padding de 16 px arriba y abajo. */
 .f-onboarding-card {
-  width: min(940px, 100%);
-  min-height: min(600px, calc(100vh - 100px));
+  width: min(1080px, calc(100vw - 32px));
+  height: min(720px, calc(100vh - 72px));
   display: grid;
-  grid-template-columns: 250px 1fr;
+  grid-template-columns: minmax(0, 42fr) minmax(0, 58fr);
   background: var(--surface);
-  border-radius: 16px;
-  box-shadow: inset 0 0 0 1px var(--line), 0 24px 64px rgba(0, 0, 0, 0.45);
+  border-radius: 14px;
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6);
   overflow: hidden;
   animation: rise var(--t-med) var(--ease);
 }
-.f-onboarding-rail {
+
+/* Héroe: imagen del logo sobre negro, degradé abajo para leer el texto. */
+.f-onboarding-hero {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
-  gap: var(--s-5);
-  padding: var(--s-5) var(--s-4);
-  background: var(--bg);
-  box-shadow: inset -1px 0 0 var(--line);
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  padding: 32px;
+  background: #000;
+  overflow: hidden;
 }
-.f-onboarding-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-}
-.f-onboarding-brand strong {
-  display: block;
-  font-size: var(--fs-lg);
-  letter-spacing: -0.01em;
-}
-.f-onboarding-brand span {
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
-}
-.f-onboarding-steps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.f-onboarding-steps button {
+.f-onboarding-hero-img {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
   width: 100%;
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  padding: var(--s-2);
-  border: 0;
-  border-radius: var(--r-md);
-  background: none;
-  color: var(--fg-2);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--t-fast) var(--ease);
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+  user-select: none;
 }
-.f-onboarding-steps button:hover {
-  background: var(--hover);
+.f-onboarding-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.92) 0%, rgba(0, 0, 0, 0.6) 36%, rgba(0, 0, 0, 0) 64%);
+  pointer-events: none;
 }
-.f-onboarding-steps button.on {
-  background: var(--card);
-  color: var(--fg);
-}
-.f-onboarding-steps button:focus-visible,
-.f-onboarding-repo:focus-visible,
-.f-onboarding-seg button:focus-visible,
-.f-onboarding h1:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 1px;
-}
-.f-onboarding h1:focus:not(:focus-visible) {
-  outline: none;
-}
-.f-onboarding-n {
-  flex: none;
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
+.f-onboarding-hero-title {
+  margin: 0;
+  font-size: clamp(28px, 2.6vw, 34px);
   font-weight: 700;
-  background: var(--card);
-  color: var(--fg-2);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: #f4f5f8;
 }
-.f-onboarding-steps button.on .f-onboarding-n {
-  background: var(--brand-grad);
-  color: var(--on-accent);
+.f-onboarding-hero-sub {
+  margin: 0;
+  max-width: 34ch;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: #a6abb8;
 }
-.f-onboarding-steps button.done:not(.on) .f-onboarding-n {
-  background: rgba(74, 222, 128, 0.14);
-  color: var(--success);
-}
-.f-onboarding-steps .item-sub {
-  display: block;
-}
-.f-onboarding-skipall {
-  margin-top: auto;
+.f-onboarding-skip {
   align-self: flex-start;
-  color: var(--fg-muted);
+  margin-top: 10px;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: #a6abb8;
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.f-onboarding-skip:hover {
+  color: #ececf0;
 }
 
+/* Columna derecha: encabezado, lista de pasos y ayuda de teclado. */
 .f-onboarding-main {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  padding: 20px 24px 16px;
+  background: var(--surface);
 }
 .f-onboarding-head {
-  padding: 0 var(--s-5);
+  flex: none;
+}
+.f-onboarding-topbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.f-onboarding-kicker {
+  flex: none;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brand-1);
 }
 .f-onboarding-progress {
+  flex: 1;
   height: 3px;
-  margin: 0 calc(var(--s-5) * -1);
-  background: var(--line);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
 }
 .f-onboarding-progress span {
   display: block;
@@ -135,34 +164,134 @@
   background: var(--brand-grad);
   transition: width var(--t-med) var(--ease);
 }
-.f-onboarding-titlerow {
+.f-onboarding-topbar .icon-btn {
+  margin-right: -6px;
+}
+.f-onboarding-section {
+  margin: 18px 0 12px;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.f-onboarding-keys {
+  flex: none;
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.f-onboarding kbd,
+.f-onboarding-keys kbd {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: #1b1f2a;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  color: var(--fg-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* Lista de pasos: tarjetas compactas y la actual expandida. */
+.f-onboarding-steps {
+  flex: 1;
+  min-height: 0;
+  list-style: none;
+  margin: 0;
+  padding: 4px 6px 4px 4px;
   display: flex;
-  align-items: flex-start;
-  gap: var(--s-2);
-  padding: var(--s-5) 0 var(--s-3);
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
 }
-.f-onboarding-kicker {
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--brand-1);
+.f-onboarding-step {
+  margin: 0;
 }
-.f-onboarding h1 {
-  margin: 4px 0 0;
-  font-size: 22px;
+.f-onboarding-step-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--fg-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease);
+}
+.f-onboarding-step-btn:hover {
+  background: var(--card-hover);
+}
+.f-onboarding-step-btn .item-title {
+  color: var(--fg-2);
+}
+.f-onboarding-step-btn .item-sub {
+  display: block;
+  color: var(--fg-muted);
+}
+.f-onboarding-step-btn .item-sub.ok {
+  color: #7fe0b9;
+}
+.f-onboarding-step-btn.is-done .item-title {
+  color: var(--fg);
+}
+.f-onboarding-step.is-current {
+  border-radius: 14px;
+  background: var(--card-on);
+  box-shadow: inset 0 0 0 1.5px rgba(138, 180, 255, 0.55);
+}
+.f-onboarding-step-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.f-onboarding-step-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px 0;
+}
+.f-onboarding-step-top h1 {
+  margin: 0;
+  font-size: 19px;
   line-height: 1.2;
   letter-spacing: -0.02em;
+  color: var(--fg);
 }
+.f-onboarding-n {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--muted);
+  color: var(--fg-muted);
+}
+.f-onboarding-n.on {
+  background: var(--brand-grad);
+  color: var(--on-accent);
+}
+.f-onboarding-n.ok {
+  background: rgba(95, 212, 166, 0.16);
+  color: #7fe0b9;
+}
+
 .f-onboarding-body {
-  flex: 1;
+  flex: none;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--s-3);
-  padding: 0 var(--s-5) var(--s-4);
+  padding: 14px 18px 4px;
   overflow-y: auto;
-  max-height: calc(100vh - 260px);
+  max-height: min(400px, 46vh);
 }
 .f-onboarding-body > * {
   max-width: 100%;
@@ -182,11 +311,70 @@
   line-height: 1.55;
 }
 .f-onboarding-foot {
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  padding: var(--s-3) var(--s-5);
+  padding: 12px 18px;
   box-shadow: inset 0 1px 0 var(--line);
+}
+
+/* Foco visible en todo el asistente y la tarjeta de login. */
+.f-onboarding :focus-visible,
+.f-onboarding-dock :focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.f-onboarding h1:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Botones, campos y chips de la paleta oscura. Los pisamos con :root para ganarle a
+   html[data-theme='light'] (que fija #fff y #2f6672 en los botones y los campos). */
+:root :is(.f-onboarding, .f-onboarding-dock) .btn {
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  color: var(--fg);
+}
+:root :is(.f-onboarding, .f-onboarding-dock) .btn:hover:not(:disabled) {
+  background: #323846;
+}
+:root :is(.f-onboarding, .f-onboarding-dock) .btn:active:not(:disabled) {
+  background: #1d212b;
+}
+:root :is(.f-onboarding, .f-onboarding-dock) .btn.ghost {
+  background: transparent;
+  box-shadow: none;
+  color: var(--fg-2);
+}
+:root :is(.f-onboarding, .f-onboarding-dock) .btn.ghost:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--fg);
+}
+:root :is(.f-onboarding, .f-onboarding-dock) .btn.primary {
+  background: var(--brand-grad);
+  box-shadow: none;
+  color: var(--on-accent);
+}
+:root :is(.f-onboarding, .f-onboarding-dock) .btn.primary:hover:not(:disabled) {
+  background: #a3c4ff;
+  filter: none;
+  color: var(--on-accent);
+}
+:root :is(.f-onboarding, .f-onboarding-dock) .btn.primary:active:not(:disabled) {
+  background: #7aa5f0;
+  filter: none;
+}
+:root :is(.f-onboarding, .f-onboarding-dock) .btn.danger {
+  background: var(--danger-soft);
+  box-shadow: none;
+  color: var(--danger-fg);
+}
+:root :is(.f-onboarding, .f-onboarding-dock) input,
+:root :is(.f-onboarding, .f-onboarding-dock) select,
+:root :is(.f-onboarding, .f-onboarding-dock) textarea {
+  background: #0f1117;
+  color: var(--fg);
 }
 
 /* Paso 1 */
@@ -400,7 +588,7 @@
   color: var(--fg-muted);
 }
 .f-onboarding-repo.on {
-  box-shadow: inset 0 0 0 1px rgba(159, 234, 249, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(138, 180, 255, 0.45);
 }
 .f-onboarding-repo.on > svg {
   color: var(--brand-1);
@@ -429,8 +617,8 @@
   gap: var(--s-2);
   padding: var(--s-3);
   border-radius: var(--r-md);
-  background: linear-gradient(135deg, rgba(159, 234, 249, 0.07), rgba(71, 132, 143, 0.05));
-  box-shadow: inset 0 0 0 1px rgba(159, 234, 249, 0.18);
+  background: linear-gradient(135deg, rgba(138, 180, 255, 0.07), rgba(138, 180, 255, 0.03));
+  box-shadow: inset 0 0 0 1px rgba(138, 180, 255, 0.22);
 }
 .f-onboarding-team-head {
   display: flex;
@@ -533,30 +721,51 @@
   display: grid;
   place-items: center;
   border-radius: 10px;
-  background: rgba(159, 234, 249, 0.1);
+  background: rgba(138, 180, 255, 0.12);
   color: var(--brand-1);
 }
 
-@media (max-width: 1000px) {
-  .f-onboarding-card {
-    grid-template-columns: 1fr;
+/* Responsive: debajo de 880 px el héroe pasa arriba como franja y los pasos quedan debajo, sin scroll interno. */
+@media (max-width: 880px) {
+  .f-onboarding {
+    place-items: start center;
   }
-  .f-onboarding-rail {
-    flex-direction: row;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--s-3);
-    box-shadow: inset 0 -1px 0 var(--line);
+  .f-onboarding-card {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+  .f-onboarding-hero {
+    height: 180px;
+    flex: none;
+    padding: 18px 20px;
+  }
+  .f-onboarding-hero-img {
+    object-position: center 35%;
+  }
+  .f-onboarding-hero-title {
+    font-size: 24px;
+  }
+  .f-onboarding-hero-sub {
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  .f-onboarding-skip {
+    margin-top: 6px;
+  }
+  .f-onboarding-main {
+    padding: 16px 16px 14px;
   }
   .f-onboarding-steps {
-    flex-direction: row;
-    flex: 1;
+    flex: none;
+    overflow: visible;
   }
-  .f-onboarding-steps .item-sub {
+  .f-onboarding-body {
+    max-height: none;
+  }
+}
+@media (max-width: 560px) {
+  .f-onboarding-hero-sub {
     display: none;
-  }
-  .f-onboarding-skipall {
-    margin-top: 0;
   }
 }
 
@@ -569,7 +778,9 @@
   .f-onboarding-pulse {
     animation: none;
   }
-  .f-onboarding-progress span {
+  .f-onboarding-progress span,
+  .f-onboarding-step-btn,
+  .f-onboarding-skip {
     transition: none;
   }
 }

@@ -44,7 +44,6 @@ const api: SlothApi = {
   onPtyExit: (cb) => listen<[string, number]>('pty:exit', cb),
   onAgentStatus: (cb) => listen<[string, AgentStatus]>('agent:status', cb),
   pendingPermissions: () => ipcRenderer.invoke('permission:pending'),
-  answerPermission: (id, answer, message) => ipcRenderer.invoke('permission:answer', id, answer, message),
   onPermission: (cb) => listen<[PermissionPrompt]>('permission:new', cb),
   onPermissionResolved: (cb) => listen<[string]>('permission:resolved', cb),
   daemonInfo: () => ipcRenderer.invoke('daemon:info'),

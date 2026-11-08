@@ -9,6 +9,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.0',
+    date: '2026-11-08',
+    title: 'Rediseño completo estilo Mac',
+    items: [
+      'Diseño nuevo: paleta oscura del logo del perezoso, letra Inter, íconos propios y modo claro. Elegí el color de acento en Configuración.',
+      'El buscador de arriba es la paleta de comandos (Ctrl+K): espacios, acciones y equipo, con Tab para las acciones de cada espacio.',
+      'Barra lateral dividida por cuenta, con plan, color por espacio y filtro. Distribución Uno, Dos o Cuatro paneles.',
+      'Pedidos de permiso a pantalla completa, reglas «Permitir siempre» por espacio y avisos de Windows con No molestar.',
+      'Git integrado: preparar archivos, ver diferencias, confirmar, abrir PR, historial y ramas.',
+      'Nuevo espacio rediseñado, plantillas, ramas aparte, historial de sesiones, tickets de Gruv y enviar a varios espacios con cola.',
+      'Configuración nueva: atajos editables, terminal (fuente, cursor, shell), editor preferido, reabrir espacios y más.',
+      'Exportar e importar la configuración con contraseña. Las reglas de permiso importadas se revisan una por una.',
+      'Modo liviano para PCs con pocos recursos (Configuración › Apariencia).',
+      'Mover un espacio a otra cuenta sigue copiando la conversación: Claude continúa donde estaba.'
+    ]
+  },
+  {
     version: '0.5.0',
     date: '2026-11-06',
     title: 'Estilo nuevo, paneles y chat del equipo',

@@ -1,26 +1,252 @@
-.f-report-modal {
-  width: min(600px, calc(100vw - 32px));
+/* Página «Reportar un problema» (ReportPage). Clases rp-*. */
+
+.rp-wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 36px) clamp(16px, 4vw, 40px) 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
-.f-report-note {
-  margin: 0 0 var(--s-3);
+.rp-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rp-head h1,
+.rp-thanks h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.rp-head p {
+  margin: 0;
+  color: var(--fg-2);
+  line-height: 1.5;
+}
+
+.rp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.rp-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.rp-h {
+  margin: 0 0 0 4px;
   font-size: var(--fs-sm);
+  font-weight: 600;
   color: var(--fg-2);
 }
-
-.f-report-body {
-  min-height: 260px;
-  max-height: 46vh;
-  resize: vertical;
-  font-size: var(--fs-xs);
-  line-height: 1.45;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  overflow: auto;
+.rp-hint0 {
+  margin: 0 0 0 4px;
 }
 
-.f-report-actions {
+.rp-types {
+  align-self: flex-start;
+}
+.rp-types > button {
+  min-width: 80px;
+}
+
+.rp-card {
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.rp-que {
   display: flex;
-  justify-content: flex-end;
-  gap: var(--s-2);
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+.rp-que .field > label {
+  font-weight: 500;
+}
+
+.rp-area {
+  resize: vertical;
+  line-height: 1.5;
+  padding: 8px 10px;
+  min-height: 60px;
+}
+
+.rp-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+}
+.rp-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rp-step-n {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--btn-2);
+  color: var(--fg-2);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+.rp-step-in {
+  flex: 1;
+  min-width: 0;
+}
+.rp-steps-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 2px;
+}
+
+/* Adjuntos */
+.rp-att {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 13px 16px;
+}
+.rp-att + .rp-att {
+  border-top: 1px solid var(--line);
+}
+.rp-check {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.rp-check-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rp-box {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  background: var(--input-bg);
+  box-shadow: inset 0 0 0 1.5px var(--line-strong);
+  color: var(--accent-fg);
+}
+.rp-box.on {
+  background: var(--accent);
+  box-shadow: none;
+}
+
+.rp-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: var(--term-bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: var(--fg-2);
+  max-height: 220px;
+  overflow: auto;
+}
+.rp-line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rp-warn {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--r-md);
+  background: var(--warn-soft);
+  color: var(--warn-fg);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+.rp-shot {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rp-shot img {
+  width: 100%;
+  height: auto;
+  border-radius: var(--r-md);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.rp-send {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+.rp-send-hint {
+  flex: 1 1 240px;
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+}
+.rp-send-hint.bad {
+  color: var(--danger-fg);
+}
+
+/* Gracias */
+.rp-thanks {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 28px;
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.rp-thanks p {
+  margin: 0;
+  color: var(--fg-2);
+  line-height: 1.5;
+}
+.rp-thanks-ico {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-md);
+  background: var(--success-soft);
+  color: var(--success-fg);
+}
+.rp-thanks-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
 }

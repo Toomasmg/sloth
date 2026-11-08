@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, net, Notification, protocol, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, net, protocol, shell } from 'electron'
 import { pathToFileURL } from 'node:url'
 import { normalize, sep } from 'node:path'
 import { existsSync, readdirSync, statSync } from 'node:fs'
@@ -11,10 +11,11 @@ import { installInto, stateForEvent, writeHookScript, type HookEventPayload } fr
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
 import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
 import { createWorktree } from './git'
+import { TEMPLATE_COLOR_KEYS, validBranch } from '../shared/templates-shared'
 import { baseSettingsFor, syncSharedSetup, unshareSetup } from './setup'
 import { UsageScanner } from './usage'
 import { FEATURES } from './features'
-import { initialChrome } from './features/settings'
+import { currentSettings, initialChrome } from './features/settings'
 import { validateWorkspacePatch } from './workspace-patch'
 import { loadWindowState, trackWindowState } from './window-state'
 import type { FeatureContext } from './features/context'
@@ -27,7 +28,6 @@ import {
   type AgentStatus,
   type DaemonInfo,
   type NewWorkspaceInput,
-  type PermissionAnswer,
   type PermissionPrompt,
   type PtyChunk,
   type RevealTarget,
@@ -83,6 +83,15 @@ function serveRenderer(): void {
 app.whenReady().then(async () => {
   serveRenderer()
   const store = new Store()
+  // La ventana se crea antes que nada más: el primer render no espera a daemon, escaneos ni registros.
+  // Los handlers de las funciones se registran en este mismo turno (antes de que el renderer pida nada).
+  // Trabajo que no hace falta para pintar (setup de cada cuenta, daemon de terminales) va después de mostrar.
+  createWindow(() =>
+    setTimeout(() => {
+      for (const acc of store.accounts) safe('preparar cuenta', () => prepareAccount(acc))
+      void backend()
+    }, 1500).unref()
+  )
 
   writeHookScript()
   const usage = new UsageScanner()
@@ -106,12 +115,7 @@ app.whenReady().then(async () => {
     if (!ws) return
     const { state, detail } = stateForEvent(p)
     setAgent(ws.id, { state, detail, at: p.at ?? Date.now() })
-    if ((state === 'done' || state === 'waiting') && win && !win.isFocused() && Notification.isSupported()) {
-      new Notification({
-        title: ws.name,
-        body: state === 'done' ? 'Claude terminó.' : detail || 'Claude necesita tu atención.'
-      }).show()
-    }
+    // Los avisos de Windows los manda la función «permissions» (respeta «No molestar» y los ajustes).
   }
 
   const toPrompt = (r: PendingPermission): PermissionPrompt => ({
@@ -132,9 +136,6 @@ app.whenReady().then(async () => {
       return
     }
     send('permission:new', toPrompt(r))
-    if (win && !win.isFocused() && Notification.isSupported()) {
-      new Notification({ title: ws.name, body: `Claude pide permiso para usar ${r.tool}.` }).show()
-    }
   }
 
   // Las terminales viven en el daemon (sobreviven al cierre) o, si no hay node, dentro de la app.
@@ -185,8 +186,6 @@ app.whenReady().then(async () => {
     }
     return termPromise
   }
-  void backend()
-
   /** Nunca arrancamos una terminal con una cuenta que no sea la elegida. */
   function requireAccount(accountId: string): Account {
     const acc = store.account(accountId)
@@ -224,22 +223,21 @@ app.whenReady().then(async () => {
     }
   }
 
-  const psQuote = (s: string): string => `'${s.replace(/[\r\n]+/g, ' ').replace(/'/g, "''")}'`
-
-  function claudeCommand(ws: Workspace, acc: Account): string | undefined {
+  /** argv de Claude para la terminal del espacio (la shell lo quota según su sintaxis en ptys.ts). */
+  function claudeCommand(ws: Workspace, acc: Account): string[] | undefined {
     // Los reemplazos (p. ej. retomar tras mover de cuenta) se aplican aunque el espacio no abra Claude solo.
     for (const o of commandOverrides) {
       let cmd: string | undefined
       safe('override', () => (cmd = o(ws, acc)))
-      if (cmd) return cmd
+      if (cmd) return cmd.trim().split(/\s+/)
     }
     if (!ws.autoStartClaude) return undefined
     if (ws.initialPrompt && !ws.initialPromptUsed) {
       store.updateWorkspace(ws.id, { initialPromptUsed: true })
-      return `claude ${psQuote(ws.initialPrompt)}`
+      return ['claude', ws.initialPrompt.replace(/[\r\n]+/g, ' ')]
     }
-    if (ws.resume !== false && hasPreviousConversation(acc, ws.cwd)) return 'claude --continue'
-    return 'claude'
+    if (ws.resume !== false && hasPreviousConversation(acc, ws.cwd)) return ['claude', '--continue']
+    return ['claude']
   }
 
   function specFor(paneId: string, b: TerminalBackend): PtySpec {
@@ -247,7 +245,7 @@ app.whenReady().then(async () => {
       const acc = requireAccount(accountIdFromLoginPane(paneId))
       prepareAccount(acc)
       // Primer arranque de Claude con esta carpeta: pide tema y login.
-      return { cwd: homedir(), env: accountEnv(acc), args: ['-NoLogo', '-NoExit', '-Command', 'claude'] }
+      return { cwd: homedir(), env: accountEnv(acc), claude: ['claude'] }
     }
     const ws = store.workspace(paneId)
     if (!ws) throw new Error('Ese espacio ya no existe.')
@@ -260,49 +258,22 @@ app.whenReady().then(async () => {
       SLOTH_HOOK_URL: b.hookUrl,
       SLOTH_TOKEN: b.hookToken
     }
-    const args = ['-NoLogo']
-    const cmd = claudeCommand(ws, acc)
-    if (cmd) args.push('-NoExit', '-Command', cmd)
-    return { cwd: ws.cwd, env, args }
+    return { cwd: ws.cwd, env, claude: claudeCommand(ws, acc) }
   }
 
-  for (const acc of store.accounts) prepareAccount(acc)
-
-  ipcMain.handle('state:get', () => ({
-    accounts: store.accounts,
-    workspaces: store.workspaces,
-    openPanes: store.openPanes,
-    agents: Object.fromEntries(agents)
-  }))
+  ipcMain.handle('state:get', async () => {
+    // «Reabrir los espacios»: si está apagado, solo vuelven los paneles cuyas terminales siguen vivas en el daemon.
+    let openPanes = store.openPanes
+    if (!currentSettings().reopenSpaces) {
+      const b = await backend().catch(() => undefined)
+      openPanes = b ? openPanes.filter((id) => b.isRunning(id)) : []
+    }
+    return { accounts: store.accounts, workspaces: store.workspaces, openPanes, agents: Object.fromEntries(agents) }
+  })
 
   ipcMain.handle('permission:pending', () =>
     (term?.pendingPermissions() ?? []).filter((r) => store.workspace(r.ws)).map(toPrompt)
   )
-
-  ipcMain.handle('permission:answer', async (_e, id: string, answer: PermissionAnswer, message?: string) => {
-    const b = await backend()
-    const req = b.pendingPermissions().find((r) => r.id === id)
-    if (!req) throw new Error('Ese permiso ya no está pendiente (venció o se respondió en la terminal).')
-    let decision: object | null
-    switch (answer) {
-      case 'allow':
-        decision = { behavior: 'allow' }
-        break
-      case 'allowAlways':
-        // Aplica las reglas que sugirió Claude (ej. permitir siempre `npm test`).
-        decision = req.suggestions?.length ? { behavior: 'allow', updatedPermissions: req.suggestions } : { behavior: 'allow' }
-        break
-      case 'deny':
-        decision = { behavior: 'deny', message: String(message ?? '').trim() || 'Rechazado desde Sloth.' }
-        break
-      case 'terminal':
-        decision = null
-        break
-      default:
-        throw new Error('Respuesta inválida.')
-    }
-    b.answerPermission(id, decision)
-  })
 
   ipcMain.handle('daemon:info', async (): Promise<DaemonInfo> => {
     const b = await backend()
@@ -368,7 +339,11 @@ app.whenReady().then(async () => {
     const initialPrompt = input.initialPrompt?.trim() || undefined
     if (initialPrompt && initialPrompt.length > 4000) throw new Error('El prompt inicial es demasiado largo.')
     const branch = input.branch?.trim() || undefined
-    const cwd = branch ? await createWorktree(repoPath, branch) : repoPath
+    const baseBranch = input.baseBranch?.trim() || undefined
+    if (baseBranch && !validBranch(baseBranch)) throw new Error('La rama base no es un nombre válido.')
+    const color = input.color === undefined || input.color === null || input.color === '' ? undefined : String(input.color)
+    if (color !== undefined && !(TEMPLATE_COLOR_KEYS as readonly string[]).includes(color)) throw new Error('El color del espacio no es válido.')
+    const cwd = branch ? await createWorktree(repoPath, branch, baseBranch) : repoPath
     const ws: Workspace = {
       id: randomUUID(),
       name,
@@ -380,7 +355,8 @@ app.whenReady().then(async () => {
       createdAt: Date.now(),
       initialPrompt,
       resume: input.resume !== false,
-      ticket
+      ticket,
+      ...(color ? { color } : {})
     }
     store.addWorkspace(ws)
     return ws
@@ -416,9 +392,21 @@ app.whenReady().then(async () => {
       const err = await shell.openPath(ws.cwd)
       if (err) throw new Error(err)
     } else if (t === 'vscode') {
-      // Cada tramo codificado (rutas con #, ?, espacios o acentos); la letra de unidad queda como está.
-      const parts = ws.cwd.split(/[\\/]/).filter(Boolean).map((seg, k) => (k === 0 && /^[A-Za-z]:$/.test(seg) ? seg : encodeURIComponent(seg)))
-      await shell.openExternal(`vscode://file/${parts.join('/')}/`)
+      // Editor de Configuración. Bloc de notas (u otro) abre la carpeta en el Explorador.
+      const editor = currentSettings().editor
+      const scheme = EDITOR_SCHEME[editor]
+      if (!scheme) {
+        const err = await shell.openPath(ws.cwd)
+        if (err) throw new Error(err)
+      } else {
+        // Cada tramo codificado (rutas con #, ?, espacios o acentos); la letra de unidad queda como está.
+        const parts = ws.cwd.split(/[\\/]/).filter(Boolean).map((seg, k) => (k === 0 && /^[A-Za-z]:$/.test(seg) ? seg : encodeURIComponent(seg)))
+        try {
+          await shell.openExternal(`${scheme}://file/${parts.join('/')}/`)
+        } catch {
+          throw new Error(`No se pudo abrir ${editor}. ¿Está instalado?`)
+        }
+      }
     } else throw new Error('Destino inválido.')
   })
 
@@ -434,9 +422,10 @@ app.whenReady().then(async () => {
   ipcMain.handle('pty:start', async (_e, id: string, cols: number, rows: number) => {
     const b = await backend()
     // Si ya corre (siguió viva en el daemon), solo se reconecta: no se rearma la cuenta ni el comando.
+    const shellChoice = currentSettings().terminal.shell
     const spawn = b.isRunning(id)
-      ? toSpawnSpec({ cwd: homedir(), env: {}, args: [] }, cols, rows)
-      : toSpawnSpec(specFor(id, b), cols, rows)
+      ? toSpawnSpec({ cwd: homedir(), env: {} }, cols, rows, shellChoice)
+      : toSpawnSpec(specFor(id, b), cols, rows, shellChoice)
     const result = await b.start(id, spawn)
     if (store.workspace(id) && !agents.has(id)) setAgent(id, { state: 'idle', at: Date.now() })
     return result
@@ -495,16 +484,32 @@ app.whenReady().then(async () => {
     }
   }
 
-  // Al salir solo soltamos la conexión: en modo daemon las terminales siguen trabajando.
-  app.on('before-quit', () => {
+  // Al salir: con «Terminales vivas» la conexión se suelta y el daemon sigue; apagado, se cierran sus terminales.
+  let quitPrepared = false
+  const finishQuit = (b: TerminalBackend | undefined): void => {
     for (const f of FEATURES) safe(f.name, () => f.dispose?.())
-    term?.dispose()
+    b?.dispose()
+  }
+  app.on('before-quit', (e) => {
+    if (quitPrepared) return
+    const b = term
+    if (b && !currentSettings().keepTerminalsAlive) {
+      e.preventDefault()
+      quitPrepared = true
+      void Promise.race([b.shutdown(), new Promise((r) => setTimeout(r, 5000))])
+        .catch(() => undefined)
+        .finally(() => {
+          finishQuit(b)
+          app.quit()
+        })
+      return
+    }
+    quitPrepared = true
+    finishQuit(b)
   })
-
-  createWindow()
 })
 
-function createWindow(): void {
+function createWindow(onShown?: () => void): void {
   // Ícono: en el instalado viene en resources/; en desarrollo, en build/.
   const iconPath = [join(process.resourcesPath, 'icon.png'), join(__dirname, '../../build/icon.png')].find((p) =>
     existsSync(p)
@@ -557,6 +562,7 @@ function createWindow(): void {
     if (saved.bounds) win.setBounds(saved.bounds)
     if (saved.maximized) win.maximize()
     win.show()
+    onShown?.()
   })
   trackWindowState(win)
 
@@ -578,3 +584,6 @@ app.on('second-instance', () => {
 })
 
 app.on('window-all-closed', () => app.quit())
+
+/** Editores de «Abrir en editor»: protocolo para abrir una carpeta. Bloc de notas no tiene: usa el Explorador. */
+const EDITOR_SCHEME: Record<string, string> = { 'VS Code': 'vscode', Cursor: 'cursor', Windsurf: 'windsurf' }

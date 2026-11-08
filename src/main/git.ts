@@ -26,7 +26,7 @@ function sanitize(branch: string): string {
  * Crea un worktree junto al repo: `<padre>/<repo>-worktrees/<rama>`.
  * Usa la rama si ya existe; si no, la crea desde el HEAD actual.
  */
-export async function createWorktree(repoPath: string, branch: string): Promise<string> {
+export async function createWorktree(repoPath: string, branch: string, base?: string): Promise<string> {
   if (!(await isGitRepo(repoPath))) throw new Error(`${repoPath} no es un repositorio git`)
   const target = join(dirname(repoPath), `${basename(repoPath)}-worktrees`, sanitize(branch))
   if (existsSync(target)) throw new Error(`Ya existe la carpeta ${target}`)
@@ -36,7 +36,8 @@ export async function createWorktree(repoPath: string, branch: string): Promise<
   } catch {
     branchExists = false
   }
-  const args = branchExists ? ['worktree', 'add', target, branch] : ['worktree', 'add', '-b', branch, target]
+  // Rama nueva: se crea desde la base elegida (o desde HEAD si no hay).
+  const args = branchExists ? ['worktree', 'add', target, branch] : ['worktree', 'add', '-b', branch, target, ...(base ? [base] : [])]
   try {
     await git(repoPath, args)
   } catch (e) {

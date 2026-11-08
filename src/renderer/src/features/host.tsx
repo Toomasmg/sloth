@@ -43,6 +43,8 @@ export interface UiCtx {
 export interface NewWorkspacePreset {
   repoPath?: string
   name?: string
+  /** Cuenta preseleccionada (el «+» de cada cuenta en la barra lateral). */
+  accountId?: string
 }
 
 /** `action`: qué intenta hacer el usuario con el panel. */

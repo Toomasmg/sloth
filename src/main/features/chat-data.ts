@@ -50,6 +50,7 @@ import {
 } from './chat-map'
 import { decodePhotoBase64, downloadTeamPhoto, PhotoCache, removeTeamPhoto, uploadTeamPhoto, type Photo } from './chat-photos'
 import { openInbox } from './chat-realtime'
+import { currentSettings } from './settings'
 
 /**
  * Datos del chat (equipos, DMs, mensajes, no leídos, realtime, fotos, avisos). Contrato entre
@@ -436,7 +437,9 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     }
     changeUnread(conv, (n) => Math.min(UNREAD_CAP, n + 1))
     onChange()
-    if (!focused) void notify(conv, msg.author, msg.body).catch(() => undefined)
+    // Avisos del sistema: solo con «notify.team» activo y fuera de «No molestar» (Configuración).
+    const st = currentSettings()
+    if (!focused && st.notify.team && !st.noMolestar) void notify(conv, msg.author, msg.body).catch(() => undefined)
   }
 
   /** Aviso del sistema para un mensaje ajeno con la ventana sin foco. Como mucho uno cada 5 s por conversación. */

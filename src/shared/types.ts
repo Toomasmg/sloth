@@ -58,6 +58,8 @@ export interface Workspace {
   ticket?: string
   /** Emoji o símbolo corto elegido por el usuario (v0.5). Se muestra en sidebar, header y pestañas. */
   icon?: string
+  /** Color del espacio (TEMPLATE_COLOR_KEYS). Sin color: gris. */
+  color?: string
 }
 
 /**
@@ -79,6 +81,10 @@ export interface NewWorkspaceInput {
   accountId: string
   /** Si viene, se crea un git worktree en esa rama. */
   branch?: string
+  /** Rama base para crear la rama nueva del worktree (si no existe todavía). */
+  baseBranch?: string
+  /** Color del espacio (uno de TEMPLATE_COLOR_KEYS: cielo, hoja, lila, ambar, coral). */
+  color?: string
   autoStartClaude: boolean
   initialPrompt?: string
   resume?: boolean
@@ -167,7 +173,6 @@ export interface SlothApi {
   onPtyExit(cb: (id: string, code: number) => void): () => void
   onAgentStatus(cb: (workspaceId: string, status: AgentStatus) => void): () => void
   pendingPermissions(): Promise<PermissionPrompt[]>
-  answerPermission(id: string, answer: PermissionAnswer, message?: string): Promise<void>
   onPermission(cb: (p: PermissionPrompt) => void): () => void
   onPermissionResolved(cb: (id: string) => void): () => void
   daemonInfo(): Promise<DaemonInfo>
