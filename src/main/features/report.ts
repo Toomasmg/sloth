@@ -9,6 +9,7 @@ import {
   composeBody,
   EXPECT_MAX,
   fitBody,
+  isIssueUrl,
   readLogTail,
   recentLines,
   REPORT_TYPES,
@@ -31,7 +32,8 @@ import {
  * - preview(): líneas de sistema y de registro YA sanitizadas, para que el usuario las revise.
  * - capture(): captura SOLO de la ventana de Sloth (la pide la UI cuando el usuario la marca).
  * - submit(form): arma el cuerpo, lo vuelve a sanitizar y abre el «nuevo issue» prellenado en
- *   github.com (host fijo). La captura no entra en el link: se guarda y se muestra su carpeta.
+ *   github.com (host fijo) y devuelve esa URL. La captura no entra en el link: se guarda y se muestra su carpeta.
+ * - open(url): vuelve a abrir ese issue prellenado («Ver en GitHub»); solo acepta URLs de buildIssueUrl.
  */
 
 const TYPES: ReportType[] = ['error', 'idea', 'otra']
@@ -146,7 +148,14 @@ const feature: Feature = {
       await shell.openExternal(url)
       // La captura no va en el link: se muestra la carpeta para arrastrarla al issue.
       if (withShot && lastShot) shell.showItemInFolder(lastShot.file)
-      return { shot: withShot && lastShot ? basename(lastShot.file) : null }
+      // La URL que se abrió: la pantalla de gracias la vuelve a abrir con «Ver en GitHub».
+      return { shot: withShot && lastShot ? basename(lastShot.file) : null, url }
+    })
+
+    // Vuelve a abrir el issue prellenado. Solo acepta la URL que arma buildIssueUrl (nada de otros hosts).
+    ctx.handle('open', async (url: unknown) => {
+      if (!isIssueUrl(url)) throw new Error('Ese enlace no es del reporte de Sloth.')
+      await shell.openExternal(url)
     })
   }
 }
