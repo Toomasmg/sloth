@@ -5,8 +5,6 @@ import { randomUUID } from 'node:crypto'
 import type { Feature, FeatureContext } from './context'
 import type { TerminalBackend, PendingPermission } from '../daemon-client'
 import type { HookEventPayload } from '../hooks'
-import { chatEvents } from './chat-events'
-import type { ChatNoticeEvent } from './chat-model'
 import { currentSettings } from './settings'
 import {
   CHOICES,
@@ -75,9 +73,6 @@ function load(): State {
     return empty
   }
 }
-
-/** Mínimo entre dos avisos de mensajes de la misma conversación (como en el chat). */
-const TEAM_NOTIFY_MIN_MS = 5000
 
 const startOfToday = (): number => {
   const d = new Date()
@@ -183,31 +178,6 @@ const feature: Feature = {
       n.on('click', () => showWindow(wsId))
       n.show()
     }
-
-    /** Mensaje nuevo de otra persona en el chat del equipo (evento interno de chat-data). Respeta silenciado y «notify.team». */
-    const lastTeamNotice = new Map<string, number>()
-    function onTeamMessage(n: ChatNoticeEvent): void {
-      if (n.muted || !currentSettings().notify.team || isDnd()) return
-      if (!Notification.isSupported()) return
-      const win = ctx.window()
-      if (win && !win.isDestroyed() && win.isFocused()) return
-      const t = Date.now()
-      const last = lastTeamNotice.get(n.conversationId)
-      if (last !== undefined && t - last < TEAM_NOTIFY_MIN_MS) return
-      lastTeamNotice.set(n.conversationId, t)
-      const where = n.teamId ? 'Equipo' : 'Mensaje directo'
-      const note = new Notification({ title: `${n.from} · ${where}`, body: n.preview })
-      // El clic trae la ventana; abrir la conversación exacta la hace el chat (la pestaña queda donde esté).
-      note.on('click', () => {
-        const w = ctx.window()
-        if (!w || w.isDestroyed()) return
-        if (!w.isVisible()) w.show()
-        if (w.isMinimized()) w.restore()
-        w.focus()
-      })
-      note.show()
-    }
-    chatEvents.onMessage(onTeamMessage)
 
     /** Pedido nuevo: si una regla lo cubre se aprueba solo; si no, aviso (la tarjeta la muestra la UI). */
     function onRequest(b: TerminalBackend, req: PendingPermission): void {
