@@ -36,6 +36,15 @@
   color: var(--warn);
   background: var(--warn-soft);
 }
+/* Las acciones del encabezado del panel son cuadradas de 28 px; este botón lleva texto y número. */
+.pane-head .pane-actions .f-git-btn {
+  width: auto;
+  height: 26px;
+  flex: none;
+  padding: 0 8px;
+  gap: 5px;
+  white-space: nowrap;
+}
 @container (max-width: 560px) {
   .f-git-btn-label {
     display: none;
