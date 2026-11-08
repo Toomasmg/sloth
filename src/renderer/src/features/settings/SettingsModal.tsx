@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { SearchIcon, SLOTH_ICONS } from '../../icons/SlothIcons'
+import { AddAccountIcon, SearchIcon, SLOTH_ICONS } from '../../icons/SlothIcons'
 import { useUi } from '../host'
 import type { SectionId, SettingsTab } from './bus'
 import { NAV, navOf, normalizeTab, searchSettings } from './search'
@@ -20,6 +20,7 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
   const ui = useUi()
   const [sec, setSec] = useState<SectionId>(() => normalizeTab(initialTab))
   const [q, setQ] = useState('')
+  const [adding, setAdding] = useState(false)
   const [toast, setToast] = useState<Toast | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -68,9 +69,9 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  // Foco al entrar: el botón de volver (no el buscador, para no tapar la sección).
+  // Foco al entrar: el título de la sección (sin recuadro de foco, y no el buscador ni «Volver»).
   useEffect(() => {
-    dialogRef.current?.querySelector<HTMLButtonElement>('.f-set-back')?.focus()
+    dialogRef.current?.querySelector<HTMLElement>('#f-set-title')?.focus()
   }, [])
 
   const results = useMemo(() => searchSettings(q), [q])
@@ -81,13 +82,17 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
   const pick = (id: SectionId): void => {
     setSec(id)
     setQ('')
+    setAdding(false)
   }
 
   return (
     <div className="f-set-page" role="dialog" aria-modal="true" aria-labelledby="f-set-title" ref={dialogRef}>
       <nav className="f-set-nav" aria-label="Secciones de configuración">
         <button type="button" className="f-set-back" onClick={onClose}>
-          <span aria-hidden="true">‹</span> Volver a los espacios
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 5l-7 7 7 7" />
+          </svg>
+          Volver a los espacios
         </button>
         <label className="f-set-search">
           <SearchIcon size={14} />
@@ -128,13 +133,22 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
       <main className="f-set-main">
         <div className="f-set-col">
           <header className="f-set-head">
-            <h1 id="f-set-title">{meta.name}</h1>
-            <p>{meta.sub}</p>
+            <div className="f-set-head-text">
+              <h1 id="f-set-title" tabIndex={-1}>
+                {meta.name}
+              </h1>
+              <p>{meta.sub}</p>
+            </div>
+            {sec === 'cuentas' && (
+              <button type="button" className="btn primary sm f-set-add" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>
+                <AddAccountIcon size={14} /> Agregar cuenta
+              </button>
+            )}
           </header>
           <SaveContext.Provider value={run}>
             <div className="f-set-body" role="region" aria-label={meta.name}>
               {sec === 'general' && <GeneralSection />}
-              {sec === 'cuentas' && <AccountsSection onClose={onClose} />}
+              {sec === 'cuentas' && <AccountsSection onClose={onClose} adding={adding} setAdding={setAdding} />}
               {sec === 'apariencia' && <AppearanceSection />}
               {sec === 'terminal' && <TerminalSection />}
               {sec === 'atajos' && <ShortcutsSection />}
@@ -149,7 +163,9 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
 
       {toast && (
         <div role={toast.err ? 'alert' : 'status'} aria-live="polite" className={`f-set-toast ${toast.err ? 'err' : ''}`}>
-          {!toast.err && <span aria-hidden="true" className="f-set-toast-ok">✓</span>}
+          {!toast.err && <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" className="f-set-toast-ok" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12.5l4.5 4.5L19 7.5" />
+            </svg>}
           {toast.text}
         </div>
       )}

@@ -56,13 +56,19 @@
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: var(--fg-2);
+  color: #c9cdd6;
   font: inherit;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   cursor: pointer;
 }
 .f-set-back:hover {
   background: var(--hover);
   color: var(--fg);
+}
+.f-set-back:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .f-set-search {
@@ -126,9 +132,14 @@
   gap: 1px;
 }
 .f-set-list li.sep {
-  margin-top: 8px;
-  padding-top: 8px;
-  box-shadow: inset 0 1px 0 var(--line);
+  margin-top: 6px;
+}
+.f-set-list li.sep::before {
+  content: '';
+  display: block;
+  height: 1px;
+  margin: 0 8px 6px;
+  background: rgba(255, 255, 255, 0.06);
 }
 .f-set-item {
   width: 100%;
@@ -179,11 +190,30 @@
   place-items: center;
 }
 
+.f-set-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+.f-set-head-text {
+  flex: 1 1 280px;
+  min-width: 0;
+}
 .f-set-head h1 {
   margin: 0;
   font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.02em;
+}
+.f-set-head h1:focus {
+  outline: none;
+}
+.f-set-add {
+  height: 32px;
+  padding: 0 14px;
+  gap: 6px;
+  font-weight: 600;
 }
 .f-set-head p {
   margin: 6px 0 0;
@@ -412,6 +442,35 @@ button.f-set-toggle:disabled {
 }
 .f-set-select {
   min-width: 180px;
+  appearance: none;
+  padding-right: 28px;
+  background-image: linear-gradient(45deg, transparent 50%, #8b909c 50%), linear-gradient(135deg, #8b909c 50%, transparent 50%);
+  background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+.f-set-page .f-set-input:focus,
+.f-set-page .f-set-select:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent), 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.f-set-label {
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.f-set-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.f-set-stack.grow2 {
+  flex: 2 1 220px;
+}
+.f-set-stack.grow1 {
+  flex: 1 1 140px;
+}
+.f-set-form-add {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .f-set-input {
   width: 100%;
@@ -462,14 +521,29 @@ button.f-set-toggle:disabled {
   justify-content: flex-end;
 }
 .f-set-slider input[type='range'] {
+  appearance: none;
   flex: 1 1 160px;
-  max-width: 260px;
-  accent-color: var(--accent);
+  height: 4px;
+  border-radius: 2px;
+  background: #2a2f3b;
+  outline: none;
+}
+.f-set-slider input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
 }
 .f-set-slider output {
-  width: 52px;
+  width: 44px;
+  flex: none;
   text-align: right;
-  color: var(--fg-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: #c9cdd6;
 }
 
 /* Toast «Guardado» */
@@ -501,6 +575,9 @@ button.f-set-toggle:disabled {
 .f-set-acc {
   display: flex;
   flex-direction: column;
+}
+.f-set-acc > .f-set-row {
+  padding: 14px 16px;
 }
 .f-set-avatar {
   width: 38px;
@@ -565,7 +642,7 @@ button.f-set-toggle:disabled {
 /* ---------- Apariencia ---------- */
 .f-set-themes {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
 }
 .f-set-theme {
@@ -628,11 +705,9 @@ button.f-set-toggle:disabled {
   color: var(--fg);
   font: inherit;
   cursor: pointer;
-  box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 .f-set-accent.on {
   background: var(--btn-2);
-  box-shadow: inset 0 0 0 2px var(--accent);
 }
 .f-set-accent-dot {
   width: 18px;
@@ -698,8 +773,19 @@ button.f-set-toggle:disabled {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   padding: 16px;
+}
+.f-set-status .f-set-row-title {
+  font-weight: 600;
+}
+.f-set-status .f-set-hint {
+  color: var(--fg-2);
+  margin-top: 2px;
+}
+.f-set-status-ico.lg {
+  width: 40px;
+  height: 40px;
 }
 .f-set-status-ico {
   width: 38px;
@@ -728,7 +814,14 @@ button.f-set-toggle:disabled {
   align-items: center;
   gap: 10px;
   padding: 28px;
+  border-radius: 14px;
   text-align: center;
+}
+.f-set-about > .f-set-hint {
+  color: var(--fg-2);
+}
+.f-set-about > .f-set-actions {
+  margin-top: 8px;
 }
 .f-set-about-name {
   font-size: 20px;
