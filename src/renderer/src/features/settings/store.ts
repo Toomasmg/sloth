@@ -4,6 +4,7 @@ import { api } from '../../api'
 import { accountColor } from '../../format'
 import {
   DEFAULT_SETTINGS,
+  SCROLLBACK,
   cloneSettings,
   normalize,
   type SettingsPayload,
@@ -76,6 +77,9 @@ export function applyToDocument(p: SettingsPayload): void {
   if (p.settings.theme === 'noche') el.dataset.night = 'true'
   else delete el.dataset.night
   el.dataset.density = p.settings.density === 'cómoda' ? 'comfortable' : 'compact'
+  // Modo liviano: CSS apaga animaciones, sombras y fotos (styles.css). Ver lightMode en el modelo.
+  if (p.settings.lightMode) el.dataset.lite = 'true'
+  else delete el.dataset.lite
   el.style.setProperty('--ui-font-size', `${p.settings.uiFontSize}px`)
   el.style.colorScheme = p.dark ? 'dark' : 'light'
 }
@@ -275,7 +279,8 @@ export function termOptions(p: SettingsPayload = state): TermOptions {
     cursorBlink: t.cursorBlink,
     theme: termTheme(p.dark),
     minimumContrastRatio: p.dark ? 1 : 4.5,
-    scrollback: t.scrollback
+    // En modo liviano, el historial de cada terminal es el mínimo.
+    scrollback: p.settings.lightMode ? SCROLLBACK.min : t.scrollback
   }
 }
 

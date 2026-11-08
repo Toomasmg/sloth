@@ -1404,3 +1404,19 @@ kbd,
     animation-iteration-count: infinite !important;
   }
 }
+
+/* Modo liviano (Configuración › Rendimiento): sin animaciones, transiciones ni sombras. El foco
+   del teclado conserva su marca (es accesibilidad, no decoración). Los spinners de carga siguen girando. */
+html[data-lite='true'] *,
+html[data-lite='true'] *::before,
+html[data-lite='true'] *::after {
+  animation: none !important;
+  transition: none !important;
+  text-shadow: none !important;
+}
+html[data-lite='true'] *:not(:focus-visible) {
+  box-shadow: none !important;
+}
+html[data-lite='true'] .spin {
+  animation: spin 0.9s linear infinite !important;
+}

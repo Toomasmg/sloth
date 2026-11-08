@@ -2,6 +2,7 @@ import { app, dialog, type SaveDialogOptions } from 'electron'
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import type { Feature, FeatureContext } from './context'
+import { currentSettings } from './settings'
 import {
   listRecentSessions,
   listSessions,
@@ -127,7 +128,9 @@ function register(ctx: FeatureContext): void {
   }
 
   ctx.handle('list', async () => {
-    const since = Date.now() - SESSION_RANGE_DAYS * 86_400_000
+    // Modo liviano: solo la última semana (la lista es lo que más se lee del disco).
+    const days = currentSettings().lightMode ? 7 : SESSION_RANGE_DAYS
+    const since = Date.now() - days * 86_400_000
     const files = await listRecentSessions(accountsForScan(), since)
     const seen = new Set<string>()
     const rows: SessionRow[] = []

@@ -67,6 +67,7 @@ export interface ExportedAppearance {
   density?: string
   uiFontSize?: number
   accent?: string
+  lightMode?: boolean
 }
 export interface ExportDoc {
   formato: typeof FORMAT
@@ -388,6 +389,7 @@ export function parseImport(text: string): ParsedImport {
     if (typeof a.density === 'string' && (DENSITIES as readonly string[]).includes(a.density)) apariencia.density = a.density
     if (Number.isInteger(a.uiFontSize) && (a.uiFontSize as number) >= UI_FONT.min && (a.uiFontSize as number) <= UI_FONT.max) apariencia.uiFontSize = a.uiFontSize as number
     if (typeof a.accent === 'string' && (ACCENTS as readonly AccentChoice[]).includes(a.accent as AccentChoice)) apariencia.accent = a.accent as AccentChoice
+    if (typeof a.lightMode === 'boolean') apariencia.lightMode = a.lightMode
   }
 
   // Atajos: solo ids conocidos y combinaciones válidas (la Configuración vuelve a validar al aplicar).

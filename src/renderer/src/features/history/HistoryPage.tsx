@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
+import { getSettings } from '../settings/store'
 import { DoneIcon, FolderIcon, IdleIcon, PermissionIcon, SearchIcon } from '../../icons/SlothIcons'
 import { PageShell } from '../help/PageShell'
 import { marks, wordsOf } from '../help/text'
@@ -22,8 +23,9 @@ import {
 import type { ListReply, PrefsReply, SessionRow, TextHit } from './types'
 import './history.css'
 
-/** Valores por defecto de los filtros (el rango por defecto son 30 días). */
-const DEFAULTS: Omit<Filters, 'q'> = { space: 'todos', acc: 'todas', range: '30', showHidden: false }
+/** Valores por defecto de los filtros (30 días; en modo liviano, 7 días). */
+const DEFAULTS: Omit<Filters, 'q' | 'range'> = { space: 'todos', acc: 'todas', showHidden: false }
+const defaultRange = (): Range => (getSettings().settings.lightMode ? '7' : '30')
 
 export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Element {
   const ui = useUi()
@@ -37,7 +39,7 @@ export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Ele
   const [q, setQ] = useState('')
   const [space, setSpace] = useState(DEFAULTS.space)
   const [acc, setAcc] = useState(DEFAULTS.acc)
-  const [range, setRange] = useState<Range>(DEFAULTS.range)
+  const [range, setRange] = useState<Range>(defaultRange)
   const [showHidden, setShowHidden] = useState(DEFAULTS.showHidden)
   const [sel, setSel] = useState<string | null>(null)
   const [textHits, setTextHits] = useState<Record<string, TextHit>>({})
@@ -135,7 +137,7 @@ export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Ele
   const groups = useMemo(() => groupRows(visible, pinned), [visible, pinned])
   const spaces = useMemo(() => spaceOptions(all, { acc, range, showHidden }, hidden), [all, acc, range, showHidden, hidden])
 
-  const filtersOn = q.trim() !== '' || space !== 'todos' || acc !== 'todas' || range !== '30'
+  const filtersOn = q.trim() !== '' || space !== 'todos' || acc !== 'todas' || range !== defaultRange()
   const countLabel = !rows
     ? ''
     : filtersOn
@@ -152,7 +154,7 @@ export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Ele
     setQ('')
     setSpace(DEFAULTS.space)
     setAcc(DEFAULTS.acc)
-    setRange(DEFAULTS.range)
+    setRange(defaultRange())
     say('Filtros limpios')
   }
 
@@ -335,7 +337,7 @@ export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Ele
             <div className="hist-field">
               <span>Rango</span>
               <div className="seg hist-seg" role="group" aria-label="Rango">
-                {RANGES.map((g) => (
+                {RANGES.filter((g) => !getSettings().settings.lightMode || g.id !== '30').map((g) => (
                   <button key={g.id} type="button" aria-pressed={range === g.id} onClick={() => setRange(g.id)}>
                     {g.name}
                   </button>

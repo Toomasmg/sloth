@@ -232,7 +232,7 @@ const feature: Feature = {
         }
       }
       if (sel.plantillas) doc.plantillas = exportTemplates(readTemplates(), ctx.store.accounts)
-      if (sel.apariencia) doc.apariencia = { theme: settings.theme, density: settings.density, uiFontSize: settings.uiFontSize, accent: settings.accent }
+      if (sel.apariencia) doc.apariencia = { theme: settings.theme, density: settings.density, uiFontSize: settings.uiFontSize, accent: settings.accent, lightMode: settings.lightMode }
       if (sel.atajos && Object.keys(settings.shortcuts).length) doc.atajos = { ...settings.shortcuts }
       if (sel.equipo) {
         const url = readTeamUrl()
@@ -260,7 +260,7 @@ const feature: Feature = {
       return {
         espacios,
         plantillas: tpl.length,
-        apariencia: { theme: settings.theme, density: settings.density, uiFontSize: settings.uiFontSize, accent: settings.accent },
+        apariencia: { theme: settings.theme, density: settings.density, uiFontSize: settings.uiFontSize, accent: settings.accent, lightMode: settings.lightMode },
         atajos: Object.keys(settings.shortcuts).length,
         equipo: teamUrl,
         reglasTotal: espacios.reduce((a, e) => a + e.reglas, 0),

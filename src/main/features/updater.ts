@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import type { AppUpdater, CancellationToken, UpdateInfo } from 'electron-updater'
 import type { Feature, FeatureContext } from './context'
 import { groupNotes, type NoteGroup } from './updater-notes'
+import { currentSettings } from './settings'
 
 /**
  * Actualizaciones automáticas desde los releases de GitHub (Toomasmg/sloth).
@@ -308,7 +309,7 @@ const feature: Feature = {
         // Ventana oculta o minimizada (bandeja): no se busca. Se reintenta en 5 min.
         const w = ctx.window()
         if (!w || w.isDestroyed() || !w.isVisible() || w.isMinimized()) return schedule(HIDDEN_RETRY_MS)
-        void check(false).finally(() => schedule(EVERY_MS))
+        void check(false).finally(() => schedule(currentSettings().lightMode ? EVERY_MS * 2 : EVERY_MS))
       }, ms)
       timer.unref()
     }

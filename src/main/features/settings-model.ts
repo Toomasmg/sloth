@@ -65,6 +65,11 @@ export interface SlothSettings {
   notify: NotifySettings
   /** Canal del updater: estable (recomendado) o beta. */
   updateChannel: UpdateChannel
+  /**
+   * Modo liviano para PCs con pocos recursos: menos efectos (sin animaciones, sombras ni fotos) y menos
+   * trabajo en segundo plano (consultas al doble de intervalo, historial de 7 días, scrollback mínimo).
+   */
+  lightMode: boolean
   /** Atajos personalizados: id → combinación canónica («Ctrl Shift K»). Sin entrada = el por defecto. */
   shortcuts: Partial<Record<ShortcutId, string>>
 }
@@ -150,6 +155,7 @@ export const DEFAULT_SETTINGS: SlothSettings = {
   noMolestar: false,
   notify: { done: true, perm: true, team: true },
   updateChannel: 'estable',
+  lightMode: false,
   shortcuts: {}
 }
 
@@ -265,7 +271,7 @@ export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOp
     patch,
     [
       'theme', 'density', 'uiFontSize', 'accent', 'terminal', 'accountColors', 'accountPlans', 'openAtLogin', 'confirmClosePanes',
-      'reopenSpaces', 'keepTerminalsAlive', 'editor', 'projectsDir', 'sounds', 'soundName', 'noMolestar', 'notify', 'updateChannel', 'shortcuts'
+      'reopenSpaces', 'keepTerminalsAlive', 'editor', 'projectsDir', 'sounds', 'soundName', 'noMolestar', 'notify', 'updateChannel', 'lightMode', 'shortcuts'
     ],
     ''
   )
@@ -284,6 +290,7 @@ export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOp
   if ('soundName' in patch) next.soundName = oneOf(patch.soundName, SOUND_NAMES, 'El sonido')
   if ('noMolestar' in patch) next.noMolestar = bool(patch.noMolestar, '«No molestar»')
   if ('updateChannel' in patch) next.updateChannel = oneOf(patch.updateChannel, UPDATE_CHANNELS, 'El canal de actualizaciones')
+  if ('lightMode' in patch) next.lightMode = bool(patch.lightMode, '«Modo liviano»')
   if ('terminal' in patch) {
     const t = patch.terminal
     if (!isObj(t)) throw new Error('terminal tiene que ser un objeto.')
@@ -366,7 +373,7 @@ export function normalize(raw: unknown): SlothSettings {
   }
   const scalars = [
     'theme', 'density', 'uiFontSize', 'accent', 'openAtLogin', 'confirmClosePanes', 'reopenSpaces', 'keepTerminalsAlive',
-    'editor', 'projectsDir', 'sounds', 'soundName', 'noMolestar', 'updateChannel'
+    'editor', 'projectsDir', 'sounds', 'soundName', 'noMolestar', 'updateChannel', 'lightMode'
   ] as const
   for (const k of scalars) if (k in src) tryPatch({ [k]: src[k] })
   if (isObj(src.terminal)) for (const [k, v] of Object.entries(src.terminal)) tryPatch({ terminal: { [k]: v } })
@@ -390,6 +397,7 @@ export function resetSection(current: SlothSettings, section: unknown): SlothSet
       next.density = d.density
       next.uiFontSize = d.uiFontSize
       next.accent = d.accent
+      next.lightMode = d.lightMode
       break
     case 'terminal':
       next.terminal = { ...d.terminal }

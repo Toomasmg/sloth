@@ -364,6 +364,15 @@ export function AppearanceSection(): React.JSX.Element {
         </div>
       </Group>
 
+      <Group id="g-lite" title="Rendimiento">
+        <ToggleRow
+          title="Modo liviano"
+          hint="Para PCs con pocos recursos: menos efectos y menos trabajo en segundo plano."
+          checked={s.lightMode}
+          onChange={(lightMode) => save({ lightMode })}
+        />
+      </Group>
+
       <Group id="g-de" title="Densidad y tamaño">
         <Row title="Densidad de las listas">
           <Seg<Density>
@@ -410,6 +419,9 @@ export function TerminalSection(): React.JSX.Element {
         : { w: '0.6em', h: '2px' }
   return (
     <>
+      {p.settings.lightMode ? (
+        <p className="f-set-hint">La vista previa de la terminal está apagada en el modo liviano.</p>
+      ) : (
       <pre
         className="f-set-term"
         aria-label="Vista previa de la terminal"
@@ -426,6 +438,7 @@ export function TerminalSection(): React.JSX.Element {
           aria-hidden="true"
         />
       </pre>
+      )}
       <Group id="g-term" title="Texto y cursor">
         <Row title={<label htmlFor="f-set-tfont">Fuente</label>}>
           <select id="f-set-tfont" className="f-set-select" value={t.fontFamily} onChange={(e) => save({ terminal: { fontFamily: e.target.value as TermFont } })}>

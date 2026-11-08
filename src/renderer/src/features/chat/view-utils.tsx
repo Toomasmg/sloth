@@ -1,4 +1,5 @@
 import { Fragment } from 'react'
+import { useSettings } from '../settings/store'
 
 /** Avatares solo de GitHub (la CSP también lo exige). */
 const SAFE_AVATAR = /^https:\/\/avatars\.githubusercontent\.com\//
@@ -6,7 +7,9 @@ const SAFE_PHOTO = /^data:image\/(webp|png|jpeg);base64,/
 
 /** Foto o avatar si son válidos; si no, la inicial. Siempre decorativo (el nombre va al lado). */
 export function Av({ src, initial, size = 22 }: { src?: string; initial: string; size?: number }): React.JSX.Element {
-  if (src && (SAFE_AVATAR.test(src) || SAFE_PHOTO.test(src))) {
+  // Modo liviano: sin fotos, solo la inicial.
+  const lite = useSettings().settings.lightMode
+  if (!lite && src && (SAFE_AVATAR.test(src) || SAFE_PHOTO.test(src))) {
     return <img className="f-chat-av" src={src} alt="" width={size} height={size} loading="lazy" decoding="async" />
   }
   return (

@@ -1,4 +1,5 @@
 import { useLayoutEffect } from 'react'
+import { useSettings } from '../../settings/store'
 import { X } from '@phosphor-icons/react'
 import type { ChatProfile, ChatRole } from '../../../../../shared/chat'
 
@@ -114,7 +115,9 @@ export function ConfirmInline({
 
 /** Foto de perfil o, si no hay, la inicial. El nombre va al lado, así que la imagen es decorativa. */
 export function Avatar({ profile, size = 28 }: { profile: ChatProfile; size?: number }): React.JSX.Element {
-  const url = profile.avatarUrl && AVATAR_HOST.test(profile.avatarUrl) ? profile.avatarUrl : undefined
+  // Modo liviano: sin fotos, solo la inicial.
+  const lite = useSettings().settings.lightMode
+  const url = !lite && profile.avatarUrl && AVATAR_HOST.test(profile.avatarUrl) ? profile.avatarUrl : undefined
   const style = { width: size, height: size }
   if (url) {
     return <img className="f-chat-team-avatar" src={url} alt="" width={size} height={size} loading="lazy" style={style} />
