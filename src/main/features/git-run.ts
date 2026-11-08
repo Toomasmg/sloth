@@ -99,6 +99,12 @@ export function readable(r: RunResult, what: string): string {
   if (/gh auth login|not logged into/i.test(raw)) return 'gh no tiene sesión iniciada: corré «gh auth login».'
   if (/rejected.*non-fast-forward|fetch first/i.test(raw))
     return 'El remoto tiene commits que no tenés (push rechazado). Traelos con pull/rebase antes de pushear; nunca se fuerza.'
+  if (/Not possible to fast-forward|divergent branches|Diverging branches/i.test(raw))
+    return 'La rama local y el remoto se separaron: no se puede traer sin combinar. Resolvelo a mano (merge o rebase); Sloth nunca fuerza nada.'
+  if (/There is no tracking information|no upstream branch/i.test(raw)) return 'La rama no tiene remoto asociado. Subila primero con «Subir».'
+  if (/Your local changes to the following files would be overwritten|would be overwritten by/i.test(raw))
+    return 'Hay cambios sin confirmar que chocan con la otra rama. Confirmalos o guardalos en stash antes de cambiar.'
+  if (/CONFLICT|Automatic merge failed/i.test(raw)) return 'Quedaron conflictos. Resolvelos a mano en el editor.'
   if (/Could not read from remote|Authentication failed|Permission denied \(publickey\)/i.test(raw))
     return `No se pudo conectar con el remoto (credenciales o red). ${text}`
   return `${what} falló${text ? `: ${text}` : ` (código ${r.code}).`}`

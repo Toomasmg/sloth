@@ -1,35 +1,51 @@
 import { app, shell } from 'electron'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import { GitError, isDir, normPath, validBranchName } from './git-run'
 import {
   changeCount,
-  commitAll,
+  commitFiles,
+  commitStaged,
   commitsToPush,
   commitsVsBase,
   createBranch,
   createPr,
   defaultBase,
   diffFile,
+  discardFile,
+  findStash,
   GITHUB_PR_URL,
+  ghStatus,
   hasRef,
   isProtected,
+  localBranches,
+  logBranch,
   prCreateArgs,
   prView,
+  pullFF,
   push,
-  pushArgs,
   readTemplate,
-  remoteUrl,
+  remoteBranches,
   repoInfo,
+  stageAll,
+  stageFile,
+  stashPush,
+  stashRestore,
   status,
+  switchBranch,
+  syncInfo,
+  unstageAll,
+  unstageFile,
   upstream,
   validatePr
 } from './git-ops'
+import type { FileChange } from './git-ops'
 
 /**
- * Función «git»: ver los cambios de un espacio (status + diff), commitear, pushear y abrir PR.
- * Nada corre solo: todo a pedido de la UI. Avisa «changed» cuando Claude termina (hook Stop).
+ * Función «git»: cambios del espacio (preparar, sacar, descartar, commit), historial, ramas
+ * (subir, traer, cambiar, stash de Sloth) y PR con gh. Nada corre solo: todo a pedido de la UI.
+ * Avisa «changed» cuando Claude termina (hook Stop) o cuando una operación cambia el repo.
  */
 
 interface Saved {
@@ -93,6 +109,27 @@ function changed(wsId: string): void {
   ctx.emit('changed', wsId)
 }
 
+function text(v: unknown, max: number, what: string): string {
+  if (typeof v !== 'string' || v.length === 0 || v.length > max) throw new GitError(`${what} inválido.`)
+  return v
+}
+
+/** Un archivo del status: nunca se opera sobre rutas arbitrarias. */
+async function fileOf(cwd: string, path: unknown): Promise<{ top: string; file: FileChange; hasHead: boolean }> {
+  const p = text(path, 1024, 'Archivo')
+  const st = await status(cwd)
+  const file = st.files.find((f) => f.path === p)
+  if (!file || !st.top) throw new GitError('Ese archivo ya no tiene cambios.')
+  const info = await repoInfo(cwd)
+  return { top: st.top, file, hasHead: Boolean(info.hasHead) }
+}
+
+async function topOf(cwd: string): Promise<string> {
+  const info = await repoInfo(cwd)
+  if (!info.isRepo || !info.top) throw new GitError('No es un repositorio git.')
+  return info.top
+}
+
 /** Errores con mensaje limpio para la UI (Electron antepone «Error invoking remote method…»). */
 function wrap<A extends unknown[], R>(fn: (...a: A) => Promise<R>): (...a: A) => Promise<R> {
   return async (...a: A) => {
@@ -103,6 +140,20 @@ function wrap<A extends unknown[], R>(fn: (...a: A) => Promise<R>): (...a: A) =>
       throw new Error(e instanceof Error ? e.message : String(e))
     }
   }
+}
+
+/**
+ * Operación que cambia el repo: se serializa por espacio y, si sale bien, avisa a la UI.
+ * El primer argumento siempre es el id del espacio.
+ */
+function mutating<R>(fn: (cwd: string, ...rest: unknown[]) => Promise<R>): (wsId: unknown, ...rest: unknown[]) => Promise<R> {
+  return wrap(async (wsId: unknown, ...rest: unknown[]) => {
+    const cwd = cwdOf(wsId)
+    const id = wsId as string
+    const out = await exclusive(id, () => fn(cwd, ...rest))
+    changed(id)
+    return out
+  })
 }
 
 const feature: Feature = {
@@ -144,14 +195,9 @@ const feature: Feature = {
       'diff',
       wrap(async (wsId: unknown, path: unknown, limit: unknown) => {
         const cwd = cwdOf(wsId)
-        if (typeof path !== 'string' || !path || path.length > 1024) throw new GitError('Archivo inválido.')
+        const { top, file, hasHead } = await fileOf(cwd, path)
         const lim = typeof limit === 'number' && Number.isFinite(limit) ? Math.min(Math.max(100, Math.floor(limit)), 20000) : 2000
-        // Solo se puede pedir el diff de un archivo que figure en el status (nada de leer rutas arbitrarias).
-        const st = await status(cwd)
-        const file = st.files.find((f) => f.path === path)
-        if (!file || !st.top) throw new GitError('Ese archivo ya no tiene cambios.')
-        const info = await repoInfo(cwd)
-        return diffFile(st.top, file, Boolean(info.hasHead), lim)
+        return diffFile(top, file, hasHead, lim)
       })
     )
 
@@ -169,57 +215,169 @@ const feature: Feature = {
       })
     )
 
+    // ----- Cambios -----
+
+    ctx.handle(
+      'stage',
+      mutating(async (cwd, path) => {
+        const { top, file } = await fileOf(cwd, path)
+        await stageFile(top, file)
+        return true
+      })
+    )
+
+    ctx.handle(
+      'unstage',
+      mutating(async (cwd, path) => {
+        const { top, file } = await fileOf(cwd, path)
+        await unstageFile(top, file)
+        return true
+      })
+    )
+
+    ctx.handle(
+      'stageAll',
+      mutating(async (cwd) => {
+        await stageAll(await topOf(cwd))
+        return true
+      })
+    )
+
+    ctx.handle(
+      'unstageAll',
+      mutating(async (cwd) => {
+        await unstageAll(await topOf(cwd))
+        return true
+      })
+    )
+
+    // Descarta los cambios de un archivo. Los no trackeados piden el nombre exacto (confirmación reforzada).
+    ctx.handle(
+      'discard',
+      mutating(async (cwd, path, confirmName) => {
+        const { top, file, hasHead } = await fileOf(cwd, path)
+        if (file.code === '??' && confirmName !== basename(file.path)) throw new GitError('Escribí el nombre del archivo para confirmar.')
+        await discardFile(top, file, hasHead)
+        return true
+      })
+    )
+
     ctx.handle(
       'commit',
-      wrap(async (wsId: unknown, message: unknown) => {
-        const cwd = cwdOf(wsId)
+      mutating(async (cwd, message) => {
         if (typeof message !== 'string' || !message.trim()) throw new GitError('El mensaje del commit es obligatorio.')
         if (message.length > 10000) throw new GitError('Mensaje demasiado largo.')
-        const sha = await exclusive(wsId as string, () => commitAll(cwd, message.trim()))
-        changed(wsId as string)
-        return sha
+        return commitStaged(cwd, message.trim())
       })
     )
 
     ctx.handle(
       'createBranch',
-      wrap(async (wsId: unknown, name: unknown) => {
-        const cwd = cwdOf(wsId)
+      mutating(async (cwd, name, base) => {
         if (typeof name !== 'string') throw new GitError('Nombre de rama inválido.')
-        await exclusive(wsId as string, () => createBranch(cwd, name.trim()))
-        changed(wsId as string)
-        return name.trim()
+        const n = name.trim()
+        await createBranch(cwd, n, typeof base === 'string' ? base : undefined)
+        return n
       })
     )
 
-    // Lo que haría el push, para la confirmación: comando exacto, remoto y commits.
+    // ----- Historial -----
+
     ctx.handle(
-      'pushPreview',
+      'log',
       wrap(async (wsId: unknown) => {
         const cwd = cwdOf(wsId)
         const info = await repoInfo(cwd)
-        if (!info.isRepo) throw new GitError('No es un repositorio git.')
-        const branch = info.branch ?? null
-        return {
-          branch,
-          protected: isProtected(branch),
-          remote: await remoteUrl(cwd),
-          upstream: await upstream(cwd),
-          commits: await commitsToPush(cwd),
-          command: branch ? ['git', ...pushArgs(branch)].join(' ') : null
-        }
+        if (!info.isRepo) return []
+        return logBranch(cwd)
       })
     )
 
     ctx.handle(
-      'push',
-      wrap(async (wsId: unknown, branch: unknown) => {
+      'commitFiles',
+      wrap(async (wsId: unknown, sha: unknown) => {
         const cwd = cwdOf(wsId)
-        if (typeof branch !== 'string') throw new GitError('Rama inválida.')
-        const out = await exclusive(wsId as string, () => push(cwd, branch))
-        changed(wsId as string)
-        return out
+        return commitFiles(cwd, text(sha, 60, 'Commit'))
       })
+    )
+
+    // ----- Subir, traer y ramas -----
+
+    ctx.handle(
+      'sync',
+      wrap(async (wsId: unknown) => {
+        const cwd = cwdOf(wsId)
+        const info = await repoInfo(cwd)
+        if (!info.isRepo) return null
+        return { branch: info.branch ?? null, ...(await syncInfo(cwd)) }
+      })
+    )
+
+    // Subir: git push -u origin <rama actual>. Sin --force nunca.
+    ctx.handle(
+      'push',
+      mutating(async (cwd, branch) => {
+        if (typeof branch !== 'string') throw new GitError('Rama inválida.')
+        return push(cwd, branch)
+      })
+    )
+
+    // Traer: solo avance limpio (--ff-only).
+    ctx.handle(
+      'pull',
+      mutating(async (cwd) => pullFF(cwd))
+    )
+
+    ctx.handle(
+      'branches',
+      wrap(async (wsId: unknown) => {
+        const cwd = cwdOf(wsId)
+        const info = await repoInfo(cwd)
+        if (!info.isRepo) return { local: [], remote: [] }
+        const local = await localBranches(cwd)
+        const remote = await remoteBranches(cwd, local)
+        return { local, remote }
+      })
+    )
+
+    ctx.handle(
+      'switch',
+      mutating(async (cwd, name, remote) => {
+        await switchBranch(cwd, text(name, 200, 'Rama'), remote === true)
+        return true
+      })
+    )
+
+    ctx.handle(
+      'stashInfo',
+      wrap(async (wsId: unknown) => {
+        const top = await topOf(cwdOf(wsId))
+        const s = await findStash(top)
+        return s ? { branch: s.branch, files: s.files } : null
+      })
+    )
+
+    ctx.handle(
+      'stashPush',
+      mutating(async (cwd) => {
+        await stashPush(cwd)
+        return true
+      })
+    )
+
+    ctx.handle(
+      'stashRestore',
+      mutating(async (cwd) => {
+        await stashRestore(cwd)
+        return true
+      })
+    )
+
+    // ----- PR -----
+
+    ctx.handle(
+      'gh',
+      wrap(async () => ghStatus())
     )
 
     // Datos para armar el PR: rama, base, si está pusheada, commits, plantilla y PR existente.
