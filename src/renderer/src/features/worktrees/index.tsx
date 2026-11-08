@@ -1,8 +1,20 @@
+import { lazy, Suspense } from 'react'
 import type { FeatureUi } from '../host'
 import { WorktreeIcon } from '../../icons/SlothIcons'
-import { openRamas } from './store'
-import { RamasPage } from './RamasPage'
+import { openRamas, useRamas } from './store'
 import './worktrees.css'
+
+// La página (escaneo de repos y tabla) se carga recién al abrirla: esta función siempre está montada.
+const RamasPage = lazy(() => import('./RamasPage').then((m) => ({ default: m.RamasPage })))
+
+function RamasGlobal(): React.JSX.Element | null {
+  const { open } = useRamas()
+  return open ? (
+    <Suspense fallback={null}>
+      <RamasPage />
+    </Suspense>
+  ) : null
+}
 
 /** Sección «Ramas aparte» al final del sidebar: abre el panel (que escanea al abrirse). */
 function RamasSection(): React.JSX.Element {
@@ -20,7 +32,7 @@ function RamasSection(): React.JSX.Element {
 const ui: FeatureUi = {
   name: 'worktrees',
   Sidebar: RamasSection,
-  Global: RamasPage,
+  Global: RamasGlobal,
   commands() {
     return [
       {

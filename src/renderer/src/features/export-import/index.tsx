@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { ExportIcon, CloseIcon } from '../../icons/SlothIcons'
 import type { FeatureUi } from '../host'
 import { useUi } from '../host'
-import { ExportTab } from './ExportTab'
-import { ImportTab } from './ImportTab'
+const ExportTab = lazy(() => import('./ExportTab').then((m) => ({ default: m.ExportTab })))
+const ImportTab = lazy(() => import('./ImportTab').then((m) => ({ default: m.ImportTab })))
 import { onRequest, request } from './bus'
 import './export-import.css'
 
@@ -55,10 +55,14 @@ function EiModal({ initial, onClose }: { initial: Tab; onClose: () => void }): R
 
         {/* Las dos pestañas quedan montadas: cambiar de pestaña no pierde lo que estabas eligiendo. */}
         <div id="ei-panel-exp" role="tabpanel" aria-labelledby="ei-tab-exp" hidden={tab !== 'exportar'}>
-          <ExportTab ui={ui} />
+          <Suspense fallback={null}>
+            <ExportTab ui={ui} />
+          </Suspense>
         </div>
         <div id="ei-panel-imp" role="tabpanel" aria-labelledby="ei-tab-imp" hidden={tab !== 'importar'}>
-          <ImportTab ui={ui} onClose={onClose} />
+          <Suspense fallback={null}>
+            <ImportTab ui={ui} onClose={onClose} />
+          </Suspense>
         </div>
       </div>
     </div>

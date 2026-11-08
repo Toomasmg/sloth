@@ -1,15 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { ReportIcon } from '../../icons/SlothIcons'
 import type { FeatureUi } from '../host'
 import { onOpenReport, openReport } from './bus'
-import { ReportPage } from './ReportPage'
+const ReportPage = lazy(() => import('./ReportPage').then((m) => ({ default: m.ReportPage })))
 import './report.css'
 
 /** Global de «report»: la página de Reportar se abre desde la paleta, el menú de ayuda o Configuración. */
 function Global(): React.JSX.Element | null {
   const [open, setOpen] = useState(false)
   useEffect(() => onOpenReport(() => setOpen(true)), [])
-  return open ? <ReportPage onClose={() => setOpen(false)} /> : null
+  return open ? (
+    <Suspense fallback={null}>
+      <ReportPage onClose={() => setOpen(false)} />
+    </Suspense>
+  ) : null
 }
 
 const ui: FeatureUi = {

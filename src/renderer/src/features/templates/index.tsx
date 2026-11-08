@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { NewSpaceIcon, TicketIcon, BranchIcon, ChangesIcon, TemplatesIcon } from '../../icons/SlothIcons'
 import { isLoginPane, type Workspace } from '../../../../shared/types'
 import { useUi, type Command, type FeatureUi, type UiCtx } from '../host'
 import { cleanError, shortPath } from '../../format'
 import { createFrom, loadTemplates, openDialog, setView, useTemplates, usesTicket, getTemplates, type TemplateDto, type TemplatesView } from './store'
-import { TemplatesScreen } from './TemplatesScreen'
+const TemplatesScreen = lazy(() => import('./TemplatesScreen').then((m) => ({ default: m.TemplatesScreen })))
 import { colorHex, iconPath } from './catalog'
 import './templates.css'
 
@@ -75,7 +75,11 @@ function Global(): React.JSX.Element | null {
   }, [])
 
   if (!dialog) return null
-  return <TemplatesScreen key={dialog.id ?? 'new'} initialId={dialog.id} onClose={() => openDialog(null)} />
+  return (
+    <Suspense fallback={null}>
+      <TemplatesScreen key={dialog.id ?? 'new'} initialId={dialog.id} onClose={() => openDialog(null)} />
+    </Suspense>
+  )
 }
 
 const OPEN_KEY = 'sloth.templates.open'

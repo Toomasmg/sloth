@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { useUi, type FeatureUi } from '../host'
 import { TicketIcon } from '../../icons/SlothIcons'
-import { Board } from './Board'
+const Board = lazy(() => import('./Board').then((m) => ({ default: m.Board })))
 import { isMine, setBoardOpen, setSnapshot, useBoardOpen, useSnapshot, type Snapshot } from './model'
 import './gruv.css'
 
@@ -39,7 +39,11 @@ function Global(): React.JSX.Element | null {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  return open ? <Board /> : null
+  return open ? (
+    <Suspense fallback={null}>
+      <Board />
+    </Suspense>
+  ) : null
 }
 
 const ui: FeatureUi = {

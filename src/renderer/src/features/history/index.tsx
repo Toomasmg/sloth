@@ -1,8 +1,8 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore, lazy, Suspense } from 'react'
 import { HistoryIcon } from '../../icons/SlothIcons'
 import { comboLabel, isCapturingShortcut, matchShortcut } from '../../shortcuts'
 import type { FeatureUi } from '../host'
-import { HistoryPage } from './HistoryPage'
+const HistoryPage = lazy(() => import('./HistoryPage').then((m) => ({ default: m.HistoryPage })))
 import './history.css'
 
 
@@ -37,7 +37,11 @@ function Global(): React.JSX.Element | null {
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [])
-  return open ? <HistoryPage onClose={() => setOpen(false)} /> : null
+  return open ? (
+    <Suspense fallback={null}>
+      <HistoryPage onClose={() => setOpen(false)} />
+    </Suspense>
+  ) : null
 }
 
 function TitlebarButton(): React.JSX.Element {

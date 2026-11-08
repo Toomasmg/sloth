@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, lazy, Suspense } from 'react'
 import { SettingsIcon } from '../../icons/SlothIcons'
 import type { FeatureUi } from '../host'
 import { useUi } from '../host'
@@ -6,7 +6,7 @@ import { bindingOf, matchShortcut, isCapturingShortcut } from '../../shortcuts'
 import { UpdateDot } from '../updater'
 import { onOpenSettings, openSettings, type SettingsTab } from './bus'
 import { getSettings } from './store'
-import { SettingsModal } from './SettingsModal'
+const SettingsModal = lazy(() => import('./SettingsModal').then((m) => ({ default: m.SettingsModal })))
 import './settings-page.css'
 
 /** «Ctrl Shift K» → «Ctrl+Shift+K» para mostrar. */
@@ -81,7 +81,9 @@ function Global(): React.JSX.Element {
     }
   }, [tab])
 
-  return <>{tab && <SettingsModal initialTab={tab} onClose={() => setTab(null)} />}</>
+  return (
+    <Suspense fallback={null}>{tab && <SettingsModal initialTab={tab} onClose={() => setTab(null)} />}</Suspense>
+  )
 }
 
 const ui: FeatureUi = {

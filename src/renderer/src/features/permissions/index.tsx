@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { useUi, type Command, type FeatureUi } from '../host'
-import { PermissionReview } from './PermissionReview'
-import { DecisionsPanel } from './DecisionsPanel'
+const PermissionReview = lazy(() => import('./PermissionReview').then((m) => ({ default: m.PermissionReview })))
+const DecisionsPanel = lazy(() => import('./DecisionsPanel').then((m) => ({ default: m.DecisionsPanel })))
 import { setFocusedSpace } from './api'
 import { closePermissionUi, openPermissionDecisions, openPermissionReview, usePermissionUi } from './store'
 import { PermissionIcon } from '../../icons/SlothIcons'
@@ -46,16 +46,18 @@ const Global = (): React.JSX.Element | null => {
 
   return (
     <>
-      {open.review && (
-        <PermissionReview
-          prompts={live}
-          workspaces={ui.workspaces}
-          accounts={ui.accounts}
-          initialId={open.review.id}
-          onClose={closePermissionUi}
-        />
-      )}
-      {open.decisions && <DecisionsPanel onClose={closePermissionUi} />}
+      <Suspense fallback={null}>
+        {open.review && (
+          <PermissionReview
+            prompts={live}
+            workspaces={ui.workspaces}
+            accounts={ui.accounts}
+            initialId={open.review.id}
+            onClose={closePermissionUi}
+          />
+        )}
+        {open.decisions && <DecisionsPanel onClose={closePermissionUi} />}
+      </Suspense>
     </>
   )
 }

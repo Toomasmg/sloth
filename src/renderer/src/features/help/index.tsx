@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, lazy, Suspense } from 'react'
 import type { ChangelogEntry } from '../../../../shared/changelog'
 import { CHANGELOG } from '../../../../shared/changelog'
 import { HelpIcon, InviteIcon, KeyboardIcon, ReportIcon, UpdateIcon } from '../../icons/SlothIcons'
@@ -6,9 +6,9 @@ import type { Command, FeatureUi } from '../host'
 import { useUi } from '../host'
 import { onHelp, openHelp, type HelpAction } from './bus'
 import { openReport } from '../report/bus'
-import { AyudaPage } from './AyudaPage'
-import { WhatsNewModal } from './WhatsNew'
-import { InviteModal } from './Invite'
+const AyudaPage = lazy(() => import('./AyudaPage').then((m) => ({ default: m.AyudaPage })))
+const WhatsNewModal = lazy(() => import('./WhatsNew').then((m) => ({ default: m.WhatsNewModal })))
+const InviteModal = lazy(() => import('./Invite').then((m) => ({ default: m.InviteModal })))
 import './help.css'
 
 interface WhatsNewReply {
@@ -201,9 +201,17 @@ function HelpGlobal(): React.JSX.Element {
   }
 
   if (!dialog) return <></>
-  if (dialog.kind === 'ayuda') return <AyudaPage onClose={close} />
-  if (dialog.kind === 'invite') return <InviteModal onClose={close} />
-  return <WhatsNewModal entries={dialog.entries} onClose={close} />
+  return (
+    <Suspense fallback={null}>
+      {dialog.kind === 'ayuda' ? (
+        <AyudaPage onClose={close} />
+      ) : dialog.kind === 'invite' ? (
+        <InviteModal onClose={close} />
+      ) : (
+        <WhatsNewModal entries={dialog.entries} onClose={close} />
+      )}
+    </Suspense>
+  )
 }
 
 const ui: FeatureUi = {
