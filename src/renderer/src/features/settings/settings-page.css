@@ -1,14 +1,6 @@
 /* Configuración (función «settings»): pantalla con barra lateral de secciones, buscador y filas.
    Usa los tokens de styles.css / themes.css (oscuro, claro, acento y densidad). */
 
-/* «Más oscuro»: solo cambia los fondos; el resto sigue el tema oscuro. */
-html[data-night='true'] {
-  --bg: #050608;
-  --surface: #0a0b0e;
-  --surface-2: #0a0b0e;
-  --card: #0d0e12;
-}
-
 .f-settings-gear {
   color: var(--fg-2);
   position: relative;
