@@ -3,6 +3,7 @@ import { SettingsIcon } from '../../icons/SlothIcons'
 import type { FeatureUi } from '../host'
 import { useUi } from '../host'
 import { bindingOf, matchShortcut, isCapturingShortcut } from '../../shortcuts'
+import { UpdateDot } from '../updater'
 import { onOpenSettings, openSettings, type SettingsTab } from './bus'
 import { getSettings } from './store'
 import { SettingsModal } from './SettingsModal'
@@ -11,12 +12,13 @@ import './settings-page.css'
 /** «Ctrl Shift K» → «Ctrl+Shift+K» para mostrar. */
 const showCombo = (c: string): string => c.split(' ').join('+')
 
-/** Engranaje en la barra de título. */
+/** Engranaje en la barra de título. Lleva el punto de «versión pendiente» (updater). */
 function GearButton(): React.JSX.Element {
   const label = showCombo(bindingOf('settings'))
   return (
     <button type="button" className="icon-btn f-settings-gear" onClick={() => openSettings()} aria-label="Configuración" title={`Configuración (${label})`}>
       <SettingsIcon size={16} />
+      <UpdateDot />
     </button>
   )
 }
