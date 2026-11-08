@@ -11,23 +11,25 @@ import { getSettings } from './features/settings/store'
 export interface Shortcut {
   /** Cada combinación es una lista de teclas; varias combinaciones = alternativas. */
   keys: string[][]
+  /** Si la acción se puede cambiar en Configuración, la hoja muestra la combinación vigente (bindingOf). */
+  id?: ShortcutId
   what: string
   /** Para agrupar en la hoja de atajos. */
   group?: 'General' | 'Paneles' | 'Terminal' | 'Chat'
 }
 
 export const SHORTCUTS: Shortcut[] = [
-  { keys: [['Ctrl', 'K']], what: 'Paleta de comandos', group: 'General' },
+  { keys: [['Ctrl', 'K']], what: 'Paleta de comandos', group: 'General', id: 'palette' },
   { keys: [['Ctrl', 'Shift', 'P']], what: 'Paleta de comandos (alternativo)', group: 'General' },
-  { keys: [['Ctrl', ',']], what: 'Configuración', group: 'General' },
+  { keys: [['Ctrl', ',']], what: 'Configuración', group: 'General', id: 'settings' },
   { keys: [['?']], what: 'Esta hoja de atajos', group: 'General' },
-  { keys: [['Ctrl', 'Shift', 'F']], what: 'Buscar en el historial de conversaciones', group: 'General' },
-  { keys: [['Ctrl', 'Shift', 'B']], what: 'Enviar a varios espacios', group: 'General' },
-  { keys: [['Ctrl', 'N']], what: 'Nuevo espacio', group: 'General' },
-  { keys: [['Ctrl', 'B']], what: 'Mostrar u ocultar la barra lateral', group: 'General' },
-  { keys: [['Ctrl', 'Shift', 'M']], what: 'Abrir el chat del equipo', group: 'Chat' },
+  { keys: [['Ctrl', 'Shift', 'F']], what: 'Buscar en el historial de conversaciones', group: 'General', id: 'history' },
+  { keys: [['Ctrl', 'Shift', 'B']], what: 'Enviar a varios espacios', group: 'General', id: 'broadcast' },
+  { keys: [['Ctrl', 'N']], what: 'Nuevo espacio', group: 'General', id: 'new' },
+  { keys: [['Ctrl', 'B']], what: 'Mostrar u ocultar la barra lateral', group: 'General', id: 'sidebar' },
+  { keys: [['Ctrl', 'Shift', 'M']], what: 'Abrir el chat del equipo', group: 'Chat', id: 'chat' },
   { keys: [['Esc']], what: 'Cerrar ventanas y paletas', group: 'General' },
-  { keys: [['F2']], what: 'Renombrar el panel activo (o el espacio enfocado en la lista)', group: 'Paneles' },
+  { keys: [['F2']], what: 'Renombrar el panel activo (o el espacio enfocado en la lista)', group: 'Paneles', id: 'rename' },
   { keys: [['Ctrl', 'Alt', '1–4']], what: 'Distribución: 1 (uno), 2 (dos), 3 o 4 (cuatro) paneles a la vista', group: 'Paneles' },
   { keys: [['Ctrl', 'Tab'], ['Ctrl', 'Shift', 'Tab']], what: 'Cambiar de panel (siguiente o anterior, en pestañas)', group: 'Paneles' },
   { keys: [['Ctrl', 'Alt', '←']], what: 'Mover el panel a la izquierda', group: 'Paneles' },
@@ -59,6 +61,11 @@ export const SHORTCUT_ACTIONS: readonly ShortcutAction[] = [
   { id: 'history', name: 'Buscar en el historial de conversaciones', def: 'Ctrl Shift F' },
   { id: 'rename', name: 'Renombrar el panel activo', def: 'F2' }
 ]
+
+/** Combinaciones de una fila de la hoja: las personalizadas si la acción se puede cambiar. */
+export function shortcutKeys(s: Shortcut): string[][] {
+  return s.id ? [bindingOf(s.id).split(' ').filter(Boolean)] : s.keys
+}
 
 /** Texto para mostrar de una acción: «Ctrl+Shift+F». */
 export const comboLabel = (id: ShortcutId): string => bindingOf(id).split(' ').join('+')
@@ -128,7 +135,10 @@ export function findConflict(id: ShortcutId, combo: string, custom: Partial<Reco
     if (a.id === id || a.fixed) continue
     if (norm(bindingOf(a.id, custom)) === target) return a.name
   }
-  for (const s of SHORTCUTS) for (const k of s.keys) if (norm(k.join(' ')) === target) return s.what
+  for (const s of SHORTCUTS) {
+    if (s.id) continue
+    for (const k of s.keys) if (norm(k.join(' ')) === target) return s.what
+  }
   return null
 }
 

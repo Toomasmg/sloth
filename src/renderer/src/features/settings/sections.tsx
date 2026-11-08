@@ -530,7 +530,7 @@ export function ShortcutsSection(): React.JSX.Element {
       }
       const combo = comboFromEvent(e)
       if (!combo) {
-        if (keyTokenOf(e) && !e.ctrlKey && !e.altKey) setMsg('Usá Ctrl o Alt en la combinación.')
+        if (keyTokenOf(e) && !e.ctrlKey && !e.altKey) setMsg('Usá Ctrl o Alt en la combinación (o una tecla F sola).')
         return
       }
       const conflict = findConflict(cap, combo, customRef.current)
@@ -594,7 +594,7 @@ export function ShortcutsSection(): React.JSX.Element {
           {msg}
         </p>
       )}
-      <SectionHint>Tocá un atajo y apretá la combinación nueva. Ctrl o Alt son obligatorios. Esc cancela. «Cambiar distribución» es fijo: 1 a 4 eligen la distribución.</SectionHint>
+      <SectionHint>Tocá un atajo y apretá la combinación nueva. Ctrl o Alt son obligatorios, salvo en F1 a F12. Esc cancela. «Cambiar distribución» es fijo: 1 a 4 eligen la distribución.</SectionHint>
     </>
   )
 }

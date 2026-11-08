@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { SHORTCUTS, type Shortcut } from '../../shortcuts'
+import { SHORTCUTS, shortcutKeys, type Shortcut } from '../../shortcuts'
 import { AccountIcon, BranchIcon, ChatIcon, FolderIcon, PermissionIcon, ReportIcon, SearchIcon } from '../../icons/SlothIcons'
 import { openSettings } from '../settings/bus'
 import { openReport } from '../report/bus'
@@ -115,7 +115,7 @@ const SECTIONS = [
 ] as const
 
 /** Combinaciones de un atajo como texto: «Ctrl+K», o varias separadas por « o ». */
-const comboText = (s: Shortcut): string => s.keys.map((c) => c.join('+')).join(' o ')
+const comboText = (s: Shortcut): string => shortcutKeys(s).map((c) => c.join('+')).join(' o ')
 
 export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Element {
   const [q, setQ] = useState('')
@@ -311,7 +311,7 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
                         <div key={r.what} className="group-row ay-key-row">
                           <span className="ay-key-what">{hl(r.what)}</span>
                           <span className="ay-keys">
-                            {r.keys.map((combo, i) => (
+                            {shortcutKeys(r).map((combo, i) => (
                               <Fragment key={i}>
                                 {i > 0 && <span className="ay-or">o</span>}
                                 {combo.map((k, j) => (
