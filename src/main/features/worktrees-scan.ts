@@ -183,6 +183,36 @@ async function ghAvailable(): Promise<boolean> {
   return ghOk
 }
 
+/** PR mergeado de una rama, por 5 minutos: gh es lento y el escaneo se pide cada vez que se abre el panel. */
+const GH_TTL_MS = 5 * 60_000
+interface MergedPr {
+  number: number
+  url: string
+  headRefOid?: string
+}
+const ghMerged = new Map<string, { at: number; pr: MergedPr | null }>()
+
+/** Último PR mergeado de la rama (o null). Si gh falla, no se guarda nada y se consulta de nuevo después. */
+async function mergedPrFor(repo: string, cwd: string, branch: string): Promise<MergedPr | null> {
+  const key = `${repo}\u0000${branch}`
+  const hit = ghMerged.get(key)
+  if (hit && Date.now() - hit.at < GH_TTL_MS) return hit.pr
+  const r = await run('gh', ['pr', 'list', '--state', 'merged', '--head', branch, '--json', 'number,url,headRefOid', '--limit', '1'], {
+    cwd,
+    timeoutMs: 20000
+  }).catch(() => null)
+  if (!r || r.code !== 0) return null
+  let pr: MergedPr | null = null
+  try {
+    const arr = JSON.parse(r.stdout) as MergedPr[]
+    pr = arr[0] ?? null
+  } catch {
+    /* salida rara: se ignora */
+  }
+  ghMerged.set(key, { at: Date.now(), pr })
+  return pr
+}
+
 export interface ScanOptions {
   /** Consultar PRs mergeados con gh (por defecto sí, si gh está instalado). */
   useGh?: boolean
@@ -255,23 +285,13 @@ async function rowOf(
     }
   }
   if (!isMain && !row.merged && c.useGh && e.branch) {
-    const r = await run('gh', ['pr', 'list', '--state', 'merged', '--head', e.branch, '--json', 'number,url,headRefOid', '--limit', '1'], {
-      cwd: e.path,
-      timeoutMs: 20000
-    }).catch(() => null)
-    if (r && r.code === 0) {
-      try {
-        const arr = JSON.parse(r.stdout) as { number: number; url: string; headRefOid?: string }[]
-        if (arr[0]) {
-          row.pr = { number: arr[0].number, url: arr[0].url }
-          row.merged = true
-          row.mergedBy = 'pr'
-          // Squash/rebase: si el HEAD local es el que se mergeó, no queda nada sin subir.
-          if (arr[0].headRefOid && arr[0].headRefOid === e.head) row.ahead = 0
-        }
-      } catch {
-        /* salida rara: se ignora */
-      }
+    const pr = await mergedPrFor(c.mainPath, e.path, e.branch)
+    if (pr) {
+      row.pr = { number: pr.number, url: pr.url }
+      row.merged = true
+      row.mergedBy = 'pr'
+      // Squash/rebase: si el HEAD local es el que se mergeó, no queda nada sin subir.
+      if (pr.headRefOid && pr.headRefOid === e.head) row.ahead = 0
     }
   }
   return row
