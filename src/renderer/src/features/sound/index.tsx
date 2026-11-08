@@ -27,10 +27,14 @@ const Global = (): null => {
     const chimes = warm || !prevAgents.current ? [] : chimesFor(prevAgents.current, ui.agents, prevPerms.current, permIds)
     prevAgents.current = ui.agents
     prevPerms.current = permIds
-    if (chimes.length === 0 || !getSettings().settings.sounds) return
+    const { settings: s } = getSettings()
+    // «No molestar» silencia todo; cada aviso se puede apagar por separado (Configuración → Notificaciones).
+    if (chimes.length === 0 || !s.sounds || s.noMolestar) return
+    const allowed = chimes.filter((c) => (c === 'done' ? s.notify.done : s.notify.perm))
+    if (allowed.length === 0) return
     if (!canPlay(lastPlayed.current, now)) return
     lastPlayed.current = now
-    playChime(chimes[0])
+    playChime(allowed[0], s.soundName)
   }, [ui.agents, ui.permissions])
 
   useEffect(() => () => disposeSound(), [])

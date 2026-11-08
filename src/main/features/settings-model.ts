@@ -3,10 +3,17 @@
  * Sin imports de Electron ni de Node: lo usan main (settings.ts), la interfaz y las pruebas.
  */
 
-export type ThemeChoice = 'oscuro' | 'claro' | 'sistema'
+export type ThemeChoice = 'oscuro' | 'noche' | 'sistema'
 export type Density = 'compacta' | 'cómoda'
 export type TermFont = 'JetBrains Mono' | 'Cascadia Code' | 'Consolas'
 export type CursorShape = 'barra' | 'bloque' | 'subrayado'
+export type AccentChoice = 'cielo' | 'hoja' | 'lila' | 'ambar'
+export type ShellChoice = 'PowerShell 7' | 'Windows PowerShell' | 'Git Bash' | 'Símbolo del sistema'
+export type EditorChoice = 'VS Code' | 'Cursor' | 'Windsurf' | 'Bloc de notas'
+export type SoundName = 'Gota' | 'Campana suave' | 'Clic'
+export type UpdateChannel = 'estable' | 'beta'
+/** Atajos que se pueden cambiar (ids estables: los usa shortcuts.ts y el main los guarda tal cual). */
+export type ShortcutId = 'palette' | 'new' | 'sidebar' | 'broadcast' | 'layout' | 'settings' | 'chat'
 
 export interface TerminalSettings {
   fontSize: number
@@ -14,19 +21,48 @@ export interface TerminalSettings {
   lineHeight: number
   cursorStyle: CursorShape
   cursorBlink: boolean
+  /** Shell de los espacios nuevos. */
+  shell: ShellChoice
+}
+
+/** Qué avisa Sloth. «No molestar» es `SlothSettings.noMolestar`. */
+export interface NotifySettings {
+  /** Claude termina una tarea. */
+  done: boolean
+  /** Claude pide permiso. */
+  perm: boolean
+  /** Mensajes directos y menciones del chat del equipo. */
+  team: boolean
 }
 
 export interface SlothSettings {
   theme: ThemeChoice
   density: Density
   uiFontSize: number
+  accent: AccentChoice
   terminal: TerminalSettings
   /** accountId → color de ACCOUNT_PALETTE. Las cuentas sin entrada usan el color automático. */
   accountColors: Record<string, string>
   openAtLogin: boolean
   confirmClosePanes: boolean
-  /** Sonido suave al terminar o al pedir permiso (v0.5, función «sound»). Apagado por defecto. */
+  /** Reabrir los espacios que estaban abiertos al iniciar (lo aplica la app al arrancar). */
+  reopenSpaces: boolean
+  /** Dejar las terminales vivas al cerrar la ventana (el daemon sigue corriendo). */
+  keepTerminalsAlive: boolean
+  /** Editor para «Abrir en editor». */
+  editor: EditorChoice
+  /** Carpeta de proyectos. Vacía = la carpeta Documentos del usuario. */
+  projectsDir: string
+  /** Sonido suave al terminar o al pedir permiso. Apagado = «Sin sonido». */
   sounds: boolean
+  soundName: SoundName
+  /** «No molestar»: silencia sonidos y avisos hasta que se apague. Lo lee también el paquete de permisos. */
+  noMolestar: boolean
+  notify: NotifySettings
+  /** Canal del updater: estable (recomendado) o beta. */
+  updateChannel: UpdateChannel
+  /** Atajos personalizados: id → combinación canónica («Ctrl Shift K»). Sin entrada = el por defecto. */
+  shortcuts: Partial<Record<ShortcutId, string>>
 }
 
 /** Lo que main manda a la interfaz (get, set, reset y el evento «changed»). */
@@ -36,14 +72,22 @@ export interface SettingsPayload {
   dark: boolean
   /** «Abrir al iniciar Windows» solo se aplica en la app instalada. */
   loginItemSupported: boolean
+  /** Carpeta Documentos del usuario (default de la carpeta de proyectos). */
+  documentsDir: string
 }
 
-export const THEMES: readonly ThemeChoice[] = ['oscuro', 'claro', 'sistema']
+export const THEMES: readonly ThemeChoice[] = ['oscuro', 'noche', 'sistema']
 export const DENSITIES: readonly Density[] = ['compacta', 'cómoda']
 export const TERM_FONTS: readonly TermFont[] = ['JetBrains Mono', 'Cascadia Code', 'Consolas']
 export const CURSORS: readonly CursorShape[] = ['barra', 'bloque', 'subrayado']
+export const ACCENTS: readonly AccentChoice[] = ['cielo', 'hoja', 'lila', 'ambar']
+export const SHELLS: readonly ShellChoice[] = ['PowerShell 7', 'Windows PowerShell', 'Git Bash', 'Símbolo del sistema']
+export const EDITORS: readonly EditorChoice[] = ['VS Code', 'Cursor', 'Windsurf', 'Bloc de notas']
+export const SOUND_NAMES: readonly SoundName[] = ['Gota', 'Campana suave', 'Clic']
+export const UPDATE_CHANNELS: readonly UpdateChannel[] = ['estable', 'beta']
+export const SHORTCUT_IDS: readonly ShortcutId[] = ['palette', 'new', 'sidebar', 'broadcast', 'layout', 'settings', 'chat']
 
-export const UI_FONT = { min: 12, max: 15 } as const
+export const UI_FONT = { min: 12, max: 16 } as const
 export const TERM_FONT = { min: 11, max: 18 } as const
 export const LINE_HEIGHT = { min: 1, max: 1.4, step: 0.05 } as const
 
@@ -67,37 +111,87 @@ export const ACCOUNT_PALETTE: readonly { hex: string; name: string }[] = [
 const PALETTE_SET = new Set(ACCOUNT_PALETTE.map((c) => c.hex))
 
 export const MAX_ACCOUNT_COLORS = 64
+export const MAX_SHORTCUTS = 32
 const ACCOUNT_ID = /^[A-Za-z0-9_-]{1,64}$/
+const MAX_PATH = 260
 
 export const DEFAULT_SETTINGS: SlothSettings = {
   theme: 'oscuro',
   density: 'compacta',
   uiFontSize: 13,
+  accent: 'cielo',
   terminal: {
     fontSize: 13,
     fontFamily: 'JetBrains Mono',
     lineHeight: 1.15,
     cursorStyle: 'barra',
-    cursorBlink: true
+    cursorBlink: true,
+    shell: 'PowerShell 7'
   },
   accountColors: {},
   openAtLogin: false,
   confirmClosePanes: true,
-  sounds: false
+  reopenSpaces: true,
+  keepTerminalsAlive: true,
+  editor: 'VS Code',
+  projectsDir: '',
+  sounds: false,
+  soundName: 'Gota',
+  noMolestar: false,
+  notify: { done: true, perm: true, team: true },
+  updateChannel: 'estable',
+  shortcuts: {}
 }
 
-export type SettingsSection = 'apariencia' | 'terminal' | 'cuentas' | 'comportamiento'
-export const SECTIONS: readonly SettingsSection[] = ['apariencia', 'terminal', 'cuentas', 'comportamiento']
+/** Secciones que se pueden restaurar por separado (`reset`). */
+export type SettingsSection = 'apariencia' | 'terminal' | 'cuentas' | 'general' | 'notif' | 'atajos' | 'updates'
+export const SECTIONS: readonly SettingsSection[] = ['apariencia', 'terminal', 'cuentas', 'general', 'notif', 'atajos', 'updates']
 
 export const cloneSettings = (s: SlothSettings): SlothSettings => ({
   ...s,
   terminal: { ...s.terminal },
-  accountColors: { ...s.accountColors }
+  accountColors: { ...s.accountColors },
+  notify: { ...s.notify },
+  shortcuts: { ...s.shortcuts }
 })
 
-/** Redondea la altura de línea al paso de 0,05 (evita 1.1500000002). */
-const roundStep = (n: number): number => Math.round(n / LINE_HEIGHT.step) * LINE_HEIGHT.step
-const fix2 = (n: number): number => Math.round(n * 100) / 100
+/* ---------- Atajos: formato canónico «Ctrl Alt Shift Tecla» ---------- */
+
+const MODIFIERS = ['Ctrl', 'Alt', 'Shift'] as const
+const KEY_TOKEN = /^(?:[A-Z0-9]|F(?:[1-9]|1[0-2])|Enter|Space|Tab|Backspace|Delete|Home|End|PageUp|PageDown|Insert|←|→|↑|↓|,|\.|;|-|=|\/)$/
+
+export interface ParsedCombo {
+  ctrl: boolean
+  alt: boolean
+  shift: boolean
+  key: string
+}
+
+/** Lee «Ctrl Shift k» o «Ctrl Shift K» → partes. null si no es una combinación válida. */
+export function parseCombo(raw: string): ParsedCombo | null {
+  const tokens = raw.trim().split(/\s+/).filter(Boolean)
+  if (tokens.length < 2) return null
+  const key = tokens[tokens.length - 1].length === 1 ? tokens[tokens.length - 1].toUpperCase() : tokens[tokens.length - 1]
+  if (!KEY_TOKEN.test(key)) return null
+  const mods = tokens.slice(0, -1)
+  const seen = new Set<string>()
+  for (const m of mods) {
+    const canon = MODIFIERS.find((x) => x.toLowerCase() === m.toLowerCase())
+    if (!canon || seen.has(canon)) return null
+    seen.add(canon)
+  }
+  if (!seen.has('Ctrl') && !seen.has('Alt')) return null
+  return { ctrl: seen.has('Ctrl'), alt: seen.has('Alt'), shift: seen.has('Shift'), key }
+}
+
+/** Forma canónica de una combinación válida, o null. */
+export function canonicalCombo(raw: string): string | null {
+  const p = parseCombo(raw)
+  if (!p) return null
+  return [p.ctrl && 'Ctrl', p.alt && 'Alt', p.shift && 'Shift', p.key].filter(Boolean).join(' ')
+}
+
+/* ---------- Validación ---------- */
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 
@@ -122,10 +216,17 @@ function bool(v: unknown, label: string): boolean {
 
 function lineHeight(v: unknown): number {
   if (typeof v !== 'number' || !Number.isFinite(v)) throw new Error('La altura de línea tiene que ser un número.')
-  const r = fix2(roundStep(v))
+  const r = Math.round(Math.round(v / LINE_HEIGHT.step) * LINE_HEIGHT.step * 100) / 100
   if (Math.abs(r - v) > 1e-6 || r < LINE_HEIGHT.min || r > LINE_HEIGHT.max)
     throw new Error(`La altura de línea va de ${LINE_HEIGHT.min} a ${LINE_HEIGHT.max}, en pasos de ${LINE_HEIGHT.step}.`)
   return r
+}
+
+function projectsDir(v: unknown): string {
+  if (typeof v !== 'string') throw new Error('La carpeta de proyectos tiene que ser texto.')
+  const t = v.trim()
+  if (t.length > MAX_PATH || /[\u0000-\u001f]/.test(t)) throw new Error('La carpeta de proyectos no es válida.')
+  return t
 }
 
 export interface PatchOptions {
@@ -135,27 +236,52 @@ export interface PatchOptions {
 
 /**
  * Aplica un cambio parcial validado. Cualquier clave desconocida o valor fuera de rango tira
- * un Error (no se aplica nada a medias). `accountColors` es un parche: color = asignar, null = quitar.
+ * un Error (no se aplica nada a medias). Los mapas son parches: `accountColors` y `shortcuts`
+ * asignan con un valor y quitan con null; `terminal` y `notify` se fusionan campo por campo.
  */
 export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOptions = {}): SlothSettings {
   if (!isObj(patch)) throw new Error('El cambio de configuración tiene que ser un objeto.')
-  checkKeys(patch, ['theme', 'density', 'uiFontSize', 'terminal', 'accountColors', 'openAtLogin', 'confirmClosePanes', 'sounds'], '')
+  checkKeys(
+    patch,
+    [
+      'theme', 'density', 'uiFontSize', 'accent', 'terminal', 'accountColors', 'openAtLogin', 'confirmClosePanes',
+      'reopenSpaces', 'keepTerminalsAlive', 'editor', 'projectsDir', 'sounds', 'soundName', 'noMolestar', 'notify', 'updateChannel', 'shortcuts'
+    ],
+    ''
+  )
   const next = cloneSettings(current)
   if ('theme' in patch) next.theme = oneOf(patch.theme, THEMES, 'El tema')
   if ('density' in patch) next.density = oneOf(patch.density, DENSITIES, 'La densidad')
   if ('uiFontSize' in patch) next.uiFontSize = intIn(patch.uiFontSize, UI_FONT.min, UI_FONT.max, 'El tamaño de letra')
+  if ('accent' in patch) next.accent = oneOf(patch.accent, ACCENTS, 'El color de acento')
   if ('openAtLogin' in patch) next.openAtLogin = bool(patch.openAtLogin, '«Abrir al iniciar Windows»')
   if ('confirmClosePanes' in patch) next.confirmClosePanes = bool(patch.confirmClosePanes, '«Confirmar al cerrar»')
+  if ('reopenSpaces' in patch) next.reopenSpaces = bool(patch.reopenSpaces, '«Reabrir los espacios»')
+  if ('keepTerminalsAlive' in patch) next.keepTerminalsAlive = bool(patch.keepTerminalsAlive, '«Terminales vivas»')
+  if ('editor' in patch) next.editor = oneOf(patch.editor, EDITORS, 'El editor')
+  if ('projectsDir' in patch) next.projectsDir = projectsDir(patch.projectsDir)
   if ('sounds' in patch) next.sounds = bool(patch.sounds, '«Sonidos»')
+  if ('soundName' in patch) next.soundName = oneOf(patch.soundName, SOUND_NAMES, 'El sonido')
+  if ('noMolestar' in patch) next.noMolestar = bool(patch.noMolestar, '«No molestar»')
+  if ('updateChannel' in patch) next.updateChannel = oneOf(patch.updateChannel, UPDATE_CHANNELS, 'El canal de actualizaciones')
   if ('terminal' in patch) {
     const t = patch.terminal
     if (!isObj(t)) throw new Error('terminal tiene que ser un objeto.')
-    checkKeys(t, ['fontSize', 'fontFamily', 'lineHeight', 'cursorStyle', 'cursorBlink'], 'terminal.')
+    checkKeys(t, ['fontSize', 'fontFamily', 'lineHeight', 'cursorStyle', 'cursorBlink', 'shell'], 'terminal.')
     if ('fontSize' in t) next.terminal.fontSize = intIn(t.fontSize, TERM_FONT.min, TERM_FONT.max, 'El tamaño de la terminal')
     if ('fontFamily' in t) next.terminal.fontFamily = oneOf(t.fontFamily, TERM_FONTS, 'La fuente')
     if ('lineHeight' in t) next.terminal.lineHeight = lineHeight(t.lineHeight)
     if ('cursorStyle' in t) next.terminal.cursorStyle = oneOf(t.cursorStyle, CURSORS, 'El cursor')
     if ('cursorBlink' in t) next.terminal.cursorBlink = bool(t.cursorBlink, 'El parpadeo')
+    if ('shell' in t) next.terminal.shell = oneOf(t.shell, SHELLS, 'El shell')
+  }
+  if ('notify' in patch) {
+    const n = patch.notify
+    if (!isObj(n)) throw new Error('notify tiene que ser un objeto.')
+    checkKeys(n, ['done', 'perm', 'team'], 'notify.')
+    if ('done' in n) next.notify.done = bool(n.done, '«Claude termina una tarea»')
+    if ('perm' in n) next.notify.perm = bool(n.perm, '«Claude pide permiso»')
+    if ('team' in n) next.notify.team = bool(n.team, '«Mensajes del equipo»')
   }
   if ('accountColors' in patch) {
     const c = patch.accountColors
@@ -172,6 +298,22 @@ export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOp
     }
     if (Object.keys(next.accountColors).length > MAX_ACCOUNT_COLORS) throw new Error('Demasiados colores de cuenta.')
   }
+  if ('shortcuts' in patch) {
+    const s = patch.shortcuts
+    if (!isObj(s)) throw new Error('shortcuts tiene que ser un objeto.')
+    for (const [id, combo] of Object.entries(s)) {
+      if (!SHORTCUT_IDS.includes(id as ShortcutId)) throw new Error(`Atajo desconocido: ${id}.`)
+      const key = id as ShortcutId
+      if (combo === null) {
+        delete next.shortcuts[key]
+        continue
+      }
+      const canon = typeof combo === 'string' ? canonicalCombo(combo) : null
+      if (!canon) throw new Error('La combinación de teclas no es válida. Usá Ctrl o Alt, más una tecla.')
+      next.shortcuts[key] = canon
+    }
+    if (Object.keys(next.shortcuts).length > MAX_SHORTCUTS) throw new Error('Demasiados atajos personalizados.')
+  }
   return next
 }
 
@@ -179,19 +321,26 @@ export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOp
 export function normalize(raw: unknown): SlothSettings {
   const out = cloneSettings(DEFAULT_SETTINGS)
   if (!isObj(raw)) return out
+  // Versiones anteriores tenían un tema «claro» manual. Ahora se elige «Según Windows».
+  const src: Record<string, unknown> = raw.theme === 'claro' ? { ...raw, theme: 'sistema' } : raw
   const tryPatch = (p: Record<string, unknown>): void => {
     try {
-      const n = applyPatch(out, p)
-      Object.assign(out, n)
+      Object.assign(out, applyPatch(out, p))
     } catch {
       /* campo inválido: queda el valor por defecto */
     }
   }
-  for (const k of ['theme', 'density', 'uiFontSize', 'openAtLogin', 'confirmClosePanes', 'sounds'] as const) if (k in raw) tryPatch({ [k]: raw[k] })
-  if (isObj(raw.terminal))
-    for (const [k, v] of Object.entries(raw.terminal)) tryPatch({ terminal: { [k]: v } })
-  if (isObj(raw.accountColors))
-    for (const [id, v] of Object.entries(raw.accountColors).slice(0, MAX_ACCOUNT_COLORS)) tryPatch({ accountColors: { [id]: v } })
+  const scalars = [
+    'theme', 'density', 'uiFontSize', 'accent', 'openAtLogin', 'confirmClosePanes', 'reopenSpaces', 'keepTerminalsAlive',
+    'editor', 'projectsDir', 'sounds', 'soundName', 'noMolestar', 'updateChannel'
+  ] as const
+  for (const k of scalars) if (k in src) tryPatch({ [k]: src[k] })
+  if (isObj(src.terminal)) for (const [k, v] of Object.entries(src.terminal)) tryPatch({ terminal: { [k]: v } })
+  if (isObj(src.notify)) for (const [k, v] of Object.entries(src.notify)) tryPatch({ notify: { [k]: v } })
+  if (isObj(src.accountColors))
+    for (const [id, v] of Object.entries(src.accountColors).slice(0, MAX_ACCOUNT_COLORS)) tryPatch({ accountColors: { [id]: v } })
+  if (isObj(src.shortcuts))
+    for (const [id, v] of Object.entries(src.shortcuts).slice(0, MAX_SHORTCUTS)) tryPatch({ shortcuts: { [id]: v } })
   return out
 }
 
@@ -204,6 +353,7 @@ export function resetSection(current: SlothSettings, section: unknown): SlothSet
       next.theme = d.theme
       next.density = d.density
       next.uiFontSize = d.uiFontSize
+      next.accent = d.accent
       break
     case 'terminal':
       next.terminal = { ...d.terminal }
@@ -211,10 +361,25 @@ export function resetSection(current: SlothSettings, section: unknown): SlothSet
     case 'cuentas':
       next.accountColors = {}
       break
-    case 'comportamiento':
+    case 'general':
+      next.reopenSpaces = d.reopenSpaces
+      next.keepTerminalsAlive = d.keepTerminalsAlive
       next.openAtLogin = d.openAtLogin
       next.confirmClosePanes = d.confirmClosePanes
+      next.editor = d.editor
+      next.projectsDir = d.projectsDir
+      break
+    case 'notif':
+      next.notify = { ...d.notify }
+      next.noMolestar = d.noMolestar
       next.sounds = d.sounds
+      next.soundName = d.soundName
+      break
+    case 'atajos':
+      next.shortcuts = {}
+      break
+    case 'updates':
+      next.updateChannel = d.updateChannel
       break
     default:
       throw new Error('Sección desconocida.')
@@ -222,6 +387,5 @@ export function resetSection(current: SlothSettings, section: unknown): SlothSet
   return next
 }
 
-/** Tema efectivo: «sistema» depende de lo que diga Windows. */
-export const resolveDark = (theme: ThemeChoice, systemDark: boolean): boolean =>
-  theme === 'oscuro' ? true : theme === 'claro' ? false : systemDark
+/** Tema efectivo: «Oscuro» y «Más oscuro» son siempre oscuros; «Según Windows» sigue al sistema. */
+export const resolveDark = (theme: ThemeChoice, systemDark: boolean): boolean => (theme === 'sistema' ? systemDark : true)
