@@ -164,7 +164,7 @@
   flex: 1;
   height: 4px;
   border-radius: 2px;
-  background: var(--muted);
+  background: var(--seg-on);
   transition: background var(--t-med) var(--ease);
 }
 .f-onboarding-progress span.on {
@@ -254,7 +254,7 @@
     color var(--t-fast) var(--ease);
 }
 .f-onboarding-step-btn:hover {
-  background: var(--muted);
+  background: var(--seg-on);
 }
 .f-onboarding-step-btn.is-done {
   color: var(--fg);
@@ -277,7 +277,7 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: var(--muted);
+  background: var(--seg-on);
   color: var(--fg-2);
   font-size: 12px;
   font-weight: 700;
@@ -356,7 +356,7 @@
 /* Botones, campos y chips de la paleta oscura. Los pisamos con :root para ganarle a
    html[data-theme='light'] (que fija #fff y #2f6672 en los botones y los campos). */
 :root :is(.f-onboarding, .f-onboarding-dock) .btn {
-  background: var(--muted);
+  background: var(--seg-on);
   box-shadow: inset 0 0 0 1px var(--line-2);
   color: var(--fg);
 }

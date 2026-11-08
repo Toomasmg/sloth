@@ -12,7 +12,7 @@
   --backdrop-soft: rgba(10, 11, 15, 0.6);
   --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.5);
   --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.45);
-  --toast-bg: #1b1f29;
+  --toast-bg: #1f2330;
   --toast-border: rgba(255, 122, 122, 0.35);
   --warn-ring: rgba(240, 180, 90, 0.4);
   --warn-tint: rgba(240, 180, 90, 0.06);
@@ -37,6 +37,12 @@
   --search-bg: #171a22;
   --newbtn-bg: #191c25;
   --seg-on: #3a4152;
+  --fg-label: #c9cdd6;
+  --row-hover: rgba(255, 255, 255, 0.045);
+  --chip-bg: #20242e;
+  --warn-strong-fg: #ffd699;
+  --check-border: #4a5160;
+  --confirm-bg: #1a1d26;
   --perm-bg: #1a1d26;
   --team-on: #140f24;
 }
@@ -99,6 +105,12 @@ html[data-theme='light'] {
   --search-bg: #ebebe7;
   --newbtn-bg: #ffffff;
   --seg-on: #ffffff;
+  --fg-label: #3d4250;
+  --row-hover: rgba(0, 0, 0, 0.04);
+  --chip-bg: #ebebe7;
+  --warn-strong-fg: #8a5a00;
+  --check-border: #a3a7b0;
+  --confirm-bg: #fdf7ec;
   --perm-bg: #fdf7ec;
   /* Texto sobre --team (claro: lila oscuro #6f4fd6, con blanco 5,8:1). */
   --team-on: #ffffff;

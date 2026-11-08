@@ -309,7 +309,7 @@
   color: var(--team-fg);
 }
 .tp-badge.mine {
-  background: var(--muted);
+  background: var(--seg-on);
   color: var(--fg-2);
 }
 .tp-empty {
@@ -562,7 +562,7 @@
   padding: 0;
   border: 0;
   border-radius: 11px;
-  background: var(--muted);
+  background: var(--seg-on);
   cursor: pointer;
 }
 .switch-btn.on {

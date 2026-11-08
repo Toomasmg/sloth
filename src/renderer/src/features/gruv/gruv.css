@@ -811,7 +811,7 @@
 .f-gruv-progress {
   height: 4px;
   border-radius: 2px;
-  background: var(--muted);
+  background: var(--seg-on);
   overflow: hidden;
 }
 .f-gruv-progress > span {

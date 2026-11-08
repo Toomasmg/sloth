@@ -183,7 +183,7 @@
   font-weight: 500;
 }
 .hist-seg > button[aria-pressed='true'] {
-  background: var(--muted);
+  background: var(--seg-on);
   color: var(--fg);
   box-shadow: none;
 }

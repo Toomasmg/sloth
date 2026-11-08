@@ -440,7 +440,7 @@ html[data-theme='light'] .f-move-backdrop {
   transition: filter 0.12s;
 }
 .f-move-go.blocked {
-  background: var(--muted);
+  background: var(--seg-on);
   color: var(--fg-2);
 }
 .f-move-go:hover:not(:disabled) {

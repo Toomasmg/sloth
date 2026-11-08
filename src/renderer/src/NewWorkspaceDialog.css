@@ -363,7 +363,7 @@ summary:focus-visible {
   background: var(--surface-hover);
 }
 .nw-chip[aria-pressed='true'] {
-  background: var(--muted);
+  background: var(--seg-on);
   color: var(--fg);
 }
 .nw-chip.ghost {
@@ -444,7 +444,7 @@ summary:focus-visible {
   padding: 0;
   border: 0;
   border-radius: 10px;
-  background: var(--muted);
+  background: var(--seg-on);
   cursor: pointer;
 }
 .nw-switch.on {
