@@ -925,3 +925,51 @@
     animation: none;
   }
 }
+
+/* ---------- Escrituras (0.6.2): toast, comentarios ---------- */
+.f-gruv-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 5;
+  max-width: calc(100vw - 32px);
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  background: var(--card-hover);
+  border: 1px solid var(--border-strong);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.f-gruv-comments {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.f-gruv-comment {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.f-gruv-comment-body {
+  min-width: 0;
+  flex: 1;
+}
+.f-gruv-comment-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-size: var(--fs-sm);
+}
+.f-gruv-comment-body p {
+  margin: 2px 0 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

@@ -5,23 +5,37 @@ import type { Feature, FeatureContext } from './context'
 import { accountStatus } from '../accounts'
 import { baseEnv } from '../ptys'
 import {
+  buildAccionArgs,
+  buildAccionPrompt,
   buildArgs,
+  buildDetalleArgs,
+  buildDetallePrompt,
   buildPrompt,
   normEstado,
+  parseAccion,
+  parseDetalle,
   resolveClaudeExe,
   runClaude,
+  sameTool,
   TICKET_RE,
   NoGruvError,
+  ToolMissingError,
+  type AccionInput,
+  type GruvAccion,
+  type GruvDetalle,
   type GruvEstado,
   type GruvTicket,
   type GruvYo
 } from './gruv-claude'
 
 /**
- * Tickets de Gruv. Gruv es un conector de claude.ai, así que la lista se pide a Claude headless
- * (`claude -p`) con la cuenta elegida, solo cuando el usuario toca «Actualizar». Es de solo lectura:
- * no hay forma de cambiar nada en Gruv desde acá (estado, asignación, comentarios, horas), y la
- * consulta niega explícitamente las herramientas de escritura (ver WRITE_TOOLS en gruv-claude.ts).
+ * Tickets de Gruv. Gruv es un conector de claude.ai, así que todo se pide a Claude headless
+ * (`claude -p`) con la cuenta que consultó Gruv la última vez:
+ * - La lista se lee solo cuando el usuario toca «Actualizar» (solo lectura, ver READ_TOOLS).
+ * - El detalle de un ticket (criterios, comentarios, horas) se lee al abrirlo.
+ * - Cada escritura (estado, tomar, soltar, comentar, tildar criterio, sumar horas) es UNA llamada
+ *   separada que habilita solo la herramienta de esa acción, disparada por un clic del usuario sobre
+ *   un ticket concreto. Nunca en automático ni en lote. Ver accion() más abajo.
  */
 
 /** Estados de Gruv por si `ver_flujo_tickets` no devuelve nada. */
@@ -115,6 +129,7 @@ function snapshot(): unknown {
     lastError: state.lastError,
     config: state.config,
     running: Boolean(running),
+    noDisponible,
     lastRepo: lastRepo()
   }
 }
@@ -240,6 +255,7 @@ async function refresh(rawAccount: unknown): Promise<unknown> {
     state.fetchedBy = acc.id
     state.lastRun = { tokens: r.tokens, costUsd: r.costUsd, durationMs: r.durationMs }
     state.lastError = undefined
+    noDisponible = {}
     state.config.queryAccountId = acc.id
     return { count: r.tickets.length, tokens: r.tokens }
   } catch (e) {
@@ -284,6 +300,178 @@ function setConfig(raw: unknown): unknown {
   return snapshot()
 }
 
+// ---------- detalle y escrituras (un clic = una llamada con una sola herramienta) ----------
+const ACCIONES: GruvAccion[] = ['estado', 'tomar', 'soltar', 'comentar', 'criterio', 'horas']
+const MAX_HORAS = 12
+const SIN_CONECTOR = 'Esta cuenta no tiene el conector de Gruv. Hacelo desde Gruv.'
+/** Detalle de la última lectura por ticket (criterios con id, comentarios, horas). Solo en memoria. */
+const detalles = new Map<string, GruvDetalle>()
+/** Tickets con una escritura en curso: una por ticket. */
+const escribiendo = new Set<string>()
+/** Acciones que esta cuenta no puede hacer (herramienta inexistente o sin conector), con el motivo. */
+let noDisponible: Partial<Record<GruvAccion, string>> = {}
+
+function ticketEnLista(id: string): GruvTicket {
+  const t = state.tickets.find((x) => x.id === id)
+  if (!t) throw new Error('Ese ticket ya no está en la lista. Actualizá Gruv.')
+  return t
+}
+
+/** Cuenta con la que se leen y escriben tickets: la que consultó Gruv la última vez. */
+function cuentaGruv(): { exe: string; cwd: string; env: Record<string, string> } {
+  const id = state.config.queryAccountId
+  if (!id) throw new Error('Actualizá Gruv primero para elegir la cuenta que lo conecta.')
+  const acc = ctx.store.account(id)
+  if (!acc) throw new Error('La cuenta para consultar Gruv ya no existe. Elegí otra en Configuración.')
+  if (!accountStatus(acc).loggedIn) throw new Error(`La cuenta «${acc.label}» no tiene sesión iniciada.`)
+  const exe = resolveClaudeExe()
+  if (!exe) throw new Error('No encontré el ejecutable de Claude Code (claude.exe) en el PATH.')
+  const cwd = join(app.getPath('userData'), 'features', 'gruv-run')
+  mkdirSync(cwd, { recursive: true })
+  return { exe, cwd, env: { ...baseEnv(), CLAUDE_CONFIG_DIR: acc.configDir } }
+}
+
+/** Lectura del detalle al abrir un ticket (criterios con id, comentarios, horas cargadas). */
+async function detalle(rawId: unknown): Promise<GruvDetalle> {
+  const id = ticketId(rawId)
+  ticketEnLista(id)
+  const c = cuentaGruv()
+  try {
+    const d = await runClaude<GruvDetalle>({
+      exe: c.exe,
+      args: buildDetalleArgs(state.config.model),
+      prompt: buildDetallePrompt(id),
+      cwd: c.cwd,
+      env: c.env,
+      timeoutMs: 90_000,
+      parse: parseDetalle
+    })
+    detalles.set(id, d)
+    return d
+  } catch (e) {
+    if (e instanceof NoGruvError) throw new Error(`No pudimos leer el detalle: ${SIN_CONECTOR}`)
+    throw e
+  }
+}
+
+const esMio = (t: GruvTicket): boolean => {
+  const me = state.me
+  if (!me || !t.responsable) return false
+  if (me.id && t.responsableId) return t.responsableId === me.id
+  return t.responsable.trim().toLowerCase() === me.nombre.trim().toLowerCase()
+}
+
+/**
+ * Valida una acción pedida con un clic y la hace con Claude: una llamada, una herramienta.
+ * Devuelve el detalle actualizado (si estaba cargado) para que la UI reemplace lo optimista.
+ */
+async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ detail: GruvDetalle | null }> {
+  if (typeof rawA !== 'string' || !ACCIONES.includes(rawA as GruvAccion)) throw new Error('Acción inválida.')
+  const a = rawA as GruvAccion
+  const id = ticketId(rawId)
+  const t = ticketEnLista(id)
+  const p = (rawIn && typeof rawIn === 'object' ? rawIn : {}) as Record<string, unknown>
+  if (escribiendo.has(id)) throw new Error('Ya hay un cambio en curso en este ticket.')
+  const no = noDisponible[a]
+  if (no) throw new Error(no)
+  const me = state.me
+
+  let input: AccionInput
+  switch (a) {
+    case 'estado': {
+      const estado = typeof p.estado === 'string' ? p.estado : ''
+      if (estado === 'cerrado' || !estados().some((e) => e.clave === estado)) throw new Error('Ese estado no está en el flujo de Gruv.')
+      if (t.estado === estado) return { detail: detalles.get(id) ?? null }
+      input = { ticket: id, estado }
+      break
+    }
+    case 'tomar': {
+      if (t.responsable) throw new Error(`Ya lo tiene ${t.responsable}.`)
+      if (!me?.id) throw new Error('Falta tu id de Gruv: actualizá la lista para cargarlo.')
+      input = { ticket: id, persona: me.id }
+      break
+    }
+    case 'soltar': {
+      if (!esMio(t)) throw new Error('Solo podés soltar un ticket que tenés asignado.')
+      input = { ticket: id, persona: null }
+      break
+    }
+    case 'comentar': {
+      input = { ticket: id, cuerpo: text(p.cuerpo, 2000, 'El comentario', true)! }
+      break
+    }
+    case 'criterio': {
+      const cid = typeof p.criterioId === 'string' ? p.criterioId : ''
+      if (!detalles.get(id)?.criterios.some((c) => c.id === cid)) throw new Error('Abrí el ticket de nuevo: no encuentro ese criterio.')
+      input = { ticket: id, criterioId: cid, hecho: p.hecho === true }
+      break
+    }
+    case 'horas': {
+      const h = typeof p.horas === 'number' ? p.horas : NaN
+      const minutos = Math.round(h * 60)
+      if (!Number.isFinite(h) || h <= 0 || h > MAX_HORAS || minutos < 1)
+        throw new Error(`Las horas tienen que ser más de 0 y hasta ${MAX_HORAS}.`)
+      input = { ticket: id, horas: minutos, motivo: 'Horas cargadas desde Sloth' }
+      break
+    }
+  }
+
+  const c = cuentaGruv()
+  escribiendo.add(id)
+  try {
+    const r = await runClaude<{ minutosTotal?: number }>({
+      exe: c.exe,
+      args: buildAccionArgs(state.config.model, a),
+      prompt: buildAccionPrompt(a, input),
+      cwd: c.cwd,
+      env: c.env,
+      timeoutMs: 90_000,
+      parse: (s) => parseAccion(s, a)
+    })
+    // Aplicamos al estado local lo que se pidió (y el total de horas que devolvió Gruv, si lo dio).
+    switch (a) {
+      case 'estado':
+        t.estado = input.estado
+        break
+      case 'tomar':
+        t.responsable = me!.nombre
+        t.responsableId = me!.id
+        break
+      case 'soltar':
+        delete t.responsable
+        delete t.responsableId
+        break
+      case 'comentar': {
+        const d = detalles.get(id)
+        if (d) d.comentarios.push({ autor: me?.nombre ?? 'Vos', cuerpo: input.cuerpo!, fecha: new Date().toISOString() })
+        break
+      }
+      case 'criterio': {
+        const d = detalles.get(id)!
+        const crit = d.criterios.find((x) => x.id === input.criterioId)
+        if (crit) crit.hecho = input.hecho!
+        t.criterios = d.criterios.map((x) => ({ ...x }))
+        break
+      }
+      case 'horas': {
+        const d = detalles.get(id)
+        if (d) d.minutos = r.minutosTotal ?? (d.minutos ?? 0) + input.horas!
+        break
+      }
+    }
+    ctx.log(`gruv: accion ${a} en ${id}: ok`)
+    return { detail: detalles.get(id) ?? null }
+  } catch (e) {
+    if (e instanceof ToolMissingError) for (const k of sameTool(a)) noDisponible[k] = e.message
+    else if (e instanceof NoGruvError) for (const k of ACCIONES) noDisponible[k] = SIN_CONECTOR
+    ctx.log(`gruv: accion ${a} en ${id}: error`)
+    throw e
+  } finally {
+    escribiendo.delete(id)
+    changed()
+  }
+}
+
 const feature: Feature = {
   name: 'gruv',
   register(c) {
@@ -302,6 +490,8 @@ const feature: Feature = {
     c.handle('setConfig', (p: unknown) => setConfig(p))
     c.handle('hasRepo', (id: unknown) => hasRepo(id))
     c.handle('start', (id: unknown, acc: unknown) => start(id, acc))
+    c.handle('detail', (id: unknown) => detalle(id))
+    c.handle('accion', (a: unknown, id: unknown, p: unknown) => accion(a, id, p))
   },
   dispose() {
     running?.abort()
