@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
-import { ChangesIcon, DoneIcon, IdleIcon, KeyboardIcon, PermissionIcon, SearchIcon } from '../../icons/SlothIcons'
+import { PencilIcon, SearchIcon, TerminalIcon } from '../../icons/SlothIcons'
 import { dayLabel, durLabel, fmtTime, plainSummary, plural, spaceColor, STATUS_LABEL } from './model'
 import type { DetailItem, OpenResult, PrefsReply, SessionInfo, SessionRow } from './types'
 
@@ -134,13 +134,10 @@ export function SessionDetail({
           <span>{durLabel(row.start, row.end)}</span>
           <span>{plural(msgCount, 'mensaje', 'mensajes')}</span>
           <span>{plural(files.length, 'archivo', 'archivos')}</span>
-          <span className={`chip ${status === 'perm' ? 'chip-perm' : status === 'ok' ? 'chip-done' : 'chip-idle'}`}>
-            {status === 'perm' ? <PermissionIcon size={12} /> : status === 'ok' ? <DoneIcon size={12} /> : <IdleIcon size={12} />}
-            {STATUS_LABEL[status]}
-          </span>
+          <span className={`chip ${status === 'perm' ? 'chip-perm' : status === 'ok' ? 'chip-done' : 'chip-idle'}`}>{STATUS_LABEL[status]}</span>
           {isHidden && <span className="chip chip-idle">Oculta en Sloth</span>}
         </div>
-        <div className="hd-path mono">
+        <div className="hd-path">
           {row.cwd}
           {row.branch ? ` · ${row.branch}` : ''}
         </div>
@@ -165,7 +162,7 @@ export function SessionDetail({
             Volver a mostrar
           </button>
         ) : (
-          <button type="button" className="btn danger" onClick={() => setAskHide(true)}>
+          <button type="button" className="btn ghost hd-quit" onClick={() => setAskHide(true)}>
             Quitar de la lista
           </button>
         )}
@@ -174,10 +171,10 @@ export function SessionDetail({
       {wsConfirm && (
         <div className="hd-box" role="group" aria-label="Confirmar retomar">
           <span className="hd-box-text">«{wsConfirm}» tiene la terminal abierta: se cierra y Claude retoma esta conversación ahí.</span>
-          <button type="button" className="btn sm ghost" onClick={() => setWsConfirm(null)}>
+          <button type="button" className="btn ghost" onClick={() => setWsConfirm(null)}>
             Cancelar
           </button>
-          <button type="button" className="btn sm primary" disabled={busy} onClick={() => void resume(true)} autoFocus>
+          <button type="button" className="btn primary" disabled={busy} onClick={() => void resume(true)} autoFocus>
             Retomar ahí
           </button>
         </div>
@@ -189,10 +186,10 @@ export function SessionDetail({
             ¿Quitar «{row.title}» de la lista de Sloth? La conversación de Claude no se borra: sigue en tu carpeta de Claude. Podés volver a
             mostrarla desde el historial.
           </span>
-          <button type="button" className="btn sm ghost" onClick={() => setAskHide(false)}>
+          <button type="button" className="btn ghost" onClick={() => setAskHide(false)}>
             Cancelar
           </button>
-          <button type="button" className="btn sm danger" onClick={() => void setHidden(true)} autoFocus>
+          <button type="button" className="btn danger" onClick={() => void setHidden(true)} autoFocus>
             Quitar de la lista
           </button>
         </div>
@@ -204,8 +201,8 @@ export function SessionDetail({
         </p>
       )}
 
-      <section className="hd-sec" aria-label="Última respuesta">
-        <h3>Última respuesta de Claude</h3>
+      <section className="hd-sec" aria-label="Resumen">
+        <h3>Resumen</h3>
         {info ? (
           <p className="hd-summary">{info.lastAnswer || 'Esta sesión no tiene respuestas de texto de Claude.'}</p>
         ) : (
@@ -214,7 +211,7 @@ export function SessionDetail({
       </section>
 
       {info && (
-        <section className="hd-sec" aria-label="Conversación">
+        <section className="hd-sec hd-conv" aria-label="Conversación">
           <h3>
             Conversación · {plural(info.messages, 'mensaje', 'mensajes')}
           </h3>
@@ -233,9 +230,9 @@ export function SessionDetail({
           <div className="hd-files">
             {files.map((f) => (
               <div key={f.path} className="hd-file">
-                <span className="hd-file-p mono">{f.path}</span>
-                <span className="mono hd-add">+{f.add}</span>
-                <span className="mono hd-del">−{f.del}</span>
+                <span className="hd-file-p">{f.path}</span>
+                <span className="hd-add">+{f.add}</span>
+                <span className={`hd-del ${f.del ? '' : 'zero'}`}>−{f.del}</span>
               </div>
             ))}
           </div>
@@ -262,7 +259,7 @@ function Item({ it, open, onToggle }: { it: DetailItem; open: boolean; onToggle:
       </div>
     )
   }
-  const Icon = it.kind === 'read' ? SearchIcon : it.kind === 'edit' ? ChangesIcon : KeyboardIcon
+  const Icon = it.kind === 'read' ? SearchIcon : it.kind === 'edit' ? PencilIcon : TerminalIcon
   const metaCls = it.err ? 'err' : it.kind === 'run' ? 'ok' : ''
   return (
     <div className="hd-tool">
@@ -281,15 +278,20 @@ function Item({ it, open, onToggle }: { it: DetailItem; open: boolean; onToggle:
         >
           <path d="M6 9l6 6 6-6" />
         </svg>
-        <Icon size={14} />
+        <Icon size={14} strokeWidth={1.8} className="hd-ico" />
         <span className="hd-tool-title">{it.title}</span>
         {it.meta && <span className={`hd-tool-meta ${metaCls}`}>{it.meta}</span>}
       </button>
       {open && (
-        <div className="hd-tool-body mono">
+        <div className={`hd-tool-body ${it.kind === 'run' ? 'is-run' : ''}`}>
           {it.cmd && <div className="hd-cmd">$ {it.cmd}</div>}
           {it.kind !== 'run' && it.lines.map((l, i) => <div key={i}>{l}</div>)}
-          {it.kind === 'run' && it.lines.map((l, i) => <div key={i} className={/FAIL|Error|Expected/.test(l) ? 'err' : ''}>{l}</div>)}
+          {it.kind === 'run' &&
+            it.lines.map((l, i) => (
+              <div key={i} className={/FAIL|Error|Expected/.test(l) ? 'err' : /PASS|passed|OK/.test(l) ? 'ok' : ''}>
+                {l}
+              </div>
+            ))}
           {it.kind === 'run' && it.lines.length === 0 && <div className="hint">Sin salida.</div>}
         </div>
       )}

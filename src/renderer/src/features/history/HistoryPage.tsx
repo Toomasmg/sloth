@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
 import { getSettings } from '../settings/store'
-import { DoneIcon, FolderIcon, IdleIcon, PermissionIcon, SearchIcon } from '../../icons/SlothIcons'
+import { CheckIcon, DoneIcon, IdleIcon, PermissionIcon } from '../../icons/SlothIcons'
 import { PageShell } from '../help/PageShell'
 import { marks, wordsOf } from '../help/text'
 import { SessionDetail } from './SessionDetail'
@@ -203,9 +203,9 @@ export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Ele
             <span className="hist-dot" style={{ background: spaceColor(r.spaceKey) }} aria-hidden="true" />
             {r.spaceName}
           </span>
-          <span aria-hidden="true">·</span>
+          <span className="hist-sep" aria-hidden="true">·</span>
           <span>{r.accountLabel}</span>
-          <span aria-hidden="true">·</span>
+          <span className="hist-sep" aria-hidden="true">·</span>
           <span>{fmtTime(r.start)}</span>
         </span>
         <span className="hist-line hist-line-2">
@@ -237,7 +237,7 @@ export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Ele
           <span className="hist-empty-title">No hay sesiones con estos filtros</span>
           <span className="hint">Probá con otra palabra o ampliá el rango de fechas.</span>
           {filtersOn && (
-            <button type="button" className="btn primary sm" onClick={clearFilters}>
+            <button type="button" className="btn primary" onClick={clearFilters}>
               Limpiar filtros
             </button>
           )}
@@ -271,7 +271,7 @@ export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Ele
       labelId="hist-title"
       title="Historial"
       onClose={onClose}
-      right={<span className="hist-head-count">{countLabel}</span>}
+      right={<span className="hist-head-count">{rows ? plural(total, 'sesión guardada', 'sesiones guardadas') : ''}</span>}
     >
       <div className="hist-wrap">
         <div className="hist-intro">
@@ -283,18 +283,16 @@ export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Ele
           <aside className="hist-aside" aria-label="Filtros">
             <label className="hist-field">
               <span>Buscar</span>
-              <span className="hist-search">
-                <SearchIcon size={14} />
-                <input
-                  ref={searchInput}
-                  type="search"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Título, espacio, archivo o texto"
-                  aria-describedby="hist-search-status"
-                  autoComplete="off"
-                />
-              </span>
+              <input
+                ref={searchInput}
+                className="hist-search"
+                type="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Título, espacio o archivo"
+                aria-describedby="hist-search-status"
+                autoComplete="off"
+              />
               <span id="hist-search-status" className="hint" role="status">
                 {q.trim().length >= 2 && searching
                   ? 'Buscando en los mensajes…'
@@ -307,7 +305,7 @@ export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Ele
             <fieldset className="hist-fs">
               <legend>Espacio</legend>
               <button type="button" className="hist-opt" aria-pressed={space === 'todos'} onClick={() => setSpace('todos')}>
-                <span className="hist-dot" style={{ background: 'var(--fg-muted)' }} aria-hidden="true" />
+                <span className="hist-dot" style={{ background: 'var(--placeholder)' }} aria-hidden="true" />
                 <span className="hist-opt-name">Todos los espacios</span>
                 <span className="hist-opt-n">{spaces.reduce((n, s) => n + s.n, 0)}</span>
               </button>
@@ -346,7 +344,7 @@ export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Ele
             </div>
 
             {filtersOn && (
-              <button type="button" className="btn sm" onClick={clearFilters}>
+              <button type="button" className="btn hist-clear" onClick={clearFilters}>
                 Limpiar filtros
               </button>
             )}
@@ -393,8 +391,7 @@ export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Ele
               />
             ) : (
               <div className="hist-nosel">
-                <FolderIcon size={22} />
-                <span className="hist-empty-title">Elegí una sesión</span>
+                  <span className="hist-empty-title">Elegí una sesión</span>
                 <span className="hint">Vas a ver la conversación y los archivos que tocó.</span>
               </div>
             )}
@@ -404,6 +401,7 @@ export function HistoryPage({ onClose }: { onClose: () => void }): React.JSX.Ele
 
       {toast && (
         <div className="hist-toast" role="status">
+          <CheckIcon size={15} strokeWidth={2.2} className="hist-toast-ico" />
           {toast}
         </div>
       )}
