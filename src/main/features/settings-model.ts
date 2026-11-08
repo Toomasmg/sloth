@@ -3,7 +3,7 @@
  * Sin imports de Electron ni de Node: lo usan main (settings.ts), la interfaz y las pruebas.
  */
 
-export type ThemeChoice = 'oscuro' | 'noche' | 'sistema'
+export type ThemeChoice = 'oscuro' | 'noche' | 'claro' | 'sistema'
 export type Density = 'compacta' | 'cómoda'
 export type TermFont = 'JetBrains Mono' | 'Cascadia Code' | 'Consolas'
 export type CursorShape = 'barra' | 'bloque' | 'subrayado'
@@ -43,6 +43,8 @@ export interface SlothSettings {
   terminal: TerminalSettings
   /** accountId → color de ACCOUNT_PALETTE. Las cuentas sin entrada usan el color automático. */
   accountColors: Record<string, string>
+  /** accountId → plan escrito a mano («Pro», «Max»…). Es una etiqueta: Sloth nunca la lee de credenciales. */
+  accountPlans: Record<string, string>
   openAtLogin: boolean
   confirmClosePanes: boolean
   /** Reabrir los espacios que estaban abiertos al iniciar (lo aplica la app al arrancar). */
@@ -76,7 +78,10 @@ export interface SettingsPayload {
   documentsDir: string
 }
 
-export const THEMES: readonly ThemeChoice[] = ['oscuro', 'noche', 'sistema']
+export const THEMES: readonly ThemeChoice[] = ['oscuro', 'noche', 'claro', 'sistema']
+/** Sugerencias para el plan de cuenta (etiqueta manual, texto libre). */
+export const PLAN_SUGGESTIONS: readonly string[] = ['Pro', 'Max', 'Team']
+export const MAX_PLAN = 20
 export const DENSITIES: readonly Density[] = ['compacta', 'cómoda']
 export const TERM_FONTS: readonly TermFont[] = ['JetBrains Mono', 'Cascadia Code', 'Consolas']
 export const CURSORS: readonly CursorShape[] = ['barra', 'bloque', 'subrayado']
@@ -129,6 +134,7 @@ export const DEFAULT_SETTINGS: SlothSettings = {
     shell: 'PowerShell 7'
   },
   accountColors: {},
+  accountPlans: {},
   openAtLogin: false,
   confirmClosePanes: true,
   reopenSpaces: true,
@@ -151,6 +157,7 @@ export const cloneSettings = (s: SlothSettings): SlothSettings => ({
   ...s,
   terminal: { ...s.terminal },
   accountColors: { ...s.accountColors },
+  accountPlans: { ...s.accountPlans },
   notify: { ...s.notify },
   shortcuts: { ...s.shortcuts }
 })
@@ -222,6 +229,13 @@ function lineHeight(v: unknown): number {
   return r
 }
 
+function planText(v: unknown): string {
+  if (typeof v !== 'string') throw new Error('El plan tiene que ser texto.')
+  const t = v.trim()
+  if (t.length > MAX_PLAN || /[\u0000-\u001f]/.test(t)) throw new Error(`El plan puede tener hasta ${MAX_PLAN} caracteres.`)
+  return t
+}
+
 function projectsDir(v: unknown): string {
   if (typeof v !== 'string') throw new Error('La carpeta de proyectos tiene que ser texto.')
   const t = v.trim()
@@ -244,7 +258,7 @@ export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOp
   checkKeys(
     patch,
     [
-      'theme', 'density', 'uiFontSize', 'accent', 'terminal', 'accountColors', 'openAtLogin', 'confirmClosePanes',
+      'theme', 'density', 'uiFontSize', 'accent', 'terminal', 'accountColors', 'accountPlans', 'openAtLogin', 'confirmClosePanes',
       'reopenSpaces', 'keepTerminalsAlive', 'editor', 'projectsDir', 'sounds', 'soundName', 'noMolestar', 'notify', 'updateChannel', 'shortcuts'
     ],
     ''
@@ -298,6 +312,20 @@ export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOp
     }
     if (Object.keys(next.accountColors).length > MAX_ACCOUNT_COLORS) throw new Error('Demasiados colores de cuenta.')
   }
+  if ('accountPlans' in patch) {
+    const pl = patch.accountPlans
+    if (!isObj(pl)) throw new Error('accountPlans tiene que ser un objeto.')
+    for (const [id, plan] of Object.entries(pl)) {
+      if (!ACCOUNT_ID.test(id)) throw new Error('Id de cuenta inválido.')
+      if (plan === null || plan === '') {
+        delete next.accountPlans[id]
+        continue
+      }
+      if (opts.accountExists && !opts.accountExists(id)) throw new Error('Esa cuenta no existe.')
+      next.accountPlans[id] = planText(plan)
+    }
+    if (Object.keys(next.accountPlans).length > MAX_ACCOUNT_COLORS) throw new Error('Demasiados planes de cuenta.')
+  }
   if ('shortcuts' in patch) {
     const s = patch.shortcuts
     if (!isObj(s)) throw new Error('shortcuts tiene que ser un objeto.')
@@ -321,8 +349,7 @@ export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOp
 export function normalize(raw: unknown): SlothSettings {
   const out = cloneSettings(DEFAULT_SETTINGS)
   if (!isObj(raw)) return out
-  // Versiones anteriores tenían un tema «claro» manual. Ahora se elige «Según Windows».
-  const src: Record<string, unknown> = raw.theme === 'claro' ? { ...raw, theme: 'sistema' } : raw
+  const src: Record<string, unknown> = raw
   const tryPatch = (p: Record<string, unknown>): void => {
     try {
       Object.assign(out, applyPatch(out, p))
@@ -339,6 +366,8 @@ export function normalize(raw: unknown): SlothSettings {
   if (isObj(src.notify)) for (const [k, v] of Object.entries(src.notify)) tryPatch({ notify: { [k]: v } })
   if (isObj(src.accountColors))
     for (const [id, v] of Object.entries(src.accountColors).slice(0, MAX_ACCOUNT_COLORS)) tryPatch({ accountColors: { [id]: v } })
+  if (isObj(src.accountPlans))
+    for (const [id, v] of Object.entries(src.accountPlans).slice(0, MAX_ACCOUNT_COLORS)) tryPatch({ accountPlans: { [id]: v } })
   if (isObj(src.shortcuts))
     for (const [id, v] of Object.entries(src.shortcuts).slice(0, MAX_SHORTCUTS)) tryPatch({ shortcuts: { [id]: v } })
   return out
@@ -360,6 +389,7 @@ export function resetSection(current: SlothSettings, section: unknown): SlothSet
       break
     case 'cuentas':
       next.accountColors = {}
+      next.accountPlans = {}
       break
     case 'general':
       next.reopenSpaces = d.reopenSpaces
@@ -388,4 +418,5 @@ export function resetSection(current: SlothSettings, section: unknown): SlothSet
 }
 
 /** Tema efectivo: «Oscuro» y «Más oscuro» son siempre oscuros; «Según Windows» sigue al sistema. */
-export const resolveDark = (theme: ThemeChoice, systemDark: boolean): boolean => (theme === 'sistema' ? systemDark : true)
+export const resolveDark = (theme: ThemeChoice, systemDark: boolean): boolean =>
+  theme === 'sistema' ? systemDark : theme !== 'claro'

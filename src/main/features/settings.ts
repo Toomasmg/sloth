@@ -53,7 +53,8 @@ export function initialChrome(): { bg: string; symbol: string; dark: boolean } {
   return { ...(dark ? CHROME.dark : CHROME.light), dark }
 }
 
-const themeSource = (t: ThemeChoice): 'dark' | 'system' => (t === 'sistema' ? 'system' : 'dark')
+/** «Según Windows» sigue al sistema en vivo (evento nativeTheme «updated»); los demás fijan el tema. */
+const themeSource = (t: ThemeChoice): 'dark' | 'light' | 'system' => (t === 'sistema' ? 'system' : t === 'claro' ? 'light' : 'dark')
 
 let settings: SlothSettings
 let ctxRef: FeatureContext | null = null

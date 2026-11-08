@@ -99,9 +99,10 @@ export async function initSettings(): Promise<void> {
 }
 
 /** Cambio parcial. Los mapas (terminal, notify) se fusionan; accountColors y shortcuts: null quita. */
-export type SettingsPatch = Partial<Omit<SlothSettings, 'terminal' | 'accountColors' | 'notify' | 'shortcuts'>> & {
+export type SettingsPatch = Partial<Omit<SlothSettings, 'terminal' | 'accountColors' | 'accountPlans' | 'notify' | 'shortcuts'>> & {
   terminal?: Partial<TerminalSettings>
   notify?: Partial<NotifySettings>
+  accountPlans?: Record<string, string | null>
   accountColors?: Record<string, string | null>
   shortcuts?: Partial<Record<ShortcutId, string | null>>
 }
@@ -110,7 +111,7 @@ export type SettingsPatch = Partial<Omit<SlothSettings, 'terminal' | 'accountCol
 export async function updateSettings(patch: SettingsPatch): Promise<void> {
   const prev = state
   const s = cloneSettings(prev.settings)
-  const { terminal, accountColors, notify, shortcuts, ...rest } = patch
+  const { terminal, accountColors, accountPlans, notify, shortcuts, ...rest } = patch
   Object.assign(s, rest)
   if (terminal) Object.assign(s.terminal, terminal)
   if (notify) Object.assign(s.notify, notify)
@@ -119,14 +120,19 @@ export async function updateSettings(patch: SettingsPatch): Promise<void> {
       if (c === null) delete s.accountColors[id]
       else s.accountColors[id] = c
     }
+  if (accountPlans)
+    for (const [id, c] of Object.entries(accountPlans)) {
+      if (c === null) delete s.accountPlans[id]
+      else s.accountPlans[id] = c
+    }
   if (shortcuts)
     for (const [id, c] of Object.entries(shortcuts)) {
       const k = id as ShortcutId
       if (c === null || c === undefined) delete s.shortcuts[k]
       else s.shortcuts[k] = c
     }
-  // «Según Windows» lo resuelve main (sabe qué dice Windows); oscuro y más oscuro se ven ya.
-  const dark = s.theme === 'sistema' ? prev.dark : true
+  // «Según Windows» lo resuelve main (sabe qué dice Windows); los demás temas se ven ya.
+  const dark = s.theme === 'sistema' ? prev.dark : s.theme !== 'claro'
   set({ ...prev, settings: s, dark })
   try {
     set(await api.feat.invoke<SettingsPayload>('feat:settings:set', patch))

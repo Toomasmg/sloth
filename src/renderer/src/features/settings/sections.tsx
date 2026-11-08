@@ -12,7 +12,7 @@ import { openHelp } from '../help/bus'
 import { SoundTest } from '../sound/SoundTest'
 import { resolveAccountColor, pickProjectsDir, projectsDirOf, useSettings } from './store'
 import { errText, Group, Row, Seg, Slider, ToggleRow, useSave, SectionHint } from './ui'
-import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, EDITORS, LINE_HEIGHT, SHELLS, TERM_FONTS, TERM_FONT, UI_FONT, UPDATE_CHANNELS, type AccentChoice, type CursorShape, type Density, type EditorChoice, type ShellChoice, type ShortcutId, type SoundName, type TermFont, type ThemeChoice, type UpdateChannel } from '../../../../main/features/settings-model'
+import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, EDITORS, LINE_HEIGHT, PLAN_SUGGESTIONS, SHELLS, TERM_FONTS, TERM_FONT, UI_FONT, UPDATE_CHANNELS, type AccentChoice, type CursorShape, type Density, type EditorChoice, type ShellChoice, type ShortcutId, type SoundName, type TermFont, type ThemeChoice, type UpdateChannel } from '../../../../main/features/settings-model'
 
 /* ---------- General ---------- */
 
@@ -166,6 +166,11 @@ export function AccountsSection({ onClose }: { onClose(): void }): React.JSX.Ele
         </form>
       )}
 
+      <datalist id="f-set-plan-list">
+        {PLAN_SUGGESTIONS.map((x) => (
+          <option key={x} value={x} />
+        ))}
+      </datalist>
       <Group id="g-cuentas" title={`Tus cuentas · ${ui.accounts.length}`}>
         {ui.accounts.length === 0 && <p className="f-set-row f-set-hint">Todavía no agregaste cuentas.</p>}
         {ui.accounts.map((a, i) => {
@@ -188,6 +193,7 @@ export function AccountsSection({ onClose }: { onClose(): void }): React.JSX.Ele
                     {logged && st?.email ? ` · ${st.email}` : ''}
                   </span>
                 </div>
+                <PlanField key={`${a.id}-${p.settings.accountPlans[a.id] ?? ''}`} label={a.label} value={p.settings.accountPlans[a.id] ?? ''} onCommit={(plan) => save({ accountPlans: { [a.id]: plan || null } })} />
                 <span className={`f-set-state ${logged ? 'ok' : 'warn'}`}>
                   <span className="f-set-dot" aria-hidden="true" />
                   {logged ? 'Sesión iniciada' : 'Hay que iniciar sesión'}
@@ -233,6 +239,35 @@ export function AccountsSection({ onClose }: { onClose(): void }): React.JSX.Ele
   )
 }
 
+/** Plan escrito a mano: etiqueta opcional, con sugerencias. Se guarda al salir del campo o al Enter. */
+function PlanField({ label, value, onCommit }: { label: string; value: string; onCommit(plan: string): void }): React.JSX.Element {
+  const [draft, setDraft] = useState(value)
+  const commit = (): void => {
+    const t = draft.trim()
+    if (t !== value) onCommit(t)
+  }
+  return (
+    <label className="f-set-plan">
+      <span className="sr-only">Plan de {label}</span>
+      <input
+        className="f-set-input f-set-plan-input"
+        list="f-set-plan-list"
+        value={draft}
+        maxLength={20}
+        placeholder="Plan"
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            commit()
+          }
+        }}
+      />
+    </label>
+  )
+}
+
 function AccountSwatches({
   acc,
   index,
@@ -270,7 +305,8 @@ function AccountSwatches({
 const TH: { id: ThemeChoice; name: string; bg: string; side: string; line: string }[] = [
   { id: 'oscuro', name: 'Oscuro', bg: '#0c0e13', side: '#111319', line: '#2a2f3b' },
   { id: 'noche', name: 'Más oscuro', bg: '#050608', side: '#0a0b0e', line: '#1f232c' },
-  { id: 'sistema', name: 'Según Windows', bg: 'linear-gradient(135deg, #0c0e13 50%, #e9e7e1 50%)', side: '#1a1d26', line: '#3a4152' }
+  { id: 'claro', name: 'Claro', bg: '#f6f6f4', side: '#ededea', line: '#e2e2dd' },
+  { id: 'sistema', name: 'Según Windows', bg: 'linear-gradient(135deg, #0c0e13 50%, #f6f6f4 50%)', side: '#1a1d26', line: '#3a4152' }
 ]
 
 const ACCENT_HEX: Record<AccentChoice, { name: string; hex: string }> = {
@@ -299,7 +335,7 @@ export function AppearanceSection(): React.JSX.Element {
                 <span className="f-set-pv" style={{ background: t.bg }}>
                   <span className="f-set-pv-side" style={{ background: t.side }} />
                   <span className="f-set-pv-main">
-                    <i style={{ background: accent, width: '60%' }} />
+                    <i style={{ background: t.id === 'claro' ? ACCENT_HEX[s.accent].hex : accent, width: '60%' }} />
                     <i style={{ background: t.line, width: '80%' }} />
                     <i style={{ background: t.line, width: '50%' }} />
                   </span>
@@ -688,7 +724,13 @@ export function TeamSection(): React.JSX.Element {
       }
     }
   }
-  const toneColor = { ok: ['rgba(95,212,166,0.16)', '#7fe0b9'], warn: ['rgba(240,180,90,0.16)', '#f5c77e'], err: ['rgba(255,122,122,0.16)', '#ffb3b3'], info: ['rgba(138,180,255,0.16)', '#a9c7ff'] }[tone]
+  // Tokens del tema (oscuro y claro): cada par fondo/texto cumple contraste sobre la tarjeta.
+  const toneColor = {
+    ok: ['var(--success-soft)', 'var(--ok-fg)'],
+    warn: ['var(--warn-soft)', 'var(--warn-fg)'],
+    err: ['var(--danger-soft)', 'var(--danger-fg)'],
+    info: ['var(--info-soft)', 'var(--info)']
+  }[tone]
   const signedIn = auth?.status === 'signedIn'
   const signingIn = auth?.status === 'signingIn'
   const offered = cfg?.offered
@@ -849,7 +891,7 @@ export function UpdatesSection(): React.JSX.Element {
   return (
     <>
       <div className="f-set-card f-set-status">
-        <span className="f-set-status-ico" style={{ background: 'rgba(95,212,166,0.16)', color: '#7fe0b9' }} aria-hidden="true">
+        <span className="f-set-status-ico" style={{ background: 'var(--success-soft)', color: 'var(--ok-fg)' }} aria-hidden="true">
           <UpdateIcon size={18} />
         </span>
         <div className="grow">

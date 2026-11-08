@@ -315,7 +315,15 @@ button.f-set-toggle:disabled {
 }
 .f-set-ok {
   margin: 0 4px;
-  color: #7fe0b9;
+  color: var(--ok-fg);
+  font-size: var(--fs-sm);
+}
+.f-set-plan {
+  flex: 0 0 120px;
+}
+.f-set-plan-input {
+  width: 120px;
+  height: 28px;
   font-size: var(--fs-sm);
 }
 
@@ -492,7 +500,7 @@ button.f-set-toggle:disabled {
   box-shadow: var(--shadow-md), inset 0 0 0 1px var(--toast-border);
 }
 .f-set-toast-ok {
-  color: #7fe0b9;
+  color: var(--ok-fg);
   font-weight: 700;
 }
 
@@ -520,10 +528,10 @@ button.f-set-toggle:disabled {
   color: var(--fg-2);
 }
 .f-set-state.ok {
-  color: #7fe0b9;
+  color: var(--ok-fg);
 }
 .f-set-state.warn {
-  color: #f5c77e;
+  color: var(--warn-fg);
 }
 .f-set-dot {
   width: 7px;
