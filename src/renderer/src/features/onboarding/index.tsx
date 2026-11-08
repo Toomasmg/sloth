@@ -26,6 +26,7 @@ import { LogoMark } from '../../Logo'
 import { useVisiblePolling } from '../../visibility'
 import { applyTeamSettings, cleanMsg, importTeam, repoName, scanTeams, settingsText, type ImportPlan, type TeamStatus } from '../team-config/store'
 import { onOpen, requestOpen } from './bus'
+import heroUrl from '../../assets/sloth-hero.webp'
 import './onboarding.css'
 
 type CheckState = 'ok' | 'warn' | 'missing'
@@ -584,87 +585,109 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
   const last = step === STEPS.length - 1
   const title = tour ? 'Tres tips y a trabajar' : ['Revisemos tu PC', 'Tus cuentas de Claude', 'El repo del equipo', 'Tu primer espacio'][step]
 
+  const renderBody = (): React.JSX.Element => (
+    <div className="f-onboarding-body">
+      {step === 0 && <EnvStep />}
+      {step === 1 && <AccountsStep onLogin={login} statuses={statuses} />}
+      {step === 2 && <RepoStep repo={repo} setRepo={setRepo} />}
+      {step === 3 && (tour ? <Tour /> : <SpaceStep repo={repo} statuses={statuses} onCreated={() => setTour(true)} />)}
+    </div>
+  )
+  const renderFoot = (): React.JSX.Element => (
+    <footer className="f-onboarding-foot">
+      {step > 0 && (
+        <button type="button" className="btn ghost" onClick={() => (tour ? setTour(false) : setStep(step - 1))}>
+          <ArrowLeft size={14} aria-hidden="true" /> Atrás
+        </button>
+      )}
+      <span className="spacer" />
+      {last && tour ? (
+        <button type="button" className="btn primary" onClick={() => finish(false)}>
+          Empezar a usar Sloth
+        </button>
+      ) : last ? (
+        <button type="button" className="btn ghost" onClick={() => setTour(true)}>
+          {ui.workspaces.length ? 'Ver los tips' : 'Saltar paso'}
+        </button>
+      ) : (
+        <>
+          <button type="button" className="btn ghost" onClick={() => setStep(step + 1)}>
+            Saltar paso
+          </button>
+          <button type="button" className="btn primary" onClick={() => setStep(step + 1)}>
+            Siguiente <ArrowRight size={14} aria-hidden="true" />
+          </button>
+        </>
+      )}
+    </footer>
+  )
+
   return (
     <div className="f-onboarding" role="dialog" aria-modal="true" aria-labelledby="f-ob-title">
       <div className="f-onboarding-card">
-        <nav className="f-onboarding-rail" aria-label="Pasos del asistente">
-          <div className="f-onboarding-brand">
-            <LogoMark size={44} />
-            <div>
-              <strong>Bienvenido a Sloth</strong>
-              <span>Configuración inicial</span>
-            </div>
+        <div className="f-onboarding-hero">
+          <img className="f-onboarding-hero-img" src={heroUrl} alt="" aria-hidden="true" draggable={false} />
+          <div className="f-onboarding-hero-text">
+            <p className="f-onboarding-hero-title">Bienvenido a Sloth</p>
+            <p className="f-onboarding-hero-sub">Trabajá con varias cuentas de Claude al mismo tiempo, cada una en su carpeta y su terminal. Sin apuro, sin mezclar nada.</p>
           </div>
-          <ol className="f-onboarding-steps">
-            {STEPS.map((s, i) => (
-              <li key={s.title}>
-                <button type="button" className={`${i === step ? 'on' : ''} ${doneFlags[i] ? 'done' : ''}`} aria-current={i === step ? 'step' : undefined} onClick={() => setStep(i)}>
-                  <span className="f-onboarding-n" aria-hidden="true">
-                    {doneFlags[i] && i !== step ? <CheckCircle size={14} weight="bold" /> : i + 1}
-                  </span>
-                  <span className="grow-min">
-                    <span className="item-title">{s.title}</span>
-                    <span className="item-sub">{doneFlags[i] && i !== step ? 'Hecho' : s.sub}</span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ol>
-          <button type="button" className="btn ghost sm f-onboarding-skipall" onClick={() => finish(true)}>
+          <button type="button" className="f-onboarding-skip" onClick={() => finish(true)}>
             Saltar asistente
           </button>
-        </nav>
+        </div>
         <section className="f-onboarding-main">
           <header className="f-onboarding-head">
-            <div className="f-onboarding-progress" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} aria-label={`Paso ${step + 1} de ${STEPS.length}`}>
-              <span style={{ width: `${((step + (tour ? 1 : 0.5)) / STEPS.length) * 100}%` }} />
-            </div>
-            <div className="f-onboarding-titlerow">
-              <div className="grow-min">
-                <span className="f-onboarding-kicker">
-                  Paso {step + 1} de {STEPS.length}
-                </span>
-                <h1 id="f-ob-title" ref={headRef} tabIndex={-1}>
-                  {title}
-                </h1>
+            <div className="f-onboarding-topbar">
+              <span className="f-onboarding-kicker">
+                Paso {step + 1} de {STEPS.length}
+              </span>
+              <div className="f-onboarding-progress" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} aria-label={`Paso ${step + 1} de ${STEPS.length}`}>
+                <span style={{ width: `${((step + (tour ? 1 : 0.5)) / STEPS.length) * 100}%` }} />
               </div>
               <button type="button" className="icon-btn" onClick={() => onClose(false)} aria-label="Cerrar el asistente (seguís después desde Ctrl+K)" title="Cerrar (Esc)">
                 <X size={16} aria-hidden="true" />
               </button>
             </div>
+            <h2 className="f-onboarding-section">Empezá en cuatro pasos</h2>
           </header>
-          <div className="f-onboarding-body">
-            {step === 0 && <EnvStep />}
-            {step === 1 && <AccountsStep onLogin={login} statuses={statuses} />}
-            {step === 2 && <RepoStep repo={repo} setRepo={setRepo} />}
-            {step === 3 && (tour ? <Tour /> : <SpaceStep repo={repo} statuses={statuses} onCreated={() => setTour(true)} />)}
-          </div>
-          <footer className="f-onboarding-foot">
-            {step > 0 && (
-              <button type="button" className="btn ghost" onClick={() => (tour ? setTour(false) : setStep(step - 1))}>
-                <ArrowLeft size={14} aria-hidden="true" /> Atrás
-              </button>
-            )}
-            <span className="spacer" />
-            {last && tour ? (
-              <button type="button" className="btn primary" onClick={() => finish(false)}>
-                Empezar a usar Sloth
-              </button>
-            ) : last ? (
-              <button type="button" className="btn ghost" onClick={() => setTour(true)}>
-                {ui.workspaces.length ? 'Ver los tips' : 'Saltar paso'}
-              </button>
-            ) : (
-              <>
-                <button type="button" className="btn ghost" onClick={() => setStep(step + 1)}>
-                  Saltar paso
-                </button>
-                <button type="button" className="btn primary" onClick={() => setStep(step + 1)}>
-                  Siguiente <ArrowRight size={14} aria-hidden="true" />
-                </button>
-              </>
-            )}
-          </footer>
+          <ol className="f-onboarding-steps">
+            {STEPS.map((s, i) => {
+              if (i === step)
+                return (
+                  <li key={s.title} className="f-onboarding-step is-current" aria-current="step">
+                    <div className="f-onboarding-step-card">
+                      <div className="f-onboarding-step-top">
+                        <span className="f-onboarding-n on" aria-hidden="true">
+                          {i + 1}
+                        </span>
+                        <h1 id="f-ob-title" ref={headRef} tabIndex={-1}>
+                          {title}
+                        </h1>
+                      </div>
+                      {renderBody()}
+                      {renderFoot()}
+                    </div>
+                  </li>
+                )
+              const done = doneFlags[i]
+              return (
+                <li key={s.title} className="f-onboarding-step">
+                  <button type="button" className={`f-onboarding-step-btn ${done ? 'is-done' : ''}`} onClick={() => setStep(i)}>
+                    <span className={`f-onboarding-n ${done ? 'ok' : ''}`} aria-hidden="true">
+                      {done ? <CheckCircle size={14} weight="bold" /> : i + 1}
+                    </span>
+                    <span className="grow-min">
+                      <span className="item-title">{s.title}</span>
+                      <span className={`item-sub ${done ? 'ok' : ''}`}>{done ? 'Listo' : s.sub}</span>
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ol>
+          <p className="f-onboarding-keys">
+            <kbd>Ctrl K</kbd> buscar cualquier cosa · <kbd>Ctrl ,</kbd> configuración · <kbd>?</kbd> atajos
+          </p>
         </section>
       </div>
     </div>

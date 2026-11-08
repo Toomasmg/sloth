@@ -2,44 +2,71 @@
    Jerarquía por elevación de superficie (bg → surface → card), no por bordes.
    Separadores de 1px muy sutiles; color solo para identidad y estado. */
 :root {
-  /* Paleta carbón + cian: base gris carbón, cian claro y verde azulado. */
-  --bg: #16181f;
-  --surface: #1c1f29;
-  --card: #252936;
-  --card-hover: #2d3242;
-  --muted: #2f3444;
-  --border: #333847;
-  --border-strong: #4a5063;
-  --fg: #eef6f8;
-  --fg-2: #cdd6e0;
-  --fg-muted: #9aa3b5;
-  --accent: #9feaf9;
-  --on-accent: #11131a;
-  --brand-1: #9feaf9;
-  --brand-2: #47848f;
-  --brand-grad: linear-gradient(135deg, #9feaf9, #5fb6c6);
-  --brand-glow: 0 0 0 3px rgba(159, 234, 249, 0.2);
-  --info: #67d8ef;
-  --warn: #f5b041;
-  --danger: #f87171;
-  --success: #4ade80;
-  --ring: #9feaf9;
-  --term-bg: #12141a;
-  --acc: #9feaf9;
+  /* Paleta Sloth (diseño Main.dc.html): noche, rama, pelaje, pizarra, niebla y cara.
+     Los nombres de siempre se conservan; los nombrados nuevos están al final del bloque. */
+  --bg: #0c0e13; /* fondo */
+  --surface: #101218; /* barras y sidebar */
+  --surface-2: #111319; /* sidebar alterno */
+  --card: #151821; /* superficie / tarjeta */
+  --card-hover: #1b1f29; /* elevada */
+  --surface-hover: #222734; /* hover */
+  --muted: #2b3242; /* activo (pizarra) */
+  --input-bg: #0f1117;
+  --btn-2: #262b37; /* botón secundario */
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --fg: #ececf0;
+  --fg-2: #a6abb8;
+  --fg-muted: #8b909c;
+  --placeholder: #6f7480;
+  --accent: #8ab4ff; /* Cielo: acción, trabajando */
+  --accent-fg: #0b1020;
+  --accent-soft: rgba(138, 180, 255, 0.14);
+  --on-accent: var(--accent-fg);
+  --brand-1: var(--accent);
+  --brand-2: var(--accent);
+  --brand-grad: var(--accent);
+  --brand-glow: 0 0 0 3px rgba(138, 180, 255, 0.28);
+  --info: #a9c7ff;
+  --info-soft: rgba(138, 180, 255, 0.14);
+  --warn: #f0b45a; /* Ámbar: te espera */
+  --warn-fg: #f5c77e;
+  --warn-soft: rgba(240, 180, 90, 0.14);
+  --danger: #ff7a7a; /* Coral: error, cerrar */
+  --danger-fg: #ff9a9a;
+  --danger-soft: rgba(255, 122, 122, 0.14);
+  --success: #5fd4a6; /* Hoja: listo, éxito */
+  --success-fg: #7fe0b9;
+  --success-soft: rgba(95, 212, 166, 0.14);
+  --ok: var(--success);
+  --ok-fg: var(--success-fg);
+  --ring: var(--accent);
+  --term-bg: #0f1117;
+  --acc: var(--accent);
+  /* Equipo y chat: Lila. */
+  --team: #b59cff;
+  --team-fg: #c9b8ff;
+  --team-soft: rgba(181, 156, 255, 0.14);
+  /* Nombres nuevos (paquete 0): alias de los de arriba, para los componentes nuevos. */
+  --fg-3: var(--fg-muted);
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
 
   /* Alturas de densidad: themes.css las ajusta por data-density. */
   --pane-head-h: 36px;
   --row-min-h: 48px;
 
   /* Separadores y superficies translúcidas (derivados de la paleta, sin colores nuevos). */
-  --line: rgba(255, 255, 255, 0.06);
-  --line-2: rgba(255, 255, 255, 0.1);
-  --hover: rgba(255, 255, 255, 0.045);
-  --press: rgba(255, 255, 255, 0.07);
-  --warn-soft: rgba(245, 176, 65, 0.12);
-  --danger-soft: rgba(248, 113, 113, 0.12);
-  --info-soft: rgba(103, 216, 239, 0.12);
-  --success-soft: rgba(74, 222, 128, 0.1);
+  --line-2: var(--line-strong);
+  --hover: var(--surface-hover);
+  --press: var(--muted);
+  --open-bg: rgba(255, 255, 255, 0.03);
+  --diff-add: rgba(95, 212, 166, 0.1);
+  --diff-del: rgba(255, 122, 122, 0.1);
+  --selection: rgba(138, 180, 255, 0.3);
 
   --r-xs: 4px;
   --r-sm: 6px;
@@ -66,7 +93,7 @@
   --fs-lg: 15px;
   --fs-xl: 18px;
 
-  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --font-ui: 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono Variable', 'Cascadia Code', Consolas, monospace;
 
   font-family: var(--font-ui);
@@ -116,7 +143,7 @@ textarea {
   flex: 1;
 }
 :focus-visible {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: var(--r-sm);
 }
@@ -235,7 +262,7 @@ textarea {
 }
 .wordmark-name span,
 .empty h1 span {
-  background: linear-gradient(90deg, #9feaf9, #5fb6c6);
+  background: var(--brand-text, var(--accent));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -434,18 +461,19 @@ textarea {
   top: 50%;
   transform: translateY(-50%);
   opacity: 0;
-  width: 30px;
-  height: 18px;
+  width: 34px;
+  height: 20px;
   min-height: 0;
   margin: 0;
   padding: 0;
   cursor: pointer;
 }
+/* 34 × 20 como en el diseño: pastilla con perilla de 16 px (inset 2 px). */
 .switch-track {
-  width: 30px;
-  height: 18px;
+  width: 34px;
+  height: 20px;
   flex: none;
-  border-radius: 999px;
+  border-radius: 10px;
   background: var(--muted);
   box-shadow: inset 0 0 0 1px var(--border-strong);
   position: relative;
@@ -454,24 +482,25 @@ textarea {
 .switch-track::after {
   content: '';
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 12px;
-  height: 12px;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
-  background: var(--fg-muted);
+  background: var(--fg-2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   transition: transform var(--t-fast) var(--ease), background var(--t-fast);
 }
 .switch:hover .switch-track {
   box-shadow: inset 0 0 0 1px var(--fg-muted);
 }
 .switch input:checked + .switch-track {
-  background: var(--brand-2);
+  background: var(--accent);
   box-shadow: none;
 }
 .switch input:checked + .switch-track::after {
-  transform: translateX(12px);
-  background: var(--fg);
+  transform: translateX(14px);
+  background: #ffffff;
 }
 .switch input:focus-visible + .switch-track {
   outline: 2px solid var(--ring);
@@ -646,27 +675,27 @@ textarea {
   }
 }
 
-/* ---------- Botones: 32 (normal) y 28 (sm); íconos 24/28 ---------- */
+/* ---------- Botones (estilo macOS, diseño Main.dc.html): 32 px normal y 28 px sm, según densidad ---------- */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   height: var(--h-md);
-  padding: 0 12px;
+  padding: 0 14px;
   border: 0;
-  border-radius: var(--r-sm);
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--line-2);
+  border-radius: var(--radius);
+  background: var(--btn-2);
+  box-shadow: inset 0 0 0 1px var(--line-strong), 0 1px 1px rgba(0, 0, 0, 0.2);
   color: var(--fg);
   font-size: var(--fs-md);
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
   transition: background var(--t-fast) var(--ease), box-shadow var(--t-fast), filter var(--t-fast);
 }
 .btn:hover:not(:disabled) {
-  background: var(--card-hover);
+  background: var(--surface-hover);
 }
 .btn:active:not(:disabled) {
   background: var(--muted);
@@ -682,17 +711,17 @@ textarea {
   flex: none;
 }
 .btn.primary {
-  background: var(--brand-grad);
+  background: var(--accent);
   box-shadow: none;
-  color: var(--on-accent);
-  font-weight: 700;
+  color: var(--accent-fg);
+  font-weight: 600;
 }
 .btn.primary:hover:not(:disabled) {
-  background: var(--brand-grad);
-  filter: brightness(1.08);
+  background: var(--accent);
+  filter: brightness(1.07);
 }
 .btn.primary:active:not(:disabled) {
-  filter: brightness(0.96);
+  filter: brightness(0.95);
 }
 .btn.ghost {
   background: transparent;
@@ -707,9 +736,10 @@ textarea {
   color: var(--danger-fg);
   background: var(--danger-soft);
   box-shadow: none;
+  font-weight: 600;
 }
 .btn.danger:hover:not(:disabled) {
-  background: rgba(248, 113, 113, 0.2);
+  background: rgba(255, 122, 122, 0.22);
 }
 .btn:disabled {
   opacity: 0.45;
@@ -719,48 +749,50 @@ textarea {
   display: flex;
   gap: 6px;
 }
+/* Botón de solo ícono: 30 × 30, radio 7, hover #222734. */
 .icon-btn {
   display: inline-grid;
   place-items: center;
-  width: var(--h-sm);
-  height: var(--h-sm);
+  width: 30px;
+  height: 30px;
   flex: none;
   border: none;
-  border-radius: var(--r-sm);
+  border-radius: 7px;
   background: transparent;
   color: var(--fg-muted);
   cursor: pointer;
   transition: background var(--t-fast) var(--ease), color var(--t-fast), opacity var(--t-fast);
 }
 .icon-btn:hover {
-  background: var(--hover);
+  background: var(--surface-hover);
   color: var(--fg);
 }
 .icon-btn:active {
-  background: var(--press);
+  background: var(--muted);
 }
 .icon-btn.danger:hover {
   color: var(--danger);
   background: var(--danger-soft);
 }
 
-/* ---------- Inputs ---------- */
+/* ---------- Inputs (fondo #0f1117, borde interno, foco con anillo de acento) ---------- */
 input,
 select,
 textarea {
   width: 100%;
   height: var(--h-md);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
+  background: var(--input-bg);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
   padding: 0 10px;
+  color: var(--fg);
   outline: none;
   transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
 input:hover,
 select:hover,
 textarea:hover {
-  border-color: var(--border-strong);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 input::placeholder,
 textarea::placeholder {
@@ -769,12 +801,132 @@ textarea::placeholder {
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: var(--brand-2);
+  border-color: var(--accent);
   box-shadow: var(--brand-glow);
 }
 input[aria-invalid='true'] {
   border-color: var(--danger);
 }
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.5;
+}
+
+/* ---------- Segmentado (contenedor #191c25; opción activa #3a4152 con sombra) ---------- */
+.seg {
+  display: inline-flex;
+  padding: 2px;
+  gap: 1px;
+  border-radius: var(--radius);
+  background: #191c25;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.seg > button {
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-2);
+  font: inherit;
+  font-size: var(--fs-md);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast);
+}
+.seg > button:hover:not([aria-pressed='true']):not(.on) {
+  color: var(--fg);
+}
+.seg > button[aria-pressed='true'],
+.seg > button.on {
+  background: #3a4152;
+  color: #ffffff;
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* ---------- Chips de estado (color + ícono + texto: nunca solo color) ---------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  padding: 0 10px 0 8px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg-2);
+  font-size: var(--fs-md);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.chip > svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+.chip-working {
+  background: rgba(138, 180, 255, 0.14);
+  color: #a9c7ff;
+}
+.chip-perm {
+  background: rgba(240, 180, 90, 0.22);
+  color: #ffd699;
+}
+.chip-waiting {
+  background: rgba(240, 180, 90, 0.14);
+  color: #f5c77e;
+}
+.chip-done {
+  background: rgba(95, 212, 166, 0.14);
+  color: #7fe0b9;
+}
+.chip-error {
+  background: rgba(255, 122, 122, 0.14);
+  color: #ff9a9a;
+}
+.chip-idle {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg-2);
+}
+
+/* ---------- Grupo de filas estilo macOS: tarjeta radio 12, filas separadas por línea interna ---------- */
+.group {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.group-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 14px;
+  color: var(--fg);
+}
+.group-row + .group-row {
+  border-top: 1px solid var(--line);
+}
+
+/* ---------- Teclas (atajos) ---------- */
+kbd,
+.kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 5px;
+  background: var(--btn-2);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px var(--line-strong);
+  color: var(--fg-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+}
+
 .inline-form {
   display: flex;
   gap: 6px;
@@ -1039,7 +1191,7 @@ input[aria-invalid='true'] {
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .steps li.done {
-  box-shadow: inset 0 0 0 1px rgba(71, 132, 143, 0.4);
+  box-shadow: inset 0 0 0 1px rgba(138, 180, 255, 0.4);
 }
 .steps strong {
   display: block;
@@ -1197,11 +1349,11 @@ input[aria-invalid='true'] {
   gap: var(--s-3);
   background: var(--toast-bg);
   border: 1px solid var(--toast-border);
-  color: var(--danger-fg-strong);
+  color: var(--fg);
   font-size: var(--fs-md);
   line-height: 1.5;
   padding: var(--s-3) var(--s-2) var(--s-3) var(--s-4);
-  border-radius: var(--r-md);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
   z-index: 20;
   animation: rise var(--t-med) var(--ease);
@@ -1233,19 +1385,19 @@ input[aria-invalid='true'] {
   }
 }
 
-/* Scrollbars discretas */
+/* Scrollbars oscuras y finas */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--muted);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 999px;
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background-color: var(--border-strong);
+  background-color: rgba(255, 255, 255, 0.18);
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -1272,7 +1424,7 @@ input[aria-invalid='true'] {
   transition: background var(--t-fast) var(--ease);
 }
 .tb-perm:hover {
-  background: rgba(245, 176, 65, 0.22);
+  background: rgba(240, 180, 90, 0.22);
 }
 .perm-tag {
   display: inline-flex;
@@ -1330,7 +1482,7 @@ input[aria-invalid='true'] {
 }
 .perm-title code {
   color: var(--brand-1);
-  background: rgba(159, 234, 249, 0.1);
+  background: var(--accent-soft);
   border-radius: var(--r-xs);
   padding: 1px 6px;
 }

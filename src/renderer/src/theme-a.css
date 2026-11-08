@@ -5,32 +5,8 @@
    Se importa después de styles.css y antes de themes.css: solo sobrescribe.
    ===================================================================== */
 :root {
-  --bg: #111318;
-  --surface: #14161c;
-  --card: #1b1e25;
-  --card-hover: #22262e;
-  --muted: #262a33;
-  --border: #2a2e38;
-  --border-strong: #3a3f4b;
-  --fg: #eceff4;
-  --fg-2: #bec5d1;
-  --fg-muted: #8b93a3;
-  --accent: #9feaf9;
-  --brand-grad: #9feaf9;
-  --brand-glow: 0 0 0 3px rgba(159, 234, 249, 0.16);
-  --term-bg: #111318;
-  --line: rgba(255, 255, 255, 0.05);
-  --line-2: rgba(255, 255, 255, 0.08);
-  --hover: rgba(255, 255, 255, 0.04);
-  --press: rgba(255, 255, 255, 0.06);
-  --warn-soft: rgba(245, 176, 65, 0.1);
-  --info-soft: rgba(103, 216, 239, 0.1);
-  --success-soft: rgba(74, 222, 128, 0.09);
-  --r-sm: 6px;
-  --r-md: 8px;
-  --r-lg: 14px;
-  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
-  --font-display: 'Segoe UI Variable Display', 'Segoe UI Variable Text', 'Segoe UI', sans-serif;
+  --font-ui: 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
   --side-w: 264px;
   font-size: 13px;
   letter-spacing: 0.002em;
@@ -251,24 +227,6 @@
   font-size: 11.5px;
   color: var(--fg-muted);
 }
-.switch-track {
-  width: 26px;
-  height: 16px;
-  box-shadow: none;
-  background: var(--muted);
-}
-.switch-track::after {
-  top: 3px;
-  left: 3px;
-  width: 10px;
-  height: 10px;
-}
-.switch input:checked + .switch-track {
-  background: var(--brand-2);
-}
-.switch input:checked + .switch-track::after {
-  transform: translateX(10px);
-}
 .inline-form {
   padding: 0 0 0 8px;
 }
@@ -311,15 +269,6 @@
 }
 .section-row .btn.sm:not(.primary):hover {
   color: var(--fg);
-}
-.btn.primary {
-  background: var(--accent);
-  color: #0d1117;
-  font-weight: 600;
-}
-.btn.primary:hover:not(:disabled) {
-  background: #b8f1fc;
-  filter: none;
 }
 .list {
   gap: 1px;
@@ -473,9 +422,6 @@
   background: transparent;
   color: var(--danger-fg);
 }
-.btn.sm {
-  border-radius: 6px;
-}
 
 /* ---------- Vacío ---------- */
 .empty-logo {
@@ -557,25 +503,6 @@
 .field > label {
   font-weight: 500;
   color: var(--fg-2);
-}
-input,
-select {
-  height: 34px;
-  background: var(--bg);
-  border-color: var(--line-2);
-  border-radius: 8px;
-}
-input:hover,
-select:hover {
-  border-color: rgba(255, 255, 255, 0.14);
-}
-input:focus,
-select:focus {
-  border-color: rgba(159, 234, 249, 0.5);
-}
-.btn {
-  border-radius: 8px;
-  font-weight: 500;
 }
 .modal-actions {
   border-top: 0;
