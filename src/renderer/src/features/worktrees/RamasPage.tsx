@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { openDrawer } from '../git/store'
-import { BranchIcon, CloseIcon, DoneIcon, PlusIcon, SearchIcon } from '../../icons/SlothIcons'
+import { BranchIcon, DoneIcon, PlusIcon, SearchIcon } from '../../icons/SlothIcons'
 import { closeRamas, setRamasDialog, useRamas } from './store'
+import '../help/page.css'
 
 // ---------- Tipos (los mismos que devuelve main) ----------
 
@@ -49,7 +50,37 @@ interface RemoveResult {
   closedSpaces: string[]
 }
 
+/** Tamaño de una carpeta: bytes (null si ya no existe) y si es un mínimo («más de»). */
+export interface SizeVal {
+  bytes: number | null
+  partial: boolean
+}
+
+/** Evento `feat:worktrees:size`: llega una vez por carpeta, cuando main la terminó de contar. */
+interface SizeMsg extends SizeVal {
+  path: string
+}
+
 // ---------- Helpers ----------
+
+const NF0 = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 })
+const NF1 = new Intl.NumberFormat('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+/** KB / MB / GB con coma decimal: «8,0 GB», «512 MB», «340 KB». */
+export function fmtBytes(b: number): string {
+  const gb = b / 1024 ** 3
+  if (gb >= 1) return `${NF1.format(gb)} GB`
+  const mb = b / 1024 ** 2
+  if (mb >= 1) return `${mb >= 100 ? NF0.format(mb) : NF1.format(mb)} MB`
+  return `${NF0.format(Math.round(b / 1024))} KB`
+}
+
+/** Texto de un tamaño: «Calculando…» mientras no llegó, «más de X» si se cortó por tiempo. */
+function sizeText(v: SizeVal | undefined, failed: boolean): string {
+  if (!v) return failed ? '—' : 'Calculando…'
+  if (v.bytes === null) return '—'
+  return v.partial ? `más de ${fmtBytes(v.bytes)}` : fmtBytes(v.bytes)
+}
 
 function errText(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e)
@@ -142,6 +173,10 @@ export function RamasPage(): React.JSX.Element | null {
   const [toast, setToast] = useState('')
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const backRef = useRef<HTMLButtonElement>(null)
+  /** Tamaños por ruta. Sin clave = todavía se calcula. */
+  const [sizes, setSizes] = useState<Record<string, SizeVal>>({})
+  const [sizeFailed, setSizeFailed] = useState(false)
 
   const say = useCallback((m: string) => {
     setToast(m)
@@ -169,6 +204,41 @@ export function RamasPage(): React.JSX.Element | null {
     void scan()
     setTimeout(() => panelRef.current?.focus(), 0)
   }, [open, nonce, scan])
+
+  // Tamaños: main los cuenta en segundo plano y avisa fila por fila. Al cerrar la pantalla se cancelan.
+  useEffect(() => {
+    const off = uiRef.current.on('feat:worktrees:size', (m: SizeMsg) => {
+      setSizes((s) => ({ ...s, [m.path]: { bytes: m.bytes, partial: m.partial } }))
+    })
+    return () => {
+      off()
+      void uiRef.current.invoke('feat:worktrees:sizesCancel').catch(() => undefined)
+    }
+  }, [])
+
+  // Después de cada lista: lo que ya está en caché llega enseguida; el resto llega por evento.
+  useEffect(() => {
+    if (!repos) return
+    let alive = true
+    setSizeFailed(false)
+    const paths = repos.flatMap((r) => r.rows.map((x) => x.path))
+    void uiRef.current
+      .invoke<Record<string, { bytes: number; partial: boolean }>>('feat:worktrees:sizes', paths)
+      .then((res) => {
+        if (!alive) return
+        setSizes((s) => {
+          const next = { ...s }
+          for (const [p, v] of Object.entries(res)) next[p] = { bytes: v.bytes, partial: v.partial }
+          return next
+        })
+      })
+      .catch(() => {
+        if (alive) setSizeFailed(true)
+      })
+    return () => {
+      alive = false
+    }
+  }, [repos])
 
   // Escape: primero cierra el diálogo o la confirmación; después el panel.
   useEffect(() => {
@@ -209,7 +279,11 @@ export function RamasPage(): React.JSX.Element | null {
   )
   const shownCount = groups.reduce((a, g) => a + g.rows.length, 0)
   const nCambios = branchRows.filter((r) => r.changes > 0).length
-  const nSinEspacio = branchRows.filter((r) => r.spaces.length === 0).length
+  // Total en disco: solo las ramas aparte (como el artboard), no la copia principal.
+  const sizeMissing = !repos || branchRows.some((r) => !(r.path in sizes))
+  const totalBytes = branchRows.reduce((a, r) => a + (sizes[r.path]?.bytes ?? 0), 0)
+  const totalPartial = branchRows.some((r) => sizes[r.path]?.partial)
+  const totalText = !sizeMissing ? `${totalPartial ? 'más de' : '≈'} ${fmtBytes(totalBytes)}` : sizeFailed ? '—' : 'Calculando…'
 
   const askRemove = (r: RowView): void => {
     setRmPath(r.path)
@@ -280,27 +354,32 @@ export function RamasPage(): React.JSX.Element | null {
   const candidates = branchRows.filter(cleanable)
 
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && !rmBusy && closeRamas()}>
-      <div ref={panelRef} className="modal f-wt-page" role="dialog" aria-modal="true" aria-labelledby="f-wt-h" tabIndex={-1}>
-        <header className="f-wt-head">
-          <div className="f-wt-head-text">
-            <h2 id="f-wt-h">Ramas aparte</h2>
-            <p className="f-wt-sub">Una rama aparte es una copia de trabajo del mismo repo en otra carpeta, para que dos Claude no se pisen.</p>
-          </div>
-          <div className="f-wt-head-actions">
-            <button type="button" className="f-wt-btn lg solid" onClick={() => setRamasDialog('limpiar')} disabled={scanning}>
-              Limpiar ramas que ya no se usan
-            </button>
-            <button type="button" className="f-wt-btn lg primary" onClick={() => setRamasDialog('nueva')} disabled={scanning || !repos?.length}>
-              <PlusIcon size={14} /> Nueva rama aparte
-            </button>
-            <button type="button" className="icon-btn" onClick={closeRamas} aria-label="Cerrar">
-              <CloseIcon size={16} />
-            </button>
-          </div>
-        </header>
+    <div ref={panelRef} className="page-shell f-wt-shell" role="dialog" aria-modal="true" aria-labelledby="f-wt-h" tabIndex={-1}>
+      <header className="page-head">
+        <button ref={backRef} type="button" className="page-back" onClick={closeRamas} disabled={rmBusy}>
+          ‹ Espacios
+        </button>
+        <span className="page-sep" aria-hidden="true" />
+        <span className="page-name">Sloth · ramas aparte</span>
+      </header>
 
-        <div className="f-wt-body">
+      <div className="page-body f-wt-body">
+        <div className="f-wt-inner">
+          <header className="f-wt-head">
+            <div className="f-wt-head-text">
+              <h1 id="f-wt-h">Ramas aparte</h1>
+              <p className="f-wt-sub">Una rama aparte es una copia de trabajo del mismo repo en otra carpeta, para que dos Claude no se pisen.</p>
+            </div>
+            <div className="f-wt-head-actions">
+              <button type="button" className="f-wt-btn lg solid" onClick={() => setRamasDialog('limpiar')} disabled={scanning}>
+                Limpiar ramas que ya no se usan
+              </button>
+              <button type="button" className="f-wt-btn lg primary" onClick={() => setRamasDialog('nueva')} disabled={scanning || !repos?.length}>
+                <PlusIcon size={14} /> Nueva rama aparte
+              </button>
+            </div>
+          </header>
+
           <div className="f-wt-tiles" role="group" aria-label="Resumen">
             <div className="f-wt-tile">
               <span className="f-wt-tile-n">{branchRows.length}</span>
@@ -311,8 +390,8 @@ export function RamasPage(): React.JSX.Element | null {
               <span className="f-wt-tile-l">con cambios sin confirmar</span>
             </div>
             <div className="f-wt-tile">
-              <span className="f-wt-tile-n">{nSinEspacio}</span>
-              <span className="f-wt-tile-l">sin espacio abierto</span>
+              <span className="f-wt-tile-n">{totalText}</span>
+              <span className="f-wt-tile-l">de espacio en disco, aprox.</span>
             </div>
           </div>
 
@@ -392,7 +471,12 @@ export function RamasPage(): React.JSX.Element | null {
                         </span>
                       ))}
                     </div>
-                    <div className="f-wt-cell f-wt-last">{ago(r.lastUseAt ?? r.lastCommitAt)}</div>
+                    <div className="f-wt-cell f-wt-last">
+                      <span>{ago(r.lastUseAt ?? r.lastCommitAt)}</span>
+                      <span className="f-wt-size" title="Tamaño en disco de la carpeta">
+                        {sizeText(sizes[r.path], sizeFailed)}
+                      </span>
+                    </div>
                     <div className="f-wt-actions">
                       {sp ? (
                         <button type="button" className="f-wt-btn solid" onClick={() => openSpace(r)}>
@@ -488,6 +572,7 @@ export function RamasPage(): React.JSX.Element | null {
 
           <p className="f-wt-foot">Cada rama aparte vive en su propia carpeta, al lado de la copia principal. Quitarla borra esa carpeta; la rama queda en el repo.</p>
         </div>
+      </div>
 
         {dialog === 'nueva' && repos && (
           <NuevaDialog
@@ -504,6 +589,8 @@ export function RamasPage(): React.JSX.Element | null {
           <LimpiarDialog
             candidates={candidates}
             repos={repos ?? []}
+            sizes={sizes}
+            sizeFailed={sizeFailed}
             onDone={async (msg) => {
               setRamasDialog(null)
               say(msg)
@@ -518,7 +605,6 @@ export function RamasPage(): React.JSX.Element | null {
             <DoneIcon size={14} /> {toast}
           </div>
         )}
-      </div>
     </div>
   )
 }
@@ -687,11 +773,15 @@ function NuevaDialog({ repos, onDone, onClose }: { repos: RepoView[]; onDone: (m
 function LimpiarDialog({
   candidates,
   repos,
+  sizes,
+  sizeFailed,
   onDone,
   onClose
 }: {
   candidates: RowView[]
   repos: RepoView[]
+  sizes: Record<string, SizeVal>
+  sizeFailed: boolean
   onDone: (msg: string) => Promise<void> | void
   onClose: () => void
 }): React.JSX.Element {
@@ -702,7 +792,13 @@ function LimpiarDialog({
   const [busy, setBusy] = useState(false)
   const on = (p: string): boolean => sel[p] !== false
   const chosen = candidates.filter((c) => on(c.path))
-  const freeLabel = 'Las ramas quedan en el repo; solo se borran sus carpetas.'
+  // Espacio que se libera: suma de lo ya contado de las elegidas.
+  const freedOf = (list: RowView[]): number => list.reduce((a, c) => a + (sizes[c.path]?.bytes ?? 0), 0)
+  const chosenPending = chosen.some((c) => !(c.path in sizes)) && !sizeFailed
+  const chosenPartial = chosen.some((c) => sizes[c.path]?.partial)
+  const freeLabel = chosenPending
+    ? 'Calculando cuánto se libera…'
+    : `Se liberan ${chosenPartial ? 'más de ' : '≈ '}${fmtBytes(freedOf(chosen))}. Las ramas quedan en el repo; solo se borran sus carpetas.`
   const reasonOf = (c: RowView): string => {
     if (c.gone) return 'Borrada en origin'
     const base = repos.find((r) => r.id === c.repo)?.defaultBase
@@ -719,14 +815,16 @@ function LimpiarDialog({
     setErr('')
     try {
       const res = await ui.invoke<RemoveResult[]>('feat:worktrees:clean', chosen.map((c) => c.path))
-      const ok = res.filter((r) => r.ok).length
+      const okRows = candidates.filter((c) => res.some((r) => r.ok && r.path === c.path))
+      const ok = okRows.length
+      const freed = ok ? ` · se liberan ≈ ${fmtBytes(freedOf(okRows))}` : ''
       const bad = Object.fromEntries(res.filter((r) => !r.ok).map((r) => [r.path, r.error ?? 'No se pudo quitar.']))
       if (Object.keys(bad).length === 0) {
-        await onDone(`${plural(ok, 'rama aparte quitada', 'ramas aparte quitadas')}`)
+        await onDone(`${plural(ok, 'rama aparte quitada', 'ramas aparte quitadas')}${freed}`)
       } else {
         setFailed(bad)
         setSel({})
-        await onDone(`${plural(ok, 'rama aparte quitada', 'ramas aparte quitadas')}. ${Object.keys(bad).length} no se pudieron quitar.`)
+        await onDone(`${plural(ok, 'rama aparte quitada', 'ramas aparte quitadas')}${freed}. ${Object.keys(bad).length} no se pudieron quitar.`)
       }
     } catch (e) {
       setErr(errText(e))
@@ -756,6 +854,7 @@ function LimpiarDialog({
                     </span>
                     {failed[c.path] && <span className="f-wt-err">{failed[c.path]}</span>}
                   </span>
+                  <span className="f-wt-pick-size">{sizeText(sizes[c.path], sizeFailed)}</span>
                 </label>
               ))}
             </div>
