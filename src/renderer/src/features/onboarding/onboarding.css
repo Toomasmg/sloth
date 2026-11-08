@@ -228,7 +228,7 @@
   gap: 8px;
 }
 .f-onboarding-steps li {
-  flex: 1 1 150px;
+  flex: 1 1 110px;
   min-width: 0;
   display: flex;
 }

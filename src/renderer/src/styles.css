@@ -1420,3 +1420,9 @@ html[data-lite='true'] *:not(:focus-visible) {
 html[data-lite='true'] .spin {
   animation: spin 0.9s linear infinite !important;
 }
+
+/* Títulos que reciben foco por código (tabIndex=-1): sin anillo, el foco visible queda para el teclado en controles. */
+[tabindex="-1"]:focus,
+[tabindex="-1"]:focus-visible {
+  outline: none;
+}
