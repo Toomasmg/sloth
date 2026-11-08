@@ -466,6 +466,16 @@ export function SearchIcon(props: SlothIconProps) {
   )
 }
 
+/** Ojo (leer o ver sin cambiar nada) */
+export function EyeIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12z" />
+      <path d="M12 9.8a2.2 2.2 0 1 0 0 4.4 2.2 2.2 0 1 0 0-4.4z" />
+    </Base>
+  )
+}
+
 /** Paleta de comandos */
 export function PaletteIcon(props: SlothIconProps) {
   return (
@@ -857,6 +867,7 @@ export const SLOTH_ICONS = {
   Ticket: TicketIcon,
   Report: ReportIcon,
   Search: SearchIcon,
+  Eye: EyeIcon,
   Palette: PaletteIcon,
   Settings: SettingsIcon,
   Bell: BellIcon,
