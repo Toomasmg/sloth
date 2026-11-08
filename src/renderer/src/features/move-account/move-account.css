@@ -1,98 +1,297 @@
-/* «Mover a otra cuenta» (v0.5). Clases con prefijo f-move-. */
+/* «Mover espacio a otra cuenta» (v0.6). Clases con prefijo f-move-. */
 
-.f-move-modal {
-  width: min(440px, calc(100vw - 32px));
+.modal.f-move-modal {
+  width: min(560px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-5);
 }
 
 .f-move-head-icon {
   color: var(--brand-2);
   flex: none;
 }
-
-.f-move-now {
-  margin: 0;
+.f-move-lead {
+  margin: calc(var(--s-1) * -1) 0 0;
   font-size: var(--fs-sm);
-  color: var(--fg-2);
+  color: var(--fg-muted);
+  line-height: 1.5;
 }
 
-.f-move-list {
-  margin: 0;
-  padding: 0;
-  border: 0;
+/* Espacio de origen */
+.f-move-space {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--input-bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.f-move-space-icon {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: var(--r-sm);
+  background: var(--info-soft);
+  color: var(--info);
+  display: grid;
+  place-items: center;
+}
+.f-move-space-text {
+  flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.f-move-space-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.f-move-space-path {
+  font-size: 12px;
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
+.f-move-space-acc {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: var(--fs-sm);
+  text-align: right;
+}
+
+.f-move-section {
   display: flex;
   flex-direction: column;
   gap: var(--s-2);
 }
-
-.f-move-list legend {
-  padding: 0;
-  margin-bottom: var(--s-1);
+.f-move-section h3 {
+  margin: 0 0 0 var(--s-1);
   font-size: var(--fs-sm);
   font-weight: 600;
-  color: var(--fg-2);
-}
-
-.f-move-opt {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  padding: var(--s-2) var(--s-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  color: var(--fg);
-  cursor: pointer;
-  transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
-}
-
-.f-move-opt:hover {
-  background: var(--hover);
-}
-
-.f-move-opt.on {
-  border-color: var(--brand-2);
-  background: var(--accent-soft);
-}
-
-.f-move-opt input {
-  width: 16px;
-  height: 16px;
-  min-height: 0;
-  margin: 0;
-  padding: 0;
-  flex: none;
-  accent-color: var(--brand-2);
-}
-
-.f-move-opt:focus-within {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-
-.f-move-opt-title {
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.f-move-opt-sub {
-  margin-left: auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--fs-sm);
   color: var(--fg-muted);
 }
 
-.f-move-explain {
+/* Cuentas destino */
+.f-move-list {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-md);
+  background: var(--input-bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.f-move-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding-right: var(--s-3);
+}
+.f-move-row.sep {
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.f-move-opt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  cursor: pointer;
+}
+.f-move-opt.off {
+  cursor: default;
+}
+.f-move-opt:not(.off):hover {
+  background: var(--hover);
+}
+.f-move-opt.on {
+  background: var(--info-soft);
+}
+.f-move-opt input {
+  accent-color: var(--brand-2);
   margin: 0;
-  font-size: var(--fs-sm);
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.f-move-opt input:disabled {
+  opacity: 0.4;
+}
+.f-move-opt-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.f-move-opt-title {
+  font-weight: 600;
+}
+.f-move-opt-sub {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.f-move-opt-sub.warn {
+  color: var(--warn-fg);
+}
+.f-move-badge {
+  flex: none;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 9px;
+  background: var(--surface-2);
   color: var(--fg-2);
 }
+.f-move-login {
+  flex: none;
+}
 
+/* Cajas de texto y el resumen */
+.f-move-box {
+  margin: 0;
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--input-bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--fg-2);
+  line-height: 1.55;
+}
+.f-move-keep {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  cursor: pointer;
+}
+.f-move-keep input {
+  accent-color: var(--brand-2);
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  flex: none;
+}
+.f-move-keep-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.f-move-keep-title {
+  font-weight: 600;
+  color: var(--fg);
+}
+.f-move-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.f-move-text {
+  box-sizing: border-box;
+  width: 100%;
+  padding: var(--s-2) var(--s-3);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--input-bg);
+  color: var(--fg);
+  font: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+/* Avisos de estado real */
+.f-move-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  color: var(--fg);
+  line-height: 1.4;
+}
+.f-move-banner.warn {
+  background: var(--warn-soft);
+  box-shadow: inset 0 0 0 1px var(--warn);
+  color: var(--warn-fg);
+}
+.f-move-banner.ok {
+  background: var(--success-soft);
+  box-shadow: inset 0 0 0 1px var(--ok);
+  color: var(--ok-fg);
+}
+.f-move-banner.info {
+  background: var(--input-bg);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.f-move-banner-text {
+  flex: 1 1 200px;
+  font-weight: 600;
+}
+.f-move-banner-title {
+  font-weight: 600;
+}
+.f-move-big {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  padding: var(--s-4);
+}
+.f-move-spin {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: f-move-spin 0.9s linear infinite;
+}
+.f-move-check {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--success-soft);
+  color: var(--ok-fg);
+}
+.f-move-done {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.f-move-p {
+  margin: var(--s-1) 0 0;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.f-move-err {
+  margin: 0;
+}
+.f-move-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+@keyframes f-move-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .f-move-opt {
-    transition: none;
+  .f-move-spin {
+    animation-duration: 3s;
+  }
+}
+@media (max-width: 560px) {
+  .f-move-space-acc {
+    display: none;
   }
 }
