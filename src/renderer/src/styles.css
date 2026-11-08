@@ -1385,3 +1385,22 @@ kbd,
 .doc-hidden .ring {
   animation-play-state: paused;
 }
+
+/* Movimiento reducido (Windows: «Efectos de animación» apagado): sin transiciones ni animaciones
+   decorativas. Los indicadores de carga (spin, ring) siguen girando, más lento. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+  .spin,
+  .ring {
+    animation-duration: 1.6s !important;
+    animation-iteration-count: infinite !important;
+  }
+}

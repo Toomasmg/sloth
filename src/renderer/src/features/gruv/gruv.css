@@ -362,7 +362,8 @@
   height: 66px;
   border-radius: 9px;
   background: var(--hover);
-  animation: fade var(--t-med) var(--ease) infinite alternate;
+  /* Esqueleto de carga: unas pocas pasadas y queda quieto (nada de animación infinita en listas). */
+  animation: fade var(--t-med) var(--ease) 2 alternate both;
 }
 .f-gruv-skel span {
   padding: 0 6px;
