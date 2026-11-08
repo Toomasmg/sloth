@@ -1,4 +1,5 @@
-/* Función «worktrees»: sección «Limpieza» del sidebar y modal. */
+/* «Ramas aparte» (v0.6): sección del sidebar, panel y diálogos. Clases con prefijo f-wt-. */
+
 .f-wt-section {
   padding-top: var(--s-2);
   padding-bottom: var(--s-2);
@@ -6,7 +7,6 @@
 .f-wt-toggle {
   display: flex;
   align-items: center;
-  gap: var(--s-1);
   width: 100%;
   height: var(--h-sm);
   padding: 0 var(--s-1);
@@ -15,261 +15,470 @@
   background: transparent;
   color: var(--fg-muted);
   cursor: pointer;
+  text-align: left;
 }
 .f-wt-toggle:hover {
   background: var(--hover);
 }
 .f-wt-title {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
   margin: 0;
   padding: 0;
-}
-.f-wt-muted {
-  color: var(--fg-muted);
-}
-.f-wt-count-on {
-  color: var(--success);
-  background: var(--success-soft);
-}
-.f-wt-body {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--s-1);
-  padding: var(--s-2) var(--s-1) 0;
-}
-.f-wt-body .hint {
-  margin: 0;
 }
 
-.modal.f-wt-modal {
-  width: min(780px, calc(100vw - 32px));
-  max-height: calc(100vh - 64px);
-  gap: var(--s-3);
-}
-.f-wt-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-}
-.f-wt-bar .hint {
-  margin: 0;
-}
-.f-wt-unsafe-toggle {
-  align-items: center;
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
-}
-.f-wt-unsafe-toggle.on {
-  color: var(--warn);
-}
-.f-wt-danger {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--s-2);
-  margin: 0;
-  padding: var(--s-2) var(--s-3);
-  border-radius: var(--r-sm);
-  background: var(--danger-soft);
-  color: var(--danger-fg-strong);
-  font-size: var(--fs-sm);
-}
-.f-wt-danger > svg {
-  color: var(--danger);
-  flex: none;
-  margin-top: 2px;
-}
-.f-wt-list {
+/* ---------- Panel ---------- */
+
+.modal.f-wt-page {
+  width: min(1040px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--s-3);
-  min-height: 80px;
+  gap: 0;
+  outline: none;
 }
-.f-wt-repo-h {
+.f-wt-head {
   display: flex;
-  align-items: baseline;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--s-2) var(--s-3);
+  padding: var(--s-4) var(--s-4) var(--s-3);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.f-wt-head-text {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.f-wt-head-text h2 {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.f-wt-head-text .hint {
+  margin: var(--s-1) 0 0;
+  line-height: 1.5;
+}
+.f-wt-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--s-2);
-  margin: 0 0 var(--s-1);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--fg-2);
 }
-.f-wt-repo-h .hint {
-  margin: 0;
-  font-weight: 400;
+
+.f-wt-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
 }
-.f-wt-none {
-  margin: 0;
+
+.f-wt-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: var(--s-2);
 }
-.f-wt-rows {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.f-wt-tile {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-.f-wt-row {
-  padding: 6px var(--s-2);
-  border-radius: var(--r-sm);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-lg);
   background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
-.f-wt-row.on {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+.f-wt-tile-n {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
-.f-wt-row.unsafe {
-  background: color-mix(in srgb, var(--card) 70%, transparent);
+.f-wt-tile-l {
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
 }
-.f-wt-row-main {
+
+.f-wt-filters {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--s-2);
 }
-.f-wt-cb,
-.f-wt-cb-space {
-  width: 16px;
-  height: 16px;
-  flex: none;
-  margin: 0;
-  padding: 0;
-  accent-color: var(--brand-2);
+.f-wt-search {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: var(--h-sm);
+  padding: 0 var(--s-2);
+  border-radius: var(--r-sm);
+  background: var(--input-bg);
+  color: var(--fg-muted);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
-.f-wt-row-text {
+.f-wt-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  box-shadow: none;
+}
+.f-wt-select {
+  height: var(--h-sm);
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--input-bg);
+  color: var(--fg);
+  font: inherit;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.f-wt-pill {
+  height: var(--h-sm);
+  padding: 0 var(--s-3);
+  border: 0;
+  border-radius: 16px;
+  background: var(--surface-2);
+  color: var(--fg-2);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.f-wt-pill.on {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.f-wt-pill:focus-visible,
+.f-wt-search:focus-within {
+  outline: 2px solid var(--info);
+  outline-offset: 1px;
+}
+.f-wt-result {
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+}
+
+.f-wt-empty,
+.f-wt-none {
+  margin: 0;
+  padding: var(--s-4);
+  text-align: center;
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.f-wt-foot {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ---------- Grupo por repo ---------- */
+
+.f-wt-group {
   display: flex;
   flex-direction: column;
+  border-radius: var(--r-lg);
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.f-wt-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.f-wt-group-head h3 {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+.f-wt-group-icon {
+  color: var(--ok);
+}
+.f-wt-pad {
+  padding: var(--s-3) var(--s-4);
+}
+
+/* ---------- Filas ---------- */
+
+.f-wt-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(150px, 1.2fr) minmax(120px, 1fr) minmax(160px, 1.2fr) 88px auto;
+  gap: 10px 14px;
+  align-items: center;
+  padding: var(--s-3) var(--s-4);
   min-width: 0;
-  cursor: pointer;
+}
+.f-wt-row.sep {
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.f-wt-cell {
+  min-width: 0;
+}
+.f-wt-cell-branch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 .f-wt-branch {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--fs-sm);
-  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.f-wt-tag {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+.f-wt-folder {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--fg-2);
+}
+.f-wt-space {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
   min-width: 0;
 }
-.f-wt-branch .mono,
-.f-wt-path {
+.f-wt-space-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.f-wt-path {
-  font-size: 11px;
-  color: var(--fg-muted);
+.f-wt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
 }
-.f-wt-badges {
+.f-wt-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.f-wt-last {
+  font-size: 12px;
+  color: var(--fg-2);
+  white-space: nowrap;
+}
+.f-wt-actions {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 4px;
-  max-width: 55%;
+  gap: 6px;
 }
-.f-wt-b {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  background: var(--hover);
-  color: var(--fg-2);
-}
-.f-wt-b.ok {
-  color: var(--success);
-  background: var(--success-soft);
-}
-.f-wt-b.warn {
-  color: var(--warn);
-  background: var(--warn-soft);
-}
-.f-wt-b.dim {
-  color: var(--fg-muted);
-  font-weight: 400;
-}
-.f-wt-b.wsp {
-  color: var(--info);
-  background: var(--info-soft);
-}
-.f-wt-reasons {
-  margin: 4px 0 0 24px;
-  padding: 0;
-  list-style: none;
-  font-size: var(--fs-xs);
-  color: var(--warn);
-}
-.f-wt-reasons li::before {
-  content: '• ';
-}
-.f-wt-opts {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 6px 0 2px 24px;
-  font-size: var(--fs-sm);
-}
-.f-wt-force {
+.f-wt-remove {
   color: var(--danger-fg);
 }
-.f-wt-results {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: var(--fs-sm);
-}
-.f-wt-results li {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-}
-.f-wt-results li.ok svg {
-  color: var(--success);
-}
-.f-wt-results li.bad {
-  color: var(--danger-fg);
-}
-.f-wt-plan {
+
+/* Confirmación de «Quitar»: ocupa toda la fila. */
+.f-wt-confirm {
+  grid-column: 1 / -1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.f-wt-confirm.danger {
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
+.f-wt-confirm-text {
+  margin: 0;
+  line-height: 1.5;
+}
+.f-wt-confirm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.f-wt-confirm-actions,
+.f-wt-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.f-wt-input {
+  height: var(--h-sm);
+  box-sizing: border-box;
+  max-width: 420px;
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--input-bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 12.5px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.f-wt-input[aria-invalid='true'] {
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
+.f-wt-err {
+  margin: 0;
   font-size: var(--fs-sm);
+  color: var(--danger-fg);
 }
-.f-wt-p {
-  margin: 0;
-  color: var(--fg-2);
+
+.f-wt-toast {
+  position: fixed;
+  right: var(--s-4);
+  bottom: var(--s-4);
+  z-index: 30;
+  max-width: calc(100vw - 36px);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--toast-bg);
+  color: var(--fg);
+  box-shadow: var(--shadow-lg);
 }
-.f-wt-plan-list {
-  margin: 0;
-  padding-left: 20px;
+
+/* ---------- Diálogos ---------- */
+
+.modal.f-wt-dialog {
+  width: min(520px, calc(100vw - 32px));
+  padding: var(--s-5);
+}
+.f-wt-dialog .f-wt-form {
   display: flex;
   flex-direction: column;
   gap: var(--s-3);
 }
-.f-wt-plan-h {
-  margin-bottom: 4px;
-  word-break: break-all;
+.f-wt-dialog h2 {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 700;
 }
-.f-wt-plan-step {
-  color: var(--info);
-  margin-bottom: 4px;
+.f-wt-lead {
+  margin: 0;
+  line-height: 1.5;
 }
-.f-wt-cmd {
-  margin: 2px 0;
-  padding: 4px var(--s-2);
-  border-radius: var(--r-xs);
-  background: var(--term-bg);
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-size: 11px;
+.f-wt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.f-wt-folder-box {
+  padding: var(--s-2);
+  border-radius: var(--r-sm);
+  background: var(--input-bg);
+  color: var(--fg-2);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.f-wt-check {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  cursor: pointer;
+}
+.f-wt-check input {
+  accent-color: var(--brand-2);
+  margin: 0;
+  width: 16px;
+  height: 16px;
+}
+.f-wt-grow {
+  flex: 1 1 200px;
 }
 
-/* Sin ligaduras: «--force» y «=>» se leen tal cual. */
-.f-wt-modal .mono,
-.f-wt-cmd {
-  font-variant-ligatures: none;
+.f-wt-list {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-md);
+  background: var(--input-bg);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.f-wt-pick {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  cursor: pointer;
+}
+.f-wt-pick:hover {
+  background: var(--hover);
+}
+.f-wt-pick.sep {
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.f-wt-pick input {
+  accent-color: var(--brand-2);
+  margin: 3px 0 0;
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+.f-wt-pick-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ---------- Spinner y movimiento ---------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  .f-wt-toast {
+    animation: f-wt-in 0.18s ease-out;
+  }
+}
+@keyframes f-wt-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* ---------- Pantallas angostas ---------- */
+
+@media (max-width: 900px) {
+  .f-wt-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .f-wt-actions {
+    justify-content: flex-start;
+  }
 }
