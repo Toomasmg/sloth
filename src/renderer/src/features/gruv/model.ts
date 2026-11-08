@@ -1,30 +1,35 @@
 import { useSyncExternalStore } from 'react'
 
-/** Columna = clave de estado de Gruv (`abierto`, `en_curso`, `en_revision`…). */
-export type ColumnKey = string
-export interface Column {
-  clave: string
-  nombre: string
+/** Lo que manda main (`feat:gruv:state` / `feat:gruv:changed`). Ver src/main/features/gruv.ts. */
+export interface GruvCriterio {
+  texto: string
+  hecho: boolean
 }
-/** Soltar acá crea el espacio del ticket. */
-export const DOING = 'en_curso'
 
 export interface Ticket {
   id: string
   titulo: string
+  /** Clave de estado de Gruv (`abierto`, `en_curso`, `en_revision`…). */
   estado?: string
   prioridad?: string
   proyecto?: string
   url?: string
-  manual?: boolean
+  responsable?: string
+  responsableId?: string
+  descripcion?: string
+  criterios?: GruvCriterio[]
+}
+
+export interface GruvEstado {
+  clave: string
+  nombre: string
 }
 
 export interface Snapshot {
   tickets: Ticket[]
-  manual: Ticket[]
-  overrides: Record<string, { col: ColumnKey; gruvEstado?: string }>
-  /** Columnas en el orden del tablero de Gruv (de `ver_flujo_tickets`, o las conocidas). */
-  columns: Column[]
+  /** Estados en el orden del flujo de Gruv. */
+  estados: GruvEstado[]
+  me?: { id?: string; nombre: string }
   fetchedAt?: number
   fetchedBy?: string
   lastRun?: { tokens?: number; costUsd?: number; durationMs?: number }
@@ -33,38 +38,46 @@ export interface Snapshot {
     queryAccountId?: string
     model: 'haiku' | 'sonnet' | 'opus'
     assigneeId: string
-    defaultRepo?: string
-    projectRepos: Record<string, string>
     confirmRefresh: boolean
   }
   running: boolean
-  lastRepo?: string
 }
 
-/** Columna donde va un ticket: la que eligió el usuario en Sloth o la de su estado en Gruv. */
-export function columnFor(
-  t: { id: string; estado?: string },
-  snap: Pick<Snapshot, 'columns' | 'overrides'>,
-  hasWorkspace: boolean
-): ColumnKey {
-  const has = (k?: string): k is string => Boolean(k) && snap.columns.some((c) => c.clave === k)
-  const o = snap.overrides[t.id]?.col
-  if (has(o)) return o
-  if (has(t.estado)) return t.estado
-  return hasWorkspace && has(DOING) ? DOING : (snap.columns[0]?.clave ?? DOING)
+/** Sin tildes y en minúsculas: para buscar «revision» y encontrar «Revisión». */
+export const norm = (s: string): string =>
+  s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+
+/** «Míos»: el responsable es la persona dueña de la cuenta que consulta (`me`). */
+export function isMine(t: Pick<Ticket, 'responsable' | 'responsableId'>, me?: Snapshot['me']): boolean {
+  if (!me || !t.responsable) return false
+  if (me.id && t.responsableId) return t.responsableId === me.id
+  return norm(t.responsable) === norm(me.nombre)
 }
 
-/** Texto corto del estado de Gruv para la tarjeta. */
-export const estadoLabel = (estado: string): string => estado.replace(/_/g, ' ')
+/** Orden de prioridad conocido; lo que no se reconoce va al final. */
+export function prioRank(p?: string): number {
+  if (!p) return 9
+  const s = norm(p)
+  if (/crit|urg|bloq/.test(s)) return 0
+  if (/alta|high/.test(s)) return 1
+  if (/media|mid|normal/.test(s)) return 2
+  if (/baja|low/.test(s)) return 3
+  return 4
+}
 
-// ---------- estado compartido entre la barra de título y el tablero ----------
+// ---------- estado compartido entre la barra de título y la pantalla ----------
 let snap: Snapshot | null = null
 let open = false
 const subs = new Set<() => void>()
 const notify = (): void => subs.forEach((s) => s())
 const subscribe = (cb: () => void): (() => void) => {
   subs.add(cb)
-  return () => subs.delete(cb)
+  return () => {
+    subs.delete(cb)
+  }
 }
 
 export const setSnapshot = (s: Snapshot): void => {

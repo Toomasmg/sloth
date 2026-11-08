@@ -1,256 +1,325 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  ArrowClockwise,
-  ArrowSquareOut,
-  CircleNotch,
-  FolderOpen,
-  GearSix,
-  Kanban,
-  Play,
-  Plus,
-  Trash,
-  WarningCircle,
-  X
-} from '@phosphor-icons/react'
+import { useEffect, useRef, useState } from 'react'
 import { useUi } from '../host'
-import { api } from '../../api'
-import { StatePill } from '../../StateIcon'
-import { cleanError, fmtTok, shortPath, totalTok } from '../../format'
+import { cleanError } from '../../format'
 import { resolveAccountColor } from '../settings/store'
+import { SPACE_CHIP, SPACE_LABEL, spaceStatus } from '../broadcast/state'
+import { CloseIcon, DoneIcon, ErrorIcon, IdleIcon, TicketIcon, WorkingIcon } from '../../icons/SlothIcons'
 import type { Workspace } from '../../../../shared/types'
 import {
-  columnFor,
-  DOING,
-  estadoLabel,
+  isMine,
+  norm,
+  prioRank,
   setBoardOpen,
   setSnapshot,
   timeAgo,
   useSnapshot,
-  type ColumnKey,
+  type GruvEstado,
   type Snapshot,
   type Ticket
 } from './model'
 
-interface Card extends Ticket {
-  col: ColumnKey
-  /** El estado de Gruv no coincide con la columna (se movió en Sloth). */
-  moved: boolean
-  ws?: Workspace
-  /** Solo existe como espacio de Sloth (Gruv no lo trajo). */
-  onlySloth?: boolean
+/** Lo que se escribe en Gruv: esta app solo lee Gruv, así que estas acciones van deshabilitadas. */
+const WHERE = 'Se hace desde Gruv'
+
+type Tab = 'mios' | 'equipo' | 'sin'
+const TABS: { id: Tab; name: string }[] = [
+  { id: 'mios', name: 'Míos' },
+  { id: 'equipo', name: 'Del equipo' },
+  { id: 'sin', name: 'Sin asignar' }
+]
+
+/** Lo que devuelve `feat:templates:list` (solo lo que usamos). */
+interface TemplateLite {
+  id: string
+  name: string
+  namePattern?: string
+  initialPrompt?: string
+  useWorktree?: { branchPattern: string }
+}
+const usesTicket = (t: TemplateLite): boolean =>
+  [t.namePattern, t.initialPrompt, t.useWorktree?.branchPattern].some((s) => Boolean(s && /\{ticket(min)?\}/.test(s)))
+
+const PRIO_PATH = {
+  0: 'M12 5v9M12 18h.01',
+  1: 'M6 14.5l6-6 6 6',
+  2: 'M5 9.5h14M5 14.5h14',
+  3: 'M6 9.5l6 6 6-6'
+} as const
+const prioPath = (p?: string): string => PRIO_PATH[(Math.min(prioRank(p), 3) as keyof typeof PRIO_PATH)]
+const prioTone = (p?: string): string => (prioRank(p) === 0 ? 'var(--danger-fg)' : prioRank(p) === 1 ? 'var(--warn-fg)' : 'var(--fg-2)')
+
+/** Clase de chip por estado de Gruv (color + texto; el color solo no alcanza). */
+function estadoChip(k?: string): string {
+  if (k === 'en_curso') return 'chip-working'
+  if (k === 'en_revision' || k === 'en_qa' || k === 'pre_rtd') return 'chip-waiting'
+  if (k === 'bloqueado' || k === 'rechazado') return 'chip-error'
+  return 'chip-idle'
 }
 
-const DRAG_TYPE = 'application/x-sloth-ticket'
+const initials = (name: string): string =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join('') || '?'
+
+const byIdDesc = (a: Ticket, b: Ticket): number => {
+  const na = Number(a.id.split('-').pop())
+  const nb = Number(b.id.split('-').pop())
+  return nb - na
+}
+
+/** Icono de prioridad (trazo, con texto al lado). */
+function PrioGlyph({ p, size = 12 }: { p?: string; size?: number }): React.JSX.Element {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}>
+      <path d={prioPath(p)} />
+    </svg>
+  )
+}
+
+function BackGlyph(): React.JSX.Element {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 5l-7 7 7 7" />
+    </svg>
+  )
+}
+
+function RefreshGlyph(): React.JSX.Element {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19.5 12a7.5 7.5 0 0 1-13 5.1M4.5 12a7.5 7.5 0 0 1 13-5.1M17.5 3.5v3.4h-3.4M6.5 20.5v-3.4h3.4" />
+    </svg>
+  )
+}
+
+function ExternalGlyph(): React.JSX.Element {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 4h6v6M20 4l-8 8M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" />
+    </svg>
+  )
+}
 
 export function Board(): React.JSX.Element {
   const ui = useUi()
   const snap = useSnapshot()
+  const [tab, setTab] = useState<Tab>('mios')
+  const [q, setQ] = useState('')
+  const [stSel, setStSel] = useState<string[]>([])
+  const [prio, setPrio] = useState('todas')
+  const [selId, setSelId] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
-  const [confirming, setConfirming] = useState(false)
-  const [settings, setSettings] = useState(false)
-  const [adding, setAdding] = useState(false)
-  const [dragOver, setDragOver] = useState<ColumnKey | null>(null)
-  const [queryAcc, setQueryAcc] = useState<string>('')
-  const firstBtn = useRef<HTMLButtonElement>(null)
+  const [tpls, setTpls] = useState<TemplateLite[]>([])
+  const backRef = useRef<HTMLButtonElement>(null)
 
-  const loggedIn = ui.accounts.filter((a) => ui.statuses[a.id]?.loggedIn)
-  const accIndex = new Map(ui.accounts.map((a, i) => [a.id, i]))
-  const accLabel = (id?: string): string => ui.accounts.find((a) => a.id === id)?.label ?? '—'
+  const close = (): void => setBoardOpen(false)
 
-  useEffect(() => {
-    if (!snap) return
-    setQueryAcc((cur) => cur || snap.config.queryAccountId || loggedIn[0]?.id || '')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snap?.config.queryAccountId, loggedIn.length])
-
-  // Foco al abrir y vuelta al botón que lo abrió al cerrar.
+  // Foco al abrir y vuelta a lo que tenía el foco al cerrar.
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null
-    firstBtn.current?.focus()
+    backRef.current?.focus()
     return () => prev?.focus?.()
   }, [])
 
-  const close = (): void => setBoardOpen(false)
+  useEffect(() => {
+    void ui.invoke<TemplateLite[]>('feat:templates:list').then((l) => setTpls(Array.isArray(l) ? l : []), () => setTpls([]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
       e.preventDefault()
       if (confirming) setConfirming(false)
-      else if (adding) setAdding(false)
       else close()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [confirming, adding])
+  }, [confirming])
 
-  const cards = useMemo<Card[]>(() => {
-    if (!snap) return []
-    const wsByTicket = new Map<string, Workspace>()
-    for (const w of ui.workspaces) if (w.ticket) wsByTicket.set(w.ticket.toUpperCase(), w)
-    const seen = new Set<string>()
-    const out: Card[] = []
-    const push = (t: Ticket): void => {
-      if (seen.has(t.id)) return
-      seen.add(t.id)
-      const ws = wsByTicket.get(t.id)
-      const col = columnFor(t, snap, Boolean(ws))
-      const natural = columnFor(t, { columns: snap.columns, overrides: {} }, Boolean(ws))
-      out.push({ ...t, col, moved: col !== natural, ws })
-    }
-    snap.tickets.forEach(push)
-    snap.manual.forEach(push)
-    for (const [id, ws] of wsByTicket) {
-      if (seen.has(id)) continue
-      push({ id, titulo: ws.name !== id ? ws.name : 'Espacio de Sloth (Gruv no lo trajo)' })
-      out[out.length - 1].onlySloth = true
-    }
-    return out
-  }, [snap, ui.workspaces])
+  const running = Boolean(snap?.running) || busy === 'refresh'
+  const tickets = snap?.tickets ?? []
+  const me = snap?.me
+  const estados = snap?.estados ?? []
+  const estadoName = (k?: string): string => estados.find((e) => e.clave === k)?.nombre ?? (k ? k.replace(/_/g, ' ') : 'Sin estado')
+  const wsOf = (id: string): Workspace | undefined => ui.workspaces.find((w) => w.ticket?.toUpperCase() === id)
+  const accLabel = (id?: string): string | undefined => ui.accounts.find((a) => a.id === id)?.label
 
-  const run = async (label: string, fn: () => Promise<unknown>): Promise<unknown> => {
-    setBusy(label)
+  const isMineT = (t: Ticket): boolean => isMine(t, me)
+  const inTab = (t: Ticket, tb: Tab): boolean => (tb === 'mios' ? isMineT(t) : tb === 'equipo' ? Boolean(t.responsable) && !isMineT(t) : !t.responsable)
+  const counts: Record<Tab, number> = {
+    mios: tickets.filter((t) => inTab(t, 'mios')).length,
+    equipo: tickets.filter((t) => inTab(t, 'equipo')).length,
+    sin: tickets.filter((t) => inTab(t, 'sin')).length
+  }
+
+  const qn = norm(q.trim())
+  const filtersOn = Boolean(qn) || stSel.length > 0 || prio !== 'todas'
+  const visible = tickets
+    .filter(
+      (t) =>
+        inTab(t, tab) &&
+        (!stSel.length || stSel.includes(t.estado ?? '')) &&
+        (prio === 'todas' || (t.prioridad ?? '') === prio) &&
+        (!qn || norm(`${t.id} ${t.titulo}`).includes(qn))
+    )
+    .sort(byIdDesc)
+  const current = visible.find((t) => t.id === selId) ?? visible[0] ?? null
+
+  // Chips de estado: los del flujo de Gruv que tienen tickets (y los que no estén en el flujo).
+  const estadoKeys = [
+    ...estados.filter((e) => tickets.some((t) => t.estado === e.clave)),
+    ...[...new Set(tickets.map((t) => t.estado).filter((k): k is string => Boolean(k)))]
+      .filter((k) => !estados.some((e) => e.clave === k))
+      .map((k): GruvEstado => ({ clave: k, nombre: k.replace(/_/g, ' ') }))
+  ]
+  const prioOpts = [...new Set(tickets.map((t) => t.prioridad).filter((p): p is string => Boolean(p)))].sort(
+    (a, b) => prioRank(a) - prioRank(b) || a.localeCompare(b)
+  )
+
+  const countLabel = visible.length === 1 ? '1 ticket' : `${visible.length} tickets`
+
+  // ---------- acciones ----------
+  const refresh = async (): Promise<void> => {
+    setConfirming(false)
+    setInfo(null)
     setErr(null)
+    setBusy('refresh')
     try {
-      return await fn()
+      const r = await ui.invoke<{ count: number }>('feat:gruv:refresh')
+      setInfo(`Gruv trajo ${r.count} ${r.count === 1 ? 'ticket' : 'tickets'}.`)
     } catch (e) {
       setErr(cleanError(e))
-      return undefined
     } finally {
       setBusy(null)
     }
   }
 
-  const apply = (r: unknown): void => {
-    if (r && typeof r === 'object' && 'tickets' in r) setSnapshot(r as Snapshot)
-  }
-
-  const refresh = async (): Promise<void> => {
-    setConfirming(false)
-    setInfo(null)
-    const r = (await run('refresh', () => ui.invoke('feat:gruv:refresh', queryAcc))) as
-      | { count: number; tokens?: number }
-      | undefined
-    if (r) setInfo(`Gruv trajo ${r.count} ${r.count === 1 ? 'ticket' : 'tickets'}${r.tokens ? ` · ~${fmtTok(r.tokens)} tokens` : ''}.`)
-  }
-
   const askRefresh = (): void => {
-    if (!snap) return
-    if (!queryAcc) {
-      setSettings(true)
-      setErr('Elegí la cuenta con la que se consulta Gruv.')
-      return
-    }
-    if (snap.config.confirmRefresh) setConfirming(true)
+    if (snap?.config.confirmRefresh) setConfirming(true)
     else void refresh()
   }
 
-  const start = async (c: Card): Promise<void> => {
-    const r = (await run(`start:${c.id}`, () => ui.invoke('feat:gruv:start', c.id))) as
-      | { id: string; created: boolean }
-      | undefined
-    if (r) close()
+  /** «Empezar en Sloth»: con la plantilla de ticket si existe; si no, el flujo de siempre (`/ticket`). */
+  const start = async (t: Ticket): Promise<void> => {
+    setErr(null)
+    const ws = wsOf(t.id)
+    if (ws) {
+      ui.openPane(ws.id)
+      close()
+      return
+    }
+    setBusy(`start:${t.id}`)
+    try {
+      const tpl = tpls.find((x) => usesTicket(x) && /gruv/i.test(x.name)) ?? tpls.find(usesTicket)
+      if (tpl) {
+        await ui.invoke('feat:templates:create', tpl.id, { ticket: t.id })
+        close()
+        return
+      }
+      if (!(await ui.invoke<boolean>('feat:gruv:hasRepo', t.id))) {
+        // No hay carpeta para tomar (ni por defecto ni de un espacio anterior): se elige en «Nuevo espacio».
+        close()
+        ui.openNewWorkspace('ticket')
+        return
+      }
+      await ui.invoke('feat:gruv:start', t.id)
+      close()
+    } catch (e) {
+      setErr(cleanError(e))
+    } finally {
+      setBusy(null)
+    }
   }
 
-  const moveTo = async (c: Card, col: ColumnKey): Promise<void> => {
-    if (col === c.col && !(col === DOING && !c.ws)) return
-    if (col === DOING) return start(c)
-    apply(await run(`move:${c.id}`, () => ui.invoke('feat:gruv:move', c.id, col)))
+  const openSpace = (ws: Workspace): void => {
+    ui.openPane(ws.id)
+    close()
   }
 
-  const resetCol = async (c: Card): Promise<void> => {
-    apply(await run(`move:${c.id}`, () => ui.invoke('feat:gruv:move', c.id, null)))
+  const setConfirmRefresh = (ask: boolean): void => {
+    void ui.invoke<Snapshot>('feat:gruv:setConfig', { confirmRefresh: ask }).then(setSnapshot, (e) => setErr(cleanError(e)))
   }
 
-  const onCardKey = (e: React.KeyboardEvent, c: Card): void => {
-    if (!e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return
-    e.preventDefault()
-    const cols = snap?.columns ?? []
-    const i = cols.findIndex((k) => k.clave === c.col)
-    const j = Math.max(0, Math.min(cols.length - 1, i + (e.key === 'ArrowLeft' ? -1 : 1)))
-    if (j !== i) void moveTo(c, cols[j].clave)
+  // ---------- estado de conexión (real: lo que dejó la última consulta) ----------
+  const anyLogged = ui.accounts.some((a) => ui.statuses[a.id]?.loggedIn)
+  type Tone = 'ok' | 'busy' | 'bad' | 'idle'
+  let tone: Tone = 'idle'
+  let connText = 'Gruv todavía no se consultó'
+  if (!snap) connText = 'Cargando…'
+  else if (running) {
+    tone = 'busy'
+    connText = `Consultando Gruv con ${accLabel(snap.config.queryAccountId) ?? 'una cuenta'}…`
+  } else if (snap.lastError) {
+    tone = 'bad'
+    connText = 'Sin conexión con Gruv'
+  } else if (!anyLogged) {
+    tone = 'bad'
+    connText = 'Ninguna cuenta tiene sesión iniciada'
+  } else if (snap.fetchedAt) {
+    tone = 'ok'
+    connText = `Conectado con ${accLabel(snap.fetchedBy) ?? 'una cuenta'} · actualizado ${timeAgo(snap.fetchedAt)}`
   }
+  const ConnIcon = tone === 'busy' ? WorkingIcon : tone === 'bad' ? ErrorIcon : tone === 'ok' ? DoneIcon : IdleIcon
+  const connClass = tone === 'busy' ? 'chip-working' : tone === 'bad' ? 'chip-error' : tone === 'ok' ? 'chip-done' : 'chip-idle'
 
-  if (!snap) {
-    return (
-      <div className="modal-backdrop f-gruv-backdrop">
-        <div className="f-gruv-board" role="dialog" aria-modal="true" aria-label="Tablero de tickets">
-          <p className="hint">Cargando…</p>
-        </div>
-      </div>
-    )
-  }
+  const offline = Boolean(snap?.lastError) && !running
 
-  const running = snap.running || busy === 'refresh'
-  const usage5h = (id: string): number => {
-    const u = ui.usage[id]
-    return u ? totalTok(u.last5h) : 0
-  }
-  const open = cards.length
+  const bodyLoading = !snap || (running && tickets.length === 0)
+  const showRows = !bodyLoading && visible.length > 0
 
   return (
-    <div className="modal-backdrop f-gruv-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div className="f-gruv-board" role="dialog" aria-modal="true" aria-labelledby="f-gruv-title">
-        <header className="f-gruv-head">
-          <Kanban size={18} weight="bold" aria-hidden="true" className="f-gruv-head-ic" />
-          <h2 id="f-gruv-title">Tickets</h2>
-          <span className="f-gruv-meta" aria-live="polite">
-            {running ? (
-              <>
-                <CircleNotch size={12} weight="bold" className="spin" aria-hidden="true" /> Consultando Gruv con{' '}
-                {accLabel(queryAcc)}… (hasta 2 min)
-              </>
-            ) : snap.fetchedAt ? (
-              <>
-                {open} {open === 1 ? 'ticket' : 'tickets'} · Gruv actualizado {timeAgo(snap.fetchedAt)} con {accLabel(snap.fetchedBy)}
-                {snap.lastRun?.tokens ? ` · ~${fmtTok(snap.lastRun.tokens)} tokens` : ''}
-              </>
-            ) : (
-              <>{open} {open === 1 ? 'ticket' : 'tickets'} · todavía no se consultó Gruv</>
-            )}
-          </span>
-          <div className="f-gruv-head-actions">
-            {running ? (
-              <button type="button" className="btn sm" onClick={() => void ui.invoke('feat:gruv:cancel')}>
-                <X size={14} aria-hidden="true" /> Cancelar consulta
-              </button>
-            ) : (
-              <button
-                ref={firstBtn}
-                type="button"
-                className="btn sm"
-                onClick={askRefresh}
-                title={queryAcc ? `Usa tokens de ${accLabel(queryAcc)}` : 'Elegí una cuenta en Configuración'}
-              >
-                <ArrowClockwise size={14} aria-hidden="true" /> Actualizar
-                {queryAcc ? <span className="f-gruv-sub">usa tokens de {accLabel(queryAcc)}</span> : null}
-              </button>
-            )}
-            <button type="button" className="btn sm" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>
-              <Plus size={14} aria-hidden="true" /> A mano
-            </button>
-            <button type="button" className="btn sm ghost" aria-expanded={settings} onClick={() => setSettings((v) => !v)}>
-              <GearSix size={14} aria-hidden="true" /> Configuración
-            </button>
-            <button type="button" className="icon-btn" aria-label="Cerrar tablero (Esc)" title="Cerrar (Esc)" onClick={close}>
-              <X size={16} aria-hidden="true" />
-            </button>
-          </div>
-        </header>
+    <div className="f-gruv-page" role="dialog" aria-modal="true" aria-labelledby="f-gruv-title">
+      <header className="f-gruv-bar">
+        <button ref={backRef} type="button" className="f-gruv-back" onClick={close}>
+          <BackGlyph />
+          Espacios
+        </button>
+        <span className="f-gruv-sep" aria-hidden="true" />
+        <span role="status" className={`chip ${connClass} f-gruv-conn`}>
+          <ConnIcon size={12} />
+          {connText}
+        </span>
+        <span className="f-gruv-grow" />
+        {running ? (
+          <button type="button" className="btn sm" onClick={() => void ui.invoke('feat:gruv:cancel')}>
+            <CloseIcon size={13} /> Cancelar consulta
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="btn sm"
+          onClick={askRefresh}
+          disabled={running || !snap}
+          title="Lee los tickets de Gruv con la cuenta que la consulta (solo lectura)"
+        >
+          <RefreshGlyph />
+          {running ? 'Actualizando…' : 'Actualizar'}
+        </button>
+      </header>
+
+      <main className="f-gruv-main">
+        <div>
+          <h1 id="f-gruv-title" className="f-gruv-h1">
+            Tickets de Gruv
+          </h1>
+          <p className="f-gruv-lead">Tus tickets y los del equipo. Empezá uno y Sloth arma el espacio para trabajarlo.</p>
+        </div>
 
         {confirming && (
-          <div className="f-gruv-bar f-gruv-confirm" role="alertdialog" aria-label="Confirmar consulta a Gruv">
-            <WarningCircle size={16} weight="fill" aria-hidden="true" className="f-gruv-warn" />
+          <div className="f-gruv-alert f-gruv-confirm" role="alertdialog" aria-label="Confirmar consulta a Gruv">
             <span>
-              Para leer Gruv se abre Claude sin ventana con <b>{accLabel(queryAcc)}</b> (modelo {snap.config.model}) y
-              usa tokens de esa cuenta. Solo lee: no cambia nada en Gruv.
+              Para leer Gruv se abre Claude sin ventana con <b>{accLabel(snap?.config.queryAccountId) ?? 'una cuenta'}</b> (modelo{' '}
+              {snap?.config.model}) y usa tokens de esa cuenta. Solo lee: no cambia nada en Gruv.
             </span>
             <label className="check f-gruv-inline-check">
-              <input
-                type="checkbox"
-                onChange={(e) => void ui.invoke('feat:gruv:setConfig', { confirmRefresh: !e.target.checked }).then(apply)}
-              />
+              <input type="checkbox" onChange={(e) => setConfirmRefresh(!e.target.checked)} />
               No volver a preguntar
             </label>
             <button type="button" className="btn sm primary" autoFocus onClick={() => void refresh()}>
@@ -261,319 +330,464 @@ export function Board(): React.JSX.Element {
             </button>
           </div>
         )}
-        {(err || (snap.lastError && !running)) && (
-          <p className="form-error f-gruv-msg" role="alert">
-            {err ?? `Última consulta: ${snap.lastError}`}
+
+        {offline && (
+          <div className="f-gruv-alert f-gruv-offline" role="alert">
+            <span className="f-gruv-alert-text">
+              No pudimos hablar con Gruv. Mostramos lo último que cargamos.
+              <span className="f-gruv-alert-detail">{snap?.lastError}</span>
+            </span>
+            <button type="button" className="btn sm primary" onClick={() => void refresh()} disabled={running}>
+              Reintentar
+            </button>
+          </div>
+        )}
+        {err && (
+          <p className="form-error" role="alert">
+            {err}
           </p>
         )}
-        {info && !err && <p className="f-gruv-msg f-gruv-ok" role="status">{info}</p>}
-
-        {adding && <AddManual onDone={(s) => { apply(s); setAdding(false) }} onError={setErr} />}
-        {settings && (
-          <Settings
-            snap={snap}
-            queryAcc={queryAcc}
-            setQueryAcc={setQueryAcc}
-            projects={[...new Set(cards.map((c) => c.proyecto).filter((p): p is string => Boolean(p)))]}
-            apply={apply}
-            onError={setErr}
-          />
+        {info && !err && !offline && (
+          <p className="f-gruv-ok" role="status">
+            {info}
+          </p>
         )}
 
-        <div className="f-gruv-cols">
-          {snap.columns.map((column) => {
-            const col = { key: column.clave, title: column.nombre }
-            const list = cards.filter((c) => c.col === col.key)
-            return (
-              <section
-                key={col.key}
-                className={`f-gruv-col ${dragOver === col.key ? 'over' : ''}`}
-                aria-labelledby={`f-gruv-col-${col.key}`}
-                onDragOver={(e) => {
-                  if (!e.dataTransfer.types.includes(DRAG_TYPE)) return
-                  e.preventDefault()
-                  e.dataTransfer.dropEffect = 'move'
-                  setDragOver(col.key)
-                }}
-                onDragLeave={(e) => {
-                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(null)
-                }}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  setDragOver(null)
-                  const id = e.dataTransfer.getData(DRAG_TYPE)
-                  const c = cards.find((x) => x.id === id)
-                  if (c) void moveTo(c, col.key)
-                }}
-              >
-                <h3 id={`f-gruv-col-${col.key}`} className="f-gruv-col-title" title={col.key === DOING ? 'Soltá una tarjeta acá para crear su espacio' : `Estado de Gruv: ${col.key}`}>
-                  {col.title} <span className="f-gruv-count">{list.length}</span>
-                </h3>
-                <ul className="f-gruv-list">
-                  {list.map((c) => (
-                    <li
-                      key={c.id}
-                      className={`f-gruv-card ${busy?.endsWith(`:${c.id}`) ? 'busy' : ''}`}
-                      tabIndex={0}
-                      draggable
-                      aria-label={`${c.id}: ${c.titulo}. Alt+flechas para moverlo de columna.`}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData(DRAG_TYPE, c.id)
-                        e.dataTransfer.effectAllowed = 'move'
-                      }}
-                      onKeyDown={(e) => onCardKey(e, c)}
+        <div className="f-gruv-grid">
+          {/* LISTA */}
+          <section className="f-gruv-panel f-gruv-list" aria-labelledby="f-gruv-lista-t">
+            <h2 id="f-gruv-lista-t" className="sr-only">
+              Lista de tickets
+            </h2>
+            <div role="tablist" aria-label="Qué tickets ver" className="f-gruv-tabs">
+              {TABS.map((t) => {
+                const on = tab === t.id
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={on}
+                    tabIndex={on ? 0 : -1}
+                    className={`f-gruv-tab ${on ? 'on' : ''}`}
+                    onClick={() => setTab(t.id)}
+                    onKeyDown={(e) => {
+                      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+                      e.preventDefault()
+                      const i = TABS.findIndex((x) => x.id === tab)
+                      const j = (i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length
+                      setTab(TABS[j].id)
+                    }}
+                  >
+                    {t.name}
+                    <span className="f-gruv-badge">{counts[t.id]}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="f-gruv-filters">
+              <label className="f-gruv-search">
+                <svg width={14} height={14} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round">
+                  <path d="M4.5 10.5a6 6 0 1 0 12 0a6 6 0 1 0 -12 0M15 15l5 5" />
+                </svg>
+                <input
+                  type="search"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Buscar por código o título"
+                  aria-label="Buscar por código o título"
+                />
+              </label>
+              <div role="group" aria-label="Filtrar por estado" className="f-gruv-chips">
+                {estadoKeys.map((e) => {
+                  const on = stSel.includes(e.clave)
+                  return (
+                    <button
+                      key={e.clave}
+                      type="button"
+                      className={`f-gruv-chipf ${on ? 'on' : ''}`}
+                      aria-pressed={on}
+                      onClick={() => setStSel((s) => (on ? s.filter((x) => x !== e.clave) : [...s, e.clave]))}
                     >
-                      <div className="f-gruv-card-top">
-                        <span className="mono f-gruv-id">{c.id}</span>
-                        {c.prioridad && <span className={`tag f-gruv-prio f-gruv-prio-${prioClass(c.prioridad)}`}>{c.prioridad}</span>}
-                        {c.manual && <span className="f-gruv-chip">a mano</span>}
-                        {c.onlySloth && <span className="f-gruv-chip">solo Sloth</span>}
-                        {c.url && (
-                          <a className="icon-btn f-gruv-link" href={c.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${c.id} en Gruv`} title="Abrir en Gruv">
-                            <ArrowSquareOut size={13} aria-hidden="true" />
-                          </a>
-                        )}
-                      </div>
-                      <p className="f-gruv-title">{c.titulo}</p>
-                      {(c.proyecto || (c.estado && c.estado !== c.col)) && (
-                        <p className="f-gruv-sub-line">
-                          {c.proyecto}
-                          {c.proyecto && c.estado && c.estado !== c.col ? ' · ' : ''}
-                          {c.estado && c.estado !== c.col ? `Gruv: ${estadoLabel(c.estado)}` : ''}
-                        </p>
-                      )}
-                      <div className="f-gruv-card-foot">
-                        {c.ws ? (
-                          <>
-                            {ui.agents[c.ws.id] ? (
-                              <StatePill state={ui.agents[c.ws.id].state} detail={ui.agents[c.ws.id].detail} />
-                            ) : (
-                              <span className="pill">Sin abrir</span>
-                            )}
-                            <span className="f-gruv-acc" title={`Cuenta del espacio · ${fmtTok(usage5h(c.ws.accountId))} tokens en 5 h`}>
-                              <span className="f-gruv-dot" style={{ background: resolveAccountColor(c.ws.accountId, accIndex.get(c.ws.accountId) ?? 0) }} aria-hidden="true" />
-                              {accLabel(c.ws.accountId)}
-                            </span>
-                            <button type="button" className="btn sm ghost f-gruv-go" onClick={() => void start(c)}>
-                              <ArrowSquareOut size={13} aria-hidden="true" /> Abrir
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            {c.moved && (
-                              <button type="button" className="btn sm ghost" onClick={() => void resetCol(c)} title="Volver a la columna del estado de Gruv">
-                                Como en Gruv
-                              </button>
-                            )}
-                            {c.manual && (
-                              <button
-                                type="button"
-                                className="icon-btn"
-                                aria-label={`Quitar ${c.id} del tablero`}
-                                title="Quitar del tablero"
-                                onClick={async () => apply(await run(`rm:${c.id}`, () => ui.invoke('feat:gruv:removeManual', c.id)))}
-                              >
-                                <Trash size={13} aria-hidden="true" />
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              className="btn sm f-gruv-go"
-                              disabled={Boolean(busy)}
-                              onClick={() => void start(c)}
-                              title={`Crea el espacio ${c.id} y arranca Claude con /ticket ${c.id}`}
-                            >
-                              {busy === `start:${c.id}` ? (
-                                <CircleNotch size={13} weight="bold" className="spin" aria-hidden="true" />
-                              ) : (
-                                <Play size={13} weight="fill" aria-hidden="true" />
-                              )}
-                              Empezar
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </li>
-                  ))}
-                  {list.length === 0 && (
-                    <li className="f-gruv-empty" aria-hidden="true">
-                      {col.key === DOING ? 'Soltá una tarjeta acá para crear su espacio' : 'Sin tickets'}
-                    </li>
+                      {e.nombre}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="f-gruv-filter-row">
+                <label className="f-gruv-prio-field">
+                  Prioridad
+                  <select value={prio} onChange={(e) => setPrio(e.target.value)}>
+                    <option value="todas">Todas</option>
+                    {prioOpts.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <span className="f-gruv-grow" />
+                {filtersOn && (
+                  <button
+                    type="button"
+                    className="f-gruv-link"
+                    onClick={() => {
+                      setQ('')
+                      setStSel([])
+                      setPrio('todas')
+                    }}
+                  >
+                    Limpiar filtros
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="f-gruv-countbar">
+              <span role="status">{snap ? countLabel : ''}</span>
+            </div>
+
+            <div aria-busy={running} className="f-gruv-body">
+              {bodyLoading && (
+                <div role="status" className="f-gruv-skel">
+                  <div />
+                  <div />
+                  <div />
+                  <div />
+                  <span>Cargando tickets de Gruv…</span>
+                </div>
+              )}
+
+              {!bodyLoading && snap && tickets.length === 0 && (
+                <div className="f-gruv-empty">
+                  {snap.lastError ? (
+                    <>
+                      <span className="f-gruv-empty-title">No pudimos cargar los tickets.</span>
+                      <button type="button" className="btn sm primary" onClick={() => void refresh()} disabled={running}>
+                        Reintentar
+                      </button>
+                    </>
+                  ) : snap.fetchedAt ? (
+                    <span className="f-gruv-empty-title">No hay tickets activos en Gruv.</span>
+                  ) : (
+                    <>
+                      <span className="f-gruv-empty-title">Todavía no se consultó Gruv.</span>
+                      <span className="f-gruv-muted">Actualizá para traer tus tickets y los del equipo.</span>
+                      <button type="button" className="btn sm primary" onClick={askRefresh} disabled={running}>
+                        Actualizar
+                      </button>
+                    </>
                   )}
+                </div>
+              )}
+
+              {showRows && (
+                <ul className="f-gruv-rows">
+                  {visible.map((t) => {
+                    const ws = wsOf(t.id)
+                    const sel = current?.id === t.id
+                    const mine = isMineT(t)
+                    const st = ws ? spaceStatus(ws.id, ui.agents, ui.permissions) : null
+                    return (
+                      <li key={t.id}>
+                        <button
+                          type="button"
+                          className={`f-gruv-row ${sel ? 'sel' : ''}`}
+                          aria-current={sel ? 'true' : undefined}
+                          onClick={() => setSelId(t.id)}
+                        >
+                          <span className="f-gruv-row-top">
+                            <span className="f-gruv-code mono">{t.id}</span>
+                            {ws && st && (
+                              <span className={`chip f-gruv-space ${SPACE_CHIP[st]}`}>
+                                <TicketIcon size={11} />
+                                <span className="f-gruv-ellipsis">
+                                  {ws.name} · {SPACE_LABEL[st]}
+                                </span>
+                              </span>
+                            )}
+                          </span>
+                          <span className="f-gruv-row-title">{t.titulo}</span>
+                          <span className="f-gruv-row-meta">
+                            <span className={`chip ${estadoChip(t.estado)}`}>{estadoName(t.estado)}</span>
+                            {t.prioridad && (
+                              <span className="f-gruv-prio" style={{ color: prioTone(t.prioridad) }}>
+                                <PrioGlyph p={t.prioridad} />
+                                {t.prioridad}
+                              </span>
+                            )}
+                            {t.responsable ? (
+                              <span className="f-gruv-who">
+                                <span className="f-gruv-av sm" aria-hidden="true" data-mine={mine ? 'true' : undefined}>
+                                  {initials(t.responsable)}
+                                </span>
+                                {mine ? 'Vos' : t.responsable}
+                              </span>
+                            ) : (
+                              <span className="f-gruv-muted">Sin asignar</span>
+                            )}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ul>
-              </section>
-            )
-          })}
+              )}
+
+              {!bodyLoading && snap && tickets.length > 0 && visible.length === 0 && (
+                <div className="f-gruv-empty">
+                  <span className="f-gruv-empty-title">Ningún ticket coincide con los filtros.</span>
+                  <span className="f-gruv-muted">Probá con otra palabra o sacá algún filtro.</span>
+                  <button
+                    type="button"
+                    className="btn sm"
+                    onClick={() => {
+                      setQ('')
+                      setStSel([])
+                      setPrio('todas')
+                    }}
+                  >
+                    Limpiar filtros
+                  </button>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* DETALLE */}
+          <section className="f-gruv-panel f-gruv-det" aria-labelledby="f-gruv-det-t">
+            {!current ? (
+              <p className="f-gruv-muted">{snap ? 'Elegí un ticket de la lista.' : 'Cargando…'}</p>
+            ) : (
+              <Detail
+                t={current}
+                ws={wsOf(current.id)}
+                mine={isMineT(current)}
+                meName={me?.nombre}
+                estados={estados}
+                estadoName={estadoName}
+                busy={busy === `start:${current.id}`}
+                disabledAll={Boolean(busy)}
+                tplName={tpls.find((x) => usesTicket(x) && /gruv/i.test(x.name))?.name ?? tpls.find(usesTicket)?.name}
+                onStart={() => void start(current)}
+                onOpenSpace={openSpace}
+              />
+            )}
+          </section>
         </div>
-        <footer className="f-gruv-foot hint">
-          Arrastrá a «En curso» (o tocá «Empezar») para crear el espacio con <span className="mono">/ticket</span>. Moverlas
-          acá no cambia nada en Gruv. Con el teclado: Alt+← / Alt+→ sobre una tarjeta.
-        </footer>
+      </main>
+
+      <div className="f-gruv-foot">
+        Solo se lee Gruv. Estado, asignación, comentarios y horas se cambian desde Gruv.
       </div>
     </div>
   )
 }
 
-function prioClass(p: string): string {
-  const s = p.toLowerCase()
-  if (/crit|urg|bloq/.test(s)) return 'crit'
-  if (/alta|high/.test(s)) return 'high'
-  if (/baja|low/.test(s)) return 'low'
-  return 'mid'
-}
-
-function AddManual({ onDone, onError }: { onDone: (s: unknown) => void; onError: (m: string) => void }): React.JSX.Element {
-  const ui = useUi()
-  const [id, setId] = useState('')
-  const [titulo, setTitulo] = useState('')
-  const [proyecto, setProyecto] = useState('')
-  const valid = /^[A-Za-z][A-Za-z0-9]*-\d{1,7}$/.test(id.trim()) && titulo.trim().length > 0
-  return (
-    <form
-      className="f-gruv-bar f-gruv-add"
-      onSubmit={async (e) => {
-        e.preventDefault()
-        try {
-          onDone(await ui.invoke('feat:gruv:addManual', { id: id.trim(), titulo, proyecto: proyecto || undefined }))
-        } catch (er) {
-          onError(cleanError(er))
-        }
-      }}
-    >
-      <label className="f-gruv-field">
-        <span>Ticket</span>
-        <input className="mono" autoFocus value={id} placeholder="TCK-1234" maxLength={20} onChange={(e) => setId(e.target.value.toUpperCase())} />
-      </label>
-      <label className="f-gruv-field grow">
-        <span>Título</span>
-        <input value={titulo} maxLength={300} onChange={(e) => setTitulo(e.target.value)} />
-      </label>
-      <label className="f-gruv-field">
-        <span>Proyecto (opcional)</span>
-        <input value={proyecto} maxLength={80} onChange={(e) => setProyecto(e.target.value)} />
-      </label>
-      <button type="submit" className="btn sm primary" disabled={!valid}>
-        <Plus size={14} aria-hidden="true" /> Agregar
-      </button>
-    </form>
-  )
-}
-
-function Settings(props: {
-  snap: Snapshot
-  queryAcc: string
-  setQueryAcc: (id: string) => void
-  projects: string[]
-  apply: (s: unknown) => void
-  onError: (m: string) => void
+function Detail(props: {
+  t: Ticket
+  ws?: Workspace
+  mine: boolean
+  meName?: string
+  estados: GruvEstado[]
+  estadoName: (k?: string) => string
+  busy: boolean
+  disabledAll: boolean
+  tplName?: string
+  onStart: () => void
+  onOpenSpace: (ws: Workspace) => void
 }): React.JSX.Element {
   const ui = useUi()
-  const { snap, apply, onError } = props
-  const [assignee, setAssignee] = useState(snap.config.assigneeId)
-  const save = async (patch: Record<string, unknown>): Promise<void> => {
-    try {
-      apply(await ui.invoke('feat:gruv:setConfig', patch))
-    } catch (e) {
-      onError(cleanError(e))
-    }
-  }
-  const pick = async (): Promise<string | null> => api.pickFolder()
-  return (
-    <div className="f-gruv-settings">
-      <div className="f-gruv-set-row">
-        <label className="f-gruv-field">
-          <span>Cuenta para consultar Gruv</span>
-          <select
-            value={props.queryAcc}
-            onChange={(e) => {
-              props.setQueryAcc(e.target.value)
-              void save({ queryAccountId: e.target.value })
-            }}
-          >
-            <option value="">Elegí una cuenta…</option>
-            {ui.accounts.map((a) => (
-              <option key={a.id} value={a.id} disabled={!ui.statuses[a.id]?.loggedIn}>
-                {a.label}
-                {ui.statuses[a.id]?.loggedIn ? '' : ' (sin sesión)'}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="f-gruv-field">
-          <span>Modelo de la consulta</span>
-          <select value={snap.config.model} onChange={(e) => void save({ model: e.target.value })}>
-            <option value="haiku">Haiku (más barato)</option>
-            <option value="sonnet">Sonnet</option>
-            <option value="opus">Opus</option>
-          </select>
-        </label>
-        <label className="f-gruv-field grow">
-          <span>Tu id de persona en Gruv</span>
-          <input
-            className="mono"
-            value={assignee}
-            maxLength={80}
-            onChange={(e) => setAssignee(e.target.value)}
-            onBlur={() => assignee !== snap.config.assigneeId && void save({ assigneeId: assignee })}
-          />
-        </label>
-      </div>
-      <p className="hint">
-        Gruv es un conector de claude.ai: la cuenta elegida tiene que tenerlo conectado. La consulta solo puede usar
-        herramientas de lectura de Gruv.
-      </p>
-      <div className="f-gruv-set-row">
-        <RepoField
-          label="Repo por defecto"
-          value={snap.config.defaultRepo}
-          placeholder={snap.lastRepo ? `Último usado: ${shortPath(snap.lastRepo)}` : 'Elegí la carpeta del repo'}
-          onPick={async () => {
-            const p = await pick()
-            if (p) await save({ defaultRepo: p })
-          }}
-          onClear={() => void save({ defaultRepo: '' })}
-        />
-        {props.projects.map((p) => (
-          <RepoField
-            key={p}
-            label={`Repo de ${p}`}
-            value={snap.config.projectRepos[p]}
-            placeholder="Usa el repo por defecto"
-            onPick={async () => {
-              const d = await pick()
-              if (d) await save({ projectRepo: { project: p, repo: d } })
-            }}
-            onClear={() => void save({ projectRepo: { project: p, repo: '' } })}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
+  const { t, ws, mine, estados } = props
+  const st = ws ? spaceStatus(ws.id, ui.agents, ui.permissions) : null
+  const resp = t.responsable
+  const avBg = mine ? 'var(--accent-soft)' : resp ? 'var(--team-soft)' : 'var(--hover)'
+  const avFg = mine ? 'var(--accent)' : resp ? 'var(--team-fg)' : 'var(--fg-muted)'
+  const wsAcc = ws ? ui.accounts.findIndex((a) => a.id === ws.accountId) : -1
+  const crit = t.criterios ?? []
+  const done = crit.filter((c) => c.hecho).length
+  const selectOpts = estados.some((e) => e.clave === t.estado) || !t.estado
+    ? estados
+    : [...estados, { clave: t.estado, nombre: props.estadoName(t.estado) }]
 
-function RepoField(p: {
-  label: string
-  value?: string
-  placeholder: string
-  onPick: () => void
-  onClear: () => void
-}): React.JSX.Element {
   return (
-    <div className="f-gruv-field f-gruv-repo">
-      <span>{p.label}</span>
-      <div className="f-gruv-repo-row">
-        <span className={`mono f-gruv-path ${p.value ? '' : 'f-gruv-path-empty'}`} title={p.value}>
-          {p.value ? shortPath(p.value) : p.placeholder}
+    <>
+      <div className="f-gruv-det-head">
+        <span className="f-gruv-code mono f-gruv-code-lg">{t.id}</span>
+        <h2 id="f-gruv-det-t" className="f-gruv-det-title">
+          {t.titulo}
+        </h2>
+        <div className="f-gruv-fields">
+          <div className="f-gruv-field">
+            <label htmlFor="f-gruv-estado">Estado</label>
+            <select id="f-gruv-estado" value={t.estado ?? ''} disabled aria-describedby="f-gruv-w-estado">
+              {!t.estado && <option value="">Sin estado</option>}
+              {selectOpts.map((e) => (
+                <option key={e.clave} value={e.clave}>
+                  {e.nombre}
+                </option>
+              ))}
+            </select>
+            <span id="f-gruv-w-estado" className="f-gruv-why">
+              {WHERE}
+            </span>
+          </div>
+          <div className="f-gruv-field">
+            <span className="f-gruv-lbl">Prioridad</span>
+            <span className="f-gruv-prio-val" style={{ color: prioTone(t.prioridad) }}>
+              <PrioGlyph p={t.prioridad} size={13} />
+              {t.prioridad ?? 'Sin prioridad'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="f-gruv-assign">
+        <span className="f-gruv-av lg" style={{ background: avBg, color: avFg }} aria-hidden="true">
+          {resp ? initials(resp) : '?'}
         </span>
-        <button type="button" className="btn sm" onClick={p.onPick}>
-          <FolderOpen size={13} aria-hidden="true" /> Elegir
-        </button>
-        {p.value && (
-          <button type="button" className="icon-btn" aria-label={`Quitar ${p.label.toLowerCase()}`} onClick={p.onClear}>
-            <X size={13} aria-hidden="true" />
+        <div className="f-gruv-assign-text">
+          <div className="f-gruv-muted">Asignado a</div>
+          <div className="f-gruv-strong">{resp ? (mine ? `${resp} (vos)` : resp) : 'Sin asignar'}</div>
+        </div>
+        {!resp && (
+          <>
+            <button type="button" className="btn sm" disabled aria-describedby="f-gruv-w-take">
+              Tomarlo
+            </button>
+            <span id="f-gruv-w-take" className="f-gruv-why">
+              {WHERE}
+            </span>
+          </>
+        )}
+        {mine && (
+          <>
+            <button type="button" className="btn sm" disabled aria-describedby="f-gruv-w-drop">
+              Soltar
+            </button>
+            <span id="f-gruv-w-drop" className="f-gruv-why">
+              {WHERE}
+            </span>
+          </>
+        )}
+        {resp && !mine && <span className="f-gruv-muted">Lo tiene {resp}</span>}
+      </div>
+
+      <div className="f-gruv-actions">
+        {ws && st ? (
+          <>
+            <span className={`chip ${SPACE_CHIP[st]} f-gruv-space-lg`}>
+              <span className="f-gruv-ellipsis">
+                {ws.name} · {SPACE_LABEL[st]}
+              </span>
+            </span>
+            <button type="button" className="btn primary" onClick={() => props.onOpenSpace(ws)}>
+              Abrir espacio
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="btn primary" onClick={props.onStart} disabled={props.busy || props.disabledAll}>
+              {props.busy ? 'Creando…' : 'Empezar en Sloth'}
+            </button>
+            <span className="f-gruv-why-block">
+              {props.tplName
+                ? `Crea un espacio con la plantilla «${props.tplName}».`
+                : `Crea el espacio ${t.id} y arranca Claude con /ticket ${t.id}.`}
+            </span>
+          </>
+        )}
+        {t.url ? (
+          <a className="btn" href={t.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${t.id} en Gruv`}>
+            <ExternalGlyph />
+            Abrir en Gruv
+          </a>
+        ) : (
+          <button type="button" className="btn" disabled title="Gruv no dio el link de este ticket">
+            <ExternalGlyph />
+            Abrir en Gruv
           </button>
         )}
+        {ws && wsAcc >= 0 && (
+          <span className="f-gruv-acc">
+            <span className="f-gruv-dot" style={{ background: resolveAccountColor(ws.accountId, wsAcc) }} aria-hidden="true" />
+            {ui.accounts[wsAcc].label}
+          </span>
+        )}
       </div>
-    </div>
+
+      <section className="f-gruv-sec" aria-labelledby="f-gruv-d-t">
+        <h3 id="f-gruv-d-t">Descripción</h3>
+        <p className="f-gruv-desc">{t.descripcion ?? 'Gruv no trajo la descripción de este ticket.'}</p>
+      </section>
+
+      {crit.length > 0 && (
+        <section className="f-gruv-sec" aria-labelledby="f-gruv-c-t">
+          <div className="f-gruv-sec-head">
+            <h3 id="f-gruv-c-t">Criterios de aceptación</h3>
+            <span className="f-gruv-strong">
+              {done} de {crit.length}
+            </span>
+          </div>
+          <div className="f-gruv-progress" role="progressbar" aria-label="Criterios cumplidos" aria-valuemin={0} aria-valuemax={crit.length} aria-valuenow={done}>
+            <span style={{ width: `${Math.round((done / crit.length) * 100)}%` }} />
+          </div>
+          <ul className="f-gruv-crit">
+            {crit.map((c, i) => (
+              <li key={i}>
+                <label>
+                  <input type="checkbox" checked={c.hecho} disabled aria-describedby="f-gruv-w-crit" />
+                  <span>{c.texto}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <span id="f-gruv-w-crit" className="f-gruv-why">
+            {WHERE}
+          </span>
+        </section>
+      )}
+
+      <section className="f-gruv-sec" aria-labelledby="f-gruv-co-t">
+        <h3 id="f-gruv-co-t">Comentarios</h3>
+        <div className="f-gruv-inline">
+          <input className="f-gruv-input" disabled placeholder="Escribí un comentario" aria-label={`Comentar en ${t.id}`} aria-describedby="f-gruv-w-com" />
+          <button type="button" className="btn" disabled>
+            Publicar
+          </button>
+        </div>
+        <div className="f-gruv-inline-foot">
+          <span id="f-gruv-w-com" className="f-gruv-why">
+            {WHERE}
+          </span>
+          {t.url ? (
+            <a className="f-gruv-link" href={t.url} target="_blank" rel="noreferrer">
+              Abrir en Gruv
+            </a>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="f-gruv-sec" aria-labelledby="f-gruv-h-t">
+        <h3 id="f-gruv-h-t">Horas</h3>
+        <div className="f-gruv-inline">
+          <input
+            className="f-gruv-input narrow"
+            disabled
+            inputMode="decimal"
+            placeholder="Ej.: 2 o 1,5"
+            aria-label={`Horas a sumar en ${t.id}`}
+            aria-describedby="f-gruv-w-hr"
+          />
+          <button type="button" className="btn" disabled>
+            Sumar horas
+          </button>
+        </div>
+        <span id="f-gruv-w-hr" className="f-gruv-why">
+          {WHERE}
+        </span>
+      </section>
+    </>
   )
 }
