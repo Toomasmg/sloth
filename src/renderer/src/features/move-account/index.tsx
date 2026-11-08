@@ -67,6 +67,8 @@ function PaneHeader({ paneId }: { paneId: string }): React.JSX.Element | null {
 
 type Phase = 'form' | 'moving' | 'done'
 
+type MoveRes = { ok: true; resumed: boolean; summary: boolean } | { ok: false; copyFailed: true; message: string }
+
 function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
   const ui = useUi()
   const ws = ui.workspaces.find((w) => w.id === wsId)
@@ -79,7 +81,10 @@ function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
   const [choice, setChoice] = useState<string | null>(null)
   const [phase, setPhase] = useState<Phase>('form')
   const [err, setErr] = useState<string | null>(null)
-  const [keep, setKeep] = useState(true)
+  const [keep, setKeep] = useState(false)
+  /** Tras un fallo al copiar la conversación: se ofrece seguir sin ella. */
+  const [copyFailed, setCopyFailed] = useState(false)
+  const [resumed, setResumed] = useState(false)
   /** null mientras se arma el resumen inicial desde el estado real del espacio. */
   const [summary, setSummary] = useState<string | null>(null)
   const [waiting, setWaiting] = useState(false)
@@ -150,8 +155,7 @@ function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
     closeMove()
   }
 
-  const confirm = async (e: React.FormEvent): Promise<void> => {
-    e.preventDefault()
+  const move = async (keepConv: boolean): Promise<void> => {
     if (busyRef.current || phase !== 'form') return
     if (!choice) {
       setErr('Elegí una cuenta destino para mover el espacio.')
@@ -166,9 +170,17 @@ function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
     busyRef.current = true
     setPhase('moving')
     setErr(null)
+    setCopyFailed(false)
     try {
       const text = keep && summary ? summary.trim() : ''
-      await ui.invoke('feat:move-account:move', wsId, choice, text ? text : null)
+      const r = await ui.invoke<MoveRes>('feat:move-account:move', wsId, choice, text ? text : null, keepConv)
+      if (!r.ok) {
+        setErr(r.message)
+        setCopyFailed(true)
+        setPhase('form')
+        return
+      }
+      setResumed(r.resumed)
       setPhase('done')
     } catch (e2) {
       setErr(cleanError(e2))
@@ -176,6 +188,11 @@ function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
     } finally {
       busyRef.current = false
     }
+  }
+
+  const confirm = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault()
+    await move(true)
   }
 
   const wait = (): void => {
@@ -271,7 +288,7 @@ function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
             <section aria-labelledby="f-move-que" className="f-move-section">
               <h3 id="f-move-que">Qué pasa</h3>
               <p className="f-move-box">
-                La terminal se reinicia con la otra cuenta. La conversación de Claude no se pasa: Claude empieza de cero en la misma carpeta. Tus archivos no cambian.
+                La terminal se reinicia con la otra cuenta y Claude sigue la misma conversación. Tus archivos no cambian.
               </p>
             </section>
 
@@ -279,7 +296,7 @@ function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
               <label className="f-move-box f-move-keep">
                 <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
                 <span className="f-move-keep-text">
-                  <span className="f-move-keep-title">Dejarle a Claude un resumen de lo que estaba haciendo</span>
+                  <span className="f-move-keep-title">Además, dejarle a Claude un resumen de lo que estaba haciendo</span>
                   <span className="hint">Claude lo lee al arrancar en la cuenta nueva.</span>
                 </span>
               </label>
@@ -328,6 +345,14 @@ function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
                 {err}
               </p>
             )}
+            {copyFailed && (
+              <div role="alert" className="f-move-banner warn">
+                <span className="f-move-banner-text">Podés seguir sin la conversación: Claude arranca de cero en la cuenta nueva (con el resumen, si lo dejaste).</span>
+                <button type="button" className="btn sm" onClick={() => void move(false)}>
+                  Seguir sin conversación
+                </button>
+              </div>
+            )}
 
             <footer className="f-move-actions">
               <button type="button" className="btn ghost" onClick={closeMove} ref={cancelRef}>
@@ -361,7 +386,11 @@ function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
               </span>
               <div>
                 <div className="f-move-banner-title">«{ws.name}» ya está en {destLabel}</div>
-                <p className="f-move-p">La terminal arrancó de nuevo con la otra cuenta. Claude empieza de cero en {ws.cwd}.</p>
+                <p className="f-move-p">
+                  {resumed
+                    ? 'La terminal arrancó de nuevo con la otra cuenta y Claude sigue la misma conversación.'
+                    : `La terminal arrancó de nuevo con la otra cuenta. Claude empieza de cero en ${ws.cwd}.`}
+                </p>
                 {keep && summary && <p className="hint f-move-p">Le dejamos el resumen para que lo lea al arrancar.</p>}
               </div>
             </div>
