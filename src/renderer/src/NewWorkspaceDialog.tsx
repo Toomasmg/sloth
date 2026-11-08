@@ -22,7 +22,7 @@ interface Props {
 }
 
 /** Lo que main acepta de un espacio nuevo (color y rama base se suman en la integración). */
-type NewInput = NewWorkspaceInput & { color?: string; baseBranch?: string }
+type NewInput = NewWorkspaceInput
 
 interface FolderInfo {
   path: string

@@ -11,6 +11,7 @@ import { installInto, stateForEvent, writeHookScript, type HookEventPayload } fr
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
 import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
 import { createWorktree } from './git'
+import { TEMPLATE_COLOR_KEYS, validBranch } from '../shared/templates-shared'
 import { baseSettingsFor, syncSharedSetup, unshareSetup } from './setup'
 import { UsageScanner } from './usage'
 import { FEATURES } from './features'
@@ -334,7 +335,11 @@ app.whenReady().then(async () => {
     const initialPrompt = input.initialPrompt?.trim() || undefined
     if (initialPrompt && initialPrompt.length > 4000) throw new Error('El prompt inicial es demasiado largo.')
     const branch = input.branch?.trim() || undefined
-    const cwd = branch ? await createWorktree(repoPath, branch) : repoPath
+    const baseBranch = input.baseBranch?.trim() || undefined
+    if (baseBranch && !validBranch(baseBranch)) throw new Error('La rama base no es un nombre válido.')
+    const color = input.color === undefined || input.color === null || input.color === '' ? undefined : String(input.color)
+    if (color !== undefined && !(TEMPLATE_COLOR_KEYS as readonly string[]).includes(color)) throw new Error('El color del espacio no es válido.')
+    const cwd = branch ? await createWorktree(repoPath, branch, baseBranch) : repoPath
     const ws: Workspace = {
       id: randomUUID(),
       name,
@@ -346,7 +351,8 @@ app.whenReady().then(async () => {
       createdAt: Date.now(),
       initialPrompt,
       resume: input.resume !== false,
-      ticket
+      ticket,
+      ...(color ? { color } : {})
     }
     store.addWorkspace(ws)
     return ws
