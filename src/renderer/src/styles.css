@@ -1426,3 +1426,10 @@ html[data-lite='true'] .spin {
 [tabindex="-1"]:focus-visible {
   outline: none;
 }
+
+/* Los campos dentro de buscadores toman el fondo del buscador (en claro se veía un recuadro blanco adentro). */
+.pal-input,
+.sl-filter input {
+  background: transparent !important;
+  box-shadow: none !important;
+}
