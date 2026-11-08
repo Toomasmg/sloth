@@ -1,0 +1,76 @@
+/* Páginas a pantalla completa (PageShell): Historial, Ayuda y Reportar. */
+
+.page-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  animation: fade var(--t-fast) var(--ease);
+}
+
+.page-head {
+  flex: none;
+  min-height: 48px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 6px 16px;
+  background: var(--surface);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
+.page-back {
+  height: 30px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--fg-2);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.page-back:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+.page-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--line-2);
+}
+
+.page-name {
+  font-weight: 600;
+}
+
+.page-grow {
+  flex: 1;
+}
+
+.page-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.page-shell button:focus-visible,
+.page-shell a:focus-visible,
+.page-shell input:focus-visible,
+.page-shell textarea:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-shell {
+    animation: none;
+  }
+}
