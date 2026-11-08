@@ -9,9 +9,9 @@ export const useSave = (): SaveFn => useContext(SaveContext)
 export const errText = (e: unknown): string => String((e as Error)?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
 
 /** Título de grupo + tarjeta con filas (el lenguaje visual del diseño de Configuración). */
-export function Group({ title, children, id }: { title?: string; children: ReactNode; id: string }): React.JSX.Element {
+export function Group({ title, children, id, label }: { title?: string; children: ReactNode; id: string; label?: string }): React.JSX.Element {
   return (
-    <section className="f-set-group" aria-labelledby={title ? `${id}-h` : undefined} aria-label={title ? undefined : id}>
+    <section className="f-set-group" aria-labelledby={title ? `${id}-h` : undefined} aria-label={title ? undefined : (label ?? id)}>
       {title && (
         <h2 id={`${id}-h`} className="f-set-group-h">
           {title}

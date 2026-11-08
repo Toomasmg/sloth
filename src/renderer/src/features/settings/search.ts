@@ -15,7 +15,7 @@ export interface NavItem {
 }
 
 export const NAV: readonly NavItem[] = [
-  { id: 'general', name: 'General', sub: 'Cómo arranca Sloth, qué editor usa y dónde están tus proyectos.', color: '#a6abb8', icon: 'Settings' },
+  { id: 'general', name: 'General', sub: 'Cómo arranca Sloth y qué editor usa.', color: '#a6abb8', icon: 'Settings' },
   { id: 'cuentas', name: 'Cuentas', sub: 'Cada cuenta de Claude tiene su propia sesión.', color: '#8ab4ff', icon: 'Account' },
   { id: 'apariencia', name: 'Apariencia', sub: 'Tema, color de acento y tamaño del texto.', color: '#b59cff', icon: 'Theme' },
   { id: 'terminal', name: 'Terminal', sub: 'Fuente, cursor y shell de cada espacio.', color: '#5fd4a6', icon: 'Editor' },
