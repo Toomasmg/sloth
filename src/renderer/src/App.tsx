@@ -18,6 +18,7 @@ import { UiContext, type NewWorkspacePreset, type PaneGuard, type UiCtx } from '
 import { resolveAccountColor, useSettings } from './features/settings/store'
 import { openChat, useChatAttach, useChatSnapshot } from './features/chat/store'
 import { openSettings } from './features/settings/bus'
+import { openHelp } from './features/help/bus'
 import { colorHex } from './features/templates/catalog'
 import { bindingOf, comboLabel, isCapturingShortcut, matchShortcut } from './shortcuts'
 import type { ShortcutId } from '../../main/features/settings-model'
@@ -582,7 +583,8 @@ export function App(): React.JSX.Element {
     newWs: () => {},
     rename: (): boolean => false,
     layout: (_m: ViewMode) => {},
-    chat: () => {}
+    chat: () => {},
+    broadcastNow: () => {}
   })
   winKeys.current = {
     side: toggleSide,
@@ -594,7 +596,11 @@ export function App(): React.JSX.Element {
       return true
     },
     layout: (m) => pickLayout(m),
-    chat: () => openChat()
+    chat: () => openChat(),
+    broadcastNow: () => {
+      runFeatureCommand('broadcast:open', uiCtx)
+      focusBroadcastText()
+    }
   }
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -603,7 +609,22 @@ export function App(): React.JSX.Element {
       const ae = document.activeElement
       const inTerm = !!ae?.closest('.terminal-host')
       const typing = !!ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || (ae as HTMLElement).isContentEditable)
-      if (matchShortcut('sidebar', e)) {
+      // Ctrl+1–4 van también desde la terminal (como Ctrl+Tab y Ctrl+Alt+flechas): no son teclas de la shell.
+      const focusN = FOCUS_IDS.findIndex((id) => matchShortcut(id, e))
+      if (focusN >= 0) {
+        e.preventDefault()
+        e.stopPropagation()
+        focusVisiblePane(focusN + 1)
+      } else if (matchShortcut('help', e)) {
+        // F1 es de la terminal cuando está enfocada (p. ej. vim o less): solo fuera de ella.
+        if (inTerm) return
+        e.preventDefault()
+        openHelp('ayuda')
+      } else if (matchShortcut('broadcastNow', e)) {
+        if (inTerm) return
+        e.preventDefault()
+        k.broadcastNow()
+      } else if (matchShortcut('sidebar', e)) {
         if (inTerm) return
         e.preventDefault()
         k.side()
@@ -1296,6 +1317,26 @@ function ArrowsInIcon(): React.JSX.Element {
 /** Fracciones del rectángulo como variables CSS (las usa layout/layout.css). */
 function rectVars(r: Rect | undefined): Record<string, number> {
   return r ? { '--x': r.x, '--y': r.y, '--w': r.w, '--h': r.h } : {}
+}
+
+const FOCUS_IDS: readonly ShortcutId[] = ['focus1', 'focus2', 'focus3', 'focus4']
+
+/**
+ * Enfoca la terminal del panel visible N (1–4), leyendo de izquierda a derecha y de arriba abajo.
+ * Si no hay tantos paneles visibles, no hace nada.
+ */
+function focusVisiblePane(n: number): void {
+  const panes = [...document.querySelectorAll<HTMLElement>('.panes .pane[data-pane-id]:not(.hidden)')]
+    .map((el) => ({ el, r: el.getBoundingClientRect() }))
+    .sort((a, b) => (Math.abs(a.r.top - b.r.top) > 8 ? a.r.top - b.r.top : a.r.left - b.r.left))
+  panes[n - 1]?.el.querySelector<HTMLElement>('.xterm-helper-textarea')?.focus()
+}
+
+/** Enfoca el mensaje de «Enviar a varios espacios»; el diálogo se carga recién al abrirlo, así que reintenta. */
+function focusBroadcastText(tries = 30): void {
+  const ta = document.getElementById('f-broadcast-text')
+  if (ta) ta.focus()
+  else if (tries > 0) requestAnimationFrame(() => focusBroadcastText(tries - 1))
 }
 
 /** Enfoca la terminal de un panel; si recién se muestra, reintenta un par de cuadros. */

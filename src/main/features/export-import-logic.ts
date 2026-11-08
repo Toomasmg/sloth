@@ -472,6 +472,8 @@ export interface ImportPlan {
   espacios: PlanSpace[]
   plantillas: { nuevas: string[]; existentes: string[]; salteadas: { name: string; reason: string }[] }
   apariencia: boolean
+  /** Los valores de Apariencia del archivo (tema, acento, densidad, tamaño, modo liviano), para mostrarlos. Sin grupo = null. */
+  aparienciaValores: ExportedAppearance | null
   atajos: number
   equipo: string | null
   permisos: PlanPermiso[]
@@ -546,6 +548,7 @@ export function buildPlan(
     espacios,
     plantillas: { nuevas, existentes, salteadas },
     apariencia: !!parsed.apariencia && Object.keys(parsed.apariencia).length > 0,
+    aparienciaValores: parsed.apariencia && Object.keys(parsed.apariencia).length > 0 ? { ...parsed.apariencia } : null,
     atajos: parsed.atajos ? Object.keys(parsed.atajos).length : 0,
     equipo: parsed.equipo ?? null,
     permisos,

@@ -24,6 +24,14 @@ import { writeJsonAtomic } from './tray-settings'
  */
 
 const OWNER_KEY = 'sloth:owner'
+/** Tiempo máximo de la prueba de conexión. */
+const TEST_TIMEOUT_MS = 8000
+
+/** Resultado de «Probar conexión»: ok solo si el servidor acepta la clave y hay sesión de GitHub. */
+export interface ChatTestResult {
+  ok: boolean
+  message: string
+}
 
 /** Cierre al salir de la app (lo arma register). */
 let teardown: (() => void) | undefined
@@ -364,6 +372,37 @@ const feature: Feature = {
       return view()
     })
 
+    /**
+     * Prueba real: una consulta mínima (GET /auth/v1/health con la anon / publishable key guardada).
+     * Nunca usa ni devuelve la service_role; redirect:'error' evita mandar la key a otro host.
+     */
+    async function testConnection(): Promise<ChatTestResult> {
+      refresh()
+      if (!active) return { ok: false, message: 'Primero guardá la URL y la clave publicable del proyecto.' }
+      const { supabaseUrl, anonKey } = active.cfg
+      const host = new URL(supabaseUrl).host
+      let res: Response
+      try {
+        res = await fetch(`${supabaseUrl}/auth/v1/health`, {
+          headers: { apikey: anonKey },
+          redirect: 'error',
+          signal: AbortSignal.timeout(TEST_TIMEOUT_MS)
+        })
+      } catch (e) {
+        const name = e instanceof Error ? e.name : ''
+        if (name === 'TimeoutError' || name === 'AbortError') return { ok: false, message: 'Supabase no respondió en 8 segundos. Revisá la conexión a internet.' }
+        return { ok: false, message: `Sin conexión: no se pudo llegar a ${host}. Revisá la red o la URL.` }
+      }
+      if (res.status === 401 || res.status === 403) return { ok: false, message: 'Supabase rechazó la clave. Revisá que sea la anon / publishable key del proyecto.' }
+      if (res.status === 404) return { ok: false, message: `${host} no responde como un proyecto de Supabase. Revisá la URL.` }
+      if (!res.ok) return { ok: false, message: `Supabase respondió con un error (código ${res.status}). Probá de nuevo en un rato.` }
+      if (auth.status !== 'signedIn') {
+        return { ok: false, message: `Conexión correcta con ${host}, pero falta la sesión de GitHub. Conectala para usar el chat.` }
+      }
+      return { ok: true, message: `Conexión correcta con ${host} · sesión de ${auth.me.login}.` }
+    }
+
+    ctx.handle('test', (): Promise<ChatTestResult> => testConnection())
     ctx.handle('signIn', (): Promise<void> => signIn())
     ctx.handle('cancelSignIn', (): void => cancelSignIn())
     ctx.handle('signOut', (): Promise<void> => signOut())

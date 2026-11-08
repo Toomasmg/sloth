@@ -13,7 +13,7 @@ export type EditorChoice = 'VS Code' | 'Cursor' | 'Windsurf' | 'Bloc de notas'
 export type SoundName = 'Gota' | 'Campana suave' | 'Clic'
 export type UpdateChannel = 'estable' | 'beta'
 /** Atajos que se pueden cambiar (ids estables: los usa shortcuts.ts y el main los guarda tal cual). */
-export type ShortcutId = 'palette' | 'new' | 'sidebar' | 'broadcast' | 'layout' | 'settings' | 'chat' | 'history' | 'rename'
+export type ShortcutId = 'palette' | 'new' | 'sidebar' | 'broadcast' | 'layout' | 'settings' | 'chat' | 'history' | 'rename' | 'help' | 'focus1' | 'focus2' | 'focus3' | 'focus4' | 'broadcastNow'
 
 export interface TerminalSettings {
   fontSize: number
@@ -97,7 +97,7 @@ export const SHELLS: readonly ShellChoice[] = ['PowerShell 7', 'Windows PowerShe
 export const EDITORS: readonly EditorChoice[] = ['VS Code', 'Cursor', 'Windsurf', 'Bloc de notas']
 export const SOUND_NAMES: readonly SoundName[] = ['Gota', 'Campana suave', 'Clic']
 export const UPDATE_CHANNELS: readonly UpdateChannel[] = ['estable', 'beta']
-export const SHORTCUT_IDS: readonly ShortcutId[] = ['palette', 'new', 'sidebar', 'broadcast', 'layout', 'settings', 'chat', 'history', 'rename']
+export const SHORTCUT_IDS: readonly ShortcutId[] = ['palette', 'new', 'sidebar', 'broadcast', 'layout', 'settings', 'chat', 'history', 'rename', 'help', 'focus1', 'focus2', 'focus3', 'focus4', 'broadcastNow']
 
 export const UI_FONT = { min: 12, max: 16 } as const
 export const TERM_FONT = { min: 11, max: 18 } as const
