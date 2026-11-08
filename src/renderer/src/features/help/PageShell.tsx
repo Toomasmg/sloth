@@ -10,12 +10,17 @@ export function PageShell({
   title,
   onClose,
   right,
+  backLabel = '‹ Espacios',
+  className,
   children
 }: {
   labelId: string
   title: string
   onClose: () => void
   right?: ReactNode
+  /** Texto del botón para volver (por defecto «‹ Espacios»). */
+  backLabel?: ReactNode
+  className?: string
   children: ReactNode
 }): React.JSX.Element {
   const closeRef = useRef(onClose)
@@ -39,10 +44,10 @@ export function PageShell({
   }, [])
 
   return (
-    <div className="page-shell" role="dialog" aria-modal="true" aria-labelledby={labelId}>
+    <div className={`page-shell ${className ?? ''}`} role="dialog" aria-modal="true" aria-labelledby={labelId}>
       <header className="page-head">
         <button ref={backRef} type="button" className="page-back" onClick={() => closeRef.current()}>
-          ‹ Espacios
+          {backLabel}
         </button>
         <span className="page-sep" aria-hidden="true" />
         <span className="page-name" id={labelId}>
