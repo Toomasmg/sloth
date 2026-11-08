@@ -1,7 +1,22 @@
 /* Función «sound»: solo el botón «Probar» de Comportamiento. Clases con prefijo f-sound-. */
 .f-sound-test {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--btn-2);
+  color: var(--fg);
+  font: inherit;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 0 6px;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.f-sound-test:hover:not(:disabled) {
+  background: var(--hover);
+}
+.f-sound-test:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
