@@ -1,4 +1,4 @@
-/* Página «Reportar un problema» (ReportPage). Clases rp-*. */
+/* Página «Reportar un problema» (ReportPage). Clases rp-*. Medidas y colores según el artboard «Reportar». */
 
 .rp-wrap {
   max-width: 720px;
@@ -51,15 +51,45 @@
   margin: 0 0 0 4px;
 }
 
+/* Segmentado «Tipo»: 30 px, fondo hundido, activo en pizarra (claro: blanco). */
 .rp-types {
   align-self: flex-start;
+  max-width: 100%;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--input-bg);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 .rp-types > button {
+  height: 30px;
   min-width: 80px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg-2);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.rp-types > button:hover {
+  color: var(--fg);
+}
+.rp-types > button[aria-checked='true'] {
+  background: #3a4152;
+  color: #ffffff;
+}
+html[data-theme='light'] .rp-types > button[aria-checked='true'] {
+  background: #ffffff;
+  color: var(--fg);
+  box-shadow: 0 1px 2px rgba(16, 22, 34, 0.12);
 }
 
 .rp-card {
-  border-radius: var(--r-lg);
+  border-radius: 12px;
   background: var(--card);
   box-shadow: inset 0 0 0 1px var(--line);
 }
@@ -72,11 +102,28 @@
 .rp-que .field > label {
   font-weight: 500;
 }
+.rp-que .field > label,
+.rp-que .field > span {
+  color: var(--fg-2);
+  font-size: var(--fs-sm);
+}
+.rp-que .input {
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--input-bg);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+html[data-theme='light'] .rp-que .input {
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
 
 .rp-area {
   resize: vertical;
   line-height: 1.5;
-  padding: 8px 10px;
+  padding: 8px 10px !important;
+  height: auto !important;
   min-height: 60px;
 }
 
@@ -106,6 +153,27 @@
 .rp-step-in {
   flex: 1;
   min-width: 0;
+  height: 32px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+html[data-theme='light'] .rp-step-in {
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.rp-step-x {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg-2);
+  cursor: pointer;
+}
+.rp-step-x:hover {
+  background: var(--hover);
+  color: var(--fg);
 }
 .rp-steps-foot {
   display: flex;
@@ -114,8 +182,14 @@
   gap: 8px 12px;
   margin-top: 2px;
 }
+.rp-add {
+  height: 30px;
+  padding: 0 12px;
+  font-size: var(--fs-sm);
+  gap: 6px;
+}
 
-/* Adjuntos */
+/* Adjuntos: filas con separador interno, como en el artboard. */
 .rp-att {
   display: flex;
   flex-direction: column;
@@ -123,7 +197,33 @@
   padding: 13px 16px;
 }
 .rp-att + .rp-att {
-  border-top: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 var(--line);
+}
+.rp-att-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px 14px;
+}
+.rp-att-top > .rp-check {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.rp-view {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--btn-2);
+  color: var(--fg-2);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.rp-view:hover {
+  background: var(--surface-hover);
+  color: var(--fg);
 }
 .rp-check {
   width: 100%;
@@ -145,6 +245,10 @@
   flex-direction: column;
   gap: 2px;
 }
+.rp-check-text > .hint {
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+}
 .rp-box {
   width: 18px;
   height: 18px;
@@ -162,35 +266,50 @@
   box-shadow: none;
 }
 
+/* Vista previa (sistema y registros): bloque hundido, mono 12 px. */
 .rp-preview {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 10px 12px;
-  border-radius: var(--r-md);
-  background: var(--term-bg);
+  border-radius: 8px;
+  background: var(--bg);
   box-shadow: inset 0 0 0 1px var(--line);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   line-height: 1.6;
   color: var(--fg-2);
   max-height: 220px;
   overflow: auto;
 }
+.rp-preview > .hint {
+  font-size: 11px;
+  color: var(--fg-muted);
+  margin-bottom: 4px;
+}
 .rp-line {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  font-size: var(--fs-sm);
 }
 
 .rp-warn {
   margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   padding: 8px 10px;
-  border-radius: var(--r-md);
+  border-radius: 8px;
   background: var(--warn-soft);
   color: var(--warn-fg);
   font-size: var(--fs-sm);
   line-height: 1.5;
 }
+.rp-warn > svg {
+  flex: none;
+  margin-top: 2px;
+}
 
+/* Captura: marco 16:9 como el artboard (la imagen real ocupa el mismo lugar). */
 .rp-shot {
   margin: 0;
   display: flex;
@@ -200,8 +319,13 @@
 .rp-shot img {
   width: 100%;
   height: auto;
-  border-radius: var(--r-md);
+  border-radius: 8px;
+  background: #090a0e;
   box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.rp-shot figcaption {
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
 }
 
 .rp-send {
@@ -209,6 +333,9 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 14px;
+}
+.rp-send > .btn {
+  height: 32px;
 }
 .rp-send-hint {
   flex: 1 1 240px;
@@ -219,14 +346,14 @@
   color: var(--danger-fg);
 }
 
-/* Gracias */
+/* Gracias: tarjeta con padding 28 y radio 14, como el artboard. */
 .rp-thanks {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 14px;
   padding: 28px;
-  border-radius: var(--r-lg);
+  border-radius: 14px;
   background: var(--card);
   box-shadow: inset 0 0 0 1px var(--line);
 }
@@ -240,7 +367,7 @@
   height: 44px;
   display: grid;
   place-items: center;
-  border-radius: var(--r-md);
+  border-radius: 12px;
   background: var(--success-soft);
   color: var(--success-fg);
 }
@@ -249,4 +376,14 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 4px;
+}
+.rp-thanks-actions > .btn {
+  height: 34px;
+  padding: 0 14px;
+}
+.rp-thanks-actions > .btn.primary {
+  font-weight: 600;
+}
+.rp-shot-note {
+  font-size: var(--fs-sm);
 }
