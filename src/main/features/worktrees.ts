@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
+import { lstat } from 'node:fs/promises'
 import { basename } from 'node:path'
 import { shell } from 'electron'
 import type { Workspace } from '../../shared/types'
@@ -9,6 +10,7 @@ import {
   branchNameError,
   countDirty,
   countUnpushed,
+  folderSize,
   localBranches,
   reposOf,
   scanRepo,
@@ -29,6 +31,30 @@ let lastRepos: RepoScan[] = []
 let lastRows = new Map<string, { repo: RepoScan; row: BranchRow }>()
 let scanning: Promise<RepoView[]> | null = null
 let busy = false
+
+/**
+ * Tamaño en disco por carpeta. Se calcula en segundo plano después de listar, fila por fila (evento
+ * `feat:worktrees:size`). Caché de 10 min, invalidada si cambia el mtime de la carpeta raíz. Tope de 20 s por carpeta.
+ */
+const SIZE_TTL_MS = 10 * 60_000
+const SIZE_DEADLINE_MS = 20_000
+export interface SizeView {
+  /** null: la carpeta ya no existe. */
+  bytes: number | null
+  /** Se pasó del tiempo: `bytes` es un mínimo («más de»). */
+  partial: boolean
+}
+interface SizeEntry extends SizeView {
+  at: number
+  mtimeMs: number
+}
+const sizeCache = new Map<string, SizeEntry>()
+const sizeQueue: string[] = []
+const sizeQueued = new Set<string>()
+let sizeCurrent: string | null = null
+let sizeGen = 0
+let sizeRunning = false
+let sizeAbort: AbortController | null = null
 
 /** Fila tal como la ve la interfaz: con la última actividad calculada. */
 export interface RowView extends BranchRow {
@@ -152,6 +178,61 @@ async function cleanOne(path: string): Promise<RemoveResult> {
   return removeOne(path, false)
 }
 
+/** Tamaño de la caché si sigue vigente (menos de 10 min y la carpeta raíz no cambió). */
+async function cachedSize(path: string): Promise<SizeView | null> {
+  const hit = sizeCache.get(key(path))
+  if (!hit || Date.now() - hit.at > SIZE_TTL_MS) return null
+  const st = await lstat(path).catch(() => null)
+  if (!st || st.mtimeMs !== hit.mtimeMs) return null
+  return { bytes: hit.bytes, partial: hit.partial }
+}
+
+/** Corta el cálculo en curso y vacía la cola (al cerrar la pantalla). */
+function cancelSizes(): void {
+  sizeGen++
+  sizeQueue.length = 0
+  sizeQueued.clear()
+  sizeCurrent = null
+  sizeRunning = false
+  sizeAbort?.abort()
+  sizeAbort = null
+}
+
+async function runSizes(gen: number): Promise<void> {
+  try {
+    while (sizeQueue.length && gen === sizeGen) {
+      const p = sizeQueue.shift() as string
+      sizeQueued.delete(key(p))
+      sizeCurrent = key(p)
+      const st = await lstat(p).catch(() => null)
+      if (gen !== sizeGen) return
+      if (!st) {
+        ctx.emit('size', { path: p, bytes: null, partial: false })
+        continue
+      }
+      const ac = new AbortController()
+      sizeAbort = ac
+      const res = await folderSize(p, { deadline: Date.now() + SIZE_DEADLINE_MS, signal: ac.signal })
+      if (gen !== sizeGen || res.aborted) return
+      sizeAbort = null
+      sizeCurrent = null
+      sizeCache.set(key(p), { bytes: res.bytes, partial: res.partial, at: Date.now(), mtimeMs: st.mtimeMs })
+      ctx.emit('size', { path: p, bytes: res.bytes, partial: res.partial })
+    }
+  } finally {
+    if (gen === sizeGen) {
+      sizeRunning = false
+      sizeCurrent = null
+    }
+  }
+}
+
+function kickSizes(): void {
+  if (sizeRunning || sizeQueue.length === 0) return
+  sizeRunning = true
+  void runSizes(sizeGen)
+}
+
 interface CreateInput {
   repoPath: string
   name: string
@@ -273,6 +354,38 @@ const feature: Feature = {
       if (!row.exists || !statSync(row.path).isDirectory()) throw new Error('La carpeta ya no existe.')
       return shell.openPath(row.path)
     })
+
+    /**
+     * Tamaños de las carpetas del último escaneo. Devuelve los que están en caché y vigentes; el resto
+     * se calcula en segundo plano y llega como evento `feat:worktrees:size`. Llamarlo otra vez no repite cálculos.
+     */
+    ctx.handle('sizes', async (x: unknown) => {
+      if (!Array.isArray(x) || x.length > 300) throw new Error('Lista de carpetas inválida.')
+      const out: Record<string, SizeView> = {}
+      for (const p of x) {
+        const path = parseText(p, 1024, 'Ruta')
+        const k = key(path)
+        if (!lastRows.has(k)) continue
+        const hit = await cachedSize(path)
+        if (hit) {
+          out[path] = hit
+        } else if (!sizeQueued.has(k) && sizeCurrent !== k) {
+          sizeQueued.add(k)
+          sizeQueue.push(path)
+        }
+      }
+      kickSizes()
+      return out
+    })
+
+    /** La pantalla se cerró: se cortan los cálculos pendientes. */
+    ctx.handle('sizesCancel', () => {
+      cancelSizes()
+      return true
+    })
+  },
+  dispose() {
+    cancelSizes()
   }
 }
 

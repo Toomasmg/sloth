@@ -30,7 +30,13 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: [['Ctrl', 'Shift', 'M']], what: 'Abrir el chat del equipo', group: 'Chat', id: 'chat' },
   { keys: [['Esc']], what: 'Cerrar ventanas y paletas', group: 'General' },
   { keys: [['F2']], what: 'Renombrar el panel activo (o el espacio enfocado en la lista)', group: 'Paneles', id: 'rename' },
+  { keys: [['F1']], what: 'Ver atajos de teclado (esta hoja)', group: 'General', id: 'help' },
   { keys: [['Ctrl', 'Alt', '1–4']], what: 'Distribución: 1 (uno), 2 (dos), 3 o 4 (cuatro) paneles a la vista', group: 'Paneles' },
+  { keys: [['Ctrl', '1']], what: 'Ir al panel 1 (el primero visible, de izquierda a derecha y de arriba abajo)', group: 'Paneles', id: 'focus1' },
+  { keys: [['Ctrl', '2']], what: 'Ir al panel 2', group: 'Paneles', id: 'focus2' },
+  { keys: [['Ctrl', '3']], what: 'Ir al panel 3', group: 'Paneles', id: 'focus3' },
+  { keys: [['Ctrl', '4']], what: 'Ir al panel 4', group: 'Paneles', id: 'focus4' },
+  { keys: [['Ctrl', 'Shift', 'Enter']], what: 'Enviar a varios espacios, con el mensaje enfocado', group: 'General', id: 'broadcastNow' },
   { keys: [['Ctrl', 'Tab'], ['Ctrl', 'Shift', 'Tab']], what: 'Cambiar de panel (siguiente o anterior, en pestañas)', group: 'Paneles' },
   { keys: [['Ctrl', 'Alt', '←']], what: 'Mover el panel a la izquierda', group: 'Paneles' },
   { keys: [['Ctrl', 'Alt', '→']], what: 'Mover el panel a la derecha', group: 'Paneles' },
@@ -59,7 +65,13 @@ export const SHORTCUT_ACTIONS: readonly ShortcutAction[] = [
   { id: 'settings', name: 'Abrir configuración', def: 'Ctrl ,' },
   { id: 'chat', name: 'Abrir el chat del equipo', def: 'Ctrl Shift M' },
   { id: 'history', name: 'Buscar en el historial de conversaciones', def: 'Ctrl Shift F' },
-  { id: 'rename', name: 'Renombrar el panel activo', def: 'F2' }
+  { id: 'rename', name: 'Renombrar el panel activo', def: 'F2' },
+  { id: 'help', name: 'Ver atajos de teclado', def: 'F1' },
+  { id: 'focus1', name: 'Ir al panel 1', def: 'Ctrl 1' },
+  { id: 'focus2', name: 'Ir al panel 2', def: 'Ctrl 2' },
+  { id: 'focus3', name: 'Ir al panel 3', def: 'Ctrl 3' },
+  { id: 'focus4', name: 'Ir al panel 4', def: 'Ctrl 4' },
+  { id: 'broadcastNow', name: 'Enviar a varios espacios, con el mensaje enfocado', def: 'Ctrl Shift Enter' }
 ]
 
 /** Combinaciones de una fila de la hoja: las personalizadas si la acción se puede cambiar. */

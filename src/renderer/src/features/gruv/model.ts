@@ -2,6 +2,8 @@ import { useSyncExternalStore } from 'react'
 
 /** Lo que manda main (`feat:gruv:state` / `feat:gruv:changed`). Ver src/main/features/gruv.ts. */
 export interface GruvCriterio {
+  /** UUID en Gruv: viene con el detalle y hace falta para tildarlo. */
+  id?: string
   texto: string
   hecho: boolean
 }
@@ -25,6 +27,38 @@ export interface GruvEstado {
   nombre: string
 }
 
+export interface GruvComentario {
+  autor: string
+  cuerpo: string
+  fecha?: string
+}
+
+/** Detalle del ticket (al abrirlo). `minutos` null = sin registro. */
+export interface GruvDetalle {
+  criterios: GruvCriterio[]
+  comentarios: GruvComentario[]
+  minutos: number | null
+}
+
+/** Escrituras que la app le pide a Gruv (una herramienta cada una). */
+export type Accion = 'estado' | 'tomar' | 'soltar' | 'comentar' | 'criterio' | 'horas'
+
+/** Lo que se muestra del detalle: datos, carga o error. */
+export interface DetView {
+  data?: GruvDetalle
+  loading?: boolean
+  error?: string
+}
+
+/**
+ * Cambio optimista de una escritura: el ticket (campos) y/o el detalle se muestran ya y se
+ * revierten si Gruv no lo acepta.
+ */
+export interface WriteOpt {
+  ticket?: Partial<Ticket>
+  det?: (d: GruvDetalle) => GruvDetalle
+}
+
 export interface Snapshot {
   tickets: Ticket[]
   /** Estados en el orden del flujo de Gruv. */
@@ -41,6 +75,8 @@ export interface Snapshot {
     confirmRefresh: boolean
   }
   running: boolean
+  /** Acciones que esta cuenta no puede hacer, con el motivo. */
+  noDisponible?: Partial<Record<Accion, string>>
 }
 
 /** Sin tildes y en minúsculas: para buscar «revision» y encontrar «Revisión». */
@@ -66,6 +102,22 @@ export function prioRank(p?: string): number {
   if (/media|mid|normal/.test(s)) return 2
   if (/baja|low/.test(s)) return 3
   return 4
+}
+
+/** Las cinco tintas del diseño para avatares (fondo y texto). */
+const AVATAR_TINTS: { fg: string; bg: string }[] = [
+  { fg: '#a9c7ff', bg: 'rgba(138,180,255,0.18)' },
+  { fg: '#c9b8ff', bg: 'rgba(181,156,255,0.18)' },
+  { fg: '#7fe0b9', bg: 'rgba(95,212,166,0.16)' },
+  { fg: '#f5c77e', bg: 'rgba(240,180,90,0.16)' },
+  { fg: '#c9cdd6', bg: '#262b37' }
+]
+
+/** Color estable por persona: hash del nombre a una de las cinco tintas. */
+export function tintFor(name: string): { fg: string; bg: string } {
+  let h = 0
+  for (const ch of norm(name.trim())) h = (h * 31 + ch.charCodeAt(0)) >>> 0
+  return AVATAR_TINTS[h % AVATAR_TINTS.length]
 }
 
 // ---------- estado compartido entre la barra de título y la pantalla ----------
@@ -99,4 +151,13 @@ export function timeAgo(ts: number, now = Date.now()): string {
   if (h < 24) return `hace ${h} h`
   const d = Math.round(h / 24)
   return `hace ${d} ${d === 1 ? 'día' : 'días'}`
+}
+
+/** Minutos como horas para mostrar: «2 h 30 min», «3 h», «45 min». */
+export function fmtHoras(min: number): string {
+  if (!min) return 'Sin horas cargadas'
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  if (h && m) return `${h} h ${m} min`
+  return h ? `${h} h` : `${m} min`
 }

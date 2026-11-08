@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
-import { PencilIcon, SearchIcon, TerminalIcon } from '../../icons/SlothIcons'
+import { EyeIcon, HideIcon, PencilIcon, TerminalIcon } from '../../icons/SlothIcons'
+import { PaneMenu, type PaneMenuItem } from '../../layout/PaneMenu'
 import { dayLabel, durLabel, fmtTime, plainSummary, plural, spaceColor, STATUS_LABEL } from './model'
 import type { DetailItem, OpenResult, PrefsReply, SessionInfo, SessionRow } from './types'
 
@@ -13,6 +14,7 @@ export function SessionDetail({
   status,
   onPrefs,
   onResumed,
+  onDeleted,
   onNotice,
   say
 }: {
@@ -23,6 +25,8 @@ export function SessionDetail({
   onPrefs: (p: PrefsReply) => void
   /** Se llama cuando la conversación ya se está retomando (la página se cierra). */
   onResumed: () => void
+  /** La conversación fue a la Papelera: la página la saca de la lista. */
+  onDeleted: (p: PrefsReply) => void
   onNotice: (m: string | null) => void
   say: (m: string) => void
 }): React.JSX.Element {
@@ -34,6 +38,8 @@ export function SessionDetail({
   const [busy, setBusy] = useState(false)
   const [open, setOpen] = useState<Record<number, boolean>>({})
   const [askHide, setAskHide] = useState(false)
+  const [askDel, setAskDel] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   /** Nombre del espacio con terminal abierta: hay que confirmar antes de retomar ahí. */
   const [wsConfirm, setWsConfirm] = useState<string | null>(null)
 
@@ -98,6 +104,32 @@ export function SessionDetail({
     }
   }
 
+  const removeConv = async (): Promise<void> => {
+    setDeleting(true)
+    setErr(null)
+    try {
+      const p = await inv.current<PrefsReply>('feat:history:delete', row.accountId, row.sessionId)
+      setAskDel(false)
+      onDeleted(p)
+    } catch (e) {
+      setErr(cleanError(e))
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const menuItems: PaneMenuItem[] = [
+    isHidden
+      ? { id: 'show', label: 'Volver a mostrar', icon: <EyeIcon size={15} />, onSelect: () => void setHidden(false) }
+      : {
+          id: 'hide',
+          label: 'Quitar de la lista',
+          hint: 'La conversación no se toca',
+          icon: <HideIcon size={15} />,
+          onSelect: () => setAskHide(true)
+        }
+  ]
+
   const copy = (): void => {
     if (!info) return
     window.sloth.clipboardWrite(plainSummary(info))
@@ -157,16 +189,25 @@ export function SessionDetail({
           Exportar como Markdown
         </button>
         <span className="hist-grow" />
-        {isHidden ? (
-          <button type="button" className="btn ghost" onClick={() => void setHidden(false)}>
-            Volver a mostrar
-          </button>
-        ) : (
-          <button type="button" className="btn ghost hd-quit" onClick={() => setAskHide(true)}>
-            Quitar de la lista
-          </button>
-        )}
+        <button type="button" className="btn ghost hd-del" onClick={() => setAskDel(true)} disabled={deleting}>
+          Borrar
+        </button>
+        <PaneMenu label="Más acciones de la conversación" items={menuItems} />
       </div>
+
+      {askDel && (
+        <div className="hd-box danger" role="group" aria-label="Confirmar borrado">
+          <span className="hd-box-text">
+            ¿Borrar «{row.title}»? Va a la Papelera de Windows; podés recuperarla desde ahí.
+          </span>
+          <button type="button" className="btn ghost" onClick={() => setAskDel(false)} disabled={deleting}>
+            Cancelar
+          </button>
+          <button type="button" className="btn danger" onClick={() => void removeConv()} disabled={deleting} autoFocus>
+            {deleting ? 'Borrando…' : 'Sí, borrar'}
+          </button>
+        </div>
+      )}
 
       {wsConfirm && (
         <div className="hd-box" role="group" aria-label="Confirmar retomar">
@@ -259,7 +300,7 @@ function Item({ it, open, onToggle }: { it: DetailItem; open: boolean; onToggle:
       </div>
     )
   }
-  const Icon = it.kind === 'read' ? SearchIcon : it.kind === 'edit' ? PencilIcon : TerminalIcon
+  const Icon = it.kind === 'read' ? EyeIcon : it.kind === 'edit' ? PencilIcon : TerminalIcon
   const metaCls = it.err ? 'err' : it.kind === 'run' ? 'ok' : ''
   return (
     <div className="hd-tool">

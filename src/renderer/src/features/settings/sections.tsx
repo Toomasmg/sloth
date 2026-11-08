@@ -738,6 +738,23 @@ export function TeamSection(): React.JSX.Element {
   const [showKey, setShowKey] = useState(false)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [testing, setTesting] = useState(false)
+  const [testRes, setTestRes] = useState<{ ok: boolean; text: string } | null>(null)
+
+  /** Consulta real a Supabase con la configuración guardada (feat:chat:test, con 8 s de tope). */
+  const runTest = (): void => {
+    setTesting(true)
+    setTestRes(null)
+    ui.invoke<{ ok: boolean; message: string }>('feat:chat:test')
+      .then(
+        (r) => setTestRes({ ok: r.ok, text: r.message }),
+        (e) => setTestRes({ ok: false, text: errText(e) })
+      )
+      .finally(() => {
+        setTesting(false)
+        void reloadState()
+      })
+  }
 
   const loadCfg = useCallback(
     () =>
@@ -858,10 +875,15 @@ export function TeamSection(): React.JSX.Element {
           <div className="f-set-row-title">{title}</div>
           <div className="f-set-hint">{sub}</div>
         </div>
-        <button type="button" className="btn sm" onClick={() => void reloadState()}>
-          Probar conexión
+        <button type="button" className="btn sm" disabled={testing} aria-busy={testing} onClick={runTest}>
+          {testing ? 'Probando…' : 'Probar conexión'}
         </button>
       </div>
+      {testRes && (
+        <p className={testRes.ok ? 'f-set-ok' : 'form-error'} role={testRes.ok ? 'status' : 'alert'}>
+          {testRes.text}
+        </p>
+      )}
 
       {offered && (
         <div className="f-set-card f-set-offer" role="group" aria-label="Configuración propuesta por el repo">

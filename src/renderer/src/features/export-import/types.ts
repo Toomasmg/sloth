@@ -73,6 +73,8 @@ export interface ImportPlan {
   espacios: PlanSpace[]
   plantillas: { nuevas: string[]; existentes: string[]; salteadas: { name: string; reason: string }[] }
   apariencia: boolean
+  /** Valores de Apariencia del archivo (solo los que trae): para mostrarlos en el resumen. */
+  aparienciaValores: { theme?: string; density?: string; uiFontSize?: number; accent?: string; lightMode?: boolean } | null
   atajos: number
   equipo: string | null
   permisos: PlanPermiso[]

@@ -31,6 +31,8 @@ interface Shot {
 interface Sent {
   title: string
   shot: string | null
+  /** La URL del issue prellenado que se abrió en GitHub. */
+  url: string
 }
 
 const errText = (e: unknown): string => String((e as Error)?.message ?? e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
@@ -64,6 +66,7 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
   const [sending, setSending] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [sent, setSent] = useState<Sent | null>(null)
+  const [reopenErr, setReopenErr] = useState<string | null>(null)
   const titleRef = useRef<HTMLInputElement>(null)
   const invokeRef = useRef(ui.invoke)
   invokeRef.current = ui.invoke
@@ -125,7 +128,7 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
     setSending(true)
     setErr(null)
     try {
-      const r = await ui.invoke<{ shot: string | null }>('feat:report:submit', {
+      const r = await ui.invoke<{ shot: string | null; url: string }>('feat:report:submit', {
         type,
         title: title.trim(),
         what,
@@ -135,7 +138,8 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
         logs,
         shot: shot && shotData !== null
       })
-      setSent({ title: title.trim(), shot: r.shot })
+      setSent({ title: title.trim(), shot: r.shot, url: r.url })
+      setReopenErr(null)
     } catch (e2) {
       setErr(errText(e2))
     } finally {
@@ -143,7 +147,17 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
     }
   }
 
+  const viewOnGithub = async (url: string): Promise<void> => {
+    setReopenErr(null)
+    try {
+      await ui.invoke('feat:report:open', url)
+    } catch (e) {
+      setReopenErr(errText(e))
+    }
+  }
+
   const reset = (): void => {
+    setReopenErr(null)
     setType('error')
     setTitle('')
     setTouched(false)
@@ -184,7 +198,15 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
                 La captura se guardó como <strong>{sent.shot}</strong> y se abrió su carpeta. Arrastrala al issue en GitHub.
               </p>
             )}
+            {reopenErr && (
+              <p className="form-error" role="alert">
+                {reopenErr}
+              </p>
+            )}
             <div className="rp-thanks-actions">
+              <button type="button" className="btn" onClick={() => void viewOnGithub(sent.url)}>
+                Ver en GitHub
+              </button>
               <button type="button" className="btn primary" onClick={onClose}>
                 Volver a Sloth
               </button>

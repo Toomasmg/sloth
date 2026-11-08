@@ -5,7 +5,7 @@
 import { createReadStream } from 'node:fs'
 import { open, readdir, stat } from 'node:fs/promises'
 import { createInterface } from 'node:readline'
-import { join } from 'node:path'
+import { isAbsolute, join, relative, resolve } from 'node:path'
 
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export const BLOCK = 1024 * 1024
@@ -647,4 +647,35 @@ export function setPref(prefs: HistoryPrefs, which: 'pinned' | 'hidden', key: st
   if (!SESSION_KEY_RE.test(key)) return null
   const rest = prefs[which].filter((k) => k !== key)
   return { ...prefs, [which]: on ? [...rest, key].slice(-MAX_KEYS) : rest }
+}
+
+/** Carpeta de proyectos de una cuenta de Claude (`<configDir>/projects`). */
+export const projectsRoot = (configDir: string): string => join(configDir, 'projects')
+
+/**
+ * true si `target` queda dentro de `projects/` de la cuenta y no es la carpeta en sí: al menos
+ * `<carpeta>/<algo>`. Así nunca se toca nada fuera de las conversaciones.
+ */
+export function isInsideProjects(configDir: string, target: string): boolean {
+  const rel = relative(resolve(projectsRoot(configDir)), resolve(target))
+  if (!rel || isAbsolute(rel)) return false
+  const parts = rel.split(/[\\/]+/)
+  return parts[0] !== '..' && parts.length >= 2 && parts.every((p) => p !== '' && p !== '.' && p !== '..')
+}
+
+/**
+ * Rutas que se mandan a la Papelera para borrar una conversación: su `<id>.jsonl` y la carpeta con el
+ * mismo id (si Claude la guardó). Null si el id o la carpeta no son válidos o queda algo fuera de projects/.
+ */
+export function sessionTrashPaths(
+  configDir: string,
+  slug: string,
+  sessionId: string
+): { file: string; dir: string } | null {
+  if (!UUID_RE.test(sessionId)) return null
+  if (!slug || slug === '.' || slug === '..' || /[\\/]/.test(slug)) return null
+  const file = join(projectsRoot(configDir), slug, `${sessionId}.jsonl`)
+  const dir = join(projectsRoot(configDir), slug, sessionId)
+  if (!isInsideProjects(configDir, file) || !isInsideProjects(configDir, dir)) return null
+  return { file, dir }
 }

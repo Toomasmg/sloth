@@ -1,5 +1,5 @@
-import { app, dialog, type SaveDialogOptions } from 'electron'
-import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { app, dialog, shell, type SaveDialogOptions } from 'electron'
+import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import { currentSettings } from './settings'
@@ -11,6 +11,7 @@ import {
   parseTranscript,
   searchSessions,
   sessionMarkdown,
+  sessionTrashPaths,
   SESSION_KEY_RE,
   SESSION_RANGE_DAYS,
   setPref,
@@ -26,11 +27,13 @@ import {
 
 /**
  * Función «history» (lado main): historial de conversaciones de Claude de cada cuenta, leído de sus
- * transcripts (projects/<carpeta>/<uuid>.jsonl). Sloth NUNCA borra ni modifica esos archivos: «quitar
- * de la lista» solo marca la conversación como oculta en userData/features/history.json.
+ * transcripts (projects/<carpeta>/<uuid>.jsonl). «Quitar de la lista» solo marca la conversación como
+ * oculta en userData/features/history.json. Lo único que toca el archivo de Claude es «borrar»: manda el
+ * .jsonl (y su carpeta con el mismo id) a la Papelera de Windows, solo dentro de projects/ y no si la
+ * sesión está abierta en una terminal viva.
  *
- * Canales: list, detail, pin(key, on), hide(key, on), export(accountId, sessionId), open(...),
- * search(searchId, query, opts) y cancel(searchId).
+ * Canales: list, detail, pin(key, on), hide(key, on), delete(accountId, sessionId), export(accountId,
+ * sessionId), open(...), search(searchId, query, opts) y cancel(searchId).
  */
 
 const projectSlug = (cwd: string): string => cwd.replace(/[^A-Za-z0-9]/g, '-')
@@ -84,6 +87,10 @@ function register(ctx: FeatureContext): void {
     return UUID_RE.test(p.sessionId) ? `claude --resume ${p.sessionId}` : undefined
   })
 
+  /** Espacios de Sloth que usan esa carpeta de la cuenta (por cwd o por repo). */
+  const workspacesFor = (accountId: string, cwd: string) =>
+    ctx.store.workspaces.filter((w) => w.accountId === accountId && (samePath(w.cwd, cwd) || samePath(w.repoPath, cwd)))
+
   const accountsForScan = (): { id: string; label: string; configDir: string }[] =>
     ctx.store.accounts.map((a) => ({ id: a.id, label: a.label, configDir: a.configDir }))
 
@@ -91,7 +98,7 @@ function register(ctx: FeatureContext): void {
   const rowOf = (f: SessionFile, p: ParsedSession): SessionRow | null => {
     if (!p.cwd) return null
     const cwd = p.cwd
-    const ws = ctx.store.workspaces.find((w) => w.accountId === f.account.id && (samePath(w.cwd, cwd) || samePath(w.repoPath, cwd)))
+    const ws = workspacesFor(f.account.id, cwd)[0]
     return {
       key: `${f.account.id}:${f.sessionId}`,
       accountId: f.account.id,
@@ -160,6 +167,41 @@ function register(ctx: FeatureContext): void {
     const row = rowOf(f, parsed)
     if (!row) throw new Error('La conversación no tiene carpeta registrada.')
     return { ...row, lastAnswer: parsed.lastAnswer, items: parsed.items }
+  })
+
+  ctx.handle('delete', async (accountId: unknown, sessionId: unknown): Promise<HistoryPrefs> => {
+    const ids = checkIds(accountId, sessionId)
+    const acc = ctx.store.account(ids.accountId)
+    if (!acc) throw new Error('Esa cuenta ya no existe en Sloth.')
+    const f = await findFile(ids.accountId, ids.sessionId)
+    // Solo rutas <configDir>/projects/<carpeta>/<uuid>(.jsonl): cualquier otra cosa se rechaza.
+    const paths = sessionTrashPaths(acc.configDir, basename(dirname(f.file)), ids.sessionId)
+    if (!paths || resolve(paths.file) !== resolve(f.file))
+      throw new Error('Esa conversación no está en la carpeta de proyectos de la cuenta. No borré nada.')
+    const parsed = await parseTranscript(f.file)
+    // Si la sesión puede estar corriendo en una terminal de Sloth, no se toca: primero hay que cerrarla.
+    const term = ctx.terminal()
+    if (!term) throw new Error('Todavía no puedo revisar las terminales abiertas. Probá de nuevo en un momento.')
+    const open = parsed.cwd ? workspacesFor(acc.id, parsed.cwd).find((w) => term.isRunning(w.id)) : undefined
+    if (open) throw new Error(`«${open.name}» tiene la terminal abierta. Cerrala antes de borrar esta conversación.`)
+
+    if (!existsSync(paths.file) || !lstatSync(paths.file).isFile()) throw new Error('No encontré esa conversación en la carpeta de la cuenta.')
+    await shell.trashItem(paths.file)
+    cache.delete(f.file)
+    ctx.log('historial: conversación enviada a la Papelera')
+    // La carpeta asociada (subagentes, resultados) va con la conversación. Si falla, el .jsonl ya está en la Papelera.
+    if (existsSync(paths.dir) && lstatSync(paths.dir).isDirectory()) {
+      try {
+        await shell.trashItem(paths.dir)
+      } catch {
+        throw new Error('La conversación fue a la Papelera, pero no pude mover su carpeta asociada. Revisala a mano.')
+      }
+    }
+    const key = `${ids.accountId}:${ids.sessionId}`
+    const cur = readPrefs()
+    const next: HistoryPrefs = { pinned: cur.pinned.filter((k) => k !== key), hidden: cur.hidden.filter((k) => k !== key) }
+    writePrefs(next)
+    return next
   })
 
   const setFlag = (which: 'pinned' | 'hidden') => (key: unknown, on: unknown) => {

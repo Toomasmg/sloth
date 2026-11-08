@@ -188,6 +188,11 @@ export function buildIssueUrl(title: string, body: string): string {
   return `${REPORT_ISSUE_URL}?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`
 }
 
+/** true solo para una URL armada por buildIssueUrl (mismo host y ruta fijos, tamaño acotado). */
+export function isIssueUrl(u: unknown): u is string {
+  return typeof u === 'string' && u.length <= URL_MAX && u.startsWith(`${REPORT_ISSUE_URL}?`)
+}
+
 const TS_RE = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)\s/
 
 /**
