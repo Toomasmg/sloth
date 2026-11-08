@@ -8,9 +8,6 @@ import type { PermissionRule } from '../../../../main/features/permissions-core'
  */
 
 export interface PermissionsList {
-  dnd: boolean
-  /** «No molestar» también puede venir de la Configuración (ajuste `noMolestar`). */
-  dndFromSettings: boolean
   rules: PermissionRule[]
   /** Decisiones de hoy, la más nueva primero. */
   history: DecisionEntry[]
@@ -38,6 +35,5 @@ export const listPermissions = (): Promise<PermissionsList> => invoke<Permission
 export const setRule = (id: string, on: boolean): Promise<void> => invoke<void>('rule:set', id, on)
 export const removeRule = (id: string): Promise<void> => invoke<void>('rule:remove', id)
 export const undoDecision = (entryId: string): Promise<void> => invoke<void>('undo', entryId)
-export const setDnd = (on: boolean): Promise<void> => invoke<void>('dnd', on)
 /** Espacio que la UI tiene en pantalla (null si ninguno): así no se avisa de lo que ya se ve. */
 export const setFocusedSpace = (wsId: string | null): Promise<void> => invoke<void>('focus', wsId)

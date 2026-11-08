@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, net, Notification, protocol, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, net, protocol, shell } from 'electron'
 import { pathToFileURL } from 'node:url'
 import { normalize, sep } from 'node:path'
 import { existsSync, readdirSync, statSync } from 'node:fs'
@@ -27,7 +27,6 @@ import {
   type AgentStatus,
   type DaemonInfo,
   type NewWorkspaceInput,
-  type PermissionAnswer,
   type PermissionPrompt,
   type PtyChunk,
   type RevealTarget,
@@ -106,12 +105,7 @@ app.whenReady().then(async () => {
     if (!ws) return
     const { state, detail } = stateForEvent(p)
     setAgent(ws.id, { state, detail, at: p.at ?? Date.now() })
-    if ((state === 'done' || state === 'waiting') && win && !win.isFocused() && Notification.isSupported()) {
-      new Notification({
-        title: ws.name,
-        body: state === 'done' ? 'Claude terminó.' : detail || 'Claude necesita tu atención.'
-      }).show()
-    }
+    // Los avisos de Windows los manda la función «permissions» (respeta «No molestar» y los ajustes).
   }
 
   const toPrompt = (r: PendingPermission): PermissionPrompt => ({
@@ -132,9 +126,6 @@ app.whenReady().then(async () => {
       return
     }
     send('permission:new', toPrompt(r))
-    if (win && !win.isFocused() && Notification.isSupported()) {
-      new Notification({ title: ws.name, body: `Claude pide permiso para usar ${r.tool}.` }).show()
-    }
   }
 
   // Las terminales viven en el daemon (sobreviven al cierre) o, si no hay node, dentro de la app.
@@ -278,31 +269,6 @@ app.whenReady().then(async () => {
   ipcMain.handle('permission:pending', () =>
     (term?.pendingPermissions() ?? []).filter((r) => store.workspace(r.ws)).map(toPrompt)
   )
-
-  ipcMain.handle('permission:answer', async (_e, id: string, answer: PermissionAnswer, message?: string) => {
-    const b = await backend()
-    const req = b.pendingPermissions().find((r) => r.id === id)
-    if (!req) throw new Error('Ese permiso ya no está pendiente (venció o se respondió en la terminal).')
-    let decision: object | null
-    switch (answer) {
-      case 'allow':
-        decision = { behavior: 'allow' }
-        break
-      case 'allowAlways':
-        // Aplica las reglas que sugirió Claude (ej. permitir siempre `npm test`).
-        decision = req.suggestions?.length ? { behavior: 'allow', updatedPermissions: req.suggestions } : { behavior: 'allow' }
-        break
-      case 'deny':
-        decision = { behavior: 'deny', message: String(message ?? '').trim() || 'Rechazado desde Sloth.' }
-        break
-      case 'terminal':
-        decision = null
-        break
-      default:
-        throw new Error('Respuesta inválida.')
-    }
-    b.answerPermission(id, decision)
-  })
 
   ipcMain.handle('daemon:info', async (): Promise<DaemonInfo> => {
     const b = await backend()

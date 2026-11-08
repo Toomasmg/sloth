@@ -167,7 +167,6 @@ export interface SlothApi {
   onPtyExit(cb: (id: string, code: number) => void): () => void
   onAgentStatus(cb: (workspaceId: string, status: AgentStatus) => void): () => void
   pendingPermissions(): Promise<PermissionPrompt[]>
-  answerPermission(id: string, answer: PermissionAnswer, message?: string): Promise<void>
   onPermission(cb: (p: PermissionPrompt) => void): () => void
   onPermissionResolved(cb: (id: string) => void): () => void
   daemonInfo(): Promise<DaemonInfo>

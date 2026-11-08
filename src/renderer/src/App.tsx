@@ -38,6 +38,7 @@ import { LogoMark } from './Logo'
 import { EmptyState } from './EmptyState'
 import { StateIcon, StatePill } from './StateIcon'
 import { PermissionCard, toolLabel } from './PermissionCard'
+import { decidePermission } from './features/permissions/api'
 import { DaemonStatus } from './DaemonStatus'
 import { useDocumentVisible, useVisiblePolling } from './visibility'
 import {
@@ -270,7 +271,7 @@ export function App(): React.JSX.Element {
   const announced = announceId ? livePerms.find((p) => p.id === announceId) : undefined
 
   const answerPermission = async (p: PermissionPrompt, answer: PermissionAnswer, message?: string): Promise<void> => {
-    await api.answerPermission(p.id, answer, message)
+    await decidePermission(p, answer, message)
     setPerms((prev) => prev.filter((x) => x.id !== p.id))
     // El botón que tenía el foco desaparece: pasarlo al próximo permiso del panel o a la terminal.
     requestAnimationFrame(() => {
@@ -741,12 +742,6 @@ export function App(): React.JSX.Element {
                 {working} trabajando
               </button>
             )}
-            {livePerms.length > 0 && (
-              <button type="button" className="chip chip-perm" onClick={() => openPane(livePerms[0].workspaceId)} title={`Ir a «${wsById.get(livePerms[0].workspaceId)?.name ?? ''}»`}>
-                <ShieldWarning size={12} weight="fill" aria-hidden="true" />
-                {livePerms.length} pide {livePerms.length === 1 ? 'permiso' : 'permisos'}
-              </button>
-            )}
             {needsYou > 0 && (
               <button type="button" className="chip chip-waiting" onClick={() => { const w = firstWs('waiting'); if (w) openPane(w.id) }} title="Ir al que te espera">
                 <StateIcon state="waiting" size={12} />
@@ -1114,6 +1109,8 @@ export function App(): React.JSX.Element {
                         prompt={perm}
                         queued={(paneQueue?.length ?? 1) - 1}
                         now={now}
+                        spaceName={wsById.get(paneId)?.name}
+                        accountLabel={accountById.get(wsById.get(paneId)?.accountId ?? '')?.label}
                         onAnswer={(answer, message) => answerPermission(perm, answer, message)}
                       />
                     )}

@@ -122,21 +122,11 @@ export interface ChatData {
 export const EMPTY_PART: ChatDataPart = { connection: 'off', teams: [], threads: [], invites: [], unreadTotal: 0 }
 
 /** Dependencias inyectables (las pruebas no cargan Electron). */
-export interface NoticeLike {
-  on(event: 'click', cb: () => void): unknown
-  show(): void
-}
-export interface NotifierCtor {
-  isSupported(): boolean
-  new (opts: { title: string; body: string; silent: boolean }): NoticeLike
-}
 export interface ChatDataDeps {
-  loadNotifier?: () => Promise<NotifierCtor | undefined>
   now?: () => number
 }
 
 const REFRESH_MIN_MS = 30_000
-const NOTIFY_MIN_MS = 5_000
 const TYPING_MIN_MS = 2_000
 const PROFILE_CACHE_MAX = 500
 const PHOTO_CACHE_MAX = 50
@@ -145,10 +135,6 @@ const NOTICE_CHARS = 120
 
 const PROFILE_SELECT = 'id, login, name, avatar_url, handle, display_name, color, photo_path, presence, status_text, status_until, role_title, timezone'
 
-const defaultNotifier = async (): Promise<NotifierCtor | undefined> => {
-  const el = await import('electron')
-  return el.Notification as unknown as NotifierCtor
-}
 
 type Lists = { teams: ChatTeam[]; threads: ChatThread[]; invites: ChatInvite[]; channels: ChatChannel[] }
 const EMPTY_LISTS: Lists = { teams: [], threads: [], invites: [], channels: [] }
@@ -170,7 +156,6 @@ const isRow = (raw: unknown): raw is MessageRow => isObj(raw) && typeof raw.id =
 const convKeyOf = (kind: string, id: string): string => `${kind}:${id}`
 
 export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onChange: () => void, deps: ChatDataDeps = {}): ChatData {
-  const loadNotifier = deps.loadNotifier ?? defaultNotifier
   const now = deps.now ?? Date.now
 
   let gen = 0
@@ -193,7 +178,6 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
   const profilePhotos = new PhotoCache(PHOTO_CACHE_MAX)
   const profilePhotoLoading = new Set<string>()
   const profilePhotoFailed = new Set<string>()
-  const lastNotify = new Map<string, number>()
   const lastTyping = new Map<string, number>()
 
   const clientNow = (): SupabaseClient => {
@@ -650,7 +634,6 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     }
     bumpUnread(key)
     onChange()
-    if (!focused && !muted) void notify(msg.conv, msg.author, msg.body).catch(() => undefined)
   }
 
   async function onUpdateRow(g: number, raw: unknown): Promise<void> {
@@ -660,29 +643,6 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     const [msg] = await hydrate(c, [raw])
     if (g !== gen || !msg) return
     ctx.emit('messageChanged', msg)
-  }
-
-  /** Aviso del sistema para un mensaje ajeno con la ventana sin foco. Como mucho uno cada 5 s por conversación. */
-  async function notify(conv: ChatConv, author: ChatProfile, body: string): Promise<void> {
-    const t = now()
-    const key = convKeyOf(conv.kind === 'dm' ? 'dm' : 'channel', conv.id)
-    const last = lastNotify.get(key)
-    if (last !== undefined && t - last < NOTIFY_MIN_MS) return
-    lastNotify.set(key, t)
-    const w = ctx.window()
-    if (!w || w.isDestroyed()) return
-    const N = await loadNotifier().catch(() => undefined)
-    if (!N || !N.isSupported()) return
-    const chName = lists.channels.find((x) => x.id === conv.id)
-    const where = conv.kind === 'dm' ? 'Mensaje directo' : chName ? `#${chName.name}` : 'Equipo'
-    const n = new N({ title: `${author.login} · ${where}`, body: firstChars(body, NOTICE_CHARS), silent: false })
-    n.on('click', () => {
-      if (w.isDestroyed()) return
-      w.show()
-      w.focus()
-      ctx.emit('open', { kind: conv.kind === 'dm' ? 'dm' : 'team', id: conv.kind === 'dm' ? conv.id : (chName?.teamId ?? conv.id) })
-    })
-    n.show()
   }
 
   // ---------- canales ----------
@@ -1276,7 +1236,6 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       profilePhotos.clear()
       profilePhotoLoading.clear()
       profilePhotoFailed.clear()
-      lastNotify.clear()
       const close = closeInbox
       closeInbox = undefined
       const realtime = rt

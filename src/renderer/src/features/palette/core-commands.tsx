@@ -13,6 +13,7 @@ import {
 import { isLoginPane, loginPaneId } from '../../../../shared/types'
 import { STATE_LABEL, cleanError, shortPath } from '../../format'
 import { toolLabel } from '../../PermissionCard'
+import { decidePermission } from '../permissions/api'
 import type { Command, UiCtx } from '../host'
 
 /** Enfoca la terminal de un panel apenas exista (si se acaba de abrir, tarda un par de cuadros). */
@@ -132,7 +133,7 @@ export function coreCommands(ctx: UiCtx): Command[] {
     const where = `${wsById.get(oldest.workspaceId)?.name ?? 'Espacio'}: ${toolLabel(oldest.tool)}`
     const answer = (a: 'allow' | 'deny') => async () => {
       try {
-        await window.sloth.answerPermission(oldest.id, a)
+        await decidePermission(oldest, a)
       } catch (e) {
         ctx.notifyError(cleanError(e))
       }

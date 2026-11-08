@@ -58,6 +58,11 @@ const themeSource = (t: ThemeChoice): 'dark' | 'light' | 'system' => (t === 'sis
 
 let settings: SlothSettings
 let ctxRef: FeatureContext | null = null
+
+/** Ajustes vigentes (los lee también la función «permissions» para avisos y «No molestar»). */
+export function currentSettings(): SlothSettings {
+  return settings ?? read()
+}
 let lastDark: boolean | null = null
 
 const loginSupported = (): boolean => app.isPackaged && process.platform === 'win32'

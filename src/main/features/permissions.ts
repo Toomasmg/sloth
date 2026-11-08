@@ -5,6 +5,9 @@ import { randomUUID } from 'node:crypto'
 import type { Feature, FeatureContext } from './context'
 import type { TerminalBackend, PendingPermission } from '../daemon-client'
 import type { HookEventPayload } from '../hooks'
+import { chatEvents } from './chat-events'
+import type { ChatNoticeEvent } from './chat-model'
+import { currentSettings } from './settings'
 import {
   CHOICES,
   decisionFor,
@@ -39,7 +42,6 @@ export interface DecisionEntry {
 }
 
 interface State {
-  dnd: boolean
   rules: PermissionRule[]
   history: DecisionEntry[]
 }
@@ -59,7 +61,7 @@ function writeAtomic(path: string, data: unknown): void {
 
 /** Lectura tolerante: lo que no se entiende se descarta (nunca tira). */
 function load(): State {
-  const empty: State = { dnd: false, rules: [], history: [] }
+  const empty: State = { rules: [], history: [] }
   try {
     const raw = JSON.parse(readFileSync(file(), 'utf8').replace(/^﻿/, '')) as Partial<State>
     const rules = Array.isArray(raw.rules)
@@ -68,21 +70,14 @@ function load(): State {
     const history = Array.isArray(raw.history)
       ? raw.history.filter((h): h is DecisionEntry => !!h && typeof h.id === 'string' && typeof h.at === 'number').slice(0, MAX_HISTORY)
       : []
-    return { dnd: raw.dnd === true, rules, history }
+    return { rules, history }
   } catch {
     return empty
   }
 }
 
-/** «No molestar» de la Configuración (ajuste `noMolestar` de settings.json). Default: apagado. */
-function settingsDnd(): boolean {
-  try {
-    const raw = JSON.parse(readFileSync(join(app.getPath('userData'), 'features', 'settings.json'), 'utf8').replace(/^﻿/, ''))
-    return raw?.noMolestar === true
-  } catch {
-    return false
-  }
-}
+/** Mínimo entre dos avisos de mensajes de la misma conversación (como en el chat). */
+const TEAM_NOTIFY_MIN_MS = 5000
 
 const startOfToday = (): number => {
   const d = new Date()
@@ -105,7 +100,8 @@ const feature: Feature = {
       ctx.emit('changed')
     }
 
-    const isDnd = (): boolean => state.dnd || settingsDnd()
+    /** Única fuente de «No molestar»: la Configuración (settings.noMolestar). */
+    const isDnd = (): boolean => currentSettings().noMolestar
 
     const spaceName = (wsId: string): string => ctx.store.workspace(wsId)?.name ?? 'Espacio borrado'
 
@@ -150,6 +146,7 @@ const feature: Feature = {
       const ws = ctx.store.workspace(req.ws)
       if (!ws || !Notification.isSupported()) return
       const win = ctx.window()
+      if (!currentSettings().notify.perm) return
       if (!shouldNotify({ dnd: isDnd(), windowFocused: !!win && !win.isDestroyed() && win.isFocused(), focusedSpace, wsId: ws.id })) return
       const n = new Notification({
         title: `${ws.name} pide permiso`,
@@ -175,15 +172,42 @@ const feature: Feature = {
       n.show()
     }
 
+    /** Aviso de un espacio (terminó o te espera): lo gobierna «notify.done». */
     function notifyText(wsId: string, title: string, body: string): void {
       const ws = ctx.store.workspace(wsId)
       if (!ws || !Notification.isSupported()) return
+      if (!currentSettings().notify.done) return
       const win = ctx.window()
       if (!shouldNotify({ dnd: isDnd(), windowFocused: !!win && !win.isDestroyed() && win.isFocused(), focusedSpace, wsId })) return
       const n = new Notification({ title: `${ws.name} ${title}`, body })
       n.on('click', () => showWindow(wsId))
       n.show()
     }
+
+    /** Mensaje nuevo de otra persona en el chat del equipo (evento interno de chat-data). Respeta silenciado y «notify.team». */
+    const lastTeamNotice = new Map<string, number>()
+    function onTeamMessage(n: ChatNoticeEvent): void {
+      if (n.muted || !currentSettings().notify.team || isDnd()) return
+      if (!Notification.isSupported()) return
+      const win = ctx.window()
+      if (win && !win.isDestroyed() && win.isFocused()) return
+      const t = Date.now()
+      const last = lastTeamNotice.get(n.conversationId)
+      if (last !== undefined && t - last < TEAM_NOTIFY_MIN_MS) return
+      lastTeamNotice.set(n.conversationId, t)
+      const where = n.teamId ? 'Equipo' : 'Mensaje directo'
+      const note = new Notification({ title: `${n.from} · ${where}`, body: n.preview })
+      // El clic trae la ventana; abrir la conversación exacta la hace el chat (la pestaña queda donde esté).
+      note.on('click', () => {
+        const w = ctx.window()
+        if (!w || w.isDestroyed()) return
+        if (!w.isVisible()) w.show()
+        if (w.isMinimized()) w.restore()
+        w.focus()
+      })
+      note.show()
+    }
+    chatEvents.onMessage(onTeamMessage)
 
     /** Pedido nuevo: si una regla lo cubre se aprueba solo; si no, aviso (la tarjeta la muestra la UI). */
     function onRequest(b: TerminalBackend, req: PendingPermission): void {
@@ -209,8 +233,6 @@ const feature: Feature = {
       state.rules = state.rules.filter((r) => Boolean(ctx.store.workspace(r.workspaceId)))
       if (state.rules.length !== before) save()
       return {
-        dnd: state.dnd,
-        dndFromSettings: settingsDnd(),
         rules: state.rules,
         history: state.history.filter((h) => h.at >= startOfToday()),
         spaces: Object.fromEntries(ctx.store.workspaces.map((w) => [w.id, { name: w.name, cwd: w.cwd, accountId: w.accountId }]))
@@ -249,12 +271,6 @@ const feature: Feature = {
       const ruleId = e.ruleId
       state.rules = state.rules.filter((r) => r.id !== ruleId)
       e.undone = true
-      save()
-    })
-
-    ctx.handle('dnd', (on: unknown) => {
-      if (typeof on !== 'boolean') throw new Error('No molestar tiene que ser sí o no.')
-      state.dnd = on
       save()
     })
 

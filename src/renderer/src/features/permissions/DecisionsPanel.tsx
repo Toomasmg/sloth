@@ -3,8 +3,9 @@ import type { DecisionEntry } from '../../../../main/features/permissions'
 import type { PermissionRule } from '../../../../main/features/permissions-core'
 import { cleanError } from '../../format'
 import { CloseIcon } from '../../icons/SlothIcons'
-import { removeRule, setDnd, setRule, undoDecision } from './api'
+import { removeRule, setRule, undoDecision } from './api'
 import { hhmm, usePermissionsList } from './store'
+import { updateSettings, useSettings } from '../settings/store'
 
 const TAG: Record<DecisionEntry['tag'], { label: string; cls: string; text: (e: DecisionEntry) => string }> = {
   once: { label: 'Permitido', cls: 'ok', text: (e) => `Permitido una vez · ${e.label}` },
@@ -23,6 +24,8 @@ type Tab = 'hist' | 'rules'
 export function DecisionsPanel({ onClose }: { onClose: () => void }): React.JSX.Element {
   const { data, error: loadError } = usePermissionsList()
   const [tab, setTab] = useState<Tab>('hist')
+  // «No molestar» tiene una sola fuente: el ajuste de la Configuración (settings.noMolestar).
+  const noMolestar = useSettings().settings.noMolestar
   const [err, setErr] = useState<string | null>(null)
   const act = async (fn: () => Promise<void>): Promise<void> => {
     setErr(null)
@@ -69,15 +72,14 @@ export function DecisionsPanel({ onClose }: { onClose: () => void }): React.JSX.
           <span className="pd-dnd-text">
             No molestar
             <span className="pd-dnd-sub">
-              {data?.dndFromSettings ? 'Activado desde la Configuración' : 'Sin avisos de Windows mientras esté activo'}
+              Sin avisos de Windows mientras esté activo · se cambia también en Configuración
             </span>
           </span>
           <span className="switch">
             <input
               type="checkbox"
-              checked={Boolean(data?.dnd)}
-              disabled={!data}
-              onChange={(e) => void act(() => setDnd(e.target.checked))}
+              checked={noMolestar}
+              onChange={(e) => void act(() => updateSettings({ noMolestar: e.target.checked }))}
             />
             <span className="switch-track" aria-hidden="true" />
           </span>

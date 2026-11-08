@@ -14,7 +14,7 @@ function useLive(): ReturnType<typeof useUi>['permissions'] {
   return ui.permissions.filter((p) => p.expiresAt > now && ui.workspaces.some((w) => w.id === p.workspaceId))
 }
 
-/** Chip de la barra de título: «N pide(n) permiso», abre la revisión de pedidos. */
+/** Chip de la barra de estado: «N pide(n) permiso», abre la revisión de pedidos (es el único chip de permisos). */
 const Titlebar = (): React.JSX.Element | null => {
   const live = useLive()
   if (live.length === 0) return null
