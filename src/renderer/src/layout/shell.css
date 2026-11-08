@@ -570,9 +570,6 @@
 .pane-head .pane-meta {
   flex: 0 1 auto;
 }
-.pane-head .pane-path {
-  display: none;
-}
 .pane-head .pill {
   height: 20px;
 }
@@ -744,9 +741,6 @@
   }
   .sl-top-search {
     flex-basis: 160px;
-  }
-  .sl-top-status .chip span.chip-label {
-    display: none;
   }
   .sl-status-keys {
     display: none;

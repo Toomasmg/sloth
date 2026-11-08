@@ -528,7 +528,7 @@
 }
 .pd-tag.lila {
   background: rgba(181, 156, 255, 0.16);
-  color: #c9b8ff;
+  color: var(--team-fg);
 }
 .pd-tag.coral {
   background: var(--danger-soft);
@@ -545,11 +545,6 @@
 .pd-text {
   font-size: var(--fs-sm);
   color: var(--fg);
-  overflow-wrap: anywhere;
-}
-.pd-note {
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
   overflow-wrap: anywhere;
 }
 .pd-undone {

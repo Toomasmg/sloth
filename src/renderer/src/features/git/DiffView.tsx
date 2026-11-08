@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Warning } from '@phosphor-icons/react'
 import { useUi } from '../host'
+import { WarnGlyph } from './glyphs'
 import { errText, fmtSize, lineClass, pairRows, type DiffLine, type DiffRes } from './util'
 
 const PAGE = 2000
@@ -46,13 +46,13 @@ export function DiffView({
   if (res.kind === 'binary')
     return (
       <div className="f-git-diff-msg">
-        <Warning size={14} aria-hidden="true" /> Archivo binario{res.size ? ` (${fmtSize(res.size)})` : ''}: no se muestra el diff.
+        <WarnGlyph size={14} /> Archivo binario{res.size ? ` (${fmtSize(res.size)})` : ''}: no se muestra el diff.
       </div>
     )
   if (res.kind === 'huge')
     return (
       <div className="f-git-diff-msg">
-        <Warning size={14} aria-hidden="true" /> Archivo enorme ({fmtSize(res.size)}): no se muestra el diff. Abrilo con tu editor.
+        <WarnGlyph size={14} /> Archivo enorme ({fmtSize(res.size)}): no se muestra el diff. Abrilo con tu editor.
       </div>
     )
   if (res.kind === 'empty') return <div className="f-git-diff-msg">Sin diferencias de contenido (archivo vacío o solo cambió el modo).</div>

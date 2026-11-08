@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { X } from '@phosphor-icons/react'
+import { CloseIcon } from '../../icons/SlothIcons'
 
 /**
  * Cáscara de modal de «help»: backdrop, role=dialog, Escape cierra y el foco vuelve a donde estaba
@@ -57,7 +57,7 @@ export function Dialog({
           {icon}
           <h2 id={labelId}>{title}</h2>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Cerrar">
-            <X size={16} aria-hidden="true" />
+            <CloseIcon size={16} />
           </button>
         </header>
         {children}
