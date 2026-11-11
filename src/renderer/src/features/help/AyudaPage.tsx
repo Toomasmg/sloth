@@ -166,8 +166,10 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
   }
 
   const copy = (text: string): void => {
-    window.sloth.clipboardWrite(text)
-    say(`Copiado «${text}»`)
+    window.sloth
+      .clipboardWrite(text)
+      .then(() => say(`Copiado «${text}»`))
+      .catch(() => say('No se pudo copiar'))
   }
 
   const hl = (text: string): React.ReactNode =>

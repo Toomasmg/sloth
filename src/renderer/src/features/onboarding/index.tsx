@@ -83,9 +83,13 @@ function EnvStep(): React.JSX.Element {
   }, [])
   useEffect(run, [run])
   const copy = (c: string): void => {
-    window.sloth.clipboardWrite(c)
-    setCopied(c)
-    setTimeout(() => setCopied((x) => (x === c ? null : x)), 1500)
+    window.sloth
+      .clipboardWrite(c)
+      .then(() => {
+        setCopied(c)
+        setTimeout(() => setCopied((x) => (x === c ? null : x)), 1500)
+      })
+      .catch((e) => ui.notifyError(cleanMsg(e)))
   }
   return (
     <>

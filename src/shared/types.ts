@@ -169,7 +169,7 @@ export interface SlothApi {
   ptyResize(id: string, cols: number, rows: number): void
   ptyKill(id: string): Promise<void>
   clipboardRead(): Promise<string>
-  clipboardWrite(text: string): void
+  clipboardWrite(text: string): Promise<void>
   onPtyData(cb: (id: string, chunk: PtyChunk) => void): () => void
   onPtyExit(cb: (id: string, code: number) => void): () => void
   onAgentStatus(cb: (workspaceId: string, status: AgentStatus) => void): () => void

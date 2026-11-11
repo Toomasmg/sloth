@@ -141,7 +141,7 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
       }
       if (ev.shiftKey && ev.code === 'KeyC') {
         const sel = term.getSelection()
-        if (sel) api.clipboardWrite(sel)
+        if (sel) void api.clipboardWrite(sel).catch(() => undefined) // si falla, la selección queda a la vista
         return false
       }
       return true
@@ -184,8 +184,10 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
       ev.preventDefault()
       const sel = term.getSelection()
       if (sel) {
-        api.clipboardWrite(sel)
-        term.clearSelection()
+        api
+          .clipboardWrite(sel)
+          .then(() => term.clearSelection())
+          .catch(() => undefined) // si falla, la selección queda a la vista
       } else pasteClipboard()
     }
     el.addEventListener('contextmenu', onContext)

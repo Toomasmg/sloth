@@ -132,8 +132,10 @@ export function SessionDetail({
 
   const copy = (): void => {
     if (!info) return
-    window.sloth.clipboardWrite(plainSummary(info))
-    say('Resumen copiado')
+    window.sloth
+      .clipboardWrite(plainSummary(info))
+      .then(() => say('Resumen copiado'))
+      .catch(() => say('No se pudo copiar el resumen'))
   }
 
   const exportMd = async (): Promise<void> => {

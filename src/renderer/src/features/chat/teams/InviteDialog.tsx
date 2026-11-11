@@ -48,10 +48,15 @@ export function InviteDialog({ team, onClose }: { team: ChatTeam; onClose(): voi
 
   const copyCode = (): void => {
     if (!code) return
-    window.sloth.clipboardWrite(`Entrá a Sloth → Chat → Entrar con código: ${code}`)
-    setCopied(true)
-    window.clearTimeout(copyTimer.current)
-    copyTimer.current = window.setTimeout(() => setCopied(false), 2000)
+    window.sloth
+      .clipboardWrite(`Entrá a Sloth → Chat → Entrar con código: ${code}`)
+      .then(() => {
+        setErr(null)
+        setCopied(true)
+        window.clearTimeout(copyTimer.current)
+        copyTimer.current = window.setTimeout(() => setCopied(false), 2000)
+      })
+      .catch((e) => setErr(`No se pudo copiar: ${cleanError(e)}`))
   }
 
   const regenerate = async (): Promise<void> => {
