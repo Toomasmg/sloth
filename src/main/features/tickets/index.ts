@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { MODELOS, type Accion, type Detalle, type EstadoBase, type Modelo, type Ticket, type TicketsSnapshot } from '../../../shared/tickets'
+import { MODELOS, type Accion, type Detalle, type EstadoBase, type Modelo, type Ticket, type TicketsConfig, type TicketsSnapshot } from '../../../shared/tickets'
 import type { Feature, FeatureContext } from '../context'
 import { accountStatus } from '../../accounts'
 import { baseEnv } from '../../ptys'
@@ -9,7 +9,7 @@ import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, tick
 import { resolveClaudeExe, runClaude } from './claude-run'
 import type { ConectorDef } from './conector'
 import { conectorPorId } from './conectores'
-import { conConector, parsearArchivo, resolverEstado, type Lectura, type TicketsState } from './estado'
+import { ASSIGNEE_MAX, assigneeValido, conConector, parsearArchivo, resolverEstado, type Lectura, type TicketsState } from './estado'
 import {
   accionesSoportadas,
   buildAccionArgs,
@@ -264,22 +264,21 @@ async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: n
   }
 }
 
-/** Pasar a otro conector deja de lado lo leído con el anterior. */
-function cambiarConector(v: unknown): void {
+/** El conector al que se pasa, o undefined si es el mismo. No cambia nada. */
+function conectorNuevo(v: unknown): ConectorDef | undefined {
   const def = typeof v === 'string' ? conectorPorId(v) : undefined
   if (!def) throw new Error('Ese conector no está en esta versión de Sloth.')
-  if (def.id === state.config.conectorId) return
+  if (def.id === state.config.conectorId) return undefined
   if (running || escribiendo.size) throw new Error('Esperá a que termine lo que está en curso para cambiar de conector.')
-  state = conConector(state, def.id)
-  noDisponible = {}
-  detalles.clear()
+  return def
 }
 
+/** Todo se valida sobre una copia: si algo falla, no queda nada aplicado a medias. */
 function setConfig(raw: unknown): TicketsSnapshot {
   if (!raw || typeof raw !== 'object') throw new Error('Configuración inválida.')
   const p = raw as Record<string, unknown>
-  if ('conectorId' in p) cambiarConector(p.conectorId)
-  const c = state.config
+  const nuevo = 'conectorId' in p ? conectorNuevo(p.conectorId) : undefined
+  const c: TicketsConfig = { ...state.config, projectRepos: { ...state.config.projectRepos } }
   if ('queryAccountId' in p) {
     const id = p.queryAccountId
     if (id === undefined || id === null || id === '') delete c.queryAccountId
@@ -291,8 +290,8 @@ function setConfig(raw: unknown): TicketsSnapshot {
     c.model = p.model as Modelo
   }
   if ('assigneeId' in p) {
-    const s = texto(p.assigneeId, 80, 'El id de persona') ?? ''
-    if (s && !/^[A-Za-z0-9-]+$/.test(s)) throw new Error('El id de persona solo lleva letras, números y guiones.')
+    const s = texto(p.assigneeId, ASSIGNEE_MAX, 'El id de persona') ?? ''
+    if (!assigneeValido(s)) throw new Error('El id de persona solo lleva letras, números y guiones.')
     c.assigneeId = s
   }
   if ('defaultRepo' in p) c.defaultRepo = dir(p.defaultRepo, 'Repo por defecto')
@@ -304,6 +303,15 @@ function setConfig(raw: unknown): TicketsSnapshot {
     else delete c.projectRepos[project]
   }
   if ('confirmRefresh' in p) c.confirmRefresh = p.confirmRefresh !== false
+  if (nuevo) {
+    // Pasar a otro conector deja de lado lo leído con el anterior.
+    state = conConector(state, nuevo.id)
+    noDisponible = {}
+    detalles.clear()
+    c.conectorId = nuevo.id
+    if (!('assigneeId' in p)) c.assigneeId = ''
+  }
+  state.config = c
   changed()
   return snapshot()
 }

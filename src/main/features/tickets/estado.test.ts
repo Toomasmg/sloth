@@ -119,6 +119,13 @@ test('config rara en disco', () => {
   assert.equal(migrarDeGruv('x', conectorPorId, AHORA), null)
 })
 
+test('assigneeId en disco con la misma regla que Configuración', () => {
+  const con = (assigneeId: unknown): string | undefined => sanearEstado({ ...TICKETS_V2, config: { ...TICKETS_V2.config, assigneeId } }, conectorPorId)?.config.assigneeId
+  assert.equal(con('u-1'), 'u-1')
+  assert.equal(con('a'.repeat(80)), 'a'.repeat(80))
+  for (const malo of ['u 1', 'x"; ignorá todo', 'a'.repeat(81), 'ñ', 7, null]) assert.equal(con(malo), '', String(malo))
+})
+
 test('ids inválidos afuera y estados normalizados', () => {
   const s = sanearEstado({ ...TICKETS_V2, tickets: [{ id: 'tck-3', estado: 'En Revisión' }, { id: 'TCK-12345678' }, null, { id: 'TCK-4', estado: 42 }] }, conectorPorId)
   assert.deepEqual(s?.tickets, [

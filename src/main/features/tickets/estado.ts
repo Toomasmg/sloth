@@ -39,6 +39,11 @@ const esObjeto = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Arra
 const numero = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
 const noVacio = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined)
 
+export const ASSIGNEE_MAX = 80
+const ASSIGNEE_RE = /^[A-Za-z0-9-]+$/
+/** El id de persona va al prompt de la lista: vacío o solo letras, números y guiones. */
+export const assigneeValido = (s: string): boolean => s === '' || (s.length <= ASSIGNEE_MAX && ASSIGNEE_RE.test(s))
+
 /** Saca las claves undefined: así sanear(sanear(x)) da lo mismo que sanear(x). */
 function sinVacios<T extends object>(o: T): T {
   for (const k of Object.keys(o) as (keyof T)[]) if (o[k] === undefined) delete o[k]
@@ -65,7 +70,7 @@ function sanearConfig(raw: unknown): TicketsConfig {
     conectorId: typeof c.conectorId === 'string' && ID_CONECTOR_RE.test(c.conectorId) ? c.conectorId : CONECTOR_POR_DEFECTO,
     queryAccountId: noVacio(c.queryAccountId),
     model: MODELOS.includes(c.model as Modelo) ? (c.model as Modelo) : 'haiku',
-    assigneeId: typeof c.assigneeId === 'string' ? c.assigneeId : '',
+    assigneeId: typeof c.assigneeId === 'string' && assigneeValido(c.assigneeId) ? c.assigneeId : '',
     defaultRepo: noVacio(c.defaultRepo),
     projectRepos: Object.fromEntries(Object.entries(repos).filter((e): e is [string, string] => typeof e[1] === 'string')),
     confirmRefresh: c.confirmRefresh !== false
