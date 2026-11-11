@@ -139,6 +139,7 @@ export function Board(): React.JSX.Element {
   const estados = snap?.estados ?? []
   const n = snap?.conector.nombre ?? 'el conector'
   const unavailable = Boolean(snap) && !snap?.conector.disponible
+  const porDefecto = snap?.porDefecto
   const kindOf = (k?: string): ReturnType<typeof estadoKind> => estadoKind(categoriaDe(k, estados, snap?.conector.estados ?? []))
   const ticketTpls = tpls.filter(usesTicket)
   const ticketTpl = ticketTpls.find((x) => x.name.toLowerCase().includes(n.toLowerCase())) ?? ticketTpls[0]
@@ -297,11 +298,16 @@ export function Board(): React.JSX.Element {
     void ui.invoke<Snapshot>('feat:tickets:setConfig', { confirmRefresh: ask }).then(setSnapshot, (e) => setErr(cleanError(e)))
   }
 
+  const usarConector = (conectorId: string): void => {
+    setErr(null)
+    void ui.invoke<Snapshot>('feat:tickets:setConfig', { conectorId }).then(setSnapshot, (e) => setErr(cleanError(e)))
+  }
+
   // ---------- estado de conexión (real: lo que dejó la última consulta) ----------
   const anyLogged = ui.accounts.some((a) => ui.statuses[a.id]?.loggedIn)
   type Tone = 'ok' | 'busy' | 'bad' | 'idle'
   let tone: Tone = 'idle'
-  let connText = `${n} todavía no se consultó`
+  let connText = `Todavía no se consultó ${n}`
   if (!snap) connText = 'Cargando…'
   else if (running) {
     tone = 'busy'
@@ -489,6 +495,11 @@ export function Board(): React.JSX.Element {
               {unavailable && (
                 <div className="f-tickets-alert f-tickets-offline" role="alert">
                   <span className="f-tickets-alert-text">{snap?.lastError}</span>
+                  {porDefecto && (
+                    <button type="button" className="f-tickets-b f-tickets-b--xs f-tickets-b--solid-danger" onClick={() => usarConector(porDefecto.id)}>
+                      Usar {porDefecto.nombre}
+                    </button>
+                  )}
                 </div>
               )}
 
