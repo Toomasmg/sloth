@@ -150,7 +150,7 @@ interface Preview {
 }
 
 const DEFAULT_LINKS: TeamLink[] = [
-  { nombre: 'Gruv', url: '' },
+  { nombre: 'Tickets', url: '' },
   { nombre: 'Staging', url: '' },
   { nombre: 'Docs', url: '' }
 ]

@@ -61,7 +61,7 @@ function brMsg(br: string, name: string): string {
   if (/\s/.test(b)) return 'El patrón no puede tener espacios.'
   if (varsIn(b).some((v) => !(BRANCH_VARS as readonly string[]).includes(v)))
     return 'En la rama solo podés usar {ticket}, {fecha}, {n} o {plantilla}.'
-  const sample = applyVars(b, { ticket: 'TCK-1290', fecha: today(), n: 1, plantilla: name })
+  const sample = applyVars(b, { ticket: 'PROJ-123', fecha: today(), n: 1, plantilla: name })
   if (!validBranch(sample)) return 'Git no acepta ese nombre de rama. Usá letras, números, guiones o barras.'
   return ''
 }
@@ -389,10 +389,10 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
   }
 
   // ---- Vista previa ----
-  const brResolved = ed?.wt ? applyVars(ed.br, { ticket: 'TCK-1290', fecha: today(), n: (cur?.counter ?? 0) + 1, plantilla: ed.name }) : ''
+  const brResolved = ed?.wt ? applyVars(ed.br, { ticket: 'PROJ-123', fecha: today(), n: (cur?.counter ?? 0) + 1, plantilla: ed.name }) : ''
   const sample = {
-    ticket: 'TCK-1290',
-    carpeta: 'Cosmos-Ai/front',
+    ticket: 'PROJ-123',
+    carpeta: 'mi-app/front',
     rama: ed?.wt ? brResolved || '…' : 'main',
     fecha: today(),
     n: (cur?.counter ?? 0) + 1,
@@ -706,7 +706,7 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
                           </p>
                         )}
                         <p className="field-help" id="tp-br-hint">
-                          Sin espacios. Podés usar {'{ticket}'}. Ejemplo con TCK-1290: <span className="mono">{brResolved || '…'}</span>
+                          Sin espacios. Podés usar {'{ticket}'}. Ejemplo con PROJ-123:<span className="mono">{brResolved || '…'}</span>
                         </p>
                       </div>
                     )}
@@ -742,7 +742,7 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
                     </div>
 
                     <div className="tp-preview" aria-labelledby="tp-pv-h">
-                      <h3 id="tp-pv-h">Vista previa con TCK-1290 en Cosmos-Ai/front</h3>
+                      <h3 id="tp-pv-h">Vista previa con PROJ-123 en mi-app/front</h3>
                       <div className="tp-preview-box">
                         {segs.length > 0 ? (
                           segs.map((s, i) => (
@@ -791,7 +791,7 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
                     </div>
                     <div className="field">
                       <label htmlFor="tp-share-team">Nombre del equipo</label>
-                      <input id="tp-share-team" value={share.equipo} maxLength={60} onChange={(e) => setShare({ ...share, equipo: e.target.value, preview: null })} placeholder="Ej.: Cosmos" />
+                      <input id="tp-share-team" value={share.equipo} maxLength={60} onChange={(e) => setShare({ ...share, equipo: e.target.value, preview: null })} placeholder="Ej.: Mi equipo" />
                     </div>
                     {share.notice && (
                       <p className="tp-err" role="alert">

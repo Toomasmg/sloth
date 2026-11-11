@@ -183,7 +183,7 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
           <div className="f-set-form-row">
             <label className="f-set-stack grow2">
               <span className="f-set-label">Nombre para reconocerla</span>
-              <input className="f-set-input" value={name} placeholder="Ej.: Cosmos de Mateo" onChange={(e) => setName(e.target.value)} aria-invalid={nameErr} />
+              <input className="f-set-input" value={name} placeholder="Ej.: Trabajo de Ana" onChange={(e) => setName(e.target.value)} aria-invalid={nameErr} />
             </label>
             <label className="f-set-stack grow1">
               <span className="f-set-label">Plan</span>
@@ -531,7 +531,7 @@ export function TerminalSection(): React.JSX.Element {
         aria-label="Vista previa de la terminal"
         style={{ fontFamily: `'${t.fontFamily}', 'JetBrains Mono', Consolas, monospace`, fontSize: `${t.fontSize}px`, lineHeight: t.lineHeight, background: th.background, color: th.foreground }}
       >
-        <span style={{ color: th.brightBlack }}>~/Cosmos-Ai/front</span>
+        <span style={{ color: th.brightBlack }}>~/mi-app/front</span>
         {'\n'}
         <span style={{ color: th.blue }}>›</span> Corré los tests de la tabla{'\n'}
         <span style={{ color: th.green }}>●</span> PASS TicketTable.test.tsx (12){'\n'}

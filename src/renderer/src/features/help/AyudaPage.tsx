@@ -25,7 +25,7 @@ const CARDS: { id: string; title: string; sum: string; icon: string; steps: stri
     icon: 'M4 7a1.5 1.5 0 0 1 1.5-1.5h13A1.5 1.5 0 0 1 20 7v10a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17zM7.5 10l2.5 2.5-2.5 2.5M12.5 15h4',
     steps: [
       'Tocá «Nuevo espacio» en la barra lateral o apretá Ctrl N.',
-      'Elegí la carpeta del proyecto, por ejemplo la carpeta front de Cosmos-Ai.',
+      'Elegí la carpeta del proyecto, por ejemplo la carpeta front de tu app.',
       'Elegí la cuenta de Claude con la que va a trabajar.',
       'Ponele un nombre corto y confirmá. La terminal abre ya en esa carpeta.'
     ]
