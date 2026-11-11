@@ -69,6 +69,24 @@ export function parsearArchivo(texto: string | null, mtimeMs = 0): Lectura {
   }
 }
 
+const PREVIO_CLAVE_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/
+const PREVIOS_MAX = 20
+
+function sanearPrevios(raw: unknown, buscar: Buscar): Record<string, string> | undefined {
+  if (!esObjeto(raw)) return undefined
+  const out: Record<string, string> = {}
+  let n = 0
+  for (const [k, v] of Object.entries(raw)) {
+    if (n >= PREVIOS_MAX) break
+    if (!PREVIO_CLAVE_RE.test(k) || typeof v !== 'string' || !v || v.length > ASSIGNEE_MAX) continue
+    const def = buscar(k)
+    if (def && !assigneeValido(v, def)) continue
+    out[k] = v
+    n++
+  }
+  return n ? out : undefined
+}
+
 function sanearConfig(raw: unknown, buscar: Buscar): TicketsConfig {
   const c = esObjeto(raw) ? raw : {}
   const repos = esObjeto(c.projectRepos) ? c.projectRepos : {}
@@ -79,6 +97,7 @@ function sanearConfig(raw: unknown, buscar: Buscar): TicketsConfig {
     queryAccountId: noVacio(c.queryAccountId),
     model: MODELOS.includes(c.model as Modelo) ? (c.model as Modelo) : 'haiku',
     assigneeId: typeof c.assigneeId === 'string' && assigneeValido(c.assigneeId, buscar(conectorId)) ? c.assigneeId : '',
+    assigneePrevios: sanearPrevios(c.assigneePrevios, buscar),
     defaultRepo: noVacio(c.defaultRepo),
     projectRepos: Object.fromEntries(Object.entries(repos).filter((e): e is [string, string] => typeof e[1] === 'string')),
     confirmRefresh: c.confirmRefresh !== false
@@ -134,18 +153,29 @@ export function migrarDeGruv(raw: unknown, buscar: Buscar, ahora: number, gruvMt
   return armar(raw, config, buscar, { archivo: 'gruv.json', en: ahora, gruvMtimeMs })
 }
 
+/** Lo leído (tickets, columnas, quién sos, la última consulta) fuera; la config queda igual. */
+export function sinLista(s: TicketsState): TicketsState {
+  return sinVacios({ version: 2, tickets: [], migradoDe: s.migradoDe, config: s.config })
+}
+
 /**
- * El estado al pasar a otro conector: lo leído con el anterior (tickets, columnas, quién sos, la
- * última consulta) no sirve. Se conservan la cuenta, el modelo y los repos.
+ * El estado al pasar a otro conector: lo leído con el anterior no sirve. Se conservan la cuenta, el
+ * modelo y los repos, y el id de persona de cada conector queda guardado para cuando se vuelva a él.
  */
 export function conConector(s: TicketsState, conectorId: string): TicketsState {
   if (s.config.conectorId === conectorId) return s
-  return sinVacios({
-    version: 2,
-    tickets: [],
-    migradoDe: s.migradoDe,
-    config: { ...s.config, conectorId, assigneeId: '', projectRepos: { ...s.config.projectRepos } }
+  const previos = { ...s.config.assigneePrevios }
+  if (s.config.assigneeId && s.config.conectorId !== SIN_CONECTOR) previos[s.config.conectorId] = s.config.assigneeId
+  const assigneeId = previos[conectorId] ?? ''
+  delete previos[conectorId]
+  const config = sinVacios({
+    ...s.config,
+    conectorId,
+    assigneeId,
+    assigneePrevios: Object.keys(previos).length ? previos : undefined,
+    projectRepos: { ...s.config.projectRepos }
   })
+  return { ...sinLista(s), config }
 }
 
 export function resolverEstado(e: { tickets: Lectura; gruv: Lectura }, buscar: Buscar, ahora: number): ResultadoCarga {

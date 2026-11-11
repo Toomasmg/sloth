@@ -43,10 +43,10 @@ import {
   type ArchivoPropios,
   type ConectorRegistrado
 } from './propios'
-import { ASSIGNEE_MAX, assigneeValido, conConector, type TicketsState } from './estado'
+import { ASSIGNEE_MAX, assigneeValido, conConector, sinLista, type TicketsState } from './estado'
 import { ghAccion, ghDetalle, ghLista, ghYo, repoValido, type GhRun } from './gh'
 import { GitError, run as correr } from '../git-run'
-import { mismoTicket } from '../../../shared/templates-shared'
+import { espacioDelTicket } from '../../../shared/templates-shared'
 import { githubRepoOf } from '../team-github'
 import {
   accionesSoportadas,
@@ -281,6 +281,8 @@ export interface TicketsParaEquipo {
   running: boolean
   model: string
   confirmar: boolean
+  /** Con gh, la carpeta de donde salen los tickets: el #12 de otro repo es otro ticket. */
+  carpetaGh?: string
 }
 
 /** Lo que trajo el conector activo, para la vista Equipo (incluye los estados 'hecho' para poder descartarlos). */
@@ -300,7 +302,8 @@ export function ticketsParaEquipo(): TicketsParaEquipo {
     fetchedAt: state.fetchedAt,
     fetchedBy: state.fetchedBy,
     lastRun: state.lastRun,
-    lastError: state.lastError
+    lastError: state.lastError,
+    carpetaGh: def.via === 'gh' ? repoFor(undefined) : undefined
   }
 }
 
@@ -346,12 +349,12 @@ function hasRepo(rawId: unknown): boolean {
 async function start(rawId: unknown, rawAccount?: unknown): Promise<{ id: string; created: boolean }> {
   const def = activo()
   const id = ticketId(def, rawId)
-  const existing = ctx.store.workspaces.find((w) => mismoTicket(w.ticket, id))
+  const repoPath = repoFor(state.tickets.find((t) => t.id === id))
+  const existing = espacioDelTicket(ctx.store.workspaces, id, repoPath, def.via === 'gh')
   if (existing) {
     ctx.ui({ type: 'open-pane', id: existing.id })
     return { id: existing.id, created: false }
   }
-  const repoPath = repoFor(state.tickets.find((t) => t.id === id))
   if (!repoPath) throw new Error('No hay carpeta de repo para este ticket. Creá el espacio desde Nuevo espacio y elegí la carpeta.')
   let accountId: string
   if (typeof rawAccount === 'string' && rawAccount) {
@@ -531,6 +534,9 @@ function setConfig(raw: unknown): TicketsSnapshot {
     c.assigneeId = s
   }
   if ('defaultRepo' in p) c.defaultRepo = dir(p.defaultRepo, 'Repo por defecto')
+  // Con gh la carpeta es el repo de donde salen los tickets: lo leído de la anterior ya no corresponde.
+  const otraCarpetaGh = nuevo === undefined && c.defaultRepo !== state.config.defaultRepo && buscar(state.config.conectorId)?.via === 'gh'
+  if (otraCarpetaGh && (running || escribiendo.size)) throw new Error('Esperá a que termine lo que está en curso para cambiar la carpeta.')
   if ('projectRepo' in p) {
     const pr = (p.projectRepo && typeof p.projectRepo === 'object' ? p.projectRepo : {}) as Record<string, unknown>
     const project = textoObligatorio(pr.project, 80, 'El proyecto')
@@ -545,7 +551,16 @@ function setConfig(raw: unknown): TicketsSnapshot {
     noDisponible = {}
     detalles.clear()
     c.conectorId = nuevo
-    if (!('assigneeId' in p)) c.assigneeId = ''
+    c.assigneePrevios = state.config.assigneePrevios
+    if (!('assigneeId' in p)) {
+      // El que se recupera se guardó con otro conector cargado: se vuelve a validar con este.
+      const previo = state.config.assigneeId
+      c.assigneeId = assigneeValido(previo, buscar(nuevo)) ? previo : ''
+    }
+  } else if (otraCarpetaGh) {
+    state = sinLista(state)
+    noDisponible = {}
+    detalles.clear()
   }
   state.config = c
   changed()

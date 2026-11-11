@@ -70,6 +70,8 @@ export interface TicketsConfig {
   model: Modelo
   /** Vacío = la persona dueña de la cuenta que consulta. */
   assigneeId: string
+  /** El id de persona que se tenía en cada conector que se dejó (id de conector → assigneeId), para recuperarlo al volver. */
+  assigneePrevios?: Record<string, string>
   defaultRepo?: string
   projectRepos: Record<string, string>
   confirmRefresh: boolean
