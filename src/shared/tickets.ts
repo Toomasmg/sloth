@@ -136,7 +136,7 @@ export interface ConectorInfo {
   ejemploId: string
   /** Los del conector, incluidos los de categoría 'hecho'. */
   estados: Estado[]
-  /** Si los espacios de sus tickets arrancan con `/ticket <id>` (la skill es de Gruv). */
+  /** Si los espacios de sus tickets arrancan con `/ticket <id>` (la skill `/ticket` es propia de un solo conector: gruv). */
   comandoTicket: boolean
 }
 

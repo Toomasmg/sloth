@@ -148,7 +148,7 @@ export function Board(): React.JSX.Element {
   const porGh = snap?.conector.via === 'gh'
   const kindOf = (k?: string): ReturnType<typeof estadoKind> => estadoKind(categoriaDe(k, estados, snap?.conector.estados ?? []))
   const ticketTpls = tpls.filter(usesTicket)
-  // `/ticket` es una skill propia del conector (hoy solo Gruv): si el conector no la usa,
+  // `/ticket` es una skill propia del conector (hoy solo gruv): si el conector no la usa,
   // una plantilla que la usa solo vale si se llama como el conector, no como la primera que haya.
   const sirveDeComodin = (x: TemplateLite): boolean => Boolean(snap?.conector.comandoTicket) || !/(^|\s)\/ticket\b/.test(x.initialPrompt ?? '')
   const ticketTpl = ticketTpls.find((x) => x.name.toLowerCase().includes(n.toLowerCase())) ?? ticketTpls.find(sirveDeComodin)

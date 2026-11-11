@@ -1,6 +1,6 @@
 /**
- * Lectura de team.json. La v1 guardaba los tickets de Gruv y su configuración; desde la v2 los
- * tickets son los del conector de Tickets y acá queda solo GitHub y el mapeo de personas.
+ * Lectura de team.json. La v1 guardaba además los tickets y la configuración de su propia consulta;
+ * desde la v2 los tickets son los del conector de Tickets y acá queda solo GitHub y el mapeo de personas.
  * Módulo puro: lo corre `node --test` con type stripping.
  */
 import { cleanMapping, PR_URL_RE, type TeamPr } from './team-core'

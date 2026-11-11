@@ -25,7 +25,9 @@ export interface TeamPr {
 export interface TeamTicket {
   id: string
   titulo: string
-  estado: 'en_curso' | 'en_revision' | 'en_qa' | 'bloqueado'
+  estado: string
+  estadoNombre: string
+  categoria: 'en_curso' | 'revision' | 'bloqueado'
   responsable?: string
   responsableId?: string
   proyecto?: string
@@ -36,8 +38,8 @@ export interface Person {
   key: string
   nombre: string
   logins: string[]
-  gruvId?: string
-  inGruv: boolean
+  idConector?: string
+  enConector: boolean
   isBot?: boolean
   matchedBy?: 'manual' | 'auto'
   tickets: TeamTicket[]
@@ -48,32 +50,28 @@ export interface TeamSnapshot {
   people: Person[]
   summary: { ciFailing: number; waitingReview: number; blocked: number; prs: number; tickets: number }
   unassigned: TeamTicket[]
-  gruvPeople: { key: string; nombre: string }[]
+  personasConector: { key: string; nombre: string }[]
   authors: { login: string; name?: string }[]
   mapping: Record<string, string>
   github: { repos: string[]; errors: Record<string, string>; fatal?: string; fetchedAt?: number }
-  gruv: {
+  tickets: {
+    /** null: no hay conector elegido en Tickets (o el elegido no está). */
+    conector: { id: string; nombre: string; via: 'mcp' | 'gh' } | null
     fetchedAt?: number
     fetchedBy?: string
     lastRun?: { tokens?: number; costUsd?: number; durationMs?: number }
     lastError?: string
     running: boolean
+    model: string
+    confirmar: boolean
   }
   githubRunning: boolean
-  config: { queryAccountId?: string; model: 'haiku' | 'sonnet'; espacio?: string; proyecto?: string; confirmGruv: boolean }
 }
 
-export const NOT_GRUV = '-'
+export const NADIE = '-'
 export const PR_URL_RE = /^https:\/\/github\.com\/[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}\/pull\/\d{1,9}$/
 /** GitHub es barato: al volver a la ventana se actualiza si pasaron más de 5 min. */
 export const STALE_MS = 5 * 60_000
-
-export const ESTADO_LABEL: Record<TeamTicket['estado'], string> = {
-  en_curso: 'En curso',
-  en_revision: 'En revisión',
-  en_qa: 'En QA',
-  bloqueado: 'Bloqueado'
-}
 
 const HUES = ['#9FEAF9', '#C4A7FF', '#F9A8D4', '#86EFAC', '#FCD34D', '#7DD3FC', '#FDBA74', '#BEF264', '#F0ABFC', '#A5B4FC']
 export function personColor(key: string): string {

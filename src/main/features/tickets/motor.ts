@@ -224,7 +224,7 @@ export function idValido(def: ConectorDef, v: unknown): string | null {
   return s.length <= ID_MAX && ID_SEGURO_RE.test(s) && regexDeId(def).test(s) ? s : null
 }
 
-/** La skill `/ticket` que arranca un espacio solo entiende tickets de Gruv. */
+/** La skill `/ticket` es propia de un solo conector (gruv): solo ese arranca el espacio con ella. */
 export const usaComandoTicket = (def: ConectorDef): boolean => def.id === 'gruv'
 
 export const leeDetalle = (def: ConectorDef): boolean => def.via === 'gh' || def.herramientas.detalle.length > 0
