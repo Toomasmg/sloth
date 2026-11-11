@@ -139,7 +139,7 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
               </button>
               {snap.config.defaultRepo && (
                 <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => set({ defaultRepo: '' })} title="Usar la carpeta del último espacio">
-                  Quitar
+                  Usar la del último espacio
                 </button>
               )}
             </div>

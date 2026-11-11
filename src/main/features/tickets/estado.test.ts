@@ -275,3 +275,9 @@ test('sinLista vacía lo leído y deja la config intacta', () => {
   assert.deepEqual(s, { version: 2, tickets: [], migradoDe: antes.migradoDe, config: antes.config })
   assert.deepEqual(antes, copia)
 })
+
+test('conConector: un id como «constructor» no recupera nada del prototipo', () => {
+  const antes = estadoVacio('gruv')
+  const despues = conConector(antes, 'constructor')
+  assert.notEqual(typeof despues.config.assigneeId, 'function')
+})

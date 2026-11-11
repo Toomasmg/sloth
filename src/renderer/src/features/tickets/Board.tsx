@@ -154,8 +154,7 @@ export function Board(): React.JSX.Element {
   const ticketTpl = ticketTpls.find((x) => x.name.toLowerCase().includes(n.toLowerCase())) ?? ticketTpls.find(sirveDeComodin)
   const estadoName = (k?: string): string => estados.find((e) => e.clave === k)?.nombre ?? (k ? k.replace(/_/g, ' ') : 'Sin estado')
   const wsOf = (t: Ticket): Workspace | undefined => {
-    const carpeta = snap?.config.projectRepos[t.proyecto ?? ''] ?? snap?.config.defaultRepo ?? snap?.lastRepo
-    return espacioDelTicket(ui.workspaces, t.id, carpeta, snap?.conector.via === 'gh')
+    return espacioDelTicket(ui.workspaces, t.id, snap?.carpetas?.[t.id], snap?.conector.via === 'gh')
   }
   const accLabel = (id?: string): string | undefined => ui.accounts.find((a) => a.id === id)?.label
 

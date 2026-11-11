@@ -101,6 +101,12 @@ export function jsonCanonico(v: unknown): string {
 
 export const claveAceptado = (repoKey: string, id: string): string => `${repoKey}::${id}`
 
+/** Las claves a guardar al aceptar: una por copia del repo, así borrar un worktree no deshace la aceptación. */
+export function clavesAceptadas(r: ConectorRegistrado, repoKey: (repo: string) => string): string[] {
+  if (r.origen.tipo !== 'equipo') return []
+  return [repoKey(r.origen.repo), ...(r.otrosRepos ?? [])].map((k) => claveAceptado(k, r.def.id))
+}
+
 /** Uno del equipo vale si se aceptó esta misma versión desde cualquiera de las copias del repo. */
 export function estaAceptado(r: ConectorRegistrado, aceptados: Readonly<Record<string, string>>, repoKey: (repo: string) => string): boolean {
   if (r.origen.tipo !== 'equipo') return true

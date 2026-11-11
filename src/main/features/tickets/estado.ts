@@ -146,7 +146,7 @@ export function sanearEstado(raw: unknown, buscar: Buscar): TicketsState | null 
   return armar(raw, sanearConfig(raw.config, buscar), buscar, raw.migradoDe)
 }
 
-/** gruv.json v1 → v2 con el conector de Gruv. gruv.json no se toca. */
+/** gruv.json v1 → v2 con el conector `gruv`. gruv.json no se toca. */
 export function migrarDeGruv(raw: unknown, buscar: Buscar, ahora: number, gruvMtimeMs: number): TicketsState | null {
   if (!esObjeto(raw)) return null
   const config = sanearConfig({ ...(esObjeto(raw.config) ? raw.config : {}), conectorId: CONECTOR_LEGADO }, buscar)
@@ -166,7 +166,7 @@ export function conConector(s: TicketsState, conectorId: string): TicketsState {
   if (s.config.conectorId === conectorId) return s
   const previos = { ...s.config.assigneePrevios }
   if (s.config.assigneeId && s.config.conectorId !== SIN_CONECTOR) previos[s.config.conectorId] = s.config.assigneeId
-  const assigneeId = previos[conectorId] ?? ''
+  const assigneeId = Object.hasOwn(previos, conectorId) ? previos[conectorId] : ''
   delete previos[conectorId]
   const config = sinVacios({
     ...s.config,
@@ -180,7 +180,7 @@ export function conConector(s: TicketsState, conectorId: string): TicketsState {
 
 export function resolverEstado(e: { tickets: Lectura; gruv: Lectura }, buscar: Buscar, ahora: number): ResultadoCarga {
   const { tickets, gruv } = e
-  // Quien tiene gruv.json (aunque esté dañado o no se pueda leer) ya usaba Gruv: no queda sin conector.
+  // Quien tiene gruv.json (aunque esté dañado o no se pueda leer) ya usaba el conector `gruv`: no queda sin conector.
   const vacioSegunGruv = (): TicketsState => estadoVacio(gruv.kind === 'falta' ? SIN_CONECTOR : CONECTOR_LEGADO)
   const migrar = (): TicketsState | null => (gruv.kind === 'ok' ? migrarDeGruv(gruv.json, buscar, ahora, gruv.mtimeMs) : null)
   const enMemoria = (soloLectura: NonNullable<ResultadoCarga['soloLectura']>): ResultadoCarga => {

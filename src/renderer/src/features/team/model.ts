@@ -64,9 +64,13 @@ export interface TeamSnapshot {
     running: boolean
     model: string
     confirmar: boolean
-    carpetaGh?: string
+    carpetas?: Record<string, string>
   }
   githubRunning: boolean
+  /** team.json no se puede guardar: lo vinculado a mano se pierde al reiniciar. */
+  aviso?: string
+  /** Equipo usaba Gruv antes de que hubiera conectores. */
+  veniaDeGruv?: true
 }
 
 export const NADIE = '-'

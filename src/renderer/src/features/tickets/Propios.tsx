@@ -40,8 +40,10 @@ export function Propios({ snap }: { snap: Snapshot }): React.JSX.Element {
   const recargar = (): void => {
     ui.invoke<Lista>('feat:tickets:propios').then(setDatos, fallo)
   }
-  // Solo al abrir: `propios` relee los archivos y avisa un snapshot nuevo, que vuelve a pintar esto.
-  useEffect(recargar, [])
+  // Al abrir y cuando cambia qué conectores hay o cuáles están aceptados. No depende del snapshot entero:
+  // `propios` relee los archivos y avisa un snapshot nuevo, y eso sería un bucle.
+  const huella = snap.conectores.map((c) => `${c.id}:${c.aceptado}`).join()
+  useEffect(recargar, [huella])
 
   const listo = (): void => {
     setAbierto(null)

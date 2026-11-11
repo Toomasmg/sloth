@@ -10,6 +10,7 @@ import linear from './conectores/linear'
 import {
   armarRegistro,
   claveAceptado,
+  clavesAceptadas,
   EQUIPO_MAX,
   estaAceptado,
   IMPORT_MAX_BYTES,
@@ -227,4 +228,10 @@ test('vistaHerramientas: cada acción muestra lo mismo que va a --allowedTools, 
   assert.equal(v.pistas.apoyo, 'Leé {ticket} antes')
   assert.equal(v.pistas.yoConId, def.pistas.yo.conId)
   assert.equal(v.pistas.detalle.length, def.pistas.detalle.length)
+})
+
+test('clavesAceptadas: la copia registrada y todas las otras, para que aceptar siga valiendo si se borra una', () => {
+  const equipo = (k: string): { repo: string; repoKey: string; equipo: string; conectores: unknown[] } => ({ repo: k, repoKey: k, equipo: 'E', conectores: [propio('mio')] })
+  const r = armarRegistro({ incluidos: [], usuario: [], equipos: [equipo('z:/wt'), equipo('z:/repo')], hash }).lista[0]
+  assert.deepEqual(clavesAceptadas(r, (k) => k), [claveAceptado('z:/repo', 'mio'), claveAceptado('z:/wt', 'mio')])
 })

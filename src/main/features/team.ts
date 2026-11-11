@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import { buildPeople, LOGIN_RE, NADIE, PR_URL_RE, personasDe, ticketsActivos, type TeamTicket } from './team-core'
-import { cargarTeam, type TeamState } from './team-estado'
+import { avisoSoloLectura, cargarTeam, type MotivoSoloLectura, type TeamState } from './team-estado'
 import { fetchGithub } from './team-github'
 import { alCambiarTickets, ticketsParaEquipo, type TicketsParaEquipo } from './tickets'
 
@@ -18,7 +18,7 @@ let state: TeamState
 let file = ''
 let ghRun: Promise<unknown> | null = null
 /** team.json es de una versión más nueva de Sloth o no se pudo leer: no se pisa. */
-let soloLectura = false
+let soloLectura: MotivoSoloLectura | null = null
 let offTickets: (() => void) | null = null
 
 function escribir(destino: string, texto: string): void {
@@ -28,13 +28,13 @@ function escribir(destino: string, texto: string): void {
 }
 
 function load(): TeamState {
-  soloLectura = false
+  soloLectura = null
   let texto: string | null = null
   try {
     texto = readFileSync(file, 'utf8')
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
-      soloLectura = true
+      soloLectura = 'ilegible'
       ctx.log(`team: no pude leer team.json, no lo voy a pisar: ${(e as Error).message}`)
     }
   }
@@ -45,11 +45,11 @@ function load(): TeamState {
       renameSync(file, aparte)
       ctx.log(`team: team.json dañado, lo guardé en ${aparte}`)
     } catch (e) {
-      soloLectura = true
+      soloLectura = 'sin-respaldo'
       ctx.log(`team: team.json dañado y no pude respaldarlo: ${(e as Error).message}`)
     }
   } else if (r.kind === 'futuro') {
-    soloLectura = true
+    soloLectura = 'futuro'
     ctx.log('team: team.json es de una versión más nueva de Sloth, no lo voy a pisar')
   } else if (r.kind === 'ok' && r.migrado && texto !== null) {
     const bak = `${file}.v1.bak`
@@ -58,7 +58,7 @@ function load(): TeamState {
       state = r.state
       save()
     } catch (e) {
-      soloLectura = true
+      soloLectura = 'sin-respaldo'
       ctx.log(`team: no pude respaldar team.json antes de migrarlo: ${(e as Error).message}`)
     }
   }
@@ -98,9 +98,11 @@ function snapshot(): unknown {
       running: tp.running,
       model: tp.model,
       confirmar: tp.confirmar,
-      carpetaGh: tp.carpetaGh
+      carpetas: tp.carpetas
     },
-    githubRunning: Boolean(ghRun)
+    githubRunning: Boolean(ghRun),
+    aviso: soloLectura ? avisoSoloLectura(soloLectura) : undefined,
+    veniaDeGruv: state.veniaDeGruv
   }
 }
 
@@ -132,6 +134,7 @@ function refreshGithub(): Promise<unknown> {
 function setMapping(rawLogin: unknown, rawKey: unknown): unknown {
   if (typeof rawLogin !== 'string' || !LOGIN_RE.test(rawLogin)) throw new Error('Login de GitHub inválido.')
   const login = rawLogin.toLowerCase()
+  if (soloLectura) throw new Error(avisoSoloLectura(soloLectura))
   if (rawKey === null || rawKey === undefined || rawKey === '') delete state.mapping[login]
   else {
     if (typeof rawKey !== 'string' || rawKey.length > 200) throw new Error('Persona inválida.')

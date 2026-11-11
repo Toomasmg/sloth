@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { cargarTeam, estadoTeamVacio } from './team-estado'
+import { avisoSoloLectura, cargarTeam, estadoTeamVacio } from './team-estado'
 
 const PR = {
   repo: 'org/app',
@@ -74,4 +74,20 @@ test('descarta PRs que no son de GitHub y mapeos inválidos', () => {
   assert.deepEqual(r.state.github.errors, {})
   assert.equal(r.state.github.fatal, undefined)
   assert.deepEqual(r.state.mapping, { beto: 'g:3' })
+})
+
+test('v1 con tickets o cuenta de Gruv: queda marcado que usaba Gruv, y la marca sobrevive en v2', () => {
+  const conTickets = cargarTeam(JSON.stringify({ version: 1, gruv: { tickets: [{ id: 'TCK-1' }] } }))
+  assert.ok(conTickets.kind === 'ok' && conTickets.state.veniaDeGruv === true)
+  const conCuenta = cargarTeam(JSON.stringify({ config: { queryAccountId: 'acc1' } }))
+  assert.ok(conCuenta.kind === 'ok' && conCuenta.state.veniaDeGruv === true)
+  const sinNada = cargarTeam(JSON.stringify({ version: 1, gruv: { tickets: [] }, mapping: {} }))
+  assert.ok(sinNada.kind === 'ok' && sinNada.state.veniaDeGruv === undefined)
+  const v2 = cargarTeam(JSON.stringify({ version: 2, veniaDeGruv: true }))
+  assert.ok(v2.kind === 'ok' && v2.state.veniaDeGruv === true)
+})
+
+test('avisoSoloLectura explica cada motivo', () => {
+  for (const m of ['futuro', 'ilegible', 'sin-respaldo'] as const) assert.match(avisoSoloLectura(m), /no se guarda/i)
+  assert.match(avisoSoloLectura('futuro'), /más nueva/)
 })

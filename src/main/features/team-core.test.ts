@@ -36,9 +36,7 @@ test('ticketsActivos sin estados activos (gh): entra lo abierto con responsable,
   )
 })
 
-test('ticketsActivos usa la clave como nombre si el estado no está en la lista', () => {
-  const [a] = ticketsActivos([t('TCK-1', 'raro', 'Ana')], [{ clave: 'en_curso', nombre: 'En curso', categoria: 'en_curso' }])
-  assert.equal(a, undefined)
+test('ticketsActivos usa la clave como nombre si no hay lista de estados', () => {
   const [b] = ticketsActivos([t('TCK-2', 'abierto', 'Ana')], [])
   assert.equal(b?.estadoNombre, 'abierto')
 })
@@ -71,4 +69,31 @@ test('un mapeo g:12 guardado se aplica a la persona con responsableId 12', () =>
   assert.equal(ana.matchedBy, 'manual')
   assert.equal(ana.idConector, '12')
   assert.deepEqual(ana.logins, ['zz-otro'])
+})
+
+test('con GitHub como conector, el PR del mismo login cae en la tarjeta del ticket', () => {
+  const pr: TeamPr = {
+    repo: 'org/app',
+    number: 5,
+    title: 'Algo',
+    login: 'TomyMG',
+    authorName: 'Tomas Munoz',
+    branch: 'b',
+    isDraft: false,
+    review: 'pending',
+    ci: 'pass',
+    checks: { pass: 1, fail: 0, running: 0 },
+    url: 'https://github.com/org/app/pull/5'
+  }
+  const tickets = ticketsActivos([t('12', 'abierto', 'tomymg', 'tomymg')], github.estados)
+  const { people } = buildPeople({ prs: [pr], tickets, personas: personasDe(tickets), mapping: {} })
+  assert.equal(people.length, 1)
+  assert.equal(people[0].tickets.length, 1)
+  assert.equal(people[0].prs.length, 1)
+  assert.equal(people[0].matchedBy, 'auto')
+})
+
+test('ticketsActivos descarta un estado que no está en la lista', () => {
+  const activos = ticketsActivos([t('TCK-1', 'raro', 'Ana')], [{ clave: 'en_curso', nombre: 'En curso', categoria: 'en_curso' }])
+  assert.deepEqual(activos, [])
 })

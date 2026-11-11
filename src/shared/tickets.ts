@@ -170,6 +170,8 @@ export interface TicketsSnapshot {
   /** Acciones que esta cuenta no puede hacer, con el motivo. */
   noDisponible?: Partial<Record<Accion, string>>
   lastRepo?: string
+  /** Con gh, la carpeta de cada ticket (id → carpeta): el #12 de otro repo es otro ticket. */
+  carpetas?: Record<string, string>
   /** Conectores propios o del equipo que no se cargaron, y por qué. */
   avisosPropios?: string[]
   /** El id del conector del equipo elegido que cambió en el repo y hay que volver a aceptar. */

@@ -10,6 +10,21 @@ export interface TeamState {
   github: { prs: TeamPr[]; repos: string[]; errors: Record<string, string>; fatal?: string; fetchedAt?: number }
   /** login de GitHub (minúscula) → clave de persona del conector, o «-» = no es nadie del conector. */
   mapping: Record<string, string>
+  /** La v1 traía tickets de Gruv: sirve para avisar que hay que elegir el conector en Tickets. */
+  veniaDeGruv?: true
+}
+
+export type MotivoSoloLectura = 'futuro' | 'ilegible' | 'sin-respaldo'
+
+export function avisoSoloLectura(m: MotivoSoloLectura): string {
+  switch (m) {
+    case 'futuro':
+      return 'team.json es de una versión más nueva de Sloth: lo que vincules no se guarda.'
+    case 'ilegible':
+      return 'No se pudo leer team.json (puede tenerlo abierto otro programa): lo que vincules no se guarda.'
+    case 'sin-respaldo':
+      return 'No se pudo respaldar team.json antes de actualizarlo: lo que vincules no se guarda.'
+  }
 }
 
 export type CargaTeam =
@@ -51,6 +66,10 @@ export function cargarTeam(texto: string | null): CargaTeam {
   if (!raw) return { kind: 'corrupto', state: estadoTeamVacio() }
   const version = typeof raw.version === 'number' ? raw.version : 1
   const state: TeamState = { version: 2, github: github(raw.github), mapping: cleanMapping(raw.mapping) }
+  const gruv = objeto(raw.gruv)
+  if (raw.veniaDeGruv === true || (version < 2 && (Boolean(gruv && Array.isArray(gruv.tickets) && gruv.tickets.length) || typeof objeto(raw.config)?.queryAccountId === 'string'))) {
+    state.veniaDeGruv = true
+  }
   if (version > 2) return { kind: 'futuro', state }
   return { kind: 'ok', state, migrado: version < 2 }
 }

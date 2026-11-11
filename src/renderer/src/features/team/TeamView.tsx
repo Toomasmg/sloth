@@ -59,7 +59,9 @@ export function TeamView(): React.JSX.Element {
   const [panel, setPanel] = useState<'none' | 'link'>('none')
   const [starting, setStarting] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [tarde, setTarde] = useState(false)
   const firstBtn = useRef<HTMLButtonElement>(null)
+  const closeBtn = useRef<HTMLButtonElement>(null)
 
   const accLabel = (id?: string): string => ui.accounts.find((a) => a.id === id)?.label ?? '—'
   const conector = snap?.tickets.conector ?? null
@@ -67,11 +69,16 @@ export function TeamView(): React.JSX.Element {
 
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null
-    firstBtn.current?.focus()
+    ;(firstBtn.current ?? closeBtn.current)?.focus()
     return () => prev?.focus?.()
   }, [])
 
   const close = (): void => setTeamOpen(false)
+  useEffect(() => {
+    if (snap) return
+    const id = setTimeout(() => setTarde(true), 4000)
+    return () => clearTimeout(id)
+  }, [snap])
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
@@ -86,7 +93,7 @@ export function TeamView(): React.JSX.Element {
   }, [confirmar, starting, panel])
 
   const espacioDe = (t: TeamTicket): Workspace | undefined =>
-    espacioDelTicket(ui.workspaces, t.id, snap?.tickets.carpetaGh, snap?.tickets.conector?.via === 'gh')
+    espacioDelTicket(ui.workspaces, t.id, snap?.tickets.carpetas?.[t.id], snap?.tickets.conector?.via === 'gh')
 
   const run = async <T,>(label: string, fn: () => Promise<T>): Promise<T | undefined> => {
     setBusy(label)
@@ -141,10 +148,32 @@ export function TeamView(): React.JSX.Element {
   }
 
   if (!snap) {
+    const reintentar = (): void => {
+      setTarde(false)
+      void ui.invoke<TeamSnapshot>('feat:team:state').then(apply, (e) => setErr(cleanError(e)))
+    }
     return (
-      <div className="f-team-backdrop">
-        <aside className="f-team-drawer" role="dialog" aria-modal="true" aria-label="Equipo">
-          <p className="hint f-team-pad">Cargando…</p>
+      <div className="f-team-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+        <aside className="f-team-drawer" role="dialog" aria-modal="true" aria-labelledby="f-team-title">
+          <header className="f-team-head">
+            <UsersThree size={18} weight="bold" aria-hidden="true" className="f-team-head-ic" />
+            <h2 id="f-team-title">Equipo</h2>
+            <div className="f-team-actions">
+              <button ref={closeBtn} type="button" className="icon-btn" aria-label="Cerrar equipo" title="Cerrar (Esc)" onClick={close}>
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+          </header>
+          {tarde ? (
+            <p className="form-error f-team-pad" role="alert">
+              No se pudo leer el equipo.{' '}
+              <button type="button" className="btn sm" onClick={reintentar}>
+                Reintentar
+              </button>
+            </p>
+          ) : (
+            <p className="hint f-team-pad">Cargando…</p>
+          )}
         </aside>
       </div>
     )
@@ -155,6 +184,7 @@ export function TeamView(): React.JSX.Element {
   const active = snap.people.filter((p) => !p.isBot && (p.prs.length || p.tickets.length))
   const idle = snap.people.filter((p) => p.isBot || (!p.prs.length && !p.tickets.length))
   const repoErrors = Object.entries(snap.github.errors)
+  const sinRepos = !ghRunning && Boolean(snap.github.fetchedAt) && !snap.github.repos.length && !snap.github.fatal
 
   const ticketRow = (t: TeamTicket): React.JSX.Element => {
     const ws = espacioDe(t)
@@ -330,7 +360,7 @@ export function TeamView(): React.JSX.Element {
                 <LinkSimple size={14} aria-hidden="true" /> Vincular
               </button>
             )}
-            <button type="button" className="icon-btn" aria-label="Cerrar equipo (Esc)" title="Cerrar (Esc)" onClick={close}>
+            <button type="button" className="icon-btn" aria-label="Cerrar equipo" title="Cerrar (Esc)" onClick={close}>
               <X size={16} aria-hidden="true" />
             </button>
           </div>
@@ -369,10 +399,19 @@ export function TeamView(): React.JSX.Element {
               <WarningCircle size={14} weight="fill" aria-hidden="true" /> {snap.github.fatal}
             </p>
           )}
-          {conector && snap.tickets.lastError && !ticketsRunning && (
+          {snap.aviso && (
             <p className="form-error f-team-msg" role="alert">
-              {n}: {snap.tickets.lastError}
+              <WarningCircle size={14} weight="fill" aria-hidden="true" /> {snap.aviso}
             </p>
+          )}
+          {snap.tickets.lastError && !ticketsRunning && (
+            <p className="form-error f-team-msg" role="alert">
+              {conector ? `${n}: ` : ''}
+              {snap.tickets.lastError}
+            </p>
+          )}
+          {!conector && !snap.tickets.lastError && snap.veniaDeGruv && (
+            <p className="hint f-team-msg">Equipo usaba Gruv: elegí Gruv como conector en los ajustes de Tickets para volver a ver los tickets.</p>
           )}
           {info && !err && (
             <p className="f-team-msg f-team-ok" role="status">
@@ -390,8 +429,8 @@ export function TeamView(): React.JSX.Element {
             </p>
           </div>
 
-          {!ghRunning && snap.github.fetchedAt && !snap.github.repos.length && !snap.github.fatal && (
-            <p className="hint f-team-msg">Ningún espacio tiene un repo con remoto de GitHub (origin), así que no hay PRs para mostrar.</p>
+          {sinRepos && (
+            <p className="hint f-team-msg">Ningún espacio tiene un repo con remoto de GitHub (origin), así que no hay PRs para mostrar. Creá un espacio en una carpeta con remoto de GitHub.</p>
           )}
           {repoErrors.length > 0 && (
             <details className="f-team-repoerr">
@@ -426,7 +465,7 @@ export function TeamView(): React.JSX.Element {
             )}
             {idle.map(card)}
           </div>
-          {!snap.people.length && !ghRunning && (
+          {!snap.people.length && !ghRunning && !sinRepos && (
             <p className="hint f-team-empty">
               Todavía no hay nadie para mostrar. Tocá «Actualizar» para leer los PRs abiertos de los repos de tus espacios.
               {conector ? ` Tocá «Traer de ${n}» para ver en qué ticket anda cada uno.` : ' Elegí un conector en los ajustes de Tickets para ver en qué ticket anda cada uno.'}
@@ -470,6 +509,7 @@ function LinkPanel({ snap, n, apply, onError }: { snap: TeamSnapshot; n: string;
                 <span className="mono">@{a.login}</span>
                 {a.name && <span className="f-team-sub">{a.name}</span>}
                 <select
+                  disabled={Boolean(snap.aviso)}
                   aria-label={`Persona de ${n} para @${a.login}`}
                   value={val}
                   onChange={(e) => ui.invoke('feat:team:setMapping', a.login, e.target.value || null).then(apply, (er) => onError(cleanError(er)))}

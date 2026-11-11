@@ -28,7 +28,7 @@ import { CONECTORES } from './conectores'
 import { buildDescubrirArgs, buildDescubrirPrompt, parseDescubrir, type Descubiertas } from './descubrir'
 import {
   armarRegistro,
-  claveAceptado,
+  clavesAceptadas,
   EQUIPO_ARCHIVO,
   EQUIPO_MAX_BYTES,
   estaAceptado,
@@ -254,6 +254,7 @@ function snapshot(): TicketsSnapshot {
     running: Boolean(running),
     noDisponible,
     lastRepo: lastRepo(),
+    carpetas: def?.via === 'gh' ? carpetasDe() : undefined,
     avisosPropios: avisosPropios.length ? avisosPropios : undefined
   }
 }
@@ -294,16 +295,17 @@ export interface TicketsParaEquipo {
   running: boolean
   model: string
   confirmar: boolean
-  /** Con gh, la carpeta de donde salen los tickets: el #12 de otro repo es otro ticket. */
-  carpetaGh?: string
+  /** Con gh, la carpeta de cada ticket: el #12 de otro repo es otro ticket. */
+  carpetas?: Record<string, string>
 }
 
 /** Lo que trajo el conector activo, para la vista Equipo (incluye los estados 'hecho' para poder descartarlos). */
 export function ticketsParaEquipo(): TicketsParaEquipo {
   if (!state) return { conector: null, tickets: [], estados: [], running: false, model: '', confirmar: true }
   const def = state.config.conectorId === SIN_CONECTOR ? undefined : buscar(state.config.conectorId)
+  const id = state.config.conectorId
   const base = { running: Boolean(running), model: state.config.model, confirmar: state.config.confirmRefresh }
-  if (!def) return { ...base, conector: null, tickets: [], estados: [] }
+  if (!def) return { ...base, conector: null, tickets: [], estados: [], lastError: id === SIN_CONECTOR ? undefined : noDisponibleConector(id) }
   // Primero los que trajo la consulta, con el nombre que se ve en el tablero.
   const porClave = new Map<string, Estado>()
   for (const e of [...conCategoria(def, estados(def)), ...def.estados]) if (!porClave.has(e.clave)) porClave.set(e.clave, e)
@@ -316,7 +318,7 @@ export function ticketsParaEquipo(): TicketsParaEquipo {
     fetchedBy: state.fetchedBy,
     lastRun: state.lastRun,
     lastError: state.lastError,
-    carpetaGh: def.via === 'gh' ? repoFor(undefined) : undefined
+    carpetas: def.via === 'gh' ? carpetasDe() : undefined
   }
 }
 
@@ -330,6 +332,16 @@ function dir(v: unknown, name: string): string | undefined {
 function lastRepo(): string | undefined {
   const ws = [...ctx.store.workspaces].sort((a, b) => b.createdAt - a.createdAt)
   return ws.find((w) => existsSync(w.repoPath))?.repoPath
+}
+
+/** La carpeta de cada ticket (la misma que usa «Empezar»), para que las vistas encuentren su espacio. */
+function carpetasDe(): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const t of state.tickets) {
+    const p = repoFor(t)
+    if (p) out[t.id] = p
+  }
+  return out
 }
 
 function repoFor(t: Ticket | undefined): string | undefined {
@@ -450,6 +462,7 @@ async function refreshGh(def: ConectorGh): Promise<{ count: number }> {
     const me = await ghYo(ghRun)
     const tickets = await ghLista(ghRun, def, repo)
     state.tickets = tickets
+    detalles.clear()
     delete state.estados
     state.me = me
     state.fetchedAt = Date.now()
@@ -594,7 +607,7 @@ async function detalle(rawId: unknown): Promise<Detalle> {
   const t = ticketEnLista(def, id)
   if (def.via === 'gh') {
     const d = await ghDetalle(ghRunCon(), t)
-    if (state.config.conectorId === def.id) detalles.set(id, d)
+    if (state.tickets.includes(t)) detalles.set(id, d)
     return d
   }
   const c = cuenta(def)
@@ -609,8 +622,8 @@ async function detalle(rawId: unknown): Promise<Detalle> {
       timeoutMs: DETALLE_TIMEOUT_MS,
       parse: (s) => parseDetalle(def, s)
     })
-    // Si mientras tanto se cambió de conector, este detalle ya no es de la lista.
-    if (state.config.conectorId === def.id) detalles.set(id, d)
+    // Si mientras tanto cambió la lista (otro conector u otra carpeta), este detalle ya no es de ella.
+    if (state.tickets.includes(t)) detalles.set(id, d)
     return d
   } catch (e) {
     if (e instanceof ConectorFaltaError) throw new Error(`No pudimos leer el detalle: ${sinConector(def)}`)
@@ -772,7 +785,8 @@ function aceptar(rawId: unknown, rawHash: unknown): TicketsSnapshot {
   const r = noIncluido(rawId)
   if (r.origen.tipo !== 'equipo') throw new Error('Solo se aceptan los conectores del equipo.')
   if (r.hash !== rawHash) throw new Error('El conector del equipo cambió mientras lo mirabas. Revisalo de nuevo.')
-  guardarArchivo({ ...archivoPropios, aceptados: { ...archivoPropios.aceptados, [claveAceptado(repoKey(r.origen.repo), r.def.id)]: r.hash } })
+  const nuevos = Object.fromEntries(clavesAceptadas(r, repoKey).map((k) => [k, r.hash]))
+  guardarArchivo({ ...archivoPropios, aceptados: { ...archivoPropios.aceptados, ...nuevos } })
   changed()
   return snapshot()
 }

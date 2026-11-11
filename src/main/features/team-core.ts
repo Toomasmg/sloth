@@ -344,7 +344,9 @@ export function buildPeople(input: {
       target = people.get(manual)
       how = 'manual'
     } else if (!manual && !a.isBot) {
-      const cands = delConector.filter((p) => looksLike(a.login, a.name, p.nombre))
+      // Con GitHub como conector el id de la persona ES el login: no hace falta adivinar por nombre.
+      const mismoLogin = delConector.find((p) => p.idConector?.toLowerCase() === lower)
+      const cands = mismoLogin ? [mismoLogin] : delConector.filter((p) => looksLike(a.login, a.name, p.nombre))
       if (cands.length === 1) {
         target = cands[0]
         how = 'auto'
