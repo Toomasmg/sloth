@@ -50,7 +50,7 @@ export interface Template {
 }
 
 export interface TemplateVars {
-  /** Ticket ya escrito (TCK-1234). */
+  /** Ticket ya escrito (PROJ-123). */
   ticket?: string
   /** Carpeta del espacio (si la plantilla no tiene una fija). */
   repoPath?: string
@@ -73,7 +73,7 @@ function checkVars(s: string | undefined, where: string, allowed: readonly strin
 
 export function normTicket(raw: unknown): string | undefined {
   if (raw === undefined || raw === null || raw === '') return undefined
-  const malo = 'El ticket solo lleva letras, números, guiones, puntos o _ (p. ej. TCK-1234 o 123).'
+  const malo = 'El ticket solo lleva letras, números, guiones, puntos o _ (p. ej. PROJ-123 o 123).'
   if (typeof raw !== 'string' || raw.length > 40) return fail(malo)
   if (!raw.trim()) return undefined
   return normTicketId(raw) ?? fail(malo)
@@ -118,7 +118,7 @@ export function sanitizeTemplate(raw: unknown, accountIds: Set<string>, prev?: T
     if (typeof r.useWorktree !== 'object') fail('Rama aparte inválida.')
     const bp = str((r.useWorktree as Record<string, unknown>).branchPattern, 200, 'el patrón de rama', true)!
     checkVars(bp, 'Rama', BRANCH_VARS)
-    const sample = applyVars(bp, { ticket: 'TCK-1', fecha: today(new Date(now)), n: 1, plantilla: name })
+    const sample = applyVars(bp, { ticket: 'PROJ-1', fecha: today(new Date(now)), n: 1, plantilla: name })
     if (!validBranch(sample)) fail(`La rama «${sample}» no es un nombre válido para git.`)
     useWorktree = { branchPattern: bp }
   }
@@ -153,7 +153,7 @@ export function buildInput(t: Template, vars: TemplateVars, accountId: string, n
   const ticket = normTicket(vars.ticket)
   const repoPath = t.repoPath ?? vars.repoPath
   if (!repoPath) fail('Elegí la carpeta del espacio.')
-  if (templateUsesTicket(t) && !ticket) fail('Esta plantilla necesita un ticket (TCK-1234).')
+  if (templateUsesTicket(t) && !ticket) fail('Esta plantilla necesita un ticket (PROJ-123).')
   const n = t.counter + 1
   const base: VarValues = { ticket, fecha: today(now), n, plantilla: t.name, carpeta: folderLabel(repoPath) }
   const branch = t.useWorktree ? applyVars(t.useWorktree.branchPattern, base) : undefined

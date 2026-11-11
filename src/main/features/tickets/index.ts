@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writ
 import { basename, join } from 'node:path'
 import {
   MODELOS,
+  SIN_CONECTOR,
   type Accion,
   type ConectorPropioVista,
   type Detalle,
@@ -22,7 +23,7 @@ import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, tick
 import { resolveClaudeExe, runClaude } from './claude-run'
 import type { ConectorDef, ConectorGh, ConectorMcp } from './conector'
 import { crearAlmacen, type Almacen, type FsTickets } from './almacen'
-import { CONECTOR_POR_DEFECTO, CONECTORES } from './conectores'
+import { CONECTOR_LEGADO, CONECTORES } from './conectores'
 import { buildDescubrirArgs, buildDescubrirPrompt, parseDescubrir, type Descubiertas } from './descubrir'
 import {
   armarRegistro,
@@ -205,20 +206,15 @@ function guardarArchivo(a: ArchivoPropios): void {
 }
 
 function activo(): ConectorDef {
+  if (state.config.conectorId === SIN_CONECTOR) throw new Error('Todavía no elegiste un conector. Elegilo en los ajustes de Tickets.')
   const def = buscar(state.config.conectorId)
   if (!def) throw new Error(noEsta(state.config.conectorId))
   return def
 }
 
-/** El conector por defecto, para volver a él si el elegido no está en esta versión. */
-function alternativa(): { id: string; nombre: string } | undefined {
-  const def = buscar(CONECTOR_POR_DEFECTO)
-  return def && { id: def.id, nombre: def.nombre }
-}
-
-/** Para crear espacios (también desde Equipo, que es de Gruv): el activo o, si no está, el por defecto. */
+/** Para crear espacios: el activo o, si no está, el de Gruv (Equipo todavía es de Gruv). */
 function paraEspacios(): ConectorDef {
-  return buscar(state.config.conectorId) ?? buscar(CONECTOR_POR_DEFECTO) ?? activo()
+  return buscar(state.config.conectorId) ?? buscar(CONECTOR_LEGADO) ?? activo()
 }
 
 /** Columnas del flujo (si la última consulta no trajo, las del conector). */
@@ -243,13 +239,12 @@ function snapshot(): TicketsSnapshot {
     fetchedAt: state.fetchedAt,
     fetchedBy: state.fetchedBy,
     lastRun: state.lastRun,
-    lastError: def ? state.lastError : noEsta(id),
+    lastError: def ? state.lastError : id === SIN_CONECTOR ? undefined : `${noEsta(id)} Elegí otro en los ajustes.`,
     aviso: almacen.aviso(),
     config: state.config,
     running: Boolean(running),
     noDisponible,
     lastRepo: lastRepo(),
-    porDefecto: def ? undefined : alternativa(),
     avisosPropios: avisosPropios.length ? avisosPropios : undefined
   }
 }
@@ -446,15 +441,20 @@ async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: n
   }
 }
 
-/** El conector al que se pasa, o undefined si es el mismo. No cambia nada. */
-function conectorNuevo(v: unknown): ConectorDef | undefined {
+/** El id del conector al que se pasa, o undefined si es el mismo. No cambia nada. */
+function conectorNuevo(v: unknown): string | undefined {
+  if (v === SIN_CONECTOR) {
+    if (state.config.conectorId === SIN_CONECTOR) return undefined
+    if (running || escribiendo.size) throw new Error('Esperá a que termine lo que está en curso para cambiar de conector.')
+    return SIN_CONECTOR
+  }
   const r = typeof v === 'string' ? registrado(v) : undefined
   if (!r) throw new Error('Ese conector no está en esta versión de Sloth.')
   if (!aceptado(r)) throw new Error('Antes de usar un conector del equipo, revisalo y aceptalo.')
   const def = r.def
   if (def.id === state.config.conectorId) return undefined
   if (running || escribiendo.size) throw new Error('Esperá a que termine lo que está en curso para cambiar de conector.')
-  return def
+  return def.id
 }
 
 /** Todo se valida sobre una copia: si algo falla, no queda nada aplicado a medias. */
@@ -475,7 +475,7 @@ function setConfig(raw: unknown): TicketsSnapshot {
   }
   if ('assigneeId' in p) {
     const s = texto(p.assigneeId, ASSIGNEE_MAX, 'El id de persona') ?? ''
-    const def = buscar(nuevo?.id ?? state.config.conectorId)
+    const def = buscar(nuevo ?? state.config.conectorId)
     if (!assigneeValido(s, def))
       throw new Error(def ? `Ese id de persona no tiene el formato de ${def.nombre}.` : 'El id de persona solo lleva letras, números y guiones.')
     c.assigneeId = s
@@ -489,12 +489,12 @@ function setConfig(raw: unknown): TicketsSnapshot {
     else delete c.projectRepos[project]
   }
   if ('confirmRefresh' in p) c.confirmRefresh = p.confirmRefresh !== false
-  if (nuevo) {
+  if (nuevo !== undefined) {
     // Pasar a otro conector deja de lado lo leído con el anterior.
-    state = conConector(state, nuevo.id)
+    state = conConector(state, nuevo)
     noDisponible = {}
     detalles.clear()
-    c.conectorId = nuevo.id
+    c.conectorId = nuevo
     if (!('assigneeId' in p)) c.assigneeId = ''
   }
   state.config = c
@@ -680,7 +680,7 @@ function borrarPropio(rawId: unknown): TicketsSnapshot {
   if (eraActivo) sinNadaEnCurso()
   guardarArchivo({ ...archivoPropios, conectores: archivoPropios.conectores.filter((c) => c.id !== id) })
   recargarPropios(state.config)
-  if (eraActivo) pasarA(CONECTOR_POR_DEFECTO)
+  if (eraActivo) pasarA(SIN_CONECTOR)
   changed()
   return snapshot()
 }

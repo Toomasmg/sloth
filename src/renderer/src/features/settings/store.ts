@@ -292,7 +292,7 @@ export const customAccountColor = (accountId: string | undefined): string | unde
 
 /**
  * Color de identidad de una cuenta: el elegido en Configuración o, si no hay, el automático por
- * posición. Es LA función que usan App (colorOf), broadcast y el tablero de Gruv.
+ * posición. Es LA función que usan App (colorOf), broadcast y el tablero de tickets.
  */
 export const resolveAccountColor = (accountId: string | undefined, index: number, p: SettingsPayload = state): string =>
   (accountId ? p.settings.accountColors[accountId] : undefined) ?? accountColor(index)

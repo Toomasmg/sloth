@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
 import { CloseIcon } from '../../icons/SlothIcons'
-import type { ConectorPropioVista, ConectorResumen } from '../../../../shared/tickets'
+import { SIN_CONECTOR, type ConectorPropioVista, type ConectorResumen } from '../../../../shared/tickets'
 import { setSnapshot, type Snapshot } from './model'
 import { aceptarYUsar, AvisoHerramientas, deDondeViene, etiquetaOrigen, Propios } from './Propios'
 
@@ -66,7 +66,7 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
   }
 
   const confirmar = (): void => {
-    if (pendiente) set({ conectorId: pendiente })
+    if (pendiente !== null) set({ conectorId: pendiente })
     setPendiente(null)
   }
 
@@ -81,6 +81,7 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
         <label className="field f-tickets-ajustes-campo">
           <span>Conector</span>
           <select value={pendiente ?? snap.config.conectorId} onChange={(e) => elegirConector(e.target.value)} disabled={snap.running}>
+            <option value={SIN_CONECTOR}>Ninguno</option>
             {grupos(snap.conectores).map((g) => (
               <optgroup key={g.etiqueta} label={g.etiqueta}>
                 {g.conectores.map((c) => (
@@ -162,7 +163,7 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
         </p>
       )}
 
-      {pendiente && (
+      {pendiente !== null && (
         <div className="f-tickets-alert f-tickets-confirm" role="alertdialog" aria-label="Confirmar cambio de conector">
           <span className="f-tickets-alert-text">Cambiar de conector borra la lista actual. ¿Seguimos?</span>
           <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={confirmar}>

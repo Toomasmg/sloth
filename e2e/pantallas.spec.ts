@@ -8,7 +8,7 @@ import { test, expect } from './sloth'
 test.use({ seed: { workspaces: [{ id: 'ws-web', name: 'web' }, { id: 'ws-api', name: 'api-pagos' }] } })
 
 const PANTALLAS: { herramienta: string; lista: string; captura: string }[] = [
-  { herramienta: 'Tickets de Gruv', lista: 'Todavía no se consultó Gruv.', captura: 'tickets.png' },
+  { herramienta: 'Tickets', lista: 'Todavía no elegiste de dónde traer tickets.', captura: 'tickets.png' },
   { herramienta: 'Historial de sesiones', lista: 'Todavía no hay sesiones guardadas', captura: 'historial.png' },
   { herramienta: 'Plantillas', lista: 'Todavía no hay plantillas.', captura: 'plantillas.png' },
   { herramienta: 'Ramas aparte', lista: 'Ningún espacio apunta a un repo git.', captura: 'ramas.png' },

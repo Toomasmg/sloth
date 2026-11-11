@@ -7,6 +7,7 @@
 import {
   ACCIONES,
   categoriaDe,
+  SIN_CONECTOR,
   type Accion,
   type Comentario,
   type ConectorInfo,
@@ -230,7 +231,7 @@ export const leeDetalle = (def: ConectorDef): boolean => def.via === 'gh' || def
 
 export function info(def: ConectorDef | undefined, idPedido: string): ConectorInfo {
   if (!def)
-    return { id: idPedido, nombre: idPedido, verificado: false, via: 'mcp', disponible: false, acciones: [], leeDetalle: false, ejemploId: '', estados: [], comandoTicket: false }
+    return { id: idPedido, nombre: idPedido === SIN_CONECTOR ? 'Sin conector' : idPedido, verificado: false, via: 'mcp', disponible: false, acciones: [], leeDetalle: false, ejemploId: '', estados: [], comandoTicket: false }
   return {
     id: def.id,
     nombre: def.nombre,

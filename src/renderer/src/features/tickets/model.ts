@@ -80,7 +80,7 @@ export const getSnapshot = (): Snapshot | null => snap
 export const useSnapshot = (): Snapshot | null => useSyncExternalStore(subscribe, () => snap)
 export const useBoardOpen = (): boolean => useSyncExternalStore(subscribe, () => open)
 
-/** «Tickets de Gruv»; sin snapshot o con un conector que esta versión no tiene, solo «Tickets». */
+/** «Tickets de Jira»; sin conector, sin snapshot o con uno que esta versión no tiene, solo «Tickets». */
 export const etiquetaTablero = (s: Snapshot | null): string => (s?.conector.disponible ? `Tickets de ${s.conector.nombre}` : 'Tickets')
 
 export function timeAgo(ts: number, now = Date.now()): string {

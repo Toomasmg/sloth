@@ -4,7 +4,7 @@ import { cleanError } from '../../format'
 import { SPACE_CHIP, SPACE_LABEL, spaceStatus } from '../broadcast/state'
 import { CloseIcon, SearchIcon, SettingsIcon, SpaceIcon } from '../../icons/SlothIcons'
 import type { Workspace } from '../../../../shared/types'
-import { categoriaDe } from '../../../../shared/tickets'
+import { categoriaDe, SIN_CONECTOR } from '../../../../shared/tickets'
 import { mismoTicket } from '../../../../shared/templates-shared'
 import {
   etiquetaTablero,
@@ -142,15 +142,15 @@ export function Board(): React.JSX.Element {
   const me = snap?.me
   const estados = snap?.estados ?? []
   const n = snap?.conector.nombre ?? 'el conector'
-  const unavailable = Boolean(snap) && !snap?.conector.disponible
-  const porDefecto = snap?.porDefecto
+  const sinConector = snap?.conector.id === SIN_CONECTOR
+  const unavailable = Boolean(snap) && !sinConector && !snap?.conector.disponible
   // Con gh no hay cuenta de Claude de por medio: se lee con la sesión de GitHub de la persona.
   const porGh = snap?.conector.via === 'gh'
   const kindOf = (k?: string): ReturnType<typeof estadoKind> => estadoKind(categoriaDe(k, estados, snap?.conector.estados ?? []))
   const ticketTpls = tpls.filter(usesTicket)
-  // `/ticket` es la skill de Gruv (main hace el mismo control con usaComandoTicket): con otro conector,
+  // `/ticket` es una skill propia del conector (hoy solo Gruv): si el conector no la usa,
   // una plantilla que la usa solo vale si se llama como el conector, no como la primera que haya.
-  const sirveDeComodin = (x: TemplateLite): boolean => snap?.conector.id === 'gruv' || !/(^|\s)\/ticket\b/.test(x.initialPrompt ?? '')
+  const sirveDeComodin = (x: TemplateLite): boolean => Boolean(snap?.conector.comandoTicket) || !/(^|\s)\/ticket\b/.test(x.initialPrompt ?? '')
   const ticketTpl = ticketTpls.find((x) => x.name.toLowerCase().includes(n.toLowerCase())) ?? ticketTpls.find(sirveDeComodin)
   const estadoName = (k?: string): string => estados.find((e) => e.clave === k)?.nombre ?? (k ? k.replace(/_/g, ' ') : 'Sin estado')
   const wsOf = (id: string): Workspace | undefined => ui.workspaces.find((w) => mismoTicket(w.ticket, id))
@@ -307,17 +307,13 @@ export function Board(): React.JSX.Element {
     void ui.invoke<Snapshot>('feat:tickets:setConfig', { confirmRefresh: ask }).then(setSnapshot, (e) => setErr(cleanError(e)))
   }
 
-  const usarConector = (conectorId: string): void => {
-    setErr(null)
-    void ui.invoke<Snapshot>('feat:tickets:setConfig', { conectorId }).then(setSnapshot, (e) => setErr(cleanError(e)))
-  }
-
   // ---------- estado de conexión (real: lo que dejó la última consulta) ----------
   const anyLogged = ui.accounts.some((a) => ui.statuses[a.id]?.loggedIn)
   type Tone = 'ok' | 'busy' | 'bad' | 'idle'
   let tone: Tone = 'idle'
   let connText = `Todavía no se consultó ${n}`
   if (!snap) connText = 'Cargando…'
+  else if (sinConector) connText = 'Sin conector'
   else if (running) {
     tone = 'busy'
     connText = porGh ? `Consultando ${n} con gh…` : `Consultando ${n} con ${accLabel(snap.config.queryAccountId) ?? 'una cuenta'}…`
@@ -361,7 +357,7 @@ export function Board(): React.JSX.Element {
           type="button"
           className="f-tickets-b f-tickets-b--sm"
           onClick={askRefresh}
-          disabled={running || !snap || unavailable}
+          disabled={running || !snap || unavailable || sinConector}
           title={porGh ? `Lee los issues de ${n} con gh (solo lectura)` : `Lee los tickets de ${n} con la cuenta que la consulta (solo lectura)`}
         >
           <RefreshGlyph />
@@ -523,11 +519,9 @@ export function Board(): React.JSX.Element {
               {unavailable && (
                 <div className="f-tickets-alert f-tickets-offline" role="alert">
                   <span className="f-tickets-alert-text">{snap?.lastError}</span>
-                  {porDefecto && (
-                    <button type="button" className="f-tickets-b f-tickets-b--xs f-tickets-b--solid-danger" onClick={() => usarConector(porDefecto.id)}>
-                      Usar {porDefecto.nombre}
-                    </button>
-                  )}
+                  <button type="button" className="f-tickets-b f-tickets-b--xs f-tickets-b--solid-danger" onClick={() => setAjustes(true)}>
+                    Elegir conector
+                  </button>
                 </div>
               )}
 
@@ -555,7 +549,15 @@ export function Board(): React.JSX.Element {
 
               {!bodyLoading && snap && !unavailable && tickets.length === 0 && (
                 <div className="f-tickets-empty">
-                  {snap.lastError ? (
+                  {sinConector ? (
+                    <>
+                      <span className="f-tickets-empty-title">Todavía no elegiste de dónde traer tickets.</span>
+                      <span className="f-tickets-muted">Sloth funciona igual sin tickets. Si tu equipo usa Jira, GitHub, Linear u otro sistema, elegilo en los ajustes.</span>
+                      <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={() => setAjustes(true)}>
+                        Elegir conector
+                      </button>
+                    </>
+                  ) : snap.lastError ? (
                     <>
                       <span className="f-tickets-empty-title">No pudimos cargar los tickets.</span>
                       <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={() => void refresh()} disabled={running}>

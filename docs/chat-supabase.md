@@ -1,6 +1,6 @@
 # Chat del equipo en Sloth (Supabase propio)
 
-Desde la v0.5, Sloth tiene un chat para personas: equipos con nombre, descripción y foto, chat grupal por equipo y mensajes directos (por ejemplo, con Mateo). Funciona sobre **tu propio proyecto de Supabase**, que es gratis. Sloth no tiene servidor propio y no ve tus mensajes.
+Desde la v0.5, Sloth tiene un chat para personas: equipos con nombre, descripción y foto, chat grupal por equipo y mensajes directos (por ejemplo, con Ana). Funciona sobre **tu propio proyecto de Supabase**, que es gratis. Sloth no tiene servidor propio y no ve tus mensajes.
 
 Esto lo hace **una sola persona del equipo, una vez**. Son unos 15 minutos. Después, cada compañero solo inicia sesión con GitHub.
 
@@ -9,7 +9,7 @@ Esto lo hace **una sola persona del equipo, una vez**. Son unos 15 minutos. Desp
 ## 1. Crear el proyecto de Supabase
 
 1. Entrá a <https://supabase.com> y creá una cuenta. Podés entrar con GitHub.
-2. Tocá **New project**. Elegí un nombre (por ejemplo `sloth-chat-cosmos`), una contraseña de base de datos (guardala en tu gestor de contraseñas: Sloth no la usa) y la región más cercana (por ejemplo *South America (São Paulo)*).
+2. Tocá **New project**. Elegí un nombre (por ejemplo `sloth-chat-equipo`), una contraseña de base de datos (guardala en tu gestor de contraseñas: Sloth no la usa) y la región más cercana (por ejemplo *South America (São Paulo)*).
 3. Esperá a que termine de crearse. Tarda 1 o 2 minutos.
 4. Andá a **Project Settings → API** (o **Data API**) y anotá:
    - **Project URL**: `https://<ref>.supabase.co`
@@ -72,7 +72,7 @@ Cuando un compañero abre Sloth con ese repo, la app le pregunta si quiere usar 
 
 - **Crear un equipo:** abrí el **Chat** (botón en la barra de arriba) y tocá **Nuevo equipo**. Elegí nombre, descripción y foto. La foto se recorta en cuadrado y se achica antes de subirla; puede pesar hasta 512 KB.
 - **Invitar:** hay dos maneras.
-  - **Por usuario de GitHub** (por ejemplo `mateo`): la invitación le aparece cuando inicia sesión.
+  - **Por usuario de GitHub** (por ejemplo `ana`): la invitación le aparece cuando inicia sesión.
   - **Por código:** pasale el código del equipo. Lo ven solo los owners y los admins, y lo pueden cambiar cuando quieran; el código viejo deja de andar.
 - **Mensaje directo:** desde la lista de miembros de un equipo, tocá **Escribirle**. Solo podés abrir un DM con gente con la que compartís un equipo.
 - **No leídos y avisos:** el botón Chat muestra cuántos mensajes tenés sin leer. Si la ventana de Sloth no tiene el foco, te llega una notificación de Windows.
@@ -82,7 +82,7 @@ Cuando un compañero abre Sloth con ese repo, la app le pregunta si quiere usar 
 - Un equipo, sus miembros y sus mensajes los leen **solo sus miembros**. Un DM lo leen **solo sus dos participantes**.
 - Nadie puede escribir en nombre de otro: el autor y la hora los pone la base de datos. Hay un tope de 30 mensajes por minuto por persona, y un mensaje puede tener hasta 4000 caracteres.
 - Entrar a un equipo, abrir un DM y marcar como leído pasan solo por funciones que revisan permisos; no se puede insertar directo. El código de invitación lo ven solo los owners y los admins.
-- El usuario de GitHub sale de la identidad que guarda Supabase al iniciar sesión, y el usuario no la puede editar. Por eso nadie puede hacerse pasar por `mateo` para quedarse con su invitación.
+- El usuario de GitHub sale de la identidad que guarda Supabase al iniciar sesión, y el usuario no la puede editar. Por eso nadie puede hacerse pasar por `ana` para quedarse con su invitación.
 - Las fotos van en un bucket **privado**. Las ven solo los miembros del equipo y las cambian solo los owners y los admins.
 
 La migración tiene una prueba con PGlite (Postgres en WASM), con 40 casos de acceso permitido y prohibido: `npm i --no-save @electric-sql/pglite` y después `node supabase/tests/rls.test.mjs supabase/migrations/0001_chat.sql`.

@@ -341,7 +341,7 @@ app.whenReady().then(async () => {
       throw new Error('Elegí una carpeta de repo válida.')
     requireAccount(input.accountId)
     const ticket = input.ticket?.trim() ? normTicketId(input.ticket) : undefined
-    if (input.ticket?.trim() && !ticket) throw new Error('El ticket solo lleva letras, números, guiones, puntos o _ (p. ej. TCK-1234 o 123).')
+    if (input.ticket?.trim() && !ticket) throw new Error('El ticket solo lleva letras, números, guiones, puntos o _ (p. ej. PROJ-123 o 123).')
     const initialPrompt = input.initialPrompt?.trim() || undefined
     if (initialPrompt && initialPrompt.length > 4000) throw new Error('El prompt inicial es demasiado largo.')
     const branch = input.branch?.trim() || undefined

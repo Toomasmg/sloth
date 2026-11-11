@@ -15,7 +15,7 @@ Un archivo versionado **dentro del repo del equipo** que Sloth detecta solo. Sir
 {
   "formato": "sloth-team",
   "versión": 1,
-  "equipo": "Cosmos-Ai",
+  "equipo": "Mi equipo",
   "plantillas": [
     {
       "name": "Ticket",
@@ -37,7 +37,7 @@ Un archivo versionado **dentro del repo del equipo** que Sloth detecta solo. Sir
   ],
   "ajustes": { "densidad": "compacta", "tamañoTerminal": 13 },
   "links": [
-    { "nombre": "Gruv", "url": "https://…" },
+    { "nombre": "Tickets", "url": "https://…" },
     { "nombre": "Staging", "url": "https://…" },
     { "nombre": "Docs", "url": "https://…" }
   ]
