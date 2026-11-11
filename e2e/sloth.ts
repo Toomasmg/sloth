@@ -13,6 +13,8 @@ import { join } from 'node:path'
 export interface Seed {
   /** Espacios de prueba (con su cuenta). Las carpetas se crean solas. */
   workspaces?: { id: string; name: string; open?: boolean }[]
+  /** Cuentas de más (sin sesión), por nombre: para las pantallas que piden dos cuentas. */
+  extraAccounts?: string[]
   /** Espacios que arrancan dormidos. */
   asleep?: string[]
   /** Parche de Configuración (features/settings.json). */
@@ -46,7 +48,14 @@ function seedUserData(dir: string, seed: Seed): void {
   })
   const state = {
     version: 1,
-    accounts: [{ id: ACCOUNT_ID, label: 'Prueba', configDir, createdAt: 1_700_000_000_000 }],
+    accounts: [
+      { id: ACCOUNT_ID, label: 'Prueba', configDir, createdAt: 1_700_000_000_000 },
+      ...(seed.extraAccounts ?? []).map((label, i) => {
+        const extraDir = join(dir, 'accounts', `acc-extra-${i}`)
+        mkdirSync(extraDir, { recursive: true })
+        return { id: `acc-extra-${i}`, label, configDir: extraDir, createdAt: 1_700_000_000_001 + i }
+      })
+    ],
     workspaces,
     openPanes: ws.filter((w) => w.open).map((w) => w.id)
   }

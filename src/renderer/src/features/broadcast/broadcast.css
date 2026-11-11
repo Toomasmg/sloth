@@ -488,6 +488,14 @@
   display: grid;
   place-items: center;
 }
+.f-broadcast-result.failed {
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 30%, transparent);
+}
+.f-broadcast-result.failed .f-broadcast-result-ic {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger-fg);
+}
 .f-broadcast-result-title {
   font-weight: 600;
   overflow-wrap: anywhere;

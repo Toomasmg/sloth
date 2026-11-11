@@ -112,7 +112,8 @@
 }
 .f-onboarding-skip {
   align-self: flex-start;
-  padding: 2px 0;
+  min-height: 24px;
+  padding: 4px 0;
   border: 0;
   border-radius: 4px;
   background: none;
@@ -170,6 +171,10 @@
 .f-onboarding-progress span.on {
   background: var(--brand-grad);
 }
+.f-onboarding h1:focus,
+.f-onboarding h2:focus {
+  outline: none;
+}
 .f-onboarding-top .icon-btn {
   flex: none;
   margin: -6px -6px 0 0;
@@ -194,6 +199,10 @@
 }
 .f-onboarding-bottom {
   margin-top: auto;
+  position: sticky;
+  bottom: 0;
+  padding: 8px 0;
+  background: var(--bg);
   display: flex;
   flex-wrap: wrap;
   align-items: center;

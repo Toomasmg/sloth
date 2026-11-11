@@ -80,9 +80,9 @@ const ui: FeatureUi = {
     {
       id: 'team:open',
       title: 'Ver equipo',
-      subtitle: 'PRs abiertos con su CI y review, y en qué ticket de Gruv anda cada uno',
+      subtitle: 'PRs abiertos con su CI y review, y en qué ticket anda cada uno',
       group: 'Equipo',
-      keywords: 'equipo team personas prs github review ci gruv tickets',
+      keywords: 'equipo team personas prs github review ci conector tickets',
       run: () => setTeamOpen(true)
     }
   ]

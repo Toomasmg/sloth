@@ -1,4 +1,7 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { DiscardConfirm } from '../../Modal'
+import { captureOpener } from '../../return-focus'
+import { FOCUSABLE, nextFocusIndex } from '../../focus-trap'
 import './page.css'
 
 /**
@@ -10,7 +13,8 @@ export function PageShell({
   title,
   onClose,
   right,
-  backLabel = '‹ Espacios',
+  backLabel,
+  dirty,
   className,
   children
 }: {
@@ -20,34 +24,55 @@ export function PageShell({
   right?: ReactNode
   /** Texto del botón para volver (por defecto «‹ Espacios»). */
   backLabel?: ReactNode
+  /** Con algo escrito, Esc o «‹ Espacios» preguntan antes de descartar. */
+  dirty?: boolean
   className?: string
   children: ReactNode
 }): React.JSX.Element {
   const closeRef = useRef(onClose)
   closeRef.current = onClose
+  const dirtyRef = useRef(false)
+  dirtyRef.current = !!dirty
+  const [asking, setAsking] = useState(false)
+  const request = (): void => {
+    if (dirtyRef.current) setAsking(true)
+    else closeRef.current()
+  }
+  const requestRef = useRef(request)
+  requestRef.current = request
   const backRef = useRef<HTMLButtonElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  const trapTab = (e: React.KeyboardEvent<HTMLDivElement>): void => {
+    if (e.key !== 'Tab' || e.defaultPrevented || !rootRef.current) return
+    const list = [...rootRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0)
+    const i = nextFocusIndex(list.length, list.indexOf(document.activeElement as HTMLElement), e.shiftKey)
+    if (i < 0) return
+    e.preventDefault()
+    list[i].focus()
+  }
 
   useEffect(() => {
-    const prev = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const restore = captureOpener()
     backRef.current?.focus()
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape' && !e.defaultPrevented) {
         e.preventDefault()
-        closeRef.current()
+        requestRef.current()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => {
       window.removeEventListener('keydown', onKey)
-      if (prev?.isConnected) prev.focus()
+      restore()
     }
   }, [])
 
   return (
-    <div className={`page-shell ${className ?? ''}`} role="dialog" aria-modal="true" aria-labelledby={labelId}>
+    <div ref={rootRef} className={`page-shell ${className ?? ''}`} role="dialog" aria-modal="true" aria-labelledby={labelId} onKeyDown={trapTab}>
       <header className="page-head">
-        <button ref={backRef} type="button" className="page-back" onClick={() => closeRef.current()}>
-          {backLabel}
+        <button ref={backRef} type="button" className="page-back" aria-label={backLabel ? undefined : 'Volver a los espacios'} title="Volver (Esc)" onClick={request}>
+          {backLabel ?? '‹ Espacios'}
         </button>
         <span className="page-sep" aria-hidden="true" />
         <span className="page-name" id={labelId}>
@@ -57,6 +82,7 @@ export function PageShell({
         {right}
       </header>
       <div className="page-body">{children}</div>
+      {asking && <DiscardConfirm onKeep={() => setAsking(false)} onDiscard={() => closeRef.current()} />}
     </div>
   )
 }

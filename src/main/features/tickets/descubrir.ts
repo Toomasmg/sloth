@@ -31,8 +31,9 @@ export function buildDescubrirArgs(): string[] {
     // Sin herramientas propias de Claude Code; las MCP siguen listadas en system/init.
     '--tools',
     '',
-    // Con allowedTools vacío y el modo default, en -p se rechaza toda llamada a una herramienta MCP que la
-    // cuenta no tenga permitida en sus propios ajustes (permissions.allow); el prompt es fijo y pide no llamar a ninguna.
+    // Con allowedTools vacío y el modo default, en -p se rechaza toda llamada MCP salvo las que la cuenta permite en
+    // su settings.json (permissions.allow): esas siguen valiendo, porque --setting-sources project,local también
+    // escondería los MCP de alcance usuario que hay que descubrir. El prompt es fijo y pide no llamar a ninguna.
     '--allowedTools',
     '',
     '--disallowedTools',

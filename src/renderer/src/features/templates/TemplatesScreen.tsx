@@ -4,6 +4,7 @@ import { cleanError, shortPath } from '../../format'
 import { applyVars, BRANCH_VARS, TEMPLATE_COLOR_KEYS, TEMPLATE_ICON_KEYS, SUGGESTED, today, unknownVars, validBranch, varsIn, type VarValues } from '../../../../shared/templates-shared'
 import { colorHex, iconPath, TEMPLATE_COLORS, TEMPLATE_ICONS, VAR_CHIPS } from './catalog'
 import { loadTemplates, openDialog, setPreselect, useTemplates, type TemplateDto } from './store'
+import { Modal } from '../../Modal'
 import { SearchIcon } from '../../icons/SlothIcons'
 
 /** Campos que se editan en el formulario (lo que el usuario puede cambiar de una plantilla propia). */
@@ -108,24 +109,13 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
   const isTeam = Boolean(cur?.team)
   const isMine = Boolean(cur && !cur.team)
 
-  // Escape cierra; con cambios sin guardar pregunta antes.
+  // Esc y la X cierran de adentro hacia afuera: primero el panel de compartir o el alta, y recién después la pantalla.
+  const hasDrafts = Object.keys(drafts).length > 0
   const requestClose = (): void => {
-    if (Object.keys(drafts).length && !window.confirm('Hay cambios sin guardar. ¿Cerrar igual?')) return
-    onClose()
+    if (share) setShare(null)
+    else if (creating) setCreating(false)
+    else onClose()
   }
-  // Esc cierra primero el panel de compartir si está abierto.
-  const escRef = useRef<() => void>(() => undefined)
-  escRef.current = () => (share ? setShare(null) : requestClose())
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        escRef.current()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
 
   useEffect(() => () => window.clearTimeout(toastTimer.current), [])
 
@@ -404,464 +394,457 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
   const segs = ed ? previewSegments(ed.prompt, sample) : []
 
   return (
-    <div className="tp-overlay" onMouseDown={(e) => e.target === e.currentTarget && requestClose()}>
-      <div className="tp-screen" role="dialog" aria-modal="true" aria-labelledby="tp-title">
-        <header className="tp-head">
-          <button type="button" className="tp-back" onClick={requestClose} title="Cerrar (Esc)">
-            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 5l-7 7 7 7" />
+    <Modal
+      title="Plantillas de espacio"
+      subtitle={`${list.length} ${list.length === 1 ? 'plantilla' : 'plantillas'} · ${list.filter((t) => t.team).length} del equipo`}
+      onClose={requestClose}
+      dirty={hasDrafts && !share && !creating}
+      className="tp-screen"
+      headClassName="tp-head"
+      titlesClassName="tp-titles"
+    >
+      <div className="tp-body">
+        <aside className="tp-list" aria-label="Lista de plantillas">
+          <label className="tp-search">
+            <SearchIcon size={14} />
+            <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar plantilla" aria-label="Buscar plantilla" />
+          </label>
+
+          <button type="button" className="btn primary tp-new-btn" aria-expanded={creating} onClick={() => setCreating((v) => !v)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
+              <path d="M12 5v14M5 12h14" />
             </svg>
-            Espacios
+            Nueva plantilla
           </button>
-          <span className="tp-divider" aria-hidden="true" />
-          <h2 id="tp-title">Plantillas de espacio</h2>
-          <span className="grow" />
-          <span className="tp-count">{`${list.length} ${list.length === 1 ? 'plantilla' : 'plantillas'} · ${list.filter((t) => t.team).length} del equipo`}</span>
-        </header>
 
-        <div className="tp-body">
-          <aside className="tp-list" aria-label="Lista de plantillas">
-            <label className="tp-search">
-              <SearchIcon size={14} />
-              <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar plantilla" aria-label="Buscar plantilla" />
-            </label>
-
-            <button type="button" className="btn primary tp-new-btn" aria-expanded={creating} onClick={() => setCreating((v) => !v)}>
-              <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              Nueva plantilla
-            </button>
-
-            {creating && (
-              <form className="tp-new" onSubmit={(e) => void createNew(e)} noValidate>
-                <div className="tp-new-title">Nueva plantilla</div>
-                <div className="field">
-                  <label htmlFor="tp-new-name">Nombre</label>
-                  <input
-                    id="tp-new-name"
-                    autoFocus
-                    value={newName}
-                    maxLength={80}
-                    onChange={(e) => {
-                      setNewName(e.target.value)
-                      setNewErr('')
-                    }}
-                    placeholder="Ej.: Hotfix de staging"
-                    aria-invalid={Boolean(newErr)}
-                    aria-describedby={newErr ? 'tp-new-err' : undefined}
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="tp-new-from">Empezar desde</label>
-                  <select id="tp-new-from" value={newFrom} onChange={(e) => setNewFrom(e.target.value)}>
-                    <option value="">Vacía</option>
-                    {list.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {newErr && (
-                  <p className="tp-err" id="tp-new-err" role="alert">
-                    {newErr}
-                  </p>
-                )}
-                <div className="tp-new-actions">
-                  <button type="button" className="btn ghost sm" onClick={() => setCreating(false)}>
-                    Cancelar
-                  </button>
-                  <button type="submit" className="btn primary sm">
-                    Crear
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {teamRows.length > 0 && (
-              <section aria-labelledby="tp-team-h" className="tp-group">
-                <h3 id="tp-team-h">Del equipo · {teamRows.length}</h3>
-                {teamRows.map(rowOf)}
-              </section>
-            )}
-            {mineRows.length > 0 && (
-              <section aria-labelledby="tp-mine-h" className="tp-group">
-                <h3 id="tp-mine-h">Mías · {mineRows.length}</h3>
-                {mineRows.map(rowOf)}
-              </section>
-            )}
-            {q0 && visible.length === 0 && (
-              <p className="tp-empty" role="status">
-                Ninguna plantilla coincide con «{q.trim()}».
-              </p>
-            )}
-            {list.length === 0 && <p className="tp-empty">Todavía no hay plantillas. Creá una con «Nueva plantilla».</p>}
-            <p className="tp-foot">Las plantillas del equipo no se editan ni se borran. Duplicalas para tener tu versión.</p>
-          </aside>
-
-          <main className="tp-main">
-            {!cur && (
-              <div className="tp-none">
-                <span className="tp-none-title">Elegí una plantilla de la lista</span>
-                <span className="tp-none-sub">Una plantilla define cómo arranca un espacio: nombre, cuenta, rama y el primer mensaje para Claude.</span>
+          {creating && (
+            <form className="tp-new" onSubmit={(e) => void createNew(e)} noValidate>
+              <div className="tp-new-title">Nueva plantilla</div>
+              <div className="field">
+                <label htmlFor="tp-new-name">Nombre</label>
+                <input
+                  id="tp-new-name"
+                  autoFocus
+                  value={newName}
+                  maxLength={80}
+                  onChange={(e) => {
+                    setNewName(e.target.value)
+                    setNewErr('')
+                  }}
+                  placeholder="Ej.: Hotfix de staging"
+                  aria-invalid={Boolean(newErr)}
+                  aria-describedby={newErr ? 'tp-new-err' : undefined}
+                />
               </div>
-            )}
+              <div className="field">
+                <label htmlFor="tp-new-from">Empezar desde</label>
+                <select id="tp-new-from" value={newFrom} onChange={(e) => setNewFrom(e.target.value)}>
+                  <option value="">Vacía</option>
+                  {list.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {newErr && (
+                <p className="tp-err" id="tp-new-err" role="alert">
+                  {newErr}
+                </p>
+              )}
+              <div className="tp-new-actions">
+                <button type="button" className="btn ghost sm" onClick={() => setCreating(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn primary sm">
+                  Crear
+                </button>
+              </div>
+            </form>
+          )}
 
-            {cur && ed && (
-              <div className="tp-detail">
-                <header className="tp-title-row">
-                  <span className="tp-big-tile" style={{ background: colorHex(isMine ? ed.color : cur.color) }}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
-                      <path d={iconPath(isMine ? ed.icon : cur.icon)} />
-                    </svg>
-                  </span>
-                  <div className="tp-title-text">
-                    <h2>{cur.name}</h2>
-                    <div className="tp-badges">
-                      <span className={`tp-badge ${cur.team ? 'team' : 'mine'}`}>{cur.team ? 'Del equipo' : 'Mía'}</span>
-                      {defaultId === cur.id && <span className="tp-badge ok">Predeterminada</span>}
+          {teamRows.length > 0 && (
+            <section aria-labelledby="tp-team-h" className="tp-group">
+              <h3 id="tp-team-h">Del equipo · {teamRows.length}</h3>
+              {teamRows.map(rowOf)}
+            </section>
+          )}
+          {mineRows.length > 0 && (
+            <section aria-labelledby="tp-mine-h" className="tp-group">
+              <h3 id="tp-mine-h">Mías · {mineRows.length}</h3>
+              {mineRows.map(rowOf)}
+            </section>
+          )}
+          {q0 && visible.length === 0 && (
+            <p className="tp-empty" role="status">
+              Ninguna plantilla coincide con «{q.trim()}».
+            </p>
+          )}
+          {list.length === 0 && <p className="tp-empty">Todavía no hay plantillas. Creá una con «Nueva plantilla».</p>}
+          <p className="tp-foot">Las plantillas del equipo no se editan ni se borran. Duplicalas para tener tu versión.</p>
+        </aside>
+
+        <main className="tp-main">
+          {!cur && (
+            <div className="tp-none">
+              <span className="tp-none-title">Elegí una plantilla de la lista</span>
+              <span className="tp-none-sub">Una plantilla define cómo arranca un espacio: nombre, cuenta, rama y el primer mensaje para Claude.</span>
+            </div>
+          )}
+
+          {cur && ed && (
+            <div className="tp-detail">
+              <header className="tp-title-row">
+                <span className="tp-big-tile" style={{ background: colorHex(isMine ? ed.color : cur.color) }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+                    <path d={iconPath(isMine ? ed.icon : cur.icon)} />
+                  </svg>
+                </span>
+                <div className="tp-title-text">
+                  <h2>{cur.name}</h2>
+                  <div className="tp-badges">
+                    <span className={`tp-badge ${cur.team ? 'team' : 'mine'}`}>{cur.team ? 'Del equipo' : 'Mía'}</span>
+                    {defaultId === cur.id && <span className="tp-badge ok">Predeterminada</span>}
+                  </div>
+                </div>
+              </header>
+
+              {dirty && (
+                <div className="tp-dirty" role="status">
+                  <span className="tp-dirty-dot" aria-hidden="true" />
+                  <strong>Cambios sin guardar</strong>
+                  <span>Guardá o descartá antes de salir de esta plantilla.</span>
+                </div>
+              )}
+
+              <div className="tp-actions">
+                <button type="button" className="btn primary" onClick={useNow}>
+                  Usar esta plantilla
+                </button>
+                <button type="button" className="btn tp-def" aria-pressed={defaultId === cur.id} onClick={() => void toggleDefault()}>
+                  {defaultId === cur.id ? 'Es la predeterminada' : 'Fijar como predeterminada'}
+                </button>
+                <button type="button" className="btn" onClick={() => void dup()}>
+                  Duplicar
+                </button>
+                {isMine && (
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      setShare(share ? null : { repo: cur.repoPath ?? '', equipo: '', notice: '', preview: null })
+                    }}
+                    aria-expanded={Boolean(share)}
+                  >
+                    Compartir con el equipo
+                  </button>
+                )}
+              </div>
+
+              {isTeam && (
+                <section className="tp-card tp-readonly" aria-label="Datos de la plantilla del equipo">
+                  <div className="tp-kv">
+                    <span>Descripción</span>
+                    <span>{cur.description || '—'}</span>
+                  </div>
+                  <div className="tp-kv">
+                    <span>Cuenta sugerida</span>
+                    <span>{accountLabel(cur.accountId)}</span>
+                  </div>
+                  <div className="tp-kv">
+                    <span>Rama</span>
+                    <span className="mono">{cur.useWorktree ? cur.useWorktree.branchPattern : 'Sin rama aparte'}</span>
+                  </div>
+                  <div className="tp-kv">
+                    <span>Primer mensaje</span>
+                    <span className="mono pre">{cur.initialPrompt || 'Sin primer mensaje: el espacio arranca vacío.'}</span>
+                  </div>
+                  <p className="tp-hint">Esta plantilla es del equipo: no se edita ni se borra. Si la necesitás distinta, duplicala y cambiá tu copia.</p>
+                </section>
+              )}
+
+              {isMine && (
+                <form
+                  className="tp-card tp-editor"
+                  noValidate
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    void save()
+                  }}
+                >
+                  <div className="field">
+                    <label htmlFor="tp-name">Nombre</label>
+                    <input
+                      id="tp-name"
+                      value={ed.name}
+                      maxLength={80}
+                      onChange={(e) => setField('name', e.target.value)}
+                      placeholder="Ej.: Ticket del tablero"
+                      aria-invalid={Boolean(nameErr)}
+                      aria-describedby={nameErr ? 'tp-name-err' : undefined}
+                    />
+                    {nameErr && (
+                      <p className="field-error" id="tp-name-err">
+                        {nameErr}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="tp-desc">Descripción</label>
+                    <input id="tp-desc" value={ed.description} maxLength={140} onChange={(e) => setField('description', e.target.value)} placeholder="Una línea para reconocerla en la lista" />
+                  </div>
+
+                  <div className="tp-field-group">
+                    <span id="tp-icon-lbl">Ícono</span>
+                    <div role="radiogroup" aria-labelledby="tp-icon-lbl" className="tp-icons">
+                      {TEMPLATE_ICON_KEYS.map((k) => {
+                        const on = ed.icon === k
+                        return (
+                          <button
+                            key={k}
+                            type="button"
+                            role="radio"
+                            aria-checked={on}
+                            aria-label={TEMPLATE_ICONS[k].label}
+                            title={TEMPLATE_ICONS[k].label}
+                            className={`tp-icon-pick${on ? ' on' : ''}`}
+                            onClick={() => setField('icon', k)}
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+                              <path d={TEMPLATE_ICONS[k].path} />
+                            </svg>
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
-                </header>
 
-                {dirty && (
-                  <div className="tp-dirty" role="status">
-                    <span className="tp-dirty-dot" aria-hidden="true" />
-                    <strong>Cambios sin guardar</strong>
-                    <span>Guardá o descartá antes de salir de esta plantilla.</span>
+                  <div className="tp-field-group">
+                    <span id="tp-col-lbl">Color</span>
+                    <div role="radiogroup" aria-labelledby="tp-col-lbl" className="tp-colors">
+                      {TEMPLATE_COLOR_KEYS.map((k) => {
+                        const on = ed.color === k
+                        return (
+                          <button
+                            key={k}
+                            type="button"
+                            role="radio"
+                            aria-checked={on}
+                            aria-label={TEMPLATE_COLORS[k].name}
+                            title={TEMPLATE_COLORS[k].name}
+                            className={`tp-color-pick${on ? ' on' : ''}`}
+                            style={{ background: TEMPLATE_COLORS[k].hex, color: TEMPLATE_COLORS[k].hex }}
+                            onClick={() => setField('color', k)}
+                          />
+                        )
+                      })}
+                    </div>
                   </div>
-                )}
 
-                <div className="tp-actions">
-                  <button type="button" className="btn primary" onClick={useNow}>
-                    Usar esta plantilla
-                  </button>
-                  <button type="button" className="btn tp-def" aria-pressed={defaultId === cur.id} onClick={() => void toggleDefault()}>
-                    {defaultId === cur.id ? 'Es la predeterminada' : 'Fijar como predeterminada'}
-                  </button>
-                  <button type="button" className="btn" onClick={() => void dup()}>
-                    Duplicar
-                  </button>
-                  {isMine && (
+                  <div className="field">
+                    <label htmlFor="tp-acc">Cuenta sugerida</label>
+                    <select id="tp-acc" value={ed.accountId} onChange={(e) => setField('accountId', e.target.value)}>
+                      <option value={SUGGESTED}>Sugerida (con sesión y menos uso en 5 h)</option>
+                      {ctx.accounts.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="tp-wt">
+                    <div className="tp-wt-text">
+                      <span id="tp-wt-lbl">Crear rama aparte (worktree)</span>
+                      <small>Abre una copia de la carpeta con su propia rama, así no pisa lo que tenés abierto.</small>
+                    </div>
                     <button
                       type="button"
-                      className="btn"
-                      onClick={() => {
-                        setShare(share ? null : { repo: cur.repoPath ?? '', equipo: '', notice: '', preview: null })
-                      }}
-                      aria-expanded={Boolean(share)}
+                      role="switch"
+                      aria-checked={ed.wt}
+                      aria-labelledby="tp-wt-lbl"
+                      className={`switch-btn${ed.wt ? ' on' : ''}`}
+                      onClick={() => setField('wt', !ed.wt)}
                     >
-                      Compartir con el equipo
+                      <span aria-hidden="true" />
+                    </button>
+                  </div>
+
+                  {ed.wt && (
+                    <div className="field indent">
+                      <label htmlFor="tp-br">Patrón de rama</label>
+                      <input
+                        id="tp-br"
+                        className="mono"
+                        spellCheck={false}
+                        value={ed.br}
+                        onChange={(e) => setField('br', e.target.value)}
+                        placeholder="fix/{ticket}"
+                        aria-invalid={Boolean(brErr)}
+                        aria-describedby="tp-br-hint"
+                      />
+                      {brErr && (
+                        <p className="field-error" role="alert">
+                          {brErr}
+                        </p>
+                      )}
+                      <p className="field-help" id="tp-br-hint">
+                        Sin espacios. Podés usar {'{ticket}'}. Ejemplo con PROJ-123:<span className="mono">{brResolved || '…'}</span>
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="field">
+                    <label htmlFor="tp-prompt">Primer mensaje para Claude</label>
+                    <textarea
+                      id="tp-prompt"
+                      ref={promptRef}
+                      rows={5}
+                      className="mono"
+                      value={ed.prompt}
+                      onChange={(e) => setField('prompt', e.target.value)}
+                      placeholder="Ej.: Leé el ticket {ticket} y resumí qué pide."
+                      aria-describedby="tp-prompt-hint"
+                    />
+                    <div className="tp-chips" role="group" aria-label="Insertar variable">
+                      <span className="tp-chips-lbl">Insertar:</span>
+                      {VAR_CHIPS.map((v) => (
+                        <button key={v} type="button" className="tp-chip mono" onClick={() => insertVar(v)} aria-label={`Insertar ${v} en el cursor`}>
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="field-help" id="tp-prompt-hint">
+                      Las variables se reemplazan al crear el espacio: {'{ticket}'} es el número del ticket, {'{carpeta}'} la carpeta y {'{rama}'} la rama que se crea.
+                    </p>
+                    {unknown.length > 0 && (
+                      <p className="field-warn">
+                        Variable que no existe: {unknown.map((u) => `{${u}}`).join(', ')}. Las que hay son {'{ticket}'}, {'{carpeta}'} y {'{rama}'}.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="tp-preview" aria-labelledby="tp-pv-h">
+                    <h3 id="tp-pv-h">Vista previa con PROJ-123 en mi-app/front</h3>
+                    <div className="tp-preview-box">
+                      {segs.length > 0 ? (
+                        segs.map((s, i) => (
+                          <span key={i} className={s.v ? 'tp-seg-var' : undefined}>
+                            {s.t}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="tp-muted">Sin primer mensaje: el espacio arranca vacío.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="tp-save-bar">
+                    <span className="tp-save-hint" role="status">
+                      {tried && (nameErr || brErr) ? 'Revisá los campos marcados.' : err}
+                    </span>
+                    <button type="button" className="btn ghost" onClick={discard} disabled={!dirty}>
+                      Descartar cambios
+                    </button>
+                    <button type="submit" className="btn primary" disabled={saving}>
+                      {saving ? 'Guardando…' : 'Guardar'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {isTeam && err && (
+                <p className="tp-err" role="alert">
+                  {err}
+                </p>
+              )}
+
+              {isMine && share && (
+                <section className="tp-card tp-share" aria-label="Compartir con el equipo">
+                  <h3>Compartir con el equipo</h3>
+                  <p className="tp-hint">Se escribe en .sloth/team.json del repo que elijas. Solo se puede si el repo todavía no tiene ese archivo.</p>
+                  <div className="field">
+                    <label htmlFor="tp-share-repo">Carpeta del repo</label>
+                    <div className="input-row">
+                      <input id="tp-share-repo" className="mono" value={share.repo} onChange={(e) => setShare({ ...share, repo: e.target.value, preview: null })} placeholder="C:\repos\…" />
+                      <button type="button" className="btn" onClick={() => void pickRepo()}>
+                        Elegir…
+                      </button>
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="tp-share-team">Nombre del equipo</label>
+                    <input id="tp-share-team" value={share.equipo} maxLength={60} onChange={(e) => setShare({ ...share, equipo: e.target.value, preview: null })} placeholder="Ej.: Mi equipo" />
+                  </div>
+                  {share.notice && (
+                    <p className="tp-err" role="alert">
+                      {share.notice}
+                    </p>
+                  )}
+                  {share.preview && (
+                    <>
+                      <p className="tp-hint">
+                        Se va a escribir <span className="mono">{shortPath(share.preview.path)}</span> con {share.preview.count} plantilla(s).
+                      </p>
+                      {share.preview.skipped.length > 0 && (
+                        <ul className="tp-skipped">
+                          {share.preview.skipped.map((s) => (
+                            <li key={s.name}>
+                              «{s.name}»: {s.reason}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      <pre className="tp-pre mono">{share.preview.text}</pre>
+                    </>
+                  )}
+                  <div className="tp-share-actions">
+                    <button type="button" className="btn ghost" onClick={() => setShare(null)}>
+                      Cerrar
+                    </button>
+                    {!share.preview ? (
+                      <button type="button" className="btn" onClick={() => void shareCheck()}>
+                        Ver qué se comparte
+                      </button>
+                    ) : (
+                      <button type="button" className="btn primary" disabled={share.preview.count === 0} onClick={() => void shareWrite()}>
+                        Guardar en el repo
+                      </button>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {isMine && (
+                <div className="tp-danger">
+                  {confirmDel ? (
+                    <div className="tp-confirm" role="alertdialog" aria-labelledby="tp-del-t">
+                      <span id="tp-del-t">¿Borrar «{cur.name}»? No se puede deshacer.</span>
+                      <button type="button" className="btn ghost sm" onClick={() => setConfirmDel(false)}>
+                        Cancelar
+                      </button>
+                      <button type="button" className="btn danger sm" onClick={() => void remove()}>
+                        Sí, borrar
+                      </button>
+                    </div>
+                  ) : (
+                    <button type="button" className="tp-del-link" onClick={() => setConfirmDel(true)}>
+                      Borrar plantilla
                     </button>
                   )}
                 </div>
-
-                {isTeam && (
-                  <section className="tp-card tp-readonly" aria-label="Datos de la plantilla del equipo">
-                    <div className="tp-kv">
-                      <span>Descripción</span>
-                      <span>{cur.description || '—'}</span>
-                    </div>
-                    <div className="tp-kv">
-                      <span>Cuenta sugerida</span>
-                      <span>{accountLabel(cur.accountId)}</span>
-                    </div>
-                    <div className="tp-kv">
-                      <span>Rama</span>
-                      <span className="mono">{cur.useWorktree ? cur.useWorktree.branchPattern : 'Sin rama aparte'}</span>
-                    </div>
-                    <div className="tp-kv">
-                      <span>Primer mensaje</span>
-                      <span className="mono pre">{cur.initialPrompt || 'Sin primer mensaje: el espacio arranca vacío.'}</span>
-                    </div>
-                    <p className="tp-hint">Esta plantilla es del equipo: no se edita ni se borra. Si la necesitás distinta, duplicala y cambiá tu copia.</p>
-                  </section>
-                )}
-
-                {isMine && (
-                  <form
-                    className="tp-card tp-editor"
-                    noValidate
-                    onSubmit={(e) => {
-                      e.preventDefault()
-                      void save()
-                    }}
-                  >
-                    <div className="field">
-                      <label htmlFor="tp-name">Nombre</label>
-                      <input
-                        id="tp-name"
-                        value={ed.name}
-                        maxLength={80}
-                        onChange={(e) => setField('name', e.target.value)}
-                        placeholder="Ej.: Ticket de Gruv"
-                        aria-invalid={Boolean(nameErr)}
-                        aria-describedby={nameErr ? 'tp-name-err' : undefined}
-                      />
-                      {nameErr && (
-                        <p className="field-error" id="tp-name-err">
-                          {nameErr}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="field">
-                      <label htmlFor="tp-desc">Descripción</label>
-                      <input id="tp-desc" value={ed.description} maxLength={140} onChange={(e) => setField('description', e.target.value)} placeholder="Una línea para reconocerla en la lista" />
-                    </div>
-
-                    <div className="tp-field-group">
-                      <span id="tp-icon-lbl">Ícono</span>
-                      <div role="radiogroup" aria-labelledby="tp-icon-lbl" className="tp-icons">
-                        {TEMPLATE_ICON_KEYS.map((k) => {
-                          const on = ed.icon === k
-                          return (
-                            <button
-                              key={k}
-                              type="button"
-                              role="radio"
-                              aria-checked={on}
-                              aria-label={TEMPLATE_ICONS[k].label}
-                              title={TEMPLATE_ICONS[k].label}
-                              className={`tp-icon-pick${on ? ' on' : ''}`}
-                              onClick={() => setField('icon', k)}
-                            >
-                              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                                <path d={TEMPLATE_ICONS[k].path} />
-                              </svg>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="tp-field-group">
-                      <span id="tp-col-lbl">Color</span>
-                      <div role="radiogroup" aria-labelledby="tp-col-lbl" className="tp-colors">
-                        {TEMPLATE_COLOR_KEYS.map((k) => {
-                          const on = ed.color === k
-                          return (
-                            <button
-                              key={k}
-                              type="button"
-                              role="radio"
-                              aria-checked={on}
-                              aria-label={TEMPLATE_COLORS[k].name}
-                              title={TEMPLATE_COLORS[k].name}
-                              className={`tp-color-pick${on ? ' on' : ''}`}
-                              style={{ background: TEMPLATE_COLORS[k].hex, color: TEMPLATE_COLORS[k].hex }}
-                              onClick={() => setField('color', k)}
-                            />
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="field">
-                      <label htmlFor="tp-acc">Cuenta sugerida</label>
-                      <select id="tp-acc" value={ed.accountId} onChange={(e) => setField('accountId', e.target.value)}>
-                        <option value={SUGGESTED}>Sugerida (con sesión y menos uso en 5 h)</option>
-                        {ctx.accounts.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="tp-wt">
-                      <div className="tp-wt-text">
-                        <span id="tp-wt-lbl">Crear rama aparte (worktree)</span>
-                        <small>Abre una copia de la carpeta con su propia rama, así no pisa lo que tenés abierto.</small>
-                      </div>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={ed.wt}
-                        aria-labelledby="tp-wt-lbl"
-                        className={`switch-btn${ed.wt ? ' on' : ''}`}
-                        onClick={() => setField('wt', !ed.wt)}
-                      >
-                        <span aria-hidden="true" />
-                      </button>
-                    </div>
-
-                    {ed.wt && (
-                      <div className="field indent">
-                        <label htmlFor="tp-br">Patrón de rama</label>
-                        <input
-                          id="tp-br"
-                          className="mono"
-                          spellCheck={false}
-                          value={ed.br}
-                          onChange={(e) => setField('br', e.target.value)}
-                          placeholder="fix/{ticket}"
-                          aria-invalid={Boolean(brErr)}
-                          aria-describedby="tp-br-hint"
-                        />
-                        {brErr && (
-                          <p className="field-error" role="alert">
-                            {brErr}
-                          </p>
-                        )}
-                        <p className="field-help" id="tp-br-hint">
-                          Sin espacios. Podés usar {'{ticket}'}. Ejemplo con PROJ-123:<span className="mono">{brResolved || '…'}</span>
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="field">
-                      <label htmlFor="tp-prompt">Primer mensaje para Claude</label>
-                      <textarea
-                        id="tp-prompt"
-                        ref={promptRef}
-                        rows={5}
-                        className="mono"
-                        value={ed.prompt}
-                        onChange={(e) => setField('prompt', e.target.value)}
-                        placeholder="Ej.: Leé el ticket {ticket} y resumí qué pide."
-                        aria-describedby="tp-prompt-hint"
-                      />
-                      <div className="tp-chips" role="group" aria-label="Insertar variable">
-                        <span className="tp-chips-lbl">Insertar:</span>
-                        {VAR_CHIPS.map((v) => (
-                          <button key={v} type="button" className="tp-chip mono" onClick={() => insertVar(v)} aria-label={`Insertar ${v} en el cursor`}>
-                            {v}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="field-help" id="tp-prompt-hint">
-                        Las variables se reemplazan al crear el espacio: {'{ticket}'} es el número del ticket, {'{carpeta}'} la carpeta y {'{rama}'} la rama que se crea.
-                      </p>
-                      {unknown.length > 0 && (
-                        <p className="field-warn">
-                          Variable que no existe: {unknown.map((u) => `{${u}}`).join(', ')}. Las que hay son {'{ticket}'}, {'{carpeta}'} y {'{rama}'}.
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="tp-preview" aria-labelledby="tp-pv-h">
-                      <h3 id="tp-pv-h">Vista previa con PROJ-123 en mi-app/front</h3>
-                      <div className="tp-preview-box">
-                        {segs.length > 0 ? (
-                          segs.map((s, i) => (
-                            <span key={i} className={s.v ? 'tp-seg-var' : undefined}>
-                              {s.t}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="tp-muted">Sin primer mensaje: el espacio arranca vacío.</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="tp-save-bar">
-                      <span className="tp-save-hint" role="status">
-                        {tried && (nameErr || brErr) ? 'Revisá los campos marcados.' : err}
-                      </span>
-                      <button type="button" className="btn ghost" onClick={discard} disabled={!dirty}>
-                        Descartar cambios
-                      </button>
-                      <button type="submit" className="btn primary" disabled={saving}>
-                        {saving ? 'Guardando…' : 'Guardar'}
-                      </button>
-                    </div>
-                  </form>
-                )}
-
-                {isTeam && err && (
-                  <p className="tp-err" role="alert">
-                    {err}
-                  </p>
-                )}
-
-                {isMine && share && (
-                  <section className="tp-card tp-share" aria-label="Compartir con el equipo">
-                    <h3>Compartir con el equipo</h3>
-                    <p className="tp-hint">Se escribe en .sloth/team.json del repo que elijas. Solo se puede si el repo todavía no tiene ese archivo.</p>
-                    <div className="field">
-                      <label htmlFor="tp-share-repo">Carpeta del repo</label>
-                      <div className="input-row">
-                        <input id="tp-share-repo" className="mono" value={share.repo} onChange={(e) => setShare({ ...share, repo: e.target.value, preview: null })} placeholder="C:\repos\…" />
-                        <button type="button" className="btn" onClick={() => void pickRepo()}>
-                          Elegir…
-                        </button>
-                      </div>
-                    </div>
-                    <div className="field">
-                      <label htmlFor="tp-share-team">Nombre del equipo</label>
-                      <input id="tp-share-team" value={share.equipo} maxLength={60} onChange={(e) => setShare({ ...share, equipo: e.target.value, preview: null })} placeholder="Ej.: Mi equipo" />
-                    </div>
-                    {share.notice && (
-                      <p className="tp-err" role="alert">
-                        {share.notice}
-                      </p>
-                    )}
-                    {share.preview && (
-                      <>
-                        <p className="tp-hint">
-                          Se va a escribir <span className="mono">{shortPath(share.preview.path)}</span> con {share.preview.count} plantilla(s).
-                        </p>
-                        {share.preview.skipped.length > 0 && (
-                          <ul className="tp-skipped">
-                            {share.preview.skipped.map((s) => (
-                              <li key={s.name}>
-                                «{s.name}»: {s.reason}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        <pre className="tp-pre mono">{share.preview.text}</pre>
-                      </>
-                    )}
-                    <div className="tp-share-actions">
-                      <button type="button" className="btn ghost" onClick={() => setShare(null)}>
-                        Cerrar
-                      </button>
-                      {!share.preview ? (
-                        <button type="button" className="btn" onClick={() => void shareCheck()}>
-                          Ver qué se comparte
-                        </button>
-                      ) : (
-                        <button type="button" className="btn primary" disabled={share.preview.count === 0} onClick={() => void shareWrite()}>
-                          Guardar en el repo
-                        </button>
-                      )}
-                    </div>
-                  </section>
-                )}
-
-                {isMine && (
-                  <div className="tp-danger">
-                    {confirmDel ? (
-                      <div className="tp-confirm" role="alertdialog" aria-labelledby="tp-del-t">
-                        <span id="tp-del-t">¿Borrar «{cur.name}»? No se puede deshacer.</span>
-                        <button type="button" className="btn ghost sm" onClick={() => setConfirmDel(false)}>
-                          Cancelar
-                        </button>
-                        <button type="button" className="btn danger sm" onClick={() => void remove()}>
-                          Sí, borrar
-                        </button>
-                      </div>
-                    ) : (
-                      <button type="button" className="tp-del-link" onClick={() => setConfirmDel(true)}>
-                        Borrar plantilla
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </main>
-        </div>
-
-        {toast && (
-          <div className="tp-toast" role="status">
-            {toast}
-          </div>
-        )}
+              )}
+            </div>
+          )}
+        </main>
       </div>
-    </div>
+
+      {toast && (
+        <div className="tp-toast" role="status">
+          {toast}
+        </div>
+      )}
+    </Modal>
   )
 }

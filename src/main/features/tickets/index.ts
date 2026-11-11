@@ -8,6 +8,7 @@ import {
   type Accion,
   type ConectorPropioVista,
   type Detalle,
+  type Estado,
   type EstadoBase,
   type Modelo,
   type Ticket,
@@ -22,14 +23,15 @@ import { writeJsonAtomic } from '../tray-settings'
 import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, ticketId } from './acciones'
 import { resolveClaudeExe, runClaude } from './claude-run'
 import type { ConectorDef, ConectorGh, ConectorMcp } from './conector'
-import { crearAlmacen, type Almacen, type FsTickets } from './almacen'
-import { CONECTOR_LEGADO, CONECTORES } from './conectores'
+import { crearAlmacen, type Almacen, type ConfigCruda, type FsTickets } from './almacen'
+import { CONECTORES } from './conectores'
 import { buildDescubrirArgs, buildDescubrirPrompt, parseDescubrir, type Descubiertas } from './descubrir'
 import {
   armarRegistro,
-  claveAceptado,
+  clavesAceptadas,
   EQUIPO_ARCHIVO,
   EQUIPO_MAX_BYTES,
+  estaAceptado,
   IMPORT_MAX_BYTES,
   parsearArchivoPropios,
   parsearConectoresEquipo,
@@ -42,10 +44,10 @@ import {
   type ArchivoPropios,
   type ConectorRegistrado
 } from './propios'
-import { ASSIGNEE_MAX, assigneeValido, conConector, type TicketsState } from './estado'
+import { ASSIGNEE_MAX, assigneeValido, conConector, sinLista, type TicketsState } from './estado'
 import { ghAccion, ghDetalle, ghLista, ghYo, repoValido, type GhRun } from './gh'
 import { GitError, run as correr } from '../git-run'
-import { mismoTicket } from '../../../shared/templates-shared'
+import { espacioDelTicket } from '../../../shared/templates-shared'
 import { githubRepoOf } from '../team-github'
 import {
   accionesSoportadas,
@@ -117,9 +119,20 @@ const save = (): void => void almacen.guardar(state)
 
 const registrado = (id: string): ConectorRegistrado | undefined => registro.find((r) => r.def.id === id)
 
-function aceptado(r: ConectorRegistrado): boolean {
-  if (r.origen.tipo !== 'equipo') return true
-  return archivoPropios.aceptados[claveAceptado(repoKey(r.origen.repo), r.def.id)] === r.hash
+/** Un incluido que nadie probó todavía contra el sistema real: se lee, pero no se escribe. */
+const sinProbar = (r?: ConectorRegistrado): boolean => r?.origen.tipo === 'incluido' && !r.def.verificado
+
+const aceptado = (r: ConectorRegistrado): boolean => estaAceptado(r, archivoPropios.aceptados, repoKey)
+
+/** El del equipo elegido que cambió en el repo desde que se aceptó: hay que volver a aceptarlo. */
+function cambiado(id: string): ConectorRegistrado | undefined {
+  const r = registrado(id)
+  return r?.origen.tipo === 'equipo' && !aceptado(r) ? r : undefined
+}
+
+const noDisponibleConector = (id: string): string => {
+  const r = cambiado(id)
+  return r ? `El conector «${r.def.nombre}» del equipo cambió en el repo: revisalo y aceptalo de nuevo en los ajustes de Tickets.` : noEsta(id)
 }
 
 /** Un conector del equipo sin aceptar (o que cambió desde que se aceptó) no está disponible. */
@@ -129,7 +142,7 @@ function buscar(id: string): ConectorDef | undefined {
 }
 
 /** Los repos donde buscar `.sloth/conectores.json`: los de los espacios y los de los ajustes de Tickets. */
-function reposDeEquipo(config?: TicketsConfig): string[] {
+function reposDeEquipo(config?: ConfigCruda): string[] {
   const candidatos = [...ctx.store.workspaces.map((w) => w.repoPath), config?.defaultRepo, ...Object.values(config?.projectRepos ?? {})]
   const repos = new Map<string, string>()
   for (const p of candidatos) {
@@ -182,8 +195,8 @@ function leerConectoresEquipo(repo: string): unknown[] | string | undefined {
   }
 }
 
-/** Relee los conectores propios y los del equipo. Sin config (al arrancar, antes de cargar el estado), solo los repos de los espacios. */
-function recargarPropios(config?: TicketsConfig): void {
+/** Relee los conectores propios y los del equipo. Sin config, solo los repos de los espacios. */
+function recargarPropios(config?: ConfigCruda): void {
   const avisos = leerArchivoPropios()
   const equipos: { repo: string; repoKey: string; equipo: string; conectores: readonly unknown[] }[] = []
   for (const repo of reposDeEquipo(config)) {
@@ -208,13 +221,8 @@ function guardarArchivo(a: ArchivoPropios): void {
 function activo(): ConectorDef {
   if (state.config.conectorId === SIN_CONECTOR) throw new Error('Todavía no elegiste un conector. Elegilo en los ajustes de Tickets.')
   const def = buscar(state.config.conectorId)
-  if (!def) throw new Error(noEsta(state.config.conectorId))
+  if (!def) throw new Error(noDisponibleConector(state.config.conectorId))
   return def
-}
-
-/** Para crear espacios: el activo o, si no está, el de Gruv (Equipo todavía es de Gruv). */
-function paraEspacios(): ConectorDef {
-  return buscar(state.config.conectorId) ?? buscar(CONECTOR_LEGADO) ?? activo()
 }
 
 /** Columnas del flujo (si la última consulta no trajo, las del conector). */
@@ -224,7 +232,7 @@ function snapshot(): TicketsSnapshot {
   const id = state.config.conectorId
   const def = buscar(id)
   return {
-    conector: info(def, id),
+    conector: info(def, id, sinProbar(registrado(id))),
     conectores: registro.map((r) => ({
       id: r.def.id,
       nombre: r.def.nombre,
@@ -239,19 +247,79 @@ function snapshot(): TicketsSnapshot {
     fetchedAt: state.fetchedAt,
     fetchedBy: state.fetchedBy,
     lastRun: state.lastRun,
-    lastError: def ? state.lastError : id === SIN_CONECTOR ? undefined : `${noEsta(id)} Elegí otro en los ajustes.`,
+    lastError: def ? state.lastError : id === SIN_CONECTOR ? undefined : cambiado(id) ? noDisponibleConector(id) : `${noEsta(id)} Elegí otro en los ajustes.`,
+    pendienteAceptar: def ? undefined : cambiado(id)?.def.id,
     aviso: almacen.aviso(),
     config: state.config,
     running: Boolean(running),
     noDisponible,
     lastRepo: lastRepo(),
+    carpetas: def?.via === 'gh' ? carpetasDe() : undefined,
     avisosPropios: avisosPropios.length ? avisosPropios : undefined
+  }
+}
+
+const oyentes = new Set<() => void>()
+
+/** Equipo se entera de cada cambio para rearmar su vista; devuelve la función que lo da de baja. */
+export function alCambiarTickets(fn: () => void): () => void {
+  oyentes.add(fn)
+  return () => oyentes.delete(fn)
+}
+
+function avisar(): void {
+  ctx.emit('changed', snapshot())
+  for (const fn of oyentes) {
+    try {
+      fn()
+    } catch (e) {
+      ctx.log(`tickets: un oyente de Equipo falló: ${(e as Error).message}`)
+    }
   }
 }
 
 function changed(): void {
   save()
-  ctx.emit('changed', snapshot())
+  avisar()
+}
+
+export interface TicketsParaEquipo {
+  /** null: sin conector elegido, el elegido no está o el estado todavía no cargó. */
+  conector: { id: string; nombre: string; via: 'mcp' | 'gh' } | null
+  tickets: Ticket[]
+  estados: Estado[]
+  fetchedAt?: number
+  fetchedBy?: string
+  lastRun?: { tokens?: number; costUsd?: number; durationMs?: number }
+  lastError?: string
+  running: boolean
+  model: string
+  confirmar: boolean
+  /** Con gh, la carpeta de cada ticket: el #12 de otro repo es otro ticket. */
+  carpetas?: Record<string, string>
+}
+
+/** Lo que trajo el conector activo, para la vista Equipo (incluye los estados 'hecho' para poder descartarlos). */
+export function ticketsParaEquipo(): TicketsParaEquipo {
+  if (!state) return { conector: null, tickets: [], estados: [], running: false, model: '', confirmar: true }
+  const def = state.config.conectorId === SIN_CONECTOR ? undefined : buscar(state.config.conectorId)
+  const id = state.config.conectorId
+  const base = { running: Boolean(running), model: state.config.model, confirmar: state.config.confirmRefresh }
+  if (!def) return { ...base, conector: null, tickets: [], estados: [], lastError: id === SIN_CONECTOR ? undefined : noDisponibleConector(id) }
+  // Primero los que trajo la consulta, con el nombre que se ve en el tablero.
+  const porClave = new Map<string, Estado>()
+  for (const e of [...conCategoria(def, estados(def)), ...def.estados]) if (!porClave.has(e.clave)) porClave.set(e.clave, e)
+  return {
+    ...base,
+    conector: { id: def.id, nombre: def.nombre, via: def.via },
+    tickets: state.tickets,
+    estados: [...porClave.values()],
+    fetchedAt: state.fetchedAt,
+    fetchedBy: state.fetchedBy,
+    lastRun: state.lastRun,
+    lastError: state.lastError,
+    carpetas: def.via === 'gh' ? carpetasDe() : undefined
+  }
 }
 
 function dir(v: unknown, name: string): string | undefined {
@@ -264,6 +332,16 @@ function dir(v: unknown, name: string): string | undefined {
 function lastRepo(): string | undefined {
   const ws = [...ctx.store.workspaces].sort((a, b) => b.createdAt - a.createdAt)
   return ws.find((w) => existsSync(w.repoPath))?.repoPath
+}
+
+/** La carpeta de cada ticket (la misma que usa «Empezar»), para que las vistas encuentren su espacio. */
+function carpetasDe(): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const t of state.tickets) {
+    const p = repoFor(t)
+    if (p) out[t.id] = p
+  }
+  return out
 }
 
 function repoFor(t: Ticket | undefined): string | undefined {
@@ -288,20 +366,20 @@ async function pickAccount(): Promise<string> {
 
 /** ¿Hay una carpeta de repo para crear el espacio de este ticket? (sin crear nada). */
 function hasRepo(rawId: unknown): boolean {
-  const id = ticketId(paraEspacios(), rawId)
+  const id = ticketId(activo(), rawId)
   return Boolean(repoFor(state.tickets.find((t) => t.id === id)))
 }
 
-/** «Empezar en Sloth»: crea el espacio del ticket (con Gruv, arranca con `/ticket <id>`). */
+/** «Empezar en Sloth»: crea el espacio del ticket (si el conector usa /ticket, arranca con `/ticket <id>`). */
 async function start(rawId: unknown, rawAccount?: unknown): Promise<{ id: string; created: boolean }> {
-  const def = paraEspacios()
+  const def = activo()
   const id = ticketId(def, rawId)
-  const existing = ctx.store.workspaces.find((w) => mismoTicket(w.ticket, id))
+  const repoPath = repoFor(state.tickets.find((t) => t.id === id))
+  const existing = espacioDelTicket(ctx.store.workspaces, id, repoPath, def.via === 'gh')
   if (existing) {
     ctx.ui({ type: 'open-pane', id: existing.id })
     return { id: existing.id, created: false }
   }
-  const repoPath = repoFor(state.tickets.find((t) => t.id === id))
   if (!repoPath) throw new Error('No hay carpeta de repo para este ticket. Creá el espacio desde Nuevo espacio y elegí la carpeta.')
   let accountId: string
   if (typeof rawAccount === 'string' && rawAccount) {
@@ -348,9 +426,9 @@ function cuenta(def: ConectorDef): Ejecucion {
   return ejecucion(def.nombre, id)
 }
 
-const ghRun: GhRun = async (args, input) => {
+const ghRunCon = (signal?: AbortSignal): GhRun => async (args, input) => {
   try {
-    return await correr('gh', args, { input, timeoutMs: 30_000 })
+    return await correr('gh', args, { input, timeoutMs: 30_000, signal })
   } catch (e) {
     if (e instanceof GitError && e.motivo === 'falta') return { code: -1, stdout: '', stderr: '', missing: true }
     if (e instanceof GitError && e.motivo === 'tiempo') return { code: -1, stdout: '', stderr: '', timedOut: true }
@@ -375,15 +453,16 @@ async function repoGh(): Promise<string> {
 async function refreshGh(def: ConectorGh): Promise<{ count: number }> {
   const ac = new AbortController()
   running = ac
-  ctx.emit('changed', snapshot())
+  avisar()
   const inicio = Date.now()
   try {
     const repo = await repoGh()
+    if (ac.signal.aborted) throw new Error('Consulta cancelada.')
+    const ghRun = ghRunCon(ac.signal)
     const me = await ghYo(ghRun)
     const tickets = await ghLista(ghRun, def, repo)
-    // gh no se puede cortar a mitad de camino: si cancelaron, se descarta lo leído.
-    if (ac.signal.aborted) throw new Error('Consulta cancelada.')
     state.tickets = tickets
+    detalles.clear()
     delete state.estados
     state.me = me
     state.fetchedAt = Date.now()
@@ -409,7 +488,7 @@ async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: n
   const run = ejecucion(def.nombre, requested ?? state.config.queryAccountId ?? (await pickAccount()))
   const ac = new AbortController()
   running = ac
-  ctx.emit('changed', snapshot())
+  avisar()
   try {
     const r = await runClaude({
       exe: run.exe,
@@ -481,6 +560,9 @@ function setConfig(raw: unknown): TicketsSnapshot {
     c.assigneeId = s
   }
   if ('defaultRepo' in p) c.defaultRepo = dir(p.defaultRepo, 'Repo por defecto')
+  // Con gh la carpeta es el repo de donde salen los tickets: lo leído de la anterior ya no corresponde.
+  const otraCarpetaGh = nuevo === undefined && c.defaultRepo !== state.config.defaultRepo && buscar(state.config.conectorId)?.via === 'gh'
+  if (otraCarpetaGh && (running || escribiendo.size)) throw new Error('Esperá a que termine lo que está en curso para cambiar la carpeta.')
   if ('projectRepo' in p) {
     const pr = (p.projectRepo && typeof p.projectRepo === 'object' ? p.projectRepo : {}) as Record<string, unknown>
     const project = textoObligatorio(pr.project, 80, 'El proyecto')
@@ -495,7 +577,16 @@ function setConfig(raw: unknown): TicketsSnapshot {
     noDisponible = {}
     detalles.clear()
     c.conectorId = nuevo
-    if (!('assigneeId' in p)) c.assigneeId = ''
+    c.assigneePrevios = state.config.assigneePrevios
+    if (!('assigneeId' in p)) {
+      // El que se recupera se guardó con otro conector cargado: se vuelve a validar con este.
+      const previo = state.config.assigneeId
+      c.assigneeId = assigneeValido(previo, buscar(nuevo)) ? previo : ''
+    }
+  } else if (otraCarpetaGh) {
+    state = sinLista(state)
+    noDisponible = {}
+    detalles.clear()
   }
   state.config = c
   changed()
@@ -515,8 +606,8 @@ async function detalle(rawId: unknown): Promise<Detalle> {
   const id = ticketId(def, rawId)
   const t = ticketEnLista(def, id)
   if (def.via === 'gh') {
-    const d = await ghDetalle(ghRun, t)
-    if (state.config.conectorId === def.id) detalles.set(id, d)
+    const d = await ghDetalle(ghRunCon(), t)
+    if (state.tickets.includes(t)) detalles.set(id, d)
     return d
   }
   const c = cuenta(def)
@@ -531,8 +622,8 @@ async function detalle(rawId: unknown): Promise<Detalle> {
       timeoutMs: DETALLE_TIMEOUT_MS,
       parse: (s) => parseDetalle(def, s)
     })
-    // Si mientras tanto se cambió de conector, este detalle ya no es de la lista.
-    if (state.config.conectorId === def.id) detalles.set(id, d)
+    // Si mientras tanto cambió la lista (otro conector u otra carpeta), este detalle ya no es de ella.
+    if (state.tickets.includes(t)) detalles.set(id, d)
     return d
   } catch (e) {
     if (e instanceof ConectorFaltaError) throw new Error(`No pudimos leer el detalle: ${sinConector(def)}`)
@@ -549,6 +640,10 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
   const a = rawA
   const def = activo()
   if (!accionesSoportadas(def).includes(a)) throw new Error(`${def.nombre} no permite esa acción desde Sloth.`)
+  if (sinProbar(registrado(def.id)))
+    throw new Error(
+      `Las acciones de ${def.nombre} todavía no se probaron: por ahora es de solo lectura. Si querés escribir, copialo como propio y revisá sus herramientas.`
+    )
   const id = ticketId(def, rawId)
   const t = ticketEnLista(def, id)
   if (escribiendo.has(id)) throw new Error('Ya hay un cambio en curso en este ticket.')
@@ -561,7 +656,7 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
   escribiendo.add(id)
   try {
     let minutosTotal: number | undefined
-    if (def.via === 'gh') await ghAccion(ghRun, t, a, input, state.me)
+    if (def.via === 'gh') await ghAccion(ghRunCon(), t, a, input, state.me)
     else if (c) {
       const r = await runClaude({
         exe: c.exe,
@@ -595,7 +690,7 @@ function vista(r: ConectorRegistrado, def: ConectorMcp): ConectorPropioVista {
 
 function propios(): { lista: ConectorPropioVista[]; avisos: string[] } {
   recargarPropios(state.config)
-  ctx.emit('changed', snapshot())
+  avisar()
   const lista = registro.flatMap((r) => (r.origen.tipo !== 'incluido' && r.def.via === 'mcp' ? [vista(r, r.def)] : []))
   return { lista, avisos: avisosPropios }
 }
@@ -690,7 +785,8 @@ function aceptar(rawId: unknown, rawHash: unknown): TicketsSnapshot {
   const r = noIncluido(rawId)
   if (r.origen.tipo !== 'equipo') throw new Error('Solo se aceptan los conectores del equipo.')
   if (r.hash !== rawHash) throw new Error('El conector del equipo cambió mientras lo mirabas. Revisalo de nuevo.')
-  guardarArchivo({ ...archivoPropios, aceptados: { ...archivoPropios.aceptados, [claveAceptado(repoKey(r.origen.repo), r.def.id)]: r.hash } })
+  const nuevos = Object.fromEntries(clavesAceptadas(r, repoKey).map((k) => [k, r.hash]))
+  guardarArchivo({ ...archivoPropios, aceptados: { ...archivoPropios.aceptados, ...nuevos } })
   changed()
   return snapshot()
 }
@@ -737,9 +833,10 @@ const feature: Feature = {
   name: 'tickets',
   register(c) {
     ctx = c
-    // Antes de cargar el estado: si el conector guardado es propio, tiene que estar en el registro.
-    recargarPropios()
+    // buscar lee el registro recién cuando se la llama: el almacén se puede crear antes de armarlo.
     almacen = crearAlmacen({ fs: fsReal, carpeta: carpeta(), buscar, log: (m) => c.log(m), ahora: Date.now })
+    // Antes de cargar el estado: si el conector guardado es del equipo de un repo de los ajustes, tiene que estar en el registro.
+    recargarPropios(almacen.configCruda())
     state = almacen.cargar()
     recargarPropios(state.config)
     c.handle('state', () => snapshot())

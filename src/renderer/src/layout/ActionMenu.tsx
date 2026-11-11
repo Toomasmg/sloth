@@ -98,6 +98,7 @@ export function ActionMenu({
                 className={`pane-menu-item ${it.danger ? 'danger' : ''}`}
                 onClick={() => {
                   setOpen(false)
+                  btnRef.current?.focus()
                   it.onSelect()
                 }}
               >

@@ -19,6 +19,8 @@ export interface RunOpts {
   input?: string
   /** Corta la salida a este tamaño (bytes aprox.). */
   maxBytes?: number
+  /** Al abortarla se corta el proceso y se rechaza con motivo 'cancelada'. */
+  signal?: AbortSignal
 }
 
 const ENV = {
@@ -34,6 +36,11 @@ const ENV = {
 
 export function run(cmd: 'git' | 'gh', args: string[], opts: RunOpts = {}): Promise<RunResult> {
   return new Promise((resolve, reject) => {
+    const { signal } = opts
+    if (signal?.aborted) {
+      reject(new GitError('Consulta cancelada.', 'cancelada'))
+      return
+    }
     const maxBytes = opts.maxBytes ?? 16 * 1024 * 1024
     let child
     try {
@@ -52,9 +59,20 @@ export function run(cmd: 'git' | 'gh', args: string[], opts: RunOpts = {}): Prom
     const err: Buffer[] = []
     let outLen = 0
     let done = false
+    const terminar = (): void => {
+      done = true
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', alAbortar)
+    }
+    const alAbortar = (): void => {
+      if (done) return
+      terminar()
+      child.kill()
+      reject(new GitError('Consulta cancelada.', 'cancelada'))
+    }
     const timer = setTimeout(() => {
       if (done) return
-      done = true
+      terminar()
       child.kill()
       reject(new GitError(`${cmd} tardó demasiado y se canceló (${Math.round((opts.timeoutMs ?? 30000) / 1000)} s).`, 'tiempo'))
     }, opts.timeoutMs ?? 30000)
@@ -68,17 +86,16 @@ export function run(cmd: 'git' | 'gh', args: string[], opts: RunOpts = {}): Prom
     })
     child.on('error', (e: NodeJS.ErrnoException) => {
       if (done) return
-      done = true
-      clearTimeout(timer)
+      terminar()
       if (e.code === 'ENOENT') reject(new GitError(`No encontré «${cmd}» en el PATH.`, 'falta'))
       else reject(e)
     })
     child.on('close', (code) => {
       if (done) return
-      done = true
-      clearTimeout(timer)
+      terminar()
       resolve({ code: code ?? -1, stdout: Buffer.concat(out).toString('utf8'), stderr: Buffer.concat(err).toString('utf8') })
     })
+    signal?.addEventListener('abort', alAbortar, { once: true })
     child.stdin.on('error', () => {})
     if (opts.input !== undefined) child.stdin.end(opts.input, 'utf8')
     else child.stdin.end()
@@ -86,9 +103,9 @@ export function run(cmd: 'git' | 'gh', args: string[], opts: RunOpts = {}): Prom
 }
 
 export class GitError extends Error {
-  /** Para quien tenga que distinguir «no está instalado» o «se pasó de tiempo» de un error de git/gh. */
-  motivo?: 'falta' | 'tiempo'
-  constructor(mensaje: string, motivo?: 'falta' | 'tiempo') {
+  /** Para quien tenga que distinguir «no está instalado», «se pasó de tiempo» o «se canceló» de un error de git/gh. */
+  motivo?: 'falta' | 'tiempo' | 'cancelada'
+  constructor(mensaje: string, motivo?: 'falta' | 'tiempo' | 'cancelada') {
     super(mensaje)
     this.motivo = motivo
   }

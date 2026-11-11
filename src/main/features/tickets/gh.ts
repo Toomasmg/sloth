@@ -6,6 +6,7 @@
  */
 import type { Accion, Detalle, Ticket, Yo } from '../../../shared/tickets'
 import type { ConectorGh } from './conector'
+import github from './conectores/github'
 import { idValido, normComentarios, type AccionInput } from './motor'
 
 export interface GhOut {
@@ -63,7 +64,7 @@ function login(v: unknown): string {
 
 async function correr(run: GhRun, args: string[], input?: string): Promise<string> {
   const r = await run(args, input)
-  if (r.missing) throw new Error('No encontré GitHub CLI (gh). Instalalo y corré `gh auth login`.')
+  if (r.missing) throw new Error(github.faltaConector.mensaje)
   if (r.timedOut) throw new Error('gh tardó demasiado.')
   if (r.code !== 0) {
     if (AUTH_RE.test(r.stderr)) throw new Error('gh no tiene sesión iniciada: corré `gh auth login`.')

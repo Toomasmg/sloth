@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { conectorPorId } from './conectores'
-import { assigneeValido, conConector, estadoVacio, migrarDeGruv, parsearArchivo, resolverEstado, sanearEstado, type Lectura } from './estado'
+import { assigneeValido, conConector, estadoVacio, migrarDeGruv, parsearArchivo, resolverEstado, sanearEstado, sinLista, type Lectura } from './estado'
 
 const AHORA = 1_700_000_000_000
 const FALTA: Lectura = { kind: 'falta' }
@@ -214,7 +214,7 @@ test('cambiar de conector limpia lo leído y conserva cuenta, modelo y repos', (
     version: 2,
     tickets: [],
     migradoDe: { archivo: 'gruv.json', en: AHORA, gruvMtimeMs: 1 },
-    config: { ...antes.config, conectorId: 'jira', assigneeId: '' }
+    config: { ...antes.config, conectorId: 'jira', assigneeId: '', assigneePrevios: { gruv: 'u-1' } }
   })
   assert.notEqual(despues.config.projectRepos, antes.config.projectRepos)
   assert.deepEqual(antes, copia)
@@ -228,4 +228,56 @@ test('quien tiene gruv.json dañado o ilegible sigue en Gruv, no queda sin conec
     assert.equal(r.state.config.conectorId, 'gruv')
   }
   assert.equal(resolverEstado({ tickets: FALTA, gruv: FALTA }, conectorPorId, AHORA).state.config.conectorId, '')
+})
+
+test('volver a un conector recupera el id de persona que tenía', () => {
+  const gruv = sanearEstado({ ...TICKETS_V2, config: { ...TICKETS_V2.config, assigneeId: 'abc' } }, conectorPorId)
+  assert.ok(gruv)
+  const jira = conConector(gruv, 'jira')
+  assert.equal(jira.config.assigneeId, '')
+  const vuelta = conConector({ ...jira, config: { ...jira.config, assigneeId: '557058:ab-1' } }, 'gruv')
+  assert.equal(vuelta.config.assigneeId, 'abc')
+  assert.deepEqual(vuelta.config.assigneePrevios, { jira: '557058:ab-1' })
+  assert.deepEqual(sanearEstado(vuelta, conectorPorId), vuelta)
+})
+
+test('sin id de persona no se guarda nada para el conector que se deja', () => {
+  const s = conConector(estadoVacio('gruv'), 'jira')
+  assert.equal(s.config.assigneePrevios, undefined)
+})
+
+test('el saneo de assigneePrevios descarta claves inválidas, valores raros y de más', () => {
+  const previos: Record<string, unknown> = {
+    gruv: 'u-1',
+    jira: '557058:ab-1',
+    'No Vale': 'x',
+    linear: 7,
+    asana: 'a'.repeat(81),
+    github: 'con espacio',
+    otro: 'z-1'
+  }
+  for (let i = 0; i < 30; i++) previos[`c${i}`] = 'ok'
+  const s = sanearEstado({ ...TICKETS_V2, config: { ...TICKETS_V2.config, assigneePrevios: previos } }, conectorPorId)
+  const p = s?.config.assigneePrevios ?? {}
+  assert.equal(p.gruv, 'u-1')
+  assert.equal(p.jira, '557058:ab-1')
+  assert.equal(p.otro, 'z-1')
+  for (const k of ['No Vale', 'linear', 'asana', 'github']) assert.equal(k in p, false, k)
+  assert.equal(Object.keys(p).length, 20)
+  assert.equal(sanearEstado({ ...TICKETS_V2, config: { ...TICKETS_V2.config, assigneePrevios: 'no' } }, conectorPorId)?.config.assigneePrevios, undefined)
+})
+
+test('sinLista vacía lo leído y deja la config intacta', () => {
+  const antes = migrarDeGruv(GRUV_V1, conectorPorId, AHORA, 1)
+  assert.ok(antes)
+  const copia = structuredClone(antes)
+  const s = sinLista(antes)
+  assert.deepEqual(s, { version: 2, tickets: [], migradoDe: antes.migradoDe, config: antes.config })
+  assert.deepEqual(antes, copia)
+})
+
+test('conConector: un id como «constructor» no recupera nada del prototipo', () => {
+  const antes = estadoVacio('gruv')
+  const despues = conConector(antes, 'constructor')
+  assert.notEqual(typeof despues.config.assigneeId, 'function')
 })

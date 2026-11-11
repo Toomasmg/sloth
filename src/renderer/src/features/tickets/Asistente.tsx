@@ -35,6 +35,14 @@ export function Asistente({
   const [guardando, setGuardando] = useState(false)
   const titulo = useRef<HTMLHeadingElement>(null)
   const primero = useRef(true)
+  const [descartando, setDescartando] = useState(false)
+  const huella = JSON.stringify([b, nombre, prefijo])
+  const huellaInicial = useRef(huella)
+  const seguir = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (descartando) seguir.current?.focus()
+  }, [descartando])
 
   useEffect(() => {
     if (primero.current) primero.current = false
@@ -99,8 +107,20 @@ export function Asistente({
         </p>
       )}
 
+      {descartando && (
+        <div className="f-tickets-alert f-tickets-confirm" role="alertdialog" aria-label="Descartar el conector">
+          <span className="f-tickets-alert-text">¿Descartar el conector a medio armar?</span>
+          <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={onCancelar}>
+            Descartar
+          </button>
+          <button type="button" className="f-tickets-b f-tickets-b--sm" ref={seguir} onClick={() => setDescartando(false)}>
+            Seguir editando
+          </button>
+        </div>
+      )}
+
       <div className="f-tickets-asis-pie">
-        <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={onCancelar}>
+        <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => (huella === huellaInicial.current ? onCancelar() : setDescartando(true))}>
           Cancelar
         </button>
         <span className="f-tickets-grow" />

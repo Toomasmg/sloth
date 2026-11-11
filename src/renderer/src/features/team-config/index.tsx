@@ -1,6 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { ArrowSquareOut, CheckCircle, DownloadSimple, Export, Plus, Sliders, Trash, UsersThree, Warning, X } from '@phosphor-icons/react'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowSquareOut, CheckCircle, DownloadSimple, Export, Plus, Trash, UsersThree, Warning, X } from '@phosphor-icons/react'
 import { useUi, type Command, type FeatureUi, type UiCtx } from '../host'
+import { Modal } from '../../Modal'
+import { SettingsIcon } from '../../icons/SlothIcons'
 import { useDocumentVisible } from '../../visibility'
 import {
   ACTION_LABEL,
@@ -20,38 +22,10 @@ import {
 } from './store'
 import './team-config.css'
 
-/** Devuelve el foco a donde estaba cuando se cierra un diálogo. */
-function useReturnFocus(): void {
-  useLayoutEffect(() => {
-    const a = document.activeElement
-    const prev = a instanceof HTMLElement && a !== document.body ? a : null
-    return () => {
-      if (prev?.isConnected) prev.focus()
-    }
-  }, [])
-}
-
-function useEscape(fn: () => void): void {
-  const ref = useRef(fn)
-  ref.current = fn
-  useEffect(() => {
-    const on = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        ref.current()
-      }
-    }
-    window.addEventListener('keydown', on)
-    return () => window.removeEventListener('keydown', on)
-  }, [])
-}
-
 // ---------- Importar ----------
 
 function ImportDialog({ repoPath, onClose }: { repoPath: string; onClose: () => void }): React.JSX.Element {
   const ctx = useUi()
-  useReturnFocus()
-  useEscape(onClose)
   const [plan, setPlan] = useState<ImportPlan | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -80,57 +54,54 @@ function ImportDialog({ repoPath, onClose }: { repoPath: string; onClose: () => 
   }
 
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal f-team-config-modal" role="dialog" aria-modal="true" aria-labelledby="f-tc-imp-h" onMouseDown={(e) => e.stopPropagation()}>
-        <header className="modal-head">
-          <UsersThree size={18} weight="duotone" aria-hidden="true" className="f-team-config-icon" />
-          <h2 id="f-tc-imp-h">Plantillas del equipo{plan ? ` · ${plan.equipo}` : ''}</h2>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Cerrar">
-            <X size={16} aria-hidden="true" />
-          </button>
-        </header>
-        <p className="field-help">
-          Desde <span className="mono">{repoName(repoPath)}\.sloth\team.json</span>. Se guardan en tus plantillas con la cuenta sugerida; las que ya importaste se actualizan, no se duplican.
+    <Modal
+      title={`Plantillas del equipo${plan ? ` · ${plan.equipo}` : ''}`}
+      icon={<UsersThree size={18} weight="duotone" aria-hidden="true" className="f-team-config-icon" />}
+      onClose={onClose}
+      backdropClose
+      className="f-team-config-modal"
+    >
+      <p className="field-help">
+        Desde <span className="mono">{repoName(repoPath)}/.sloth/team.json</span>. Se guardan en tus plantillas con la cuenta sugerida; las que ya importaste se actualizan, no se duplican.
+      </p>
+      {!plan && !err && <p className="hint">Leyendo…</p>}
+      {plan && (
+        <ul className="f-team-config-plan">
+          {plan.items.map((it) => (
+            <li key={it.key} className={it.error ? 'is-error' : it.action === 'same' ? 'is-same' : ''}>
+              {it.error ? <Warning size={14} weight="fill" aria-hidden="true" /> : it.action === 'same' ? <CheckCircle size={14} aria-hidden="true" /> : <DownloadSimple size={14} aria-hidden="true" />}
+              <span className="grow-min">
+                <span className="item-title">{it.savedName}</span>
+                {it.error && <span className="item-sub">{it.error}</span>}
+                {it.action === 'renamed' && !it.error && <span className="item-sub">Ya tenés una plantilla tuya con ese nombre: la del equipo se guarda aparte.</span>}
+              </span>
+              <span className="f-team-config-act">{it.error ? 'No se puede' : ACTION_LABEL[it.action]}</span>
+            </li>
+          ))}
+          {plan.items.length === 0 && <li className="is-same">El archivo no trae plantillas.</li>}
+        </ul>
+      )}
+      {plan && plan.orphans.length > 0 && (
+        <p className="field-help">El equipo ya no tiene: {plan.orphans.join(', ')}. Quedan en tus plantillas; borralas si no las usás.</p>
+      )}
+      {done && (
+        <p className="f-team-config-ok" role="status">
+          <CheckCircle size={14} weight="fill" aria-hidden="true" /> {done}
         </p>
-        {!plan && !err && <p className="hint">Leyendo…</p>}
-        {plan && (
-          <ul className="f-team-config-plan">
-            {plan.items.map((it) => (
-              <li key={it.key} className={it.error ? 'is-error' : it.action === 'same' ? 'is-same' : ''}>
-                {it.error ? <Warning size={14} weight="fill" aria-hidden="true" /> : it.action === 'same' ? <CheckCircle size={14} aria-hidden="true" /> : <DownloadSimple size={14} aria-hidden="true" />}
-                <span className="grow-min">
-                  <span className="item-title">{it.savedName}</span>
-                  {it.error && <span className="item-sub">{it.error}</span>}
-                  {it.action === 'renamed' && !it.error && <span className="item-sub">Ya tenés una plantilla tuya con ese nombre: la del equipo se guarda aparte.</span>}
-                </span>
-                <span className="f-team-config-act">{it.error ? 'No se puede' : ACTION_LABEL[it.action]}</span>
-              </li>
-            ))}
-            {plan.items.length === 0 && <li className="is-same">El archivo no trae plantillas.</li>}
-          </ul>
-        )}
-        {plan && plan.orphans.length > 0 && (
-          <p className="field-help">El equipo ya no tiene: {plan.orphans.join(', ')}. Quedan en tus plantillas; borralas si no las usás.</p>
-        )}
-        {done && (
-          <p className="f-team-config-ok" role="status">
-            <CheckCircle size={14} weight="fill" aria-hidden="true" /> {done}
-          </p>
-        )}
-        {err && <p className="form-error f-team-config-pre-wrap">{err}</p>}
-        <div className="modal-actions">
-          <button type="button" className="btn ghost" onClick={onClose}>
-            {done ? 'Cerrar' : 'Cancelar'}
+      )}
+      {err && <p className="form-error f-team-config-pre-wrap" role="alert">{err}</p>}
+      <div className="modal-actions">
+        <button type="button" className="btn ghost" onClick={onClose}>
+          {done ? 'Cerrar' : 'Cancelar'}
+        </button>
+        {!done && (
+          <button type="button" className="btn primary" disabled={!plan || busy || todo === 0} onClick={() => void run()}>
+            <DownloadSimple size={14} aria-hidden="true" />
+            {busy ? 'Importando…' : todo ? `Importar ${todo} plantilla${todo > 1 ? 's' : ''}` : 'Todo al día'}
           </button>
-          {!done && (
-            <button type="button" className="btn primary" disabled={!plan || busy || todo === 0} onClick={() => void run()}>
-              <DownloadSimple size={14} aria-hidden="true" />
-              {busy ? 'Importando…' : todo ? `Importar ${todo} plantilla${todo > 1 ? 's' : ''}` : 'Todo al día'}
-            </button>
-          )}
-        </div>
+        )}
       </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -157,8 +128,6 @@ const DEFAULT_LINKS: TeamLink[] = [
 
 function ExportDialog({ initialRepo, onClose }: { initialRepo?: string; onClose: () => void }): React.JSX.Element {
   const ctx = useUi()
-  useReturnFocus()
-  useEscape(onClose)
   const repos = useMemo(() => {
     const seen = new Map<string, string>()
     for (const p of [initialRepo, ...getTeams().map((t) => t.repoPath), ...ctx.workspaces.map((w) => w.repoPath)]) if (p && !seen.has(p.toLowerCase())) seen.set(p.toLowerCase(), p)
@@ -238,134 +207,130 @@ function ExportDialog({ initialRepo, onClose }: { initialRepo?: string; onClose:
   }
 
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal f-team-config-modal wide" role="dialog" aria-modal="true" aria-labelledby="f-tc-exp-h" onMouseDown={(e) => e.stopPropagation()}>
-        <header className="modal-head">
-          <Export size={18} weight="duotone" aria-hidden="true" className="f-team-config-icon" />
-          <h2 id="f-tc-exp-h">Exportar como configuración del equipo</h2>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Cerrar">
-            <X size={16} aria-hidden="true" />
-          </button>
-        </header>
-
-        {written ? (
-          <>
-            <p className="f-team-config-ok" role="status">
-              <CheckCircle size={14} weight="fill" aria-hidden="true" /> Guardado en <span className="mono">{written}</span>
-            </p>
+    <Modal
+      title="Exportar como configuración del equipo"
+      icon={<Export size={18} weight="duotone" aria-hidden="true" className="f-team-config-icon" />}
+      onClose={onClose}
+      backdropClose
+      className="f-team-config-modal wide"
+    >
+      {written ? (
+        <>
+          <p className="f-team-config-ok" role="status">
+            <CheckCircle size={14} weight="fill" aria-hidden="true" /> Guardado en <span className="mono">{written}</span>
+          </p>
+          <p className="field-help">
+            Commitealo cuando quieras: <span className="mono">git add .sloth/team.json</span>. Tus compañeros lo ven al abrir un espacio en ese repo.
+          </p>
+          <div className="modal-actions">
+            <button type="button" className="btn primary" onClick={onClose}>
+              Listo
+            </button>
+          </div>
+        </>
+      ) : preview ? (
+        <>
+          <p className="field-help">
+            Esto se guarda en <span className="mono">{preview.path}</span>
+            {preview.exists ? ' y reemplaza el archivo actual.' : '.'} No lleva cuentas, rutas absolutas ni ids.
+          </p>
+          <pre className="f-team-config-pre mono" tabIndex={0} aria-label="Contenido de team.json">
+            {preview.text}
+          </pre>
+          {preview.skipped.length > 0 && (
             <p className="field-help">
-              Commitealo cuando quieras: <span className="mono">git add .sloth/team.json</span>. Tus compañeros lo ven al abrir un espacio en ese repo.
+              <Warning size={13} weight="fill" aria-hidden="true" className="f-team-config-warn" /> Quedan afuera:{' '}
+              {preview.skipped.map((s) => `«${s.name}» (${s.reason})`).join(', ')}.
             </p>
-            <div className="modal-actions">
-              <button type="button" className="btn primary" onClick={onClose}>
-                Listo
-              </button>
-            </div>
-          </>
-        ) : preview ? (
-          <>
-            <p className="field-help">
-              Esto se guarda en <span className="mono">{preview.path}</span>
-              {preview.exists ? ' y reemplaza el archivo actual.' : '.'} No lleva cuentas, rutas absolutas ni ids.
-            </p>
-            <pre className="f-team-config-pre mono" tabIndex={0} aria-label="Contenido de team.json">
-              {preview.text}
-            </pre>
-            {preview.skipped.length > 0 && (
-              <p className="field-help">
-                <Warning size={13} weight="fill" aria-hidden="true" className="f-team-config-warn" /> Quedan afuera:{' '}
-                {preview.skipped.map((s) => `«${s.name}» (${s.reason})`).join(', ')}.
-              </p>
+          )}
+          {err && <p className="form-error" role="alert">{err}</p>}
+          <div className="modal-actions">
+            <button type="button" className="btn ghost" onClick={() => setPreview(null)}>
+              Volver
+            </button>
+            <button type="button" className="btn primary" disabled={busy} onClick={() => void doWrite()}>
+              {preview.exists ? 'Reemplazar team.json' : 'Guardar team.json'}
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="field">
+            <label htmlFor="f-tc-repo">Repo del equipo</label>
+            {repos.length ? (
+              <select id="f-tc-repo" value={repo} onChange={(e) => setRepo(e.target.value)}>
+                {repos.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="hint">Creá un espacio en el repo del equipo primero.</p>
             )}
-            {err && <p className="form-error">{err}</p>}
-            <div className="modal-actions">
-              <button type="button" className="btn ghost" onClick={() => setPreview(null)}>
-                Volver
-              </button>
-              <button type="button" className="btn primary" disabled={busy} onClick={() => void doWrite()}>
-                {preview.exists ? 'Reemplazar team.json' : 'Guardar team.json'}
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="field">
-              <label htmlFor="f-tc-repo">Repo del equipo</label>
-              {repos.length ? (
-                <select id="f-tc-repo" value={repo} onChange={(e) => setRepo(e.target.value)}>
-                  {repos.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <p className="hint">Creá un espacio en el repo del equipo primero.</p>
-              )}
-            </div>
-            <div className="field">
-              <label htmlFor="f-tc-name">Nombre del equipo</label>
-              <input id="f-tc-name" value={equipo} maxLength={60} onChange={(e) => (setEquipo(e.target.value), setPreview(null))} />
-            </div>
-            <fieldset className="f-team-config-fs">
-              <legend>Plantillas de este repo</legend>
-              {info && info.templates.length === 0 && <p className="hint">No tenés plantillas que apunten a este repo.</p>}
-              {info?.templates.map((name) => (
-                <label key={name} className="check">
-                  <input
-                    type="checkbox"
-                    checked={chosen.has(name)}
-                    onChange={() =>
-                      setChosen((s) => {
-                        const n = new Set(s)
-                        if (n.has(name)) n.delete(name)
-                        else n.add(name)
-                        return n
-                      })
-                    }
-                  />
-                  <span>{name}</span>
-                </label>
-              ))}
-            </fieldset>
-            <fieldset className="f-team-config-fs">
-              <legend>Links útiles</legend>
-              {links.map((l, i) => (
-                <div key={i} className="f-team-config-link-row">
-                  <input aria-label={`Nombre del link ${i + 1}`} value={l.nombre} maxLength={40} placeholder="Nombre" onChange={(e) => setLink(i, { nombre: e.target.value })} />
-                  <input aria-label={`URL del link ${i + 1}`} className="mono" value={l.url} placeholder="https://…" onChange={(e) => setLink(i, { url: e.target.value })} />
-                  <button type="button" className="icon-btn danger" aria-label={`Quitar link ${l.nombre || i + 1}`} onClick={() => (setLinks((ls) => ls.filter((_, j) => j !== i)), setPreview(null))}>
-                    <Trash size={13} aria-hidden="true" />
-                  </button>
-                </div>
-              ))}
-              {links.length < 12 && (
-                <button type="button" className="btn sm ghost f-team-config-add" onClick={() => setLinks((ls) => [...ls, { nombre: '', url: '' }])}>
-                  <Plus size={12} weight="bold" aria-hidden="true" /> Link
+          </div>
+          <div className="field">
+            <label htmlFor="f-tc-name">Nombre del equipo</label>
+            <input id="f-tc-name" value={equipo} maxLength={60} onChange={(e) => (setEquipo(e.target.value), setPreview(null))} />
+          </div>
+          <fieldset className="f-team-config-fs">
+            <legend>Plantillas de este repo</legend>
+            {info && info.templates.length === 0 && <p className="hint">No tenés plantillas que apunten a este repo.</p>}
+            {info?.templates.map((name) => (
+              <label key={name} className="check">
+                <input
+                  type="checkbox"
+                  checked={chosen.has(name)}
+                  onChange={() =>
+                    setChosen((s) => {
+                      const n = new Set(s)
+                      if (n.has(name)) n.delete(name)
+                      else n.add(name)
+                      return n
+                    })
+                  }
+                />
+                <span>{name}</span>
+              </label>
+            ))}
+          </fieldset>
+          <fieldset className="f-team-config-fs">
+            <legend>Links útiles</legend>
+            {links.map((l, i) => (
+              <div key={i} className="f-team-config-link-row">
+                <input aria-label={`Nombre del link ${i + 1}`} value={l.nombre} maxLength={40} placeholder="Nombre" onChange={(e) => setLink(i, { nombre: e.target.value })} />
+                <input aria-label={`URL del link ${i + 1}`} className="mono" value={l.url} placeholder="https://…" onChange={(e) => setLink(i, { url: e.target.value })} />
+                <button type="button" className="icon-btn danger" aria-label={`Quitar link ${l.nombre || i + 1}`} onClick={() => (setLinks((ls) => ls.filter((_, j) => j !== i)), setPreview(null))}>
+                  <Trash size={13} aria-hidden="true" />
                 </button>
-              )}
-              <p className="field-help">Solo https. Los vacíos no se guardan.</p>
-            </fieldset>
-            <label className="check">
-              <input type="checkbox" checked={withSettings} disabled={!mySettings} onChange={(e) => (setWithSettings(e.target.checked), setPreview(null))} />
-              <span>
-                Recomendar mis ajustes
-                <small>{mySettings ? settingsText(mySettings as never) : 'No se pudieron leer tus ajustes.'} — cada uno decide si los acepta.</small>
-              </span>
-            </label>
-            {err && <p className="form-error">{err}</p>}
-            <div className="modal-actions">
-              <button type="button" className="btn ghost" onClick={onClose}>
-                Cancelar
+              </div>
+            ))}
+            {links.length < 12 && (
+              <button type="button" className="btn sm ghost f-team-config-add" onClick={() => setLinks((ls) => [...ls, { nombre: '', url: '' }])}>
+                <Plus size={12} weight="bold" aria-hidden="true" /> Link
               </button>
-              <button type="button" className="btn primary" disabled={!repo || !equipo.trim() || busy} onClick={() => void doPreview()}>
-                Ver contenido
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+            )}
+            <p className="field-help">Solo https. Los vacíos no se guardan.</p>
+          </fieldset>
+          <label className="check">
+            <input type="checkbox" checked={withSettings} disabled={!mySettings} onChange={(e) => (setWithSettings(e.target.checked), setPreview(null))} />
+            <span>
+              Recomendar mis ajustes
+              <small>{mySettings ? settingsText(mySettings as never) : 'No se pudieron leer tus ajustes.'} — cada uno decide si los acepta.</small>
+            </span>
+          </label>
+          {err && <p className="form-error" role="alert">{err}</p>}
+          <div className="modal-actions">
+            <button type="button" className="btn ghost" onClick={onClose}>
+              Cancelar
+            </button>
+            <button type="button" className="btn primary" disabled={!repo || !equipo.trim() || busy} onClick={() => void doPreview()}>
+              Ver contenido
+            </button>
+          </div>
+        </>
+      )}
+    </Modal>
   )
 }
 
@@ -390,7 +355,7 @@ function TeamBlock({ t }: { t: TeamStatus }): React.JSX.Element {
         <p className="f-team-config-invalid" title={t.repoPath}>
           <Warning size={13} weight="fill" aria-hidden="true" />
           <span>
-            <span className="mono">{repoName(t.repoPath)}\.sloth\team.json</span> tiene un error: {t.error}
+            <span className="mono">{repoName(t.repoPath)}/.sloth/team.json</span> tiene un error: {t.error}
           </span>
         </p>
       </div>
@@ -411,7 +376,7 @@ function TeamBlock({ t }: { t: TeamStatus }): React.JSX.Element {
       )}
       {t.settingsPending && t.ajustes && (
         <div className="f-team-config-sugg">
-          <Sliders size={13} aria-hidden="true" />
+          <SettingsIcon size={13} />
           <span className="grow-min" title={`El equipo recomienda: ${settingsText(t.ajustes)}`}>
             Sugerido: {settingsText(t.ajustes)}
           </span>
@@ -501,7 +466,7 @@ const ui: FeatureUi = {
       {
         id: 'team-config:export',
         title: 'Exportar mi configuración como configuración del equipo',
-        subtitle: 'Genera <repo>\\.sloth\\team.json con tus plantillas (sin cuentas ni rutas)',
+        subtitle: 'Genera <repo>/.sloth/team.json con tus plantillas (sin cuentas ni rutas)',
         group: 'Equipo',
         keywords: 'equipo team exportar compartir team.json',
         run: () => openTeamDialog({ kind: 'export', repoPath: ok[0]?.repoPath })

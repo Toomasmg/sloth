@@ -8,11 +8,14 @@ import { cleanError } from './format'
  */
 export function SleepingCard({ paneId, name, onError }: { paneId: string; name: string; onError(message: string): void }): React.JSX.Element {
   const [waking, setWaking] = useState(false)
+  const [err, setErr] = useState('')
   const wake = (): void => {
     if (waking) return
     setWaking(true)
+    setErr('')
     window.sloth.feat.invoke('feat:sleep:wake', paneId).catch((e: unknown) => {
       setWaking(false)
+      setErr(cleanError(e))
       onError(cleanError(e))
     })
   }
@@ -21,8 +24,13 @@ export function SleepingCard({ paneId, name, onError }: { paneId: string; name: 
       <MoonIcon size={28} weight="fill" className="sleeping-ico" aria-hidden="true" />
       <p className="sleeping-title">Dormido para ahorrar memoria</p>
       <p className="sleeping-lead">La conversación no se perdió: al despertarlo, Claude sigue donde quedó.</p>
-      <button type="button" className="btn primary" onClick={wake} disabled={waking} aria-label={`Despertar ${name}`}>
-        {waking ? 'Despertando…' : 'Despertar'}
+      {err && (
+        <p className="form-error" role="alert">
+          No se pudo despertar a {name}: {err}
+        </p>
+      )}
+      <button type="button" className="btn primary" onClick={wake} disabled={waking} aria-label={waking || err ? undefined : `Despertar ${name}`}>
+        {waking ? 'Despertando…' : err ? 'Reintentar' : 'Despertar'}
       </button>
     </div>
   )

@@ -164,7 +164,7 @@ export function Ramas({ g, st, sync, stash, branches, onGoCambios }: Props): Rea
             <div className="g-banner-actions">
               <button type="button" className="g-btn-solid" onClick={() => void stashAndSwitch()} disabled={bsy}>
                 {busy === 'stash' ? <SpinGlyph /> : null}
-                Guardar en stash y cambiar
+                Guardar aparte (stash) y cambiar
               </button>
               <button type="button" className="g-btn-plain" onClick={onGoCambios} disabled={bsy}>
                 Ir a Cambios
@@ -180,7 +180,7 @@ export function Ramas({ g, st, sync, stash, branches, onGoCambios }: Props): Rea
       {stash && (
         <div className="g-card">
           <div className="g-card-body">
-            <div className="g-card-t">Cambios guardados en stash</div>
+            <div className="g-card-t">Cambios guardados aparte (stash)</div>
             <div className="g-card-s">
               {plural(stash.files, 'archivo', 'archivos')} de {stash.branch}
             </div>
