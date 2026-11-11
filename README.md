@@ -14,7 +14,7 @@ npm run dist              # instalador .exe en dist/
 1. **Cuentas**: escribí un nombre y agregala. Se abre Claude con esa cuenta para iniciar sesión
    (para la segunda cuenta usá una ventana de incógnito en el navegador, así no reusa la sesión).
 2. **Espacios**: «Nuevo» (repo + cuenta, worktree opcional, prompt inicial) o «Ticket»
-   (`TCK-1234` → abre Claude con `/ticket TCK-1234`).
+   (un id como `PROJ-123`; con un conector que use la skill `/ticket`, como Gruv, abre Claude con `/ticket PROJ-123`).
 3. Abrí varios espacios: se ven en grilla, cada uno con el color de su cuenta, su carpeta y su estado.
 
 ## Cómo funciona
