@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import type { Detalle, TicketsSnapshot as Snapshot, Ticket } from '../../../../shared/tickets'
+import { esMio, type Detalle, type TicketsSnapshot as Snapshot, type Ticket } from '../../../../shared/tickets'
 
 export type { Accion, Categoria, ConectorInfo, Detalle, Estado, EstadoBase, Ticket, TicketsSnapshot as Snapshot } from '../../../../shared/tickets'
 
@@ -26,12 +26,8 @@ export const norm = (s: string): string =>
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
 
-/** «Míos»: el responsable es la persona dueña de la cuenta que consulta (`me`). */
-export function isMine(t: Pick<Ticket, 'responsable' | 'responsableId'>, me?: Snapshot['me']): boolean {
-  if (!me || !t.responsable) return false
-  if (me.id && t.responsableId) return t.responsableId === me.id
-  return norm(t.responsable) === norm(me.nombre)
-}
+/** «Míos»: el responsable es la persona dueña de la cuenta que consulta (`me`). Misma regla que main. */
+export const isMine = (t: Pick<Ticket, 'responsable' | 'responsableId'>, me?: Snapshot['me']): boolean => esMio(me, t)
 
 /** Orden de prioridad conocido; lo que no se reconoce va al final. */
 export function prioRank(p?: string): number {
