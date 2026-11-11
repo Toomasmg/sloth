@@ -236,21 +236,23 @@ const feature: Feature = {
       }
     })
 
-    const exportInput = (input: unknown): Parameters<typeof buildTeamExport>[2] => {
+    // Los conectores no se editan desde acá: se conservan los del team.json actual.
+    const exportInput = (repo: string, input: unknown): Parameters<typeof buildTeamExport>[2] => {
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Datos inválidos.')
       const i = input as Record<string, unknown>
-      return { equipo: i.equipo, links: i.links, ajustes: i.ajustes, include: i.include }
+      const actual = readTeamConfig(repo)
+      return { equipo: i.equipo, links: i.links, ajustes: i.ajustes, include: i.include, conectores: actual.kind === 'ok' ? actual.config.conectores : undefined }
     }
 
     ctx.handle('exportPreview', (repo: unknown, input: unknown) => {
       const r = repoArg(repo)
-      const out = buildTeamExport(r, readTemplates(), exportInput(input))
+      const out = buildTeamExport(r, readTemplates(), exportInput(r, input))
       return { text: out.text, skipped: out.skipped, count: out.config.plantillas.length, path: teamFilePath(r), exists: existsSync(teamFilePath(r)) }
     })
 
     ctx.handle('exportWrite', (repo: unknown, input: unknown, shown: unknown) => {
       const r = repoArg(repo)
-      const out = buildTeamExport(r, readTemplates(), exportInput(input))
+      const out = buildTeamExport(r, readTemplates(), exportInput(r, input))
       // Se escribe exactamente lo que el usuario vio y confirmó.
       if (out.text !== shown) throw new Error('Tus plantillas cambiaron mientras mirabas la vista previa. Revisala de nuevo.')
       const dir = join(r, TEAM_DIR)
