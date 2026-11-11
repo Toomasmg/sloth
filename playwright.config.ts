@@ -15,7 +15,9 @@ export default defineConfig({
     // Margen chico para el suavizado de letras; un cambio de diseño real lo supera de lejos.
     toHaveScreenshot: { maxDiffPixelRatio: 0.01, animations: 'disabled', caret: 'hide' }
   },
-  snapshotPathTemplate: '{testDir}/capturas/{testFileName}/{arg}{ext}',
+  // Capturas por sistema (win32, darwin, linux): las letras y los controles nativos se ven distinto en cada uno.
+  // En un sistema nuevo, la primera corrida con test:e2e:update arma las suyas.
+  snapshotPathTemplate: '{testDir}/capturas/{platform}/{testFileName}/{arg}{ext}',
   reporter: [['list'], ['html', { open: 'never' }]],
   use: { trace: 'retain-on-failure', screenshot: 'only-on-failure' }
 })
