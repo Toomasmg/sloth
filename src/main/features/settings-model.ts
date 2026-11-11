@@ -37,6 +37,10 @@ export interface NotifySettings {
   team: boolean
 }
 
+/** Opciones de «Dormir espacios inactivos» (minutos; 0 = nunca). */
+export const SLEEP_MINUTES = [0, 15, 30, 60, 120] as const
+export type SleepMinutes = (typeof SLEEP_MINUTES)[number]
+
 export interface SlothSettings {
   theme: ThemeChoice
   density: Density
@@ -53,6 +57,10 @@ export interface SlothSettings {
   reopenSpaces: boolean
   /** Dejar las terminales vivas al cerrar la ventana (el daemon sigue corriendo). */
   keepTerminalsAlive: boolean
+  /** Preguntar antes de cerrar Sloth con la X si hay terminales corriendo. */
+  confirmQuit: boolean
+  /** Minutos sin actividad para dormir un espacio (cerrar su Claude y retomarlo al volver). 0 = nunca. */
+  sleepAfterMin: SleepMinutes
   /** Editor para «Abrir en editor». */
   editor: EditorChoice
   /** Carpeta de proyectos. Vacía = la carpeta Documentos del usuario. */
@@ -148,6 +156,8 @@ export const DEFAULT_SETTINGS: SlothSettings = {
   confirmClosePanes: true,
   reopenSpaces: true,
   keepTerminalsAlive: true,
+  confirmQuit: true,
+  sleepAfterMin: 0,
   editor: 'VS Code',
   projectsDir: '',
   sounds: false,
@@ -271,7 +281,7 @@ export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOp
     patch,
     [
       'theme', 'density', 'uiFontSize', 'accent', 'terminal', 'accountColors', 'accountPlans', 'openAtLogin', 'confirmClosePanes',
-      'reopenSpaces', 'keepTerminalsAlive', 'editor', 'projectsDir', 'sounds', 'soundName', 'noMolestar', 'notify', 'updateChannel', 'lightMode', 'shortcuts'
+      'reopenSpaces', 'keepTerminalsAlive', 'confirmQuit', 'sleepAfterMin', 'editor', 'projectsDir', 'sounds', 'soundName', 'noMolestar', 'notify', 'updateChannel', 'lightMode', 'shortcuts'
     ],
     ''
   )
@@ -284,6 +294,12 @@ export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOp
   if ('confirmClosePanes' in patch) next.confirmClosePanes = bool(patch.confirmClosePanes, '«Confirmar al cerrar»')
   if ('reopenSpaces' in patch) next.reopenSpaces = bool(patch.reopenSpaces, '«Reabrir los espacios»')
   if ('keepTerminalsAlive' in patch) next.keepTerminalsAlive = bool(patch.keepTerminalsAlive, '«Terminales vivas»')
+  if ('confirmQuit' in patch) next.confirmQuit = bool(patch.confirmQuit, '«Preguntar antes de cerrar Sloth»')
+  if ('sleepAfterMin' in patch) {
+    const v = patch.sleepAfterMin
+    if (!SLEEP_MINUTES.includes(v as SleepMinutes)) throw new Error(`«Dormir espacios inactivos» tiene que ser ${SLEEP_MINUTES.join(', ')}.`)
+    next.sleepAfterMin = v as SleepMinutes
+  }
   if ('editor' in patch) next.editor = oneOf(patch.editor, EDITORS, 'El editor')
   if ('projectsDir' in patch) next.projectsDir = projectsDir(patch.projectsDir)
   if ('sounds' in patch) next.sounds = bool(patch.sounds, '«Sonidos»')
@@ -373,7 +389,7 @@ export function normalize(raw: unknown): SlothSettings {
   }
   const scalars = [
     'theme', 'density', 'uiFontSize', 'accent', 'openAtLogin', 'confirmClosePanes', 'reopenSpaces', 'keepTerminalsAlive',
-    'editor', 'projectsDir', 'sounds', 'soundName', 'noMolestar', 'updateChannel', 'lightMode'
+    'confirmQuit', 'sleepAfterMin', 'editor', 'projectsDir', 'sounds', 'soundName', 'noMolestar', 'updateChannel', 'lightMode'
   ] as const
   for (const k of scalars) if (k in src) tryPatch({ [k]: src[k] })
   if (isObj(src.terminal)) for (const [k, v] of Object.entries(src.terminal)) tryPatch({ terminal: { [k]: v } })
@@ -409,6 +425,8 @@ export function resetSection(current: SlothSettings, section: unknown): SlothSet
     case 'general':
       next.reopenSpaces = d.reopenSpaces
       next.keepTerminalsAlive = d.keepTerminalsAlive
+      next.confirmQuit = d.confirmQuit
+      next.sleepAfterMin = d.sleepAfterMin
       next.openAtLogin = d.openAtLogin
       next.confirmClosePanes = d.confirmClosePanes
       next.editor = d.editor

@@ -50,6 +50,8 @@ const INDEX: readonly [string, SectionId][] = [
   ['Abrir Sloth al iniciar Windows', 'general'],
   ['Confirmar al cerrar paneles', 'general'],
   ['Al cerrar, seguir en la bandeja', 'general'],
+  ['Preguntar antes de cerrar Sloth', 'general'],
+  ['Dormir espacios inactivos (ahorrar memoria)', 'general'],
   ['Editor para abrir en editor', 'general'],
   ['Carpeta de proyectos', 'general'],
   ['Agregar cuenta', 'cuentas'],

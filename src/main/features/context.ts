@@ -30,6 +30,8 @@ export interface FeatureContext {
   onHook(cb: (p: HookEventPayload) => void): void
   onPtyData(cb: (id: string, chunks: PtyChunk[]) => void): void
   onPtyExit(cb: (id: string, code: number) => void): void
+  /** Lo que la persona escribe en una terminal desde la UI. */
+  onPtyWrite(cb: (id: string, data: string) => void): void
   agents(): ReadonlyMap<string, AgentStatus>
   setAgent(wsId: string, status: AgentStatus): void
   /** Mismas validaciones que «Nuevo espacio» (incluye crear worktree si viene branch). */

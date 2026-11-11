@@ -59,6 +59,7 @@ import { useReorderDrag } from './layout/useReorderDrag'
 import { Separators } from './layout/Separators'
 import { SIDE_DEFAULT, SideResizer, clampSide, sideMax } from './layout/SideResizer'
 import { PaneMenu, type PaneMenuItem } from './layout/PaneMenu'
+import { SleepingCard } from './SleepingCard'
 import { CrumbMenu, type CrumbGroup, type CrumbItem } from './layout/CrumbMenu'
 import { openRamas } from './features/worktrees/store'
 import { openHistory } from './features/history/index'
@@ -158,7 +159,8 @@ const STATE_CHIP: Record<AgentStatus['state'], string> = {
   waiting: 'chip-waiting',
   done: 'chip-done',
   exited: 'chip-error',
-  idle: 'chip-idle'
+  idle: 'chip-idle',
+  sleeping: 'chip-idle'
 }
 
 export function App(): React.JSX.Element {
@@ -1307,7 +1309,11 @@ export function App(): React.JSX.Element {
                       />
                     )}
                     <PaneBannerSlot paneId={paneId} />
-                    <TerminalView id={paneId} generation={generations[paneId] ?? 0} onError={onTermError} />
+                    {agents[paneId]?.state === 'sleeping' ? (
+                      <SleepingCard paneId={paneId} name={title} onError={onTermError} />
+                    ) : (
+                      <TerminalView id={paneId} generation={generations[paneId] ?? 0} onError={onTermError} />
+                    )}
                   </section>
                 )
               })}
