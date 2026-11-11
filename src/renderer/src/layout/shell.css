@@ -11,6 +11,11 @@
 }
 
 /* ---------- Barra superior ---------- */
+:root .page-shell {
+  /* La barra de arriba (z-index 20) tapaba el encabezado con «‹ Espacios»: la página arranca debajo. */
+  top: 48px;
+}
+
 .sl-top {
   position: relative;
   z-index: 20;

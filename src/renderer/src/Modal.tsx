@@ -44,6 +44,7 @@ export function Modal(p: ModalProps): React.JSX.Element {
   const dirtyRef = useRef(false)
   const closeRef = useRef(onClose)
   const lockedRef = useRef(false)
+  const closingRef = useRef(false)
   const escRef = useRef(onEscape)
   lockedRef.current = !!locked
   escRef.current = onEscape
@@ -59,17 +60,21 @@ export function Modal(p: ModalProps): React.JSX.Element {
   const requestRef = useRef(requestClose)
   requestRef.current = requestClose
 
+  // Se lee al renderizar: un `autoFocus` de adentro ya habría movido el foco cuando corre el efecto.
+  const [opener] = useState<HTMLElement | null>(() => (document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null))
+
   useLayoutEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null
     const root = rootRef.current
     if (root && !root.contains(document.activeElement)) {
       const autofocus = root.querySelector<HTMLElement>('[data-autofocus]')
       ;(autofocus ?? focusables(root).find((el) => !el.classList.contains('icon-btn')) ?? root).focus()
     }
     return () => {
+      // Sin esto, la trampa de foco (que todavía está viva) le devolvería el foco al diálogo que se está yendo.
+      closingRef.current = true
       if (opener?.isConnected) opener.focus()
     }
-  }, [])
+  }, [opener])
 
   useEffect(() => {
     const layer = (): HTMLElement | null => (askingRef.current ? confirmRef.current : rootRef.current)
@@ -90,6 +95,7 @@ export function Modal(p: ModalProps): React.JSX.Element {
       else box?.focus()
     }
     const onFocusIn = (e: FocusEvent): void => {
+      if (closingRef.current) return
       const box = layer()
       if (box && e.target instanceof Node && !box.contains(e.target)) (focusables(box)[0] ?? box).focus()
     }
