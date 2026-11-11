@@ -47,7 +47,7 @@ function targetsOf(ctx: UiCtx): Target[] {
   for (const ws of ctx.workspaces) {
     const ag = ctx.agents[ws.id]
     const isOpenPane = open.has(ws.id)
-    const aliveHidden = !isOpenPane && ag && ag.state !== 'exited'
+    const aliveHidden = !isOpenPane && ag && ag.state !== 'exited' && ag.state !== 'sleeping'
     if (!isOpenPane && !aliveHidden) continue
     out.push({
       id: ws.id,

@@ -726,7 +726,7 @@ export function App(): React.JSX.Element {
   const done = countBy('done')
   /** Pedidos de permiso vivos (uno o más por espacio). El chip del resumen los cuenta; no se repiten en otro lado. */
   const pendingPerms = [...permsByWs.values()].reduce((n, q) => n + q.length, 0)
-  const activeTerms = workspaces.filter((w) => agents[w.id] && agents[w.id].state !== 'exited').length
+  const activeTerms = workspaces.filter((w) => agents[w.id] && agents[w.id].state !== 'exited' && agents[w.id].state !== 'sleeping').length
   /** Primer espacio con ese estado (para ir al tocar un resumen). */
   const firstWs = (s: AgentStatus['state']): Workspace | undefined => workspaces.find((w) => agents[w.id]?.state === s)
 
