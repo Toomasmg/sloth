@@ -17,7 +17,7 @@ import {
   type Ticket,
   type Yo
 } from '../../../shared/tickets'
-import { ID_MAX, nombreCompleto, regexDeId, type ArgValor, type ConectorDef } from './conector'
+import { ID_MAX, ID_SEGURO_RE, nombreCompleto, regexDeId, type ArgValor, type ConectorDef } from './conector'
 
 const MAX_TICKETS = 250
 const MAX_CRITERIOS = 5
@@ -211,7 +211,7 @@ export const conCategoria = (def: ConectorDef, estados: EstadoBase[]): Estado[] 
 export function idValido(def: ConectorDef, v: unknown): string | null {
   if (typeof v !== 'string') return null
   const s = def.idMayusculas ? v.trim().toUpperCase() : v.trim()
-  return s.length <= ID_MAX && regexDeId(def).test(s) ? s : null
+  return s.length <= ID_MAX && ID_SEGURO_RE.test(s) && regexDeId(def).test(s) ? s : null
 }
 
 export function info(def: ConectorDef | undefined, idPedido: string): ConectorInfo {

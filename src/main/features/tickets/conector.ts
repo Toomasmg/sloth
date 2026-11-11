@@ -58,6 +58,8 @@ export type ConectorDef = ConectorMcp
 
 /** Un id de ticket más largo que esto no se evalúa contra la regex (ni se guarda). */
 export const ID_MAX = 20
+/** Los ids van sin comillas a los prompts y al PTY (`/ticket <id>`): además de la regex del conector, solo esto. */
+export const ID_SEGURO_RE = /^[A-Za-z0-9_#.-]+$/
 export const ID_CONECTOR_RE = /^[a-z][a-z0-9-]{1,31}$/
 
 export const PLACEHOLDERS: Record<Accion, readonly string[]> = {
@@ -226,7 +228,7 @@ function validar(raw: unknown): void {
   const ej = objeto(o.ejemplo, `${R}.ejemplo`, ['id', 'estado', 'prioridad', 'proyecto'])
   for (const k of Object.keys(ej)) campo(ej[k], `${R}.ejemplo.${k}`, 60, SIN_ESCAPE)
   const ejId = ej.id as string
-  if ((mayusculas && ejId !== ejId.toUpperCase()) || ejId.length > ID_MAX || !re.test(ejId)) fallar(`${R}.ejemplo.id`, 'no cumple idRegex')
+  if ((mayusculas && ejId !== ejId.toUpperCase()) || ejId.length > ID_MAX || !ID_SEGURO_RE.test(ejId) || !re.test(ejId)) fallar(`${R}.ejemplo.id`, 'no cumple idRegex')
   if (!claves.includes(ej.estado as string)) fallar(`${R}.ejemplo.estado`, 'no es la clave de ningún estado')
 
   const falta = objeto(o.faltaConector, `${R}.faltaConector`, ['clave', 'mensaje'])

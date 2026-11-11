@@ -5,7 +5,7 @@
  * properties, y los tipos se importan con `type`.
  */
 import { MODELOS, type Corrida, type EstadoBase, type Modelo, type Ticket, type TicketsConfig, type Yo } from '../../../shared/tickets'
-import { ID_CONECTOR_RE, ID_MAX, type ConectorDef } from './conector'
+import { ID_CONECTOR_RE, ID_MAX, ID_SEGURO_RE, type ConectorDef } from './conector'
 import { CONECTOR_POR_DEFECTO } from './conectores'
 import { idValido, normalizeEstados, normEstado, normYo } from './motor'
 
@@ -78,7 +78,7 @@ function sanearTickets(raw: unknown, def: ConectorDef | undefined): Ticket[] {
   for (const t of raw) {
     if (!esObjeto(t)) continue
     // Con un conector que no está en esta versión no se sabe validar el id: solo se acota.
-    const id = def ? idValido(def, t.id) : typeof t.id === 'string' && t.id.length <= ID_MAX ? t.id : null
+    const id = def ? idValido(def, t.id) : typeof t.id === 'string' && t.id.length <= ID_MAX && ID_SEGURO_RE.test(t.id) ? t.id : null
     if (!id) continue
     out.push(sinVacios({ ...(t as unknown as Ticket), id, estado: normEstado(t.estado) }))
   }

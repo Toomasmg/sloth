@@ -151,6 +151,15 @@ test('idValido normaliza y no evalúa ids de más de 20 caracteres', () => {
   assert.equal(idValido(GRUV, 'ABCDEFGHIJKLMNOP-1234'), null)
 })
 
+test('idValido exige caracteres seguros aunque la regex del conector acepte cualquier cosa', () => {
+  const laxa = (id: string): unknown => ({ ...structuredClone(gruv), id: 'laxo', idRegex: '^.+$', idMayusculas: false, ejemplo: { ...gruv.ejemplo, id } })
+  const laxo = validarConector(laxa('x-1'))
+  for (const ok of ['x-1', 'A_b.9', '#12', 'PROJ.sub-3']) assert.equal(idValido(laxo, ok), ok)
+  for (const malo of ['a b', 'a;rm', 'a"b', "a'b", 'a$b', 'a`b', 'a\nb', 'a/b', 'a\\b', '{x}', 'ñ-1', 'a|b'])
+    assert.equal(idValido(laxo, malo), null, JSON.stringify(malo))
+  assert.throws(() => validarConector(laxa('x 1')), /ejemplo\.id/)
+})
+
 test('info de un conector que existe y de uno que no', () => {
   const i = info(GRUV, 'gruv')
   assert.equal(i.disponible, true)

@@ -105,7 +105,7 @@ test('versión futura: se respalda aparte', () => {
 })
 
 test('un conector que no está en esta versión se conserva', () => {
-  const raw = { ...TICKETS_V2, tickets: [{ id: 'jira-12', titulo: 'J' }, { id: 'x'.repeat(21), titulo: 'Largo' }, { id: 7 }], config: { ...TICKETS_V2.config, conectorId: 'jira' } }
+  const raw = { ...TICKETS_V2, tickets: [{ id: 'jira-12', titulo: 'J' }, { id: 'x'.repeat(21), titulo: 'Largo' }, { id: 7 }, { id: 'a b; rm' }], config: { ...TICKETS_V2.config, conectorId: 'jira' } }
   const s = sanearEstado(raw, conectorPorId)
   assert.equal(s?.config.conectorId, 'jira')
   assert.deepEqual(s?.tickets, [{ id: 'jira-12', titulo: 'J' }])
