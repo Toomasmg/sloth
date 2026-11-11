@@ -23,7 +23,7 @@ import { writeJsonAtomic } from '../tray-settings'
 import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, ticketId } from './acciones'
 import { resolveClaudeExe, runClaude } from './claude-run'
 import type { ConectorDef, ConectorGh, ConectorMcp } from './conector'
-import { crearAlmacen, type Almacen, type FsTickets } from './almacen'
+import { crearAlmacen, type Almacen, type ConfigCruda, type FsTickets } from './almacen'
 import { CONECTORES } from './conectores'
 import { buildDescubrirArgs, buildDescubrirPrompt, parseDescubrir, type Descubiertas } from './descubrir'
 import {
@@ -142,7 +142,7 @@ function buscar(id: string): ConectorDef | undefined {
 }
 
 /** Los repos donde buscar `.sloth/conectores.json`: los de los espacios y los de los ajustes de Tickets. */
-function reposDeEquipo(config?: TicketsConfig): string[] {
+function reposDeEquipo(config?: ConfigCruda): string[] {
   const candidatos = [...ctx.store.workspaces.map((w) => w.repoPath), config?.defaultRepo, ...Object.values(config?.projectRepos ?? {})]
   const repos = new Map<string, string>()
   for (const p of candidatos) {
@@ -195,8 +195,8 @@ function leerConectoresEquipo(repo: string): unknown[] | string | undefined {
   }
 }
 
-/** Relee los conectores propios y los del equipo. Sin config (al arrancar, antes de cargar el estado), solo los repos de los espacios. */
-function recargarPropios(config?: TicketsConfig): void {
+/** Relee los conectores propios y los del equipo. Sin config, solo los repos de los espacios. */
+function recargarPropios(config?: ConfigCruda): void {
   const avisos = leerArchivoPropios()
   const equipos: { repo: string; repoKey: string; equipo: string; conectores: readonly unknown[] }[] = []
   for (const repo of reposDeEquipo(config)) {
@@ -819,9 +819,10 @@ const feature: Feature = {
   name: 'tickets',
   register(c) {
     ctx = c
-    // Antes de cargar el estado: si el conector guardado es propio, tiene que estar en el registro.
-    recargarPropios()
+    // buscar lee el registro recién cuando se la llama: el almacén se puede crear antes de armarlo.
     almacen = crearAlmacen({ fs: fsReal, carpeta: carpeta(), buscar, log: (m) => c.log(m), ahora: Date.now })
+    // Antes de cargar el estado: si el conector guardado es del equipo de un repo de los ajustes, tiene que estar en el registro.
+    recargarPropios(almacen.configCruda())
     state = almacen.cargar()
     recargarPropios(state.config)
     c.handle('state', () => snapshot())
