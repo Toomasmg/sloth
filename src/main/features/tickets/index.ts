@@ -1,7 +1,7 @@
 import { app, dialog, type OpenDialogOptions, type SaveDialogOptions } from 'electron'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import {
   MODELOS,
   type Accion,
@@ -16,7 +16,7 @@ import {
 import type { Feature, FeatureContext } from '../context'
 import { accountStatus } from '../../accounts'
 import { baseEnv } from '../../ptys'
-import { readTeamConfig, repoKey } from '../team-config-core'
+import { readTeamConfig, repoKey, TEAM_DIR } from '../team-config-core'
 import { writeJsonAtomic } from '../tray-settings'
 import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, ticketId } from './acciones'
 import { resolveClaudeExe, runClaude } from './claude-run'
@@ -27,8 +27,11 @@ import { buildDescubrirArgs, buildDescubrirPrompt, parseDescubrir, type Descubie
 import {
   armarRegistro,
   claveAceptado,
+  EQUIPO_ARCHIVO,
+  EQUIPO_MAX_BYTES,
   IMPORT_MAX_BYTES,
   parsearArchivoPropios,
+  parsearConectoresEquipo,
   parsearImport,
   PROPIOS_MAX,
   recortarAvisos,
@@ -123,7 +126,7 @@ function buscar(id: string): ConectorDef | undefined {
   return r && aceptado(r) ? r.def : undefined
 }
 
-/** Los repos donde buscar un team.json con conectores: los de los espacios y los de los ajustes de Tickets. */
+/** Los repos donde buscar `.sloth/conectores.json`: los de los espacios y los de los ajustes de Tickets. */
 function reposDeEquipo(config?: TicketsConfig): string[] {
   const candidatos = [...ctx.store.workspaces.map((w) => w.repoPath), config?.defaultRepo, ...Object.values(config?.projectRepos ?? {})]
   const repos = new Map<string, string>()
@@ -161,14 +164,32 @@ function leerArchivoPropios(): string[] {
   }
 }
 
-/** Relee los conectores propios y los team.json. Sin config (al arrancar, antes de cargar el estado), solo los repos de los espacios. */
+/** Los de `<repo>/.sloth/conectores.json`; undefined si no hay archivo y un texto si no se pudo leer. */
+function leerConectoresEquipo(repo: string): unknown[] | string | undefined {
+  const file = join(repo, TEAM_DIR, EQUIPO_ARCHIVO)
+  const donde = `${TEAM_DIR}/${EQUIPO_ARCHIVO} de ${repo}`
+  try {
+    const st = statSync(file)
+    if (!st.isFile()) return `${donde} no es un archivo.`
+    if (st.size > EQUIPO_MAX_BYTES) return `${donde} pesa más de ${EQUIPO_MAX_BYTES / 1024} KB.`
+    return parsearConectoresEquipo(readFileSync(file, 'utf8'))
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return undefined
+    return `${donde} no se pudo leer: ${(e as Error).message}`
+  }
+}
+
+/** Relee los conectores propios y los del equipo. Sin config (al arrancar, antes de cargar el estado), solo los repos de los espacios. */
 function recargarPropios(config?: TicketsConfig): void {
   const avisos = leerArchivoPropios()
   const equipos: { repo: string; repoKey: string; equipo: string; conectores: readonly unknown[] }[] = []
   for (const repo of reposDeEquipo(config)) {
-    const t = readTeamConfig(repo)
-    if (t.kind === 'invalid') avisos.push(`El team.json de ${repo} no se pudo leer: ${t.error}`)
-    else if (t.kind === 'ok' && t.config.conectores?.length) equipos.push({ repo, repoKey: repoKey(repo), equipo: t.config.equipo, conectores: t.config.conectores })
+    const r = leerConectoresEquipo(repo)
+    if (typeof r === 'string') avisos.push(r)
+    else if (r?.length) {
+      const t = readTeamConfig(repo)
+      equipos.push({ repo, repoKey: repoKey(repo), equipo: t.kind === 'ok' ? t.config.equipo : basename(repo), conectores: r })
+    }
   }
   const r = armarRegistro({ incluidos: CONECTORES, usuario: archivoPropios.conectores, equipos, hash: hashCorto })
   registro = r.lista
@@ -658,7 +679,7 @@ function guardarPropio(raw: unknown, rawAnterior: unknown): TicketsSnapshot {
 
 function borrarPropio(rawId: unknown): TicketsSnapshot {
   const id = idOpcional(rawId)
-  if (id === undefined || !archivoPropios.conectores.some((c) => c.id === id)) throw new Error('Ese conector propio ya no existe. Los del equipo se sacan del team.json.')
+  if (id === undefined || !archivoPropios.conectores.some((c) => c.id === id)) throw new Error('Ese conector propio ya no existe. Los del equipo se sacan de .sloth/conectores.json.')
   const eraActivo = id === state.config.conectorId
   if (eraActivo) sinNadaEnCurso()
   guardarArchivo({ ...archivoPropios, conectores: archivoPropios.conectores.filter((c) => c.id !== id) })

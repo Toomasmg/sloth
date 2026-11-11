@@ -78,7 +78,7 @@ export interface TicketsConfig {
 /** Cómo habla Sloth con el sistema: Claude con un conector MCP, o GitHub CLI directo. */
 export type Via = 'mcp' | 'gh'
 
-/** De dónde sale un conector: viene con Sloth, lo armó la persona o lo trae el team.json de un repo. */
+/** De dónde sale un conector: viene con Sloth, lo armó la persona o lo trae el .sloth/conectores.json de un repo. */
 export type OrigenConector = { tipo: 'incluido' } | { tipo: 'usuario' } | { tipo: 'equipo'; repo: string; equipo: string }
 
 export interface ConectorResumen {

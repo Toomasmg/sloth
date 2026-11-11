@@ -18,7 +18,6 @@ export const TEAM_FILE = 'team.json'
 export const MAX_TEAM_BYTES = 256 * 1024
 const MAX_TEMPLATES = 50
 const MAX_LINKS = 12
-const MAX_CONECTORES = 10
 
 /** Los mismos valores que la Configuración de Sloth (settings-model.ts). */
 export type Density = 'compacta' | 'cómoda'
@@ -57,8 +56,6 @@ export interface TeamConfig {
   links: TeamLink[]
   /** Chat del equipo: se usa solo si el usuario lo acepta (ver chat.ts). */
   chat?: ChatServerConfig
-  /** Conectores de tickets. Acá solo se mira que sea una lista: los valida Tickets y cada persona los acepta. */
-  conectores?: unknown[]
 }
 
 export class TeamConfigError extends Error {}
@@ -201,7 +198,7 @@ export function parseTeamConfig(textIn: string): TeamConfig {
     fail('No es un JSON válido.')
   }
   if (!isObj(data)) return fail('El archivo tiene que ser un objeto JSON.')
-  onlyKeys(data, ['formato', 'versión', 'equipo', 'plantillas', 'ajustes', 'links', 'chat', 'conectores'], 'team.json')
+  onlyKeys(data, ['formato', 'versión', 'equipo', 'plantillas', 'ajustes', 'links', 'chat'], 'team.json')
   if (data.formato !== TEAM_FORMAT) fail(`formato: tiene que ser «${TEAM_FORMAT}».`)
   if (data.versión !== TEAM_VERSION) fail(`versión: esta versión de Sloth entiende la ${TEAM_VERSION}. Actualizá Sloth.`)
   const equipo = text(data.equipo, 60, 'equipo', true)!
@@ -224,12 +221,6 @@ export function parseTeamConfig(textIn: string): TeamConfig {
     } catch (e) {
       fail(`chat: ${e instanceof Error ? e.message : 'configuración inválida.'}`)
     }
-  }
-  if (data.conectores !== undefined) {
-    if (!Array.isArray(data.conectores)) fail('conectores: tiene que ser una lista.')
-    const conectores = data.conectores as unknown[]
-    if (conectores.length > MAX_CONECTORES) fail(`conectores: como mucho ${MAX_CONECTORES}.`)
-    cfg.conectores = conectores
   }
   return cfg
 }
@@ -440,8 +431,6 @@ export interface ExportInput {
   ajustes?: unknown
   /** Nombres de plantillas elegidas (si falta, todas las del repo). */
   include?: unknown
-  /** Los del team.json actual, para no perderlos al exportar plantillas. */
-  conectores?: unknown[]
 }
 
 export interface ExportResult {
@@ -483,7 +472,7 @@ export function buildTeamExport(repo: string, templates: readonly ExistingTempla
     if (t.useWorktree?.branchPattern) out.useWorktree = { branchPattern: t.useWorktree.branchPattern }
     plantillas.push(out)
   }
-  const draft = { formato: TEAM_FORMAT, versión: TEAM_VERSION, equipo, plantillas, ajustes: input.ajustes ?? undefined, links: input.links ?? [], conectores: input.conectores }
+  const draft = { formato: TEAM_FORMAT, versión: TEAM_VERSION, equipo, plantillas, ajustes: input.ajustes ?? undefined, links: input.links ?? [] }
   // Se valida con el mismo parser que la importación: lo que se exporta siempre se puede importar.
   const textOut = JSON.stringify(draft, null, 2) + '\n'
   const config = parseTeamConfig(textOut)

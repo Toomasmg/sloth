@@ -1,5 +1,5 @@
 /**
- * Conectores que no vienen con Sloth: los que arma la persona y los que trae el team.json de un
+ * Conectores que no vienen con Sloth: los que arma la persona y los que trae el .sloth/conectores.json de un
  * repo. Pasan por el mismo validador que los incluidos y además nunca son «verificados» ni pueden
  * leer con una herramienta que parezca de escritura.
  * Módulo puro y sin `node:*`: también lo importa la interfaz. El hash se inyecta desde main.
@@ -23,6 +23,10 @@ export interface ArchivoPropios {
 export const PROPIOS_MAX = 30
 export const EQUIPO_MAX = 10
 export const IMPORT_MAX_BYTES = 64 * 1024
+/** `<repo>/.sloth/conectores.json`: aparte del team.json para que las versiones viejas de Sloth no lo rechacen entero. */
+export const EQUIPO_ARCHIVO = 'conectores.json'
+export const EQUIPO_FORMATO = 'sloth-conectores'
+export const EQUIPO_MAX_BYTES = 256 * 1024
 
 const AVISO_MAX = 200
 const AVISOS_MAX = 10
@@ -179,6 +183,28 @@ export function parsearImport(texto: string): ConectorDef {
     throw new Error('El archivo no es un JSON válido.')
   }
   return validarPropio(raw)
+}
+
+/** El texto de `.sloth/conectores.json`: la lista cruda, que después pasa por `armarRegistro`. Tira con un mensaje legible. */
+export function parsearConectoresEquipo(texto: string): unknown[] {
+  if (new TextEncoder().encode(texto).length > EQUIPO_MAX_BYTES) throw new Error(`pesa más de ${EQUIPO_MAX_BYTES / 1024} KB.`)
+  let raw: unknown
+  try {
+    raw = JSON.parse(texto.replace(/^﻿/, ''), sinPrototipos)
+  } catch (e) {
+    if (e instanceof ConectorInvalidoError) throw new Error(e.message)
+    throw new Error('no es un JSON válido.')
+  }
+  if (!esObj(raw)) throw new Error('tiene que ser un objeto JSON.')
+  for (const k of Object.keys(raw)) {
+    if (k.startsWith('_') || k.startsWith('$')) continue
+    if (!['formato', 'versión', 'conectores'].includes(k)) throw new Error(`no conozco la clave «${k}».`)
+  }
+  if (raw.formato !== EQUIPO_FORMATO) throw new Error(`formato: tiene que ser «${EQUIPO_FORMATO}».`)
+  if (raw.versión !== 1) throw new Error('versión: esta versión de Sloth entiende la 1. Actualizá Sloth.')
+  if (!Array.isArray(raw.conectores)) throw new Error('conectores: tiene que ser una lista.')
+  if (raw.conectores.length > EQUIPO_MAX) throw new Error(`conectores: como mucho ${EQUIPO_MAX}.`)
+  return raw.conectores
 }
 
 export const textoExport = (def: ConectorDef): string => JSON.stringify(def, null, 2) + '\n'

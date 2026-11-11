@@ -13,6 +13,7 @@ import {
   IMPORT_MAX_BYTES,
   jsonCanonico,
   parsearArchivoPropios,
+  parsearConectoresEquipo,
   parsearImport,
   textoExport,
   validarPropio
@@ -132,4 +133,20 @@ test('armarRegistro: el mismo conector en otra copia del repo no avisa', () => {
   const r = armarRegistro({ incluidos: [], usuario: [], equipos: [equipo('z:/wt'), equipo('z:/repo')], hash })
   assert.deepEqual(r.avisos, [])
   assert.deepEqual(r.lista[0].origen, { tipo: 'equipo', repo: 'z:/repo', equipo: 'E' })
+})
+
+test('parsearConectoresEquipo: devuelve la lista cruda e ignora las claves _ de arriba', () => {
+  const conectores = [{ id: 'mio', cualquier: 'cosa' }]
+  assert.deepEqual(parsearConectoresEquipo(JSON.stringify({ formato: 'sloth-conectores', versión: 1, _nota: 'x', conectores })), conectores)
+})
+
+test('parsearConectoresEquipo: rechaza formato, versión, claves desconocidas, más de 10 y __proto__', () => {
+  const t = (o: Record<string, unknown>): string => JSON.stringify({ formato: 'sloth-conectores', versión: 1, conectores: [], ...o })
+  assert.throws(() => parsearConectoresEquipo(t({ formato: 'sloth-team' })), /formato/)
+  assert.throws(() => parsearConectoresEquipo(t({ versión: 2 })), /Actualizá Sloth/)
+  assert.throws(() => parsearConectoresEquipo(t({ plantillas: [] })), /plantillas/)
+  assert.throws(() => parsearConectoresEquipo(t({ conectores: Array.from({ length: 11 }, () => ({})) })), /como mucho 10/)
+  assert.throws(() => parsearConectoresEquipo(t({ conectores: { id: 'x' } })), /tiene que ser una lista/)
+  assert.throws(() => parsearConectoresEquipo('{"formato":"sloth-conectores","versión":1,"conectores":[{"__proto__":{}}]}'), /__proto__/)
+  assert.throws(() => parsearConectoresEquipo('{'), /JSON/)
 })
