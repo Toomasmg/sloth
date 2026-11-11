@@ -1,4 +1,5 @@
 import { useEffect, useState, lazy, Suspense } from 'react'
+import { ModalLoading } from '../../Modal'
 import { ReportIcon } from '../../icons/SlothIcons'
 import type { FeatureUi } from '../host'
 import { onOpenReport, openReport } from './bus'
@@ -10,7 +11,7 @@ function Global(): React.JSX.Element | null {
   const [open, setOpen] = useState(false)
   useEffect(() => onOpenReport(() => setOpen(true)), [])
   return open ? (
-    <Suspense fallback={null}>
+    <Suspense fallback={<ModalLoading />}>
       <ReportPage onClose={() => setOpen(false)} />
     </Suspense>
   ) : null

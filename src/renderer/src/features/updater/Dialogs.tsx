@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useUi } from '../host'
-import { DoneIcon, ErrorIcon, UpdateIcon, CloseIcon } from '../../icons/SlothIcons'
+import { DoneIcon, ErrorIcon, UpdateIcon } from '../../icons/SlothIcons'
+import { Modal } from '../../Modal'
 import logo from '../../assets/sloth-logo.png'
 import { setPhase, setRestarting, usePhase } from './phase'
 import { showUpdateToast } from './bus'
@@ -62,24 +63,12 @@ export function UpdateDialogs(): React.JSX.Element | null {
   const st = useUpdateStatus()
   const { phase, restarting } = usePhase()
   const [err, setErr] = useState<string | null>(null)
-  const ref = useRef<HTMLDivElement>(null)
 
   const close = (): void => {
     if (restarting) return
     setPhase(null)
     setErr(null)
   }
-
-  useEffect(() => {
-    if (!phase) return
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') close()
-    }
-    window.addEventListener('keydown', onKey)
-    ref.current?.focus()
-    return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, restarting])
 
   if (!st || !st.version || !phase) return null
   const v = st.version
@@ -115,36 +104,28 @@ export function UpdateDialogs(): React.JSX.Element | null {
 
   let body: React.ReactNode
   let title = ''
+  let subtitle: React.ReactNode = null
+  let icon: React.ReactNode = null
+  let stage = ''
 
   if (restarting) {
+    stage = 'restarting'
     title = 'Reiniciando Sloth…'
-    body = (
-      <>
-        <div className="f-updater-head" role="status">
-          <span className="f-updater-ico round">
-            <Ico d="M12 4a8 8 0 1 1-8 8" size={18} className="f-updater-spin" />
-          </span>
-          <div className="f-updater-titles">
-            <h2 id="f-updater-title">{title}</h2>
-            <p>Ya vuelve con la {v}.</p>
-          </div>
-        </div>
-      </>
+    subtitle = `Ya vuelve con la ${v}.`
+    icon = (
+      <span className="f-updater-ico round">
+        <Ico d="M12 4a8 8 0 1 1-8 8" size={18} className="f-updater-spin" />
+      </span>
     )
+    body = null
   } else if (phase === 'notes' && st.state !== 'error') {
+    stage = 'notes'
     title = `Sloth ${v}`
+    subtitle = `${st.releaseDate ? `Publicada el ${fmtDate(st.releaseDate)} · ` : ''}Tenés la ${cur}`
+    icon = <img src={logo} alt="" className="f-updater-logo" />
     const groups = st.notes ?? []
     body = (
       <>
-        <div className="f-updater-head">
-          <img src={logo} alt="" className="f-updater-logo" />
-          <div className="f-updater-titles">
-            <h2 id="f-updater-title">Sloth {v}</h2>
-            <p>
-              {st.releaseDate ? `Publicada el ${fmtDate(st.releaseDate)} · ` : ''}Tenés la {cur}
-            </p>
-          </div>
-        </div>
         <div className="f-updater-notes">
           {groups.length === 0 && <p className="f-updater-muted">Esta versión no trae notas de cambios.</p>}
           {groups.map((g) => {
@@ -171,7 +152,7 @@ export function UpdateDialogs(): React.JSX.Element | null {
         </div>
         <footer className="f-updater-actions">
           <button type="button" className="btn ghost" onClick={close}>
-            Ahora no
+            Más tarde
           </button>
           <span className="f-updater-grow" />
           <button type="button" className="btn" onClick={queue}>
@@ -184,21 +165,16 @@ export function UpdateDialogs(): React.JSX.Element | null {
       </>
     )
   } else if (st.state === 'error') {
+    stage = 'error'
     title = 'No se pudo descargar. Revisá tu conexión.'
+    subtitle = `Sloth ${v} no se instaló. La ${cur} sigue funcionando.${st.error ? ` (${st.error})` : ''}`
+    icon = (
+      <span className="f-updater-ico danger">
+        <Ico d="M12 3.5l7 3v5c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9v-5zM12 8.5v4M12 15.5h.01" size={18} sw={1.8} />
+      </span>
+    )
     body = (
       <>
-        <div className="f-updater-head" role="alert">
-          <span className="f-updater-ico danger">
-            <Ico d="M12 3.5l7 3v5c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9v-5zM12 8.5v4M12 15.5h.01" size={18} sw={1.8} />
-          </span>
-          <div className="f-updater-titles">
-            <h2 id="f-updater-title" className="f-updater-err-title">{title}</h2>
-            <p>
-              Sloth {v} no se instaló. La {cur} sigue funcionando.
-              {st.error ? ` (${st.error})` : ''}
-            </p>
-          </div>
-        </div>
         <footer className="f-updater-actions">
           <button type="button" className="btn ghost" onClick={close}>
             Cerrar
@@ -211,22 +187,23 @@ export function UpdateDialogs(): React.JSX.Element | null {
       </>
     )
   } else if (st.state === 'ready') {
+    stage = 'ready'
     title = 'Listo para reiniciar'
+    subtitle = `Sloth ${v} ya está descargada.`
+    icon = (
+      <span className="f-updater-ico ok">
+        <Ico d="M5 12.5l4.5 4.5L19 7.5" size={18} sw={2.2} />
+      </span>
+    )
     body = (
       <>
-        <div className="f-updater-head">
-          <span className="f-updater-ico ok">
-            <Ico d="M5 12.5l4.5 4.5L19 7.5" size={18} sw={2.2} />
-          </span>
-          <div className="f-updater-titles">
-            <h2 id="f-updater-title">{title}</h2>
-            <p>Sloth {v} ya está descargada.</p>
-          </div>
-        </div>
         <p className="f-updater-box">
           Al reiniciar, Sloth se cierra y se vuelve a abrir. Los espacios y las terminales vuelven solos después, con la misma distribución y la misma cuenta.
         </p>
         <footer className="f-updater-actions">
+          <button type="button" className="btn ghost" onClick={close}>
+            Más tarde
+          </button>
           <span className="f-updater-grow" />
           <button type="button" className="btn" onClick={queue}>
             Al cerrar Sloth
@@ -239,20 +216,18 @@ export function UpdateDialogs(): React.JSX.Element | null {
     )
   } else if (st.state === 'downloading' || st.state === 'available') {
     // Descargando (o volvió a «disponible» tras cancelar): progreso real.
+    stage = 'dl'
     title = `Descargando Sloth ${v}`
+    subtitle = 'Se instala cuando reinicie Sloth.'
+    icon = (
+      <span className="f-updater-ico">
+        <Ico d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14" size={18} sw={1.8} />
+      </span>
+    )
     const pct = st.percent ?? 0
     const haveTotal = (st.total ?? 0) > 0
     body = (
       <>
-        <div className="f-updater-head">
-          <span className="f-updater-ico">
-            <Ico d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14" size={18} sw={1.8} />
-          </span>
-          <div className="f-updater-titles">
-            <h2 id="f-updater-title">{title}</h2>
-            <p>Se instala cuando reinicie Sloth.</p>
-          </div>
-        </div>
         <div className="f-updater-progress">
           <div className="f-updater-track" role="progressbar" aria-label="Progreso de la descarga" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
             <div style={{ width: `${pct}%` }} />
@@ -263,6 +238,9 @@ export function UpdateDialogs(): React.JSX.Element | null {
           </div>
         </div>
         <footer className="f-updater-actions">
+          <button type="button" className="btn ghost" onClick={close} data-autofocus>
+            Más tarde
+          </button>
           <span className="f-updater-grow" />
           <button
             type="button"
@@ -274,7 +252,7 @@ export function UpdateDialogs(): React.JSX.Element | null {
               })
             }
           >
-            Cancelar
+            Cancelar descarga
           </button>
         </footer>
       </>
@@ -284,24 +262,27 @@ export function UpdateDialogs(): React.JSX.Element | null {
   }
 
   return (
-    <div className="modal-backdrop f-updater-backdrop" onMouseDown={close}>
-      <section
-        ref={ref}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="f-updater-title"
-        className="f-updater-dialog"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        {body}
-        {err && (
-          <p className="form-error" role="alert">
-            {err}
-          </p>
-        )}
-      </section>
-    </div>
+    <Modal
+      key={stage}
+      bare
+      backdropClassName="modal-backdrop f-updater-backdrop"
+      className={`f-updater-dialog${stage === 'error' ? ' is-err' : ''}`}
+      headClassName="f-updater-head"
+      titlesClassName="f-updater-titles"
+      icon={icon}
+      title={title}
+      subtitle={subtitle}
+      backdropClose
+      locked={restarting}
+      onClose={close}
+    >
+      {body}
+      {err && (
+        <p className="form-error" role="alert">
+          {err}
+        </p>
+      )}
+    </Modal>
   )
 }
 
@@ -316,16 +297,9 @@ export function AboutModal({ onClose }: { onClose: () => void }): React.JSX.Elem
   const [closeToTray, setCloseToTray] = useState<boolean | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const dialogRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     ui.invoke<{ closeToTray: boolean }>('feat:tray:get').then((s) => setCloseToTray(s.closeToTray), () => setCloseToTray(null))
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    dialogRef.current?.focus()
-    return () => window.removeEventListener('keydown', onKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -363,23 +337,7 @@ export function AboutModal({ onClose }: { onClose: () => void }): React.JSX.Elem
   const checking = st?.state === 'checking' || st?.state === 'downloading' || st?.state === 'available'
 
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        className="modal f-updater-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="f-updater-about-title"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <header className="modal-head">
-          <h2 id="f-updater-about-title">Acerca de Sloth</h2>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Cerrar">
-            <CloseIcon size={16} />
-          </button>
-        </header>
-
+    <Modal className="f-updater-modal" title="Acerca de Sloth" backdropClose onClose={onClose}>
         <div className="f-updater-id">
           <div>
             <div className="f-updater-name">Sloth</div>
@@ -433,8 +391,7 @@ export function AboutModal({ onClose }: { onClose: () => void }): React.JSX.Elem
             </button>
           )}
         </footer>
-      </div>
-    </div>
+    </Modal>
   )
 }
 

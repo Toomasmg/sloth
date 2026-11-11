@@ -75,10 +75,14 @@
   display: flex;
   align-items: center;
   gap: var(--s-3);
-  padding-right: var(--s-6);
 }
 .f-updater-titles {
+  flex: 1;
   min-width: 0;
+}
+.f-updater-head .icon-btn {
+  align-self: flex-start;
+  margin: -6px -8px 0 0;
 }
 .f-updater-titles h2 {
   margin: 0;
@@ -86,7 +90,7 @@
   font-weight: 700;
   letter-spacing: -0.01em;
 }
-.f-updater-titles h2.f-updater-err-title {
+.f-updater-dialog.is-err .f-updater-titles h2 {
   font-size: var(--fs-xl);
 }
 .f-updater-titles p {

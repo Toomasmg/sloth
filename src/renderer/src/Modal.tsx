@@ -171,3 +171,12 @@ export function Modal(p: ModalProps): React.JSX.Element {
     </div>
   )
 }
+
+/** Mientras se baja el código de un diálogo (la primera vez): el clic ya tiene respuesta. */
+export function ModalLoading(): React.JSX.Element {
+  return (
+    <div role="status" className="modal-backdrop modal-loading">
+      Cargando…
+    </div>
+  )
+}

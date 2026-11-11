@@ -1495,3 +1495,7 @@ html[data-lite='true'] .spin {
   font-size: var(--fs-lg);
   font-weight: 600;
 }
+
+.modal-loading {
+  color: var(--fg-2);
+}

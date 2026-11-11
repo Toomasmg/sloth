@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react'
+import { ModalLoading } from '../../Modal'
 import { useUi, type Command, type FeatureUi, type UiCtx } from '../host'
 import { MoveAccountIcon } from '../../icons/SlothIcons'
 import './move-account.css'
@@ -32,7 +33,7 @@ function Global(): React.JSX.Element | null {
   const t = useMoveTarget()
   if (!t || !ui.workspaces.some((w) => w.id === t.wsId)) return null
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<ModalLoading />}>
       <MoveDialog wsId={t.wsId} />
     </Suspense>
   )
