@@ -1,5 +1,5 @@
 import { execFile, spawn } from 'node:child_process'
-import { extractJson, normEstado, NO_GRUV, NoGruvError, WRITE_TOOLS } from './tickets/legado-gruv'
+import { extractJson, herramientasNegadas, noGruvClave, normEstado, NoGruvError } from './tickets/legado-gruv'
 import { ACTIVE_ESTADOS, TICKET_ID_RE, type ActiveEstado, type GruvPersona, type TeamTicket } from './team-core'
 
 /**
@@ -75,7 +75,7 @@ export function buildTeamPrompt(q: TeamQuery = {}): string {
     'Respondé SOLO con un JSON, sin texto antes ni después y sin bloque de código, con esta forma:',
     '{"personas":[{"id":"<uuid>","nombre":"Ana Pérez"}],"tickets":[{"id":"TCK-1234","titulo":"…","estado":"<clave del estado, p. ej. en_revision>","responsable":"<nombre del responsable>","responsable_id":"<uuid del responsable>","proyecto":"<espacio o proyecto, si lo da>","url":"<link al ticket, si lo da>"}]}',
     'Si un ticket no tiene responsable, no pongas responsable ni responsable_id. Si un campo opcional no viene, no lo pongas. Si no hay tickets, devolvé "tickets":[].',
-    `Si no tenés ninguna herramienta de Gruv disponible, respondé exactamente {"error":"${NO_GRUV}","tickets":[]}.`
+    `Si no tenés ninguna herramienta de Gruv disponible, respondé exactamente {"error":"${noGruvClave()}","tickets":[]}.`
   ]
   return lines.join('\n')
 }
@@ -92,7 +92,7 @@ export function buildTeamArgs(model: string): string[] {
     '--allowedTools',
     TEAM_READ_TOOLS.join(','),
     '--disallowedTools',
-    WRITE_TOOLS.join(','),
+    herramientasNegadas().join(','),
     '--no-session-persistence',
     '--settings',
     JSON.stringify({ disableAllHooks: true }),
@@ -186,7 +186,7 @@ export function parseTeamOutput(stdout: string): TeamGruvResult {
     if (/gruv/i.test(result) && /(no (tengo|hay|encuentro|está|dispon)|not (available|found)|sin acceso)/i.test(result)) throw new NoGruvError()
     throw e
   }
-  if (data && typeof data === 'object' && (data as { error?: unknown }).error === NO_GRUV) throw new NoGruvError()
+  if (data && typeof data === 'object' && (data as { error?: unknown }).error === noGruvClave()) throw new NoGruvError()
   const { tickets, personas } = normalizeTeam(data)
   if (!tickets.length && Array.isArray(env.permission_denials) && env.permission_denials.length)
     throw new Error('Claude no pudo usar las herramientas de Gruv (permiso negado). Probá de nuevo.')
