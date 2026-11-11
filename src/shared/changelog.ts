@@ -9,6 +9,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.8',
+    date: '2026-11-11',
+    title: 'Sloth para cualquier equipo',
+    items: [
+      'Sloth arranca sin conector de tickets: elegís el tuyo en los ajustes del tablero. Si ya usabas Gruv, seguís igual.',
+      'La vista Equipo usa el conector que elegiste: sus tickets y personas junto a los PRs de GitHub. Sin conector, muestra solo los PRs.',
+      '«Cerrar panel» ahora corta la terminal y pregunta si Claude está trabajando. «Ocultar panel» la deja corriendo.',
+      'Todas las pantallas y diálogos se cierran con un botón visible, no solo con Esc, y el foco vuelve a donde estabas.',
+      'Si escribiste algo en un diálogo, Sloth pregunta antes de descartarlo.',
+      'La configuración se ve como una tuerca en toda la app.'
+    ]
+  },
+  {
     version: '0.6.7',
     date: '2026-11-11',
     title: 'Conectores de tickets propios',
