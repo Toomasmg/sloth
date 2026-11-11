@@ -118,6 +118,9 @@ const save = (): void => void almacen.guardar(state)
 
 const registrado = (id: string): ConectorRegistrado | undefined => registro.find((r) => r.def.id === id)
 
+/** Un incluido que nadie probó todavía contra el sistema real: se lee, pero no se escribe. */
+const sinProbar = (r?: ConectorRegistrado): boolean => r?.origen.tipo === 'incluido' && !r.def.verificado
+
 function aceptado(r: ConectorRegistrado): boolean {
   if (r.origen.tipo !== 'equipo') return true
   return archivoPropios.aceptados[claveAceptado(repoKey(r.origen.repo), r.def.id)] === r.hash
@@ -220,7 +223,7 @@ function snapshot(): TicketsSnapshot {
   const id = state.config.conectorId
   const def = buscar(id)
   return {
-    conector: info(def, id),
+    conector: info(def, id, sinProbar(registrado(id))),
     conectores: registro.map((r) => ({
       id: r.def.id,
       nombre: r.def.nombre,
@@ -614,6 +617,10 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
   const a = rawA
   const def = activo()
   if (!accionesSoportadas(def).includes(a)) throw new Error(`${def.nombre} no permite esa acción desde Sloth.`)
+  if (sinProbar(registrado(def.id)))
+    throw new Error(
+      `Las acciones de ${def.nombre} todavía no se probaron: por ahora es de solo lectura. Si querés escribir, copialo como propio y revisá sus herramientas.`
+    )
   const id = ticketId(def, rawId)
   const t = ticketEnLista(def, id)
   if (escribiendo.has(id)) throw new Error('Ya hay un cambio en curso en este ticket.')

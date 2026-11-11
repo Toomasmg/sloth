@@ -229,7 +229,8 @@ export const usaComandoTicket = (def: ConectorDef): boolean => def.id === 'gruv'
 
 export const leeDetalle = (def: ConectorDef): boolean => def.via === 'gh' || def.herramientas.detalle.length > 0
 
-export function info(def: ConectorDef | undefined, idPedido: string): ConectorInfo {
+/** `soloLectura`: un incluido sin probar se puede leer pero no ofrece acciones. */
+export function info(def: ConectorDef | undefined, idPedido: string, soloLectura = false): ConectorInfo {
   if (!def)
     return { id: idPedido, nombre: idPedido === SIN_CONECTOR ? 'Sin conector' : idPedido, verificado: false, via: 'mcp', disponible: false, acciones: [], leeDetalle: false, ejemploId: '', estados: [], comandoTicket: false }
   return {
@@ -238,7 +239,7 @@ export function info(def: ConectorDef | undefined, idPedido: string): ConectorIn
     verificado: def.verificado,
     via: def.via,
     disponible: true,
-    acciones: accionesSoportadas(def),
+    acciones: soloLectura ? [] : accionesSoportadas(def),
     leeDetalle: leeDetalle(def),
     ejemploId: def.ejemplo.id,
     estados: def.estados.map((e) => ({ ...e })),
