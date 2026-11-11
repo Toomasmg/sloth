@@ -6,7 +6,7 @@ import type { NewWorkspacePreset } from './features/host'
 import { useUi } from './features/host'
 import { useTemplates, openDialog, peekPreselect, takePreselect, usesTicket, type TemplateDto } from './features/templates/store'
 import { TEMPLATE_COLORS, colorHex } from './features/templates/catalog'
-import { setBoardOpen } from './features/gruv/model'
+import { setBoardOpen, useSnapshot } from './features/tickets/model'
 import { applyVars, folderLabel, missingVars, TEMPLATE_COLOR_KEYS, TICKET_RE, today, validBranch, type VarValues } from '../../shared/templates-shared'
 import './NewWorkspaceDialog.css'
 
@@ -55,6 +55,7 @@ function branchError(raw: string, resolved: string, values: VarValues): string {
 
 export function NewWorkspaceDialog(props: Props): React.JSX.Element {
   const ctx = useUi()
+  const tk = useSnapshot()
   const { accounts, statuses, usage, mode, onClose } = props
   const ticketMode = mode === 'ticket'
   const tplState = useTemplates()
@@ -299,8 +300,8 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
     onClose()
     openDialog({ kind: 'manage' })
   }
-  // Tickets de Gruv: el tablero crea el espacio desde el ticket elegido. Cierra este diálogo para no encimarlo.
-  const openGruv = (): void => {
+  // Tickets: el tablero crea el espacio desde el ticket elegido. Cierra este diálogo para no encimarlo.
+  const openTickets = (): void => {
     onClose()
     setBoardOpen(true)
   }
@@ -557,8 +558,8 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
                     <button type="button" className="nw-link" onClick={openTemplates}>
                       Administrar plantillas…
                     </button>
-                    <button type="button" className="nw-link" onClick={openGruv}>
-                      Desde un ticket de Gruv…
+                    <button type="button" className="nw-link" onClick={openTickets}>
+                      {tk?.conector.disponible ? `Desde un ticket de ${tk.conector.nombre}…` : 'Desde un ticket…'}
                     </button>
                   </div>
                   {tpl?.description && <span className="nw-hint">{tpl.description}</span>}

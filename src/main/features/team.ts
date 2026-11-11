@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import { accountStatus } from '../accounts'
 import { baseEnv } from '../ptys'
-import { NoGruvError, resolveClaudeExe } from './gruv-claude'
+import { NoGruvError, resolveClaudeExe } from './tickets/legado-gruv'
 import {
   buildPeople,
   cleanMapping,

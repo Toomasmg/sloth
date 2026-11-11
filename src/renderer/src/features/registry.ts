@@ -7,7 +7,7 @@ import broadcast from './broadcast'
 import templates from './templates'
 import updater from './updater'
 import exportImport from './export-import'
-import gruv from './gruv'
+import tickets from './tickets'
 import settings from './settings'
 import onboarding from './onboarding'
 import teamConfig from './team-config'
@@ -21,4 +21,4 @@ import moveAccount from './move-account'
 import permissions from './permissions'
 
 /** Todas las funciones de la interfaz, en el orden en que aparecen en cada lugar. */
-export const FEATURE_UIS: FeatureUi[] = [history, git, worktrees, palette, broadcast, templates, updater, exportImport, gruv, settings, onboarding, teamConfig, team, layout, chat, help, report, sound, moveAccount, permissions]
+export const FEATURE_UIS: FeatureUi[] = [history, git, worktrees, palette, broadcast, templates, updater, exportImport, tickets, settings, onboarding, teamConfig, team, layout, chat, help, report, sound, moveAccount, permissions]
