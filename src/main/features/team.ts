@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import { buildPeople, LOGIN_RE, NADIE, PR_URL_RE, personasDe, ticketsActivos, type TeamTicket } from './team-core'
-import { avisoSoloLectura, cargarTeam, type MotivoSoloLectura, type TeamState } from './team-estado'
+import { adoptarLegado, avisoSoloLectura, cargarTeam, mappingDe, type MotivoSoloLectura, type TeamState } from './team-estado'
 import { fetchGithub } from './team-github'
 import { alCambiarTickets, ticketsParaEquipo, type TicketsParaEquipo } from './tickets'
 
@@ -76,9 +76,25 @@ function delConector(): { tp: TicketsParaEquipo; tickets: TeamTicket[] } {
   return { tp, tickets: tp.conector ? ticketsActivos(tp.tickets, tp.estados) : [] }
 }
 
+/** Mapeo del conector activo; la primera vez que hay uno se le pasa el mapeo de antes, con respaldo. */
+function mappingActivo(conectorId: string | null): Record<string, string> {
+  if (!conectorId) return {}
+  if (!soloLectura && Object.keys(state.mapping).length > 0) {
+    const bak = `${file}.v2.bak`
+    try {
+      if (!existsSync(bak)) escribir(bak, readFileSync(file, 'utf8'))
+      if (adoptarLegado(state, conectorId)) save()
+    } catch (e) {
+      ctx.log(`team: no pude respaldar team.json antes de pasar el mapeo al conector: ${(e as Error).message}`)
+    }
+  }
+  return mappingDe(state, conectorId)
+}
+
 function snapshot(): unknown {
   const { tp, tickets } = delConector()
-  const view = buildPeople({ prs: state.github.prs, tickets, personas: personasDe(tickets), mapping: state.mapping })
+  const mapping = mappingActivo(tp.conector?.id ?? null)
+  const view = buildPeople({ prs: state.github.prs, tickets, personas: personasDe(tickets), mapping })
   // Personas del conector para el selector de «vincular».
   const personasConector = view.people.filter((p) => p.enConector).map((p) => ({ key: p.key, nombre: p.nombre }))
   const authors = new Map<string, { login: string; name?: string }>()
@@ -87,7 +103,7 @@ function snapshot(): unknown {
     ...view,
     personasConector,
     authors: [...authors.values()].sort((a, b) => a.login.localeCompare(b.login)),
-    mapping: state.mapping,
+    mapping,
     github: { repos: state.github.repos, errors: state.github.errors, fatal: state.github.fatal, fetchedAt: state.github.fetchedAt },
     tickets: {
       conector: tp.conector,
@@ -135,7 +151,10 @@ function setMapping(rawLogin: unknown, rawKey: unknown): unknown {
   if (typeof rawLogin !== 'string' || !LOGIN_RE.test(rawLogin)) throw new Error('Login de GitHub inválido.')
   const login = rawLogin.toLowerCase()
   if (soloLectura) throw new Error(avisoSoloLectura(soloLectura))
-  if (rawKey === null || rawKey === undefined || rawKey === '') delete state.mapping[login]
+  const conectorId = delConector().tp.conector?.id
+  if (!conectorId) throw new Error('Elegí un conector en Tickets para vincular personas.')
+  const mapping = mappingActivo(conectorId)
+  if (rawKey === null || rawKey === undefined || rawKey === '') delete mapping[login]
   else {
     if (typeof rawKey !== 'string' || rawKey.length > 200) throw new Error('Persona inválida.')
     if (rawKey !== NADIE) {
@@ -143,8 +162,9 @@ function setMapping(rawLogin: unknown, rawKey: unknown): unknown {
       const view = buildPeople({ prs: [], tickets, personas: personasDe(tickets), mapping: {} })
       if (!view.people.some((p) => p.key === rawKey)) throw new Error('Esa persona no está en lo último que trajo el conector.')
     }
-    state.mapping[login] = rawKey
+    mapping[login] = rawKey
   }
+  state.mappings[conectorId] = mapping
   changed()
   return snapshot()
 }

@@ -34,7 +34,7 @@ const api: SlothApi = {
   ptyResize: (id, cols, rows) => ipcRenderer.send('pty:resize', id, cols, rows),
   ptyKill: (id) => ipcRenderer.invoke('pty:kill', id),
   clipboardRead: () => ipcRenderer.invoke('clipboard:read'),
-  clipboardWrite: (text) => ipcRenderer.send('clipboard:write', text),
+  clipboardWrite: (text) => ipcRenderer.invoke('clipboard:write', text),
   // main puede agrupar varios chunks en un solo mensaje IPC (menos overhead); acepta también uno suelto.
   onPtyData: (cb) =>
     listen<[string, PtyChunk | PtyChunk[]]>('pty:data', (id, chunks) => {

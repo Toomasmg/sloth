@@ -11,16 +11,21 @@ export const INVITE_TEXT =
   '3) Creá un espacio con tu repo (o soltá la carpeta en la ventana).'
 
 export function InviteModal({ onClose }: { onClose: () => void }): React.JSX.Element {
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<'ok' | 'error' | null>(null)
   const timer = useRef<number | undefined>(undefined)
 
   useEffect(() => () => window.clearTimeout(timer.current), [])
 
   const copy = (): void => {
-    api.clipboardWrite(INVITE_TEXT)
-    setCopied(true)
-    window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => setCopied(false), 2000)
+    api
+      .clipboardWrite(INVITE_TEXT)
+      .then(() => 'ok' as const)
+      .catch(() => 'error' as const)
+      .then((r) => {
+        setCopied(r)
+        window.clearTimeout(timer.current)
+        timer.current = window.setTimeout(() => setCopied(null), 2000)
+      })
   }
 
   return (
@@ -31,11 +36,12 @@ export function InviteModal({ onClose }: { onClose: () => void }): React.JSX.Ele
       footer={
         <>
           <span className="f-help-copied" role="status">
-            {copied && (
+            {copied === 'ok' && (
               <>
                 <DoneIcon size={14} /> Copiado
               </>
             )}
+            {copied === 'error' && 'No se pudo copiar'}
           </span>
           <button type="button" className="btn" onClick={onClose}>
             Cerrar

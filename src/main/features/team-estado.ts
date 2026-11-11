@@ -8,8 +8,10 @@ import { cleanMapping, PR_URL_RE, type TeamPr } from './team-core'
 export interface TeamState {
   version: 2
   github: { prs: TeamPr[]; repos: string[]; errors: Record<string, string>; fatal?: string; fetchedAt?: number }
-  /** login de GitHub (minúscula) → clave de persona del conector, o «-» = no es nadie del conector. */
+  /** Mapeo de antes de que fuera por conector: se pasa al primer conector activo con `adoptarLegado`. */
   mapping: Record<string, string>
+  /** id del conector → (login de GitHub en minúscula → clave de persona, o «-» = no es nadie del conector). */
+  mappings: Record<string, Record<string, string>>
   /** La v1 traía tickets de Gruv: sirve para avisar que hay que elegir el conector en Tickets. */
   veniaDeGruv?: true
 }
@@ -34,7 +36,7 @@ export type CargaTeam =
   | { kind: 'futuro'; state: TeamState }
 
 export function estadoTeamVacio(): TeamState {
-  return { version: 2, github: { prs: [], repos: [], errors: {} }, mapping: {} }
+  return { version: 2, github: { prs: [], repos: [], errors: {} }, mapping: {}, mappings: {} }
 }
 
 const objeto = (v: unknown): Record<string, unknown> | undefined =>
@@ -53,6 +55,29 @@ function github(raw: unknown): TeamState['github'] {
   }
 }
 
+function mappingsPorConector(raw: unknown): TeamState['mappings'] {
+  const out: TeamState['mappings'] = {}
+  for (const [id, m] of Object.entries(objeto(raw) ?? {})) {
+    if (!id || id.length > 100) continue
+    const limpio = cleanMapping(m)
+    if (Object.keys(limpio).length) out[id] = limpio
+    if (Object.keys(out).length >= 50) break
+  }
+  return out
+}
+
+export function mappingDe(state: TeamState, conectorId: string): Record<string, string> {
+  return state.mappings[conectorId] ?? {}
+}
+
+/** Devuelve true si movió algo; lo que el conector ya tenía vinculado gana sobre el mapeo viejo. */
+export function adoptarLegado(state: TeamState, conectorId: string | null): boolean {
+  if (!conectorId || Object.keys(state.mapping).length === 0) return false
+  state.mappings[conectorId] = { ...state.mapping, ...mappingDe(state, conectorId) }
+  state.mapping = {}
+  return true
+}
+
 /** `texto` null = el archivo no existe. */
 export function cargarTeam(texto: string | null): CargaTeam {
   if (texto === null) return { kind: 'vacio', state: estadoTeamVacio() }
@@ -65,7 +90,7 @@ export function cargarTeam(texto: string | null): CargaTeam {
   const raw = objeto(datos)
   if (!raw) return { kind: 'corrupto', state: estadoTeamVacio() }
   const version = typeof raw.version === 'number' ? raw.version : 1
-  const state: TeamState = { version: 2, github: github(raw.github), mapping: cleanMapping(raw.mapping) }
+  const state: TeamState = { version: 2, github: github(raw.github), mapping: cleanMapping(raw.mapping), mappings: mappingsPorConector(raw.mappings) }
   const gruv = objeto(raw.gruv)
   if (raw.veniaDeGruv === true || (version < 2 && (Boolean(gruv && Array.isArray(gruv.tickets) && gruv.tickets.length) || typeof objeto(raw.config)?.queryAccountId === 'string'))) {
     state.veniaDeGruv = true
