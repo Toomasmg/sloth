@@ -26,7 +26,7 @@ function falso(out: Partial<GhOut> = {}): { run: GhRun; llamadas: Llamada[] } {
 
 const accion = async (a: Accion, i: Partial<AccionInput>, me = ME as typeof ME | undefined): Promise<Llamada[]> => {
   const f = falso()
-  await ghAccion(f.run, 'octo-1/repo.x', a, { ticket: '42', ...i }, me)
+  await ghAccion(f.run, { proyecto: 'octo-1/repo.x' }, a, { ticket: '42', ...i }, me)
   return f.llamadas
 }
 
@@ -95,7 +95,7 @@ test('ghDetalle trae los comentarios', async () => {
     { author: { login: 'x' }, body: '' }
   ]
   const f = falso({ stdout: JSON.stringify({ comments }) })
-  assert.deepEqual(await ghDetalle(f.run, 'o/r', '7'), {
+  assert.deepEqual(await ghDetalle(f.run, { id: '7', proyecto: 'o/r' }), {
     criterios: [],
     comentarios: [
       { autor: 'ana', cuerpo: 'Hola', fecha: '2026-11-10T10:00:00Z' },
@@ -104,7 +104,7 @@ test('ghDetalle trae los comentarios', async () => {
     minutos: null
   })
   assert.deepEqual(f.llamadas, [{ args: ['issue', 'view', '7', '--repo', 'o/r', '--json', 'comments'] }])
-  await assert.rejects(ghDetalle(falso().run, 'o/r', '1;x'), /número/)
+  await assert.rejects(ghDetalle(falso().run, { id: '1;x', proyecto: 'o/r' }), /número/)
 })
 
 test('ghAccion arma los argumentos exactos de cada acción', async () => {
@@ -138,12 +138,25 @@ test('ghAccion valida todo antes de correr gh', async () => {
   ]
   for (const [nombre, a, i, me, motivo] of casos) {
     const f = falso()
-    await assert.rejects(ghAccion(f.run, 'o/r', a, { ticket: '42', ...i }, me), motivo, nombre)
+    await assert.rejects(ghAccion(f.run, { proyecto: 'o/r' }, a, { ticket: '42', ...i }, me), motivo, nombre)
     assert.equal(f.llamadas.length, 0, nombre)
   }
   const f = falso()
-  await assert.rejects(ghAccion(f.run, 'a/b c', 'estado', { ticket: '42', estado: 'cerrado' }, ME), /dueño\/repo/)
+  for (const proyecto of ['a/b c', undefined, '--repo=x/y']) {
+    await assert.rejects(ghAccion(f.run, { proyecto }, 'estado', { ticket: '42', estado: 'cerrado' }, ME), /de qué repo/, String(proyecto))
+    await assert.rejects(ghDetalle(f.run, { id: '42', proyecto }), /de qué repo/, String(proyecto))
+  }
   assert.equal(f.llamadas.length, 0)
+})
+
+test('el detalle y las escrituras van al repo de donde salió el issue', async () => {
+  const f = falso({ stdout: '{"comments":[]}' })
+  const t = { id: '7', proyecto: 'dueno/repo-a' }
+  await ghDetalle(f.run, t)
+  await ghAccion(f.run, t, 'estado', { ticket: '7', estado: 'cerrado' }, ME)
+  await ghAccion(f.run, t, 'comentar', { ticket: '7', cuerpo: 'Hola' }, ME)
+  for (const l of f.llamadas) assert.equal(l.args[l.args.indexOf('--repo') + 1], 'dueno/repo-a', l.args.join(' '))
+  assert.equal(f.llamadas.length, 3)
 })
 
 test('los errores de gh se explican', async () => {

@@ -45,6 +45,12 @@ export function repoValido(v: unknown): string {
   return v
 }
 
+/** El repo guardado al listar el issue: el detalle y las escrituras nunca van a otro. */
+function repoDelIssue(t: Pick<Ticket, 'proyecto'>): string {
+  if (typeof t.proyecto !== 'string' || !REPO_RE.test(t.proyecto)) throw new Error('No sé de qué repo es este issue: actualizá GitHub Issues.')
+  return t.proyecto
+}
+
 function numero(v: unknown): string {
   if (typeof v !== 'string' || !NUM_RE.test(v)) throw new Error('El issue tiene que ser un número.')
   return v
@@ -140,8 +146,9 @@ export async function ghLista(run: GhRun, def: ConectorGh, repo: string): Promis
   return out
 }
 
-export async function ghDetalle(run: GhRun, repo: string, id: string): Promise<Detalle> {
-  const data = json(await correr(run, ['issue', 'view', numero(id), '--repo', repoValido(repo), '--json', 'comments']))
+export async function ghDetalle(run: GhRun, t: Pick<Ticket, 'id' | 'proyecto'>): Promise<Detalle> {
+  const r = repoDelIssue(t)
+  const data = json(await correr(run, ['issue', 'view', numero(t.id), '--repo', r, '--json', 'comments']))
   if (!esObj(data)) throw new Error(NO_ENTIENDO)
   const comentarios = Array.isArray(data.comments)
     ? data.comments.filter(esObj).map((c) => ({
@@ -153,8 +160,8 @@ export async function ghDetalle(run: GhRun, repo: string, id: string): Promise<D
   return { criterios: [], comentarios: normComentarios(comentarios), minutos: null }
 }
 
-export async function ghAccion(run: GhRun, repo: string, a: Accion, i: AccionInput, me: Yo | undefined): Promise<void> {
-  const r = repoValido(repo)
+export async function ghAccion(run: GhRun, t: Pick<Ticket, 'proyecto'>, a: Accion, i: AccionInput, me: Yo | undefined): Promise<void> {
+  const r = repoDelIssue(t)
   const id = numero(i.ticket)
   switch (a) {
     case 'estado':

@@ -365,9 +365,9 @@ async function detalle(rawId: unknown): Promise<Detalle> {
   const def = activo()
   if (!leeDetalle(def)) throw new Error(`${def.nombre} no tiene detalle de tickets en Sloth.`)
   const id = ticketId(def, rawId)
-  ticketEnLista(def, id)
+  const t = ticketEnLista(def, id)
   if (def.via === 'gh') {
-    const d = await ghDetalle(ghRun, await repoGh(), id)
+    const d = await ghDetalle(ghRun, t)
     if (state.config.conectorId === def.id) detalles.set(id, d)
     return d
   }
@@ -413,7 +413,7 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
   escribiendo.add(id)
   try {
     let minutosTotal: number | undefined
-    if (def.via === 'gh') await ghAccion(ghRun, await repoGh(), a, input, state.me)
+    if (def.via === 'gh') await ghAccion(ghRun, t, a, input, state.me)
     else if (c) {
       const r = await runClaude({
         exe: c.exe,
