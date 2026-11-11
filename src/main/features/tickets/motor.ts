@@ -262,6 +262,9 @@ export function buildArgs(model: string, o: { allow: string[]; deny: string[]; s
     o.deny.join(','),
     '--no-session-persistence',
     // Si la cuenta tiene bypassPermissions o acceptEdits, un texto de un ticket podría usar herramientas sin preguntar.
+    // Las reglas permissions.allow del settings.json de la cuenta siguen sumándose a --allowedTools. No se cortan con
+    // --setting-sources project,local porque ese flag también esconde los MCP de alcance usuario (.claude.json), que
+    // es donde están los conectores que no son de claude.ai (Azure DevOps, propios sobre un MCP local).
     '--permission-mode',
     'default',
     // Sin hooks: los de Sloth esperan un espacio y el de permisos bloquearía la consulta.
