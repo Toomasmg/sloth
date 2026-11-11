@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import type { Accion } from '../../../shared/tickets'
 import { ACCIONES_GH, nombreCompleto, validarConector, type ConectorMcp } from './conector'
+import { CONECTORES } from './conectores'
 import github from './conectores/github'
 import gruv from './conectores/gruv'
 import {
@@ -28,6 +29,7 @@ import {
   OUTPUT_SCHEMA,
   parseAccion,
   parseClaudeOutput,
+  permisosPorConsulta,
   parseDetalle,
   TOOL_MISSING,
   type AccionInput
@@ -254,4 +256,17 @@ test('un placeholder sin valor deja afuera la clave y los literales quedan tipad
   assert.match(p, /Llamá a asignar_ticket con \{"id":"TCK-1","persona":null\}\./)
   const h = buildAccionPrompt(GRUV, 'horas', { ticket: 'TCK-1', minutos: 30 })
   assert.match(h, /\{"entidad":"ticket","id":"TCK-1","minutos":30\}/)
+})
+
+test('permisosPorConsulta es exactamente lo que va a --allowedTools en cada consulta y acción', () => {
+  const permitidas = (args: string[]): string[] => args[args.indexOf('--allowedTools') + 1].split(',').filter(Boolean)
+  for (const def of CONECTORES) {
+    if (def.via !== 'mcp') continue
+    const p = permisosPorConsulta(def)
+    const full = (xs: string[] | undefined): string[] => (xs ?? []).map((t) => nombreCompleto(def, t))
+    assert.deepEqual(permitidas(buildListaArgs(def, 'haiku')), full(p.lista), def.id)
+    assert.deepEqual(permitidas(buildDetalleArgs(def, 'haiku')), full(p.detalle), def.id)
+    assert.deepEqual(Object.keys(p.acciones), accionesSoportadas(def), def.id)
+    for (const a of accionesSoportadas(def)) assert.deepEqual(permitidas(buildAccionArgs(def, 'haiku', a)), full(p.acciones[a]), `${def.id} ${a}`)
+  }
 })

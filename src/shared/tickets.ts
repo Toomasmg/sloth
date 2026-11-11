@@ -78,11 +78,50 @@ export interface TicketsConfig {
 /** Cómo habla Sloth con el sistema: Claude con un conector MCP, o GitHub CLI directo. */
 export type Via = 'mcp' | 'gh'
 
+/** De dónde sale un conector: viene con Sloth, lo armó la persona o lo trae el .sloth/conectores.json de un repo. */
+export type OrigenConector = { tipo: 'incluido' } | { tipo: 'usuario' } | { tipo: 'equipo'; repo: string; equipo: string }
+
 export interface ConectorResumen {
   id: string
   nombre: string
   verificado: boolean
   via: Via
+  origen: OrigenConector
+  /** Solo los del equipo: si la persona aceptó esta versión. Sin aceptar no se puede usar. */
+  aceptado?: boolean
+}
+
+/** Todo lo que un conector le pide a Claude, para revisarlo antes de aceptarlo. */
+export interface HerramientasVista {
+  prefijo: string
+  /** Lo que va a --allowedTools (nombres cortos) al actualizar la lista, al abrir un ticket y en cada acción. */
+  lista: string[]
+  detalle: string[]
+  acciones: Partial<Record<Accion, string[]>>
+  escritura: Partial<Record<Accion, string>>
+  negar: number
+  pistas: PistasVista
+}
+
+/** Los textos y argumentos que el conector suma a los prompts. */
+export interface PistasVista {
+  yoConId: string
+  yoSinId: string
+  lista: string
+  estados?: string
+  apoyo?: string
+  /** Cada paso del detalle: herramienta y argumentos en JSON. */
+  detalle: string[]
+  acciones: Partial<Record<Accion, { args: string; nota?: string }>>
+}
+
+export interface ConectorPropioVista {
+  id: string
+  nombre: string
+  origen: OrigenConector
+  aceptado: boolean
+  hash: string
+  herramientas: HerramientasVista
 }
 
 export interface ConectorInfo {
@@ -128,6 +167,8 @@ export interface TicketsSnapshot {
   lastRepo?: string
   /** Si el conector elegido no está en esta versión, al que se puede volver. */
   porDefecto?: { id: string; nombre: string }
+  /** Conectores propios o del equipo que no se cargaron, y por qué. */
+  avisosPropios?: string[]
 }
 
 /** La primera lista que tenga la clave gana; si ninguna la tiene, 'pendiente'. */
