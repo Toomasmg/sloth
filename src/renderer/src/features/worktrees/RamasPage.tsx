@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { openDrawer } from '../git/store'
 import { BranchIcon, DoneIcon, PlusIcon, SearchIcon } from '../../icons/SlothIcons'
+import { Modal } from '../../Modal'
 import { closeRamas, setRamasCandidates, setRamasDialog, useRamas } from './store'
 import '../help/page.css'
 
@@ -252,11 +253,11 @@ export function RamasPage(): React.JSX.Element | null {
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape' || rmBusy) return
+      // Con un diálogo abierto, el Esc es del Modal.
+      if (e.key !== 'Escape' || rmBusy || dialog) return
       e.preventDefault()
       e.stopPropagation()
-      if (dialog) setRamasDialog(null)
-      else if (rmPath) {
+      if (rmPath) {
         setRmPath(null)
         setRmText('')
         setRmTried(false)
@@ -388,7 +389,7 @@ export function RamasPage(): React.JSX.Element | null {
               <button type="button" className="f-wt-btn lg solid" onClick={() => setRamasDialog('limpiar')}>
                 Limpiar ramas que ya no se usan
               </button>
-              <button type="button" className="f-wt-btn lg primary" onClick={() => setRamasDialog('nueva')} disabled={scanning || !repos?.length}>
+              <button type="button" className="f-wt-btn lg primary" onClick={() => setRamasDialog('nueva')} disabled={scanning || !repos?.length} title={scanning ? 'Esperá a que termine el escaneo' : !repos?.length ? 'Hace falta un espacio con un repo git' : undefined}>
                 <PlusIcon size={14} /> Nueva rama aparte
               </button>
             </div>
@@ -432,7 +433,21 @@ export function RamasPage(): React.JSX.Element | null {
           </div>
 
           {scanErr && <p className="form-error" role="alert">{scanErr}</p>}
-          {repos?.length === 0 && !scanErr && <p className="hint f-wt-empty">Ningún espacio apunta a un repo git. Abrí un espacio con un repo para ver sus ramas aparte.</p>}
+          {repos?.length === 0 && !scanErr && (
+            <p className="hint f-wt-empty">
+              Ningún espacio apunta a un repo git. Abrí un espacio con un repo para ver sus ramas aparte.{' '}
+              <button
+                type="button"
+                className="f-wt-btn lg solid"
+                onClick={() => {
+                  closeRamas()
+                  ui.openNewWorkspace('normal')
+                }}
+              >
+                Nuevo espacio
+              </button>
+            </p>
+          )}
 
           {groups.map(({ repo, rows }) => (
             <section key={repo.id} className="f-wt-group" aria-labelledby={`f-wt-g-${repo.id}`}>
@@ -694,11 +709,8 @@ function NuevaDialog({ repos, onDone, onClose }: { repos: RepoView[]; onDone: (m
   }
 
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
-      <div className="modal f-wt-dialog" role="dialog" aria-modal="true" aria-labelledby="f-wt-nr-t">
-        <form className="f-wt-form" onSubmit={(e) => void submit(e)} noValidate>
-          <h2 id="f-wt-nr-t">Nueva rama aparte</h2>
-
+    <Modal className="f-wt-dialog" title="Nueva rama aparte" dirty={name.trim() !== ''} locked={busy} onClose={onClose} onSubmit={(e) => void submit(e)}>
+        <div className="f-wt-form">
           <label className="f-wt-field">
             <span>Repositorio</span>
             <select className="f-wt-select" value={repo?.mainPath ?? ''} onChange={(e) => { setRepoPath(e.target.value); setBase(null) }}>
@@ -785,9 +797,8 @@ function NuevaDialog({ repos, onDone, onClose }: { repos: RepoView[]; onDone: (m
               {busy ? 'Creando…' : 'Crear rama aparte'}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+    </Modal>
   )
 }
 
@@ -884,10 +895,8 @@ function LimpiarDialog({
   }
 
   return (
-    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
-      <div className="modal f-wt-dialog wide" role="dialog" aria-modal="true" aria-labelledby="f-wt-cl-t">
+    <Modal className="f-wt-dialog wide" title="Limpiar ramas que ya no se usan" locked={busy} onClose={onClose}>
         <div className="f-wt-form">
-          <h2 id="f-wt-cl-t">Limpiar ramas que ya no se usan</h2>
           <p className="f-wt-lead">
             Estas ramas aparte no tienen espacio, no tienen cambios ni commits sin subir, y ya están mergeadas o borradas en origin. Destildá las que quieras conservar.
           </p>
@@ -918,7 +927,6 @@ function LimpiarDialog({
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

@@ -132,7 +132,7 @@ export function Drawer(): React.JSX.Element | null {
   return (
     <>
       <div className="f-git-backdrop" onMouseDown={close} aria-hidden="true" />
-      <aside ref={panelRef} className="f-git-drawer" role="dialog" aria-label={`Git de ${ws?.name ?? 'espacio'}`} tabIndex={-1}>
+      <aside ref={panelRef} className="f-git-drawer" role="dialog" aria-modal="true" aria-label={`Git de ${ws?.name ?? 'espacio'}`} tabIndex={-1}>
         <header className="f-git-head">
           <div role="tablist" aria-label="Vista de Git" className="g-tabs">
             {tabs.map((t) => (
@@ -158,7 +158,7 @@ export function Drawer(): React.JSX.Element | null {
               <span className="g-branch-name">{cur}</span>
             </span>
           )}
-          <button className="icon-btn" onClick={close} aria-label="Cerrar panel de cambios" title="Cerrar (Esc)">
+          <button className="icon-btn" onClick={close} aria-label="Cerrar Git" title="Cerrar (Esc)">
             <CloseIcon size={12} aria-hidden="true" />
           </button>
         </header>
