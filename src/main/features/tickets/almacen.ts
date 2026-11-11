@@ -30,7 +30,7 @@ export interface Almacen {
   cargar(): TicketsState
   /** Escribe tickets.json. En solo lectura no hace nada. true si quedó guardado. */
   guardar(state: TicketsState): boolean
-  /** Por qué esta sesión no guarda, para mostrarlo. undefined si guarda. */
+  /** Para mostrar: por qué esta sesión no guarda, si falló el último guardado o si se reemplazó tickets.json. */
   aviso(): string | undefined
 }
 
@@ -47,7 +47,9 @@ const mensaje = (e: unknown): string => (e instanceof Error ? e.message : String
 
 export function crearAlmacen(o: OpcionesAlmacen): Almacen {
   const archivo = join(o.carpeta, 'tickets.json')
-  let aviso: string | undefined
+  let soloLectura: string | undefined
+  let fallo: string | undefined
+  let remigrado: string | undefined
 
   function leer(ruta: string): Lectura {
     try {
@@ -78,9 +80,11 @@ export function crearAlmacen(o: OpcionesAlmacen): Almacen {
       const tmp = `${archivo}.tmp`
       o.fs.escribir(tmp, JSON.stringify(state, null, 2))
       o.fs.renombrar(tmp, archivo)
+      fallo = undefined
       return true
     } catch (e) {
       o.log(`tickets: no pude guardar tickets.json: ${mensaje(e)}`)
+      fallo = `No pude guardar tickets.json (${mensaje(e)}). Si sigue pasando, lo que cambies se pierde al cerrar Sloth.`
       return false
     }
   }
@@ -89,21 +93,25 @@ export function crearAlmacen(o: OpcionesAlmacen): Almacen {
     cargar() {
       const ahora = o.ahora()
       const r = resolverEstado({ tickets: leer(archivo), gruv: leer(join(o.carpeta, 'gruv.json')) }, o.buscar, ahora)
-      if (r.soloLectura) aviso = AVISOS[r.soloLectura]
-      else if (r.respaldar === 'corrupto' && !apartar(`${archivo}.corrupt-${ahora}`, 'ilegible')) aviso = AVISOS['sin-respaldo']
-      else if (r.respaldar === 'previo' && !apartar(`${archivo}.bak-${ahora}`, 'reemplazado por gruv.json, que cambió')) aviso = AVISOS['sin-respaldo']
-      if (r.origen === 'gruv') o.log(`tickets: estado migrado desde gruv.json${aviso ? ' (solo en memoria)' : ''}`)
-      if (aviso) o.log(`tickets: ${aviso}`)
+      const bak = `${archivo}.bak-${ahora}`
+      if (r.soloLectura) soloLectura = AVISOS[r.soloLectura]
+      else if (r.respaldar === 'corrupto' && !apartar(`${archivo}.corrupt-${ahora}`, 'ilegible')) soloLectura = AVISOS['sin-respaldo']
+      else if (r.respaldar === 'previo') {
+        if (apartar(bak, 'reemplazado por gruv.json, que cambió')) remigrado = `Volví a cargar gruv.json porque cambió desde la última vez. Tu tickets.json anterior quedó en ${bak}.`
+        else soloLectura = AVISOS['sin-respaldo']
+      }
+      if (r.origen === 'gruv') o.log(`tickets: estado migrado desde gruv.json${soloLectura ? ' (solo en memoria)' : ''}`)
+      if (soloLectura) o.log(`tickets: ${soloLectura}`)
       else if (r.guardar) escribir(r.state)
       return r.state
     },
     guardar(state) {
-      if (aviso) {
+      if (soloLectura) {
         o.log('tickets: tickets.json no se guarda en esta sesión')
         return false
       }
       return escribir(state)
     },
-    aviso: () => aviso
+    aviso: () => [soloLectura, fallo, remigrado].filter(Boolean).join(' ') || undefined
   }
 }

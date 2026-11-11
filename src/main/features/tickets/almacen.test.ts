@@ -34,7 +34,7 @@ interface Falso {
 
 const error = (code: string): Error => Object.assign(new Error(`${code}: falló`), { code })
 
-function fsFalso(inicial: Record<string, Archivo>, o: { leerFalla?: Record<string, string>; apartarFalla?: boolean } = {}): Falso {
+function fsFalso(inicial: Record<string, Archivo>, o: { leerFalla?: Record<string, string>; apartarFalla?: boolean; escribirFalla?: string } = {}): Falso {
   const archivos = new Map(Object.entries(inicial))
   const ops: string[] = []
   const fs: FsTickets = {
@@ -60,6 +60,7 @@ function fsFalso(inicial: Record<string, Archivo>, o: { leerFalla?: Record<strin
     },
     escribir(r, datos) {
       ops.push(`escribir ${basename(r)}`)
+      if (o.escribirFalla) throw error(o.escribirFalla)
       archivos.set(r, { texto: datos, mtimeMs: AHORA })
     },
     crearCarpeta() {}
@@ -104,11 +105,14 @@ test('migración inicial: guarda tickets.json con el mtime de gruv.json', () => 
 test('gruv.json cambió desde la migración: respalda tickets.json como .bak y vuelve a migrar', () => {
   const previo = v2(100)
   const f = fsFalso({ [TICKETS]: { texto: previo, mtimeMs: 900 }, [GRUV]: { texto: GRUV_V1, mtimeMs: 200 } })
-  const s = almacen(f).cargar()
+  const a = almacen(f)
+  const s = a.cargar()
   assert.equal(s.tickets[0].id, 'TCK-1')
   assert.deepEqual(f.ops, [`renombrar tickets.json tickets.json.bak-${AHORA}`, ...GUARDAR])
   assert.equal(f.archivos.get(`${TICKETS}.bak-${AHORA}`)?.texto, previo)
   assert.equal(enDisco(f).migradoDe?.gruvMtimeMs, 200)
+  assert.match(a.aviso() ?? '', /Volví a cargar gruv\.json/)
+  assert.ok(a.aviso()?.includes(`tickets.json.bak-${AHORA}`))
   gruvIntacto(f, GRUV_V1)
 })
 
@@ -205,6 +209,20 @@ test('versión futura: no renombra ni escribe en toda la sesión y avisa', () =>
     assert.equal(f.archivos.get(TICKETS)?.texto, futuro)
     gruvIntacto(f, GRUV in gruv ? GRUV_V1 : undefined)
   }
+})
+
+test('si falla guardar: avisa con el motivo y el aviso se va cuando vuelve a guardar', () => {
+  const fallas: { escribirFalla?: string } = { escribirFalla: 'ENOSPC' }
+  const f = fsFalso({}, fallas)
+  const a = almacen(f)
+  const s = a.cargar()
+  assert.equal(a.aviso(), undefined)
+  assert.equal(a.guardar(s), false)
+  assert.match(a.aviso() ?? '', /No pude guardar tickets\.json \(ENOSPC/)
+  assert.ok(f.logs.some((l) => l.includes('ENOSPC')))
+  delete fallas.escribirFalla
+  assert.equal(a.guardar(s), true)
+  assert.equal(a.aviso(), undefined)
 })
 
 test('si no se puede apartar tickets.json, no se guarda en toda la sesión', () => {
