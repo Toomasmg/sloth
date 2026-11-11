@@ -78,11 +78,32 @@ export interface TicketsConfig {
 /** Cómo habla Sloth con el sistema: Claude con un conector MCP, o GitHub CLI directo. */
 export type Via = 'mcp' | 'gh'
 
+/** De dónde sale un conector: viene con Sloth, lo armó la persona o lo trae el team.json de un repo. */
+export type OrigenConector = { tipo: 'incluido' } | { tipo: 'usuario' } | { tipo: 'equipo'; repo: string; equipo: string }
+
 export interface ConectorResumen {
   id: string
   nombre: string
   verificado: boolean
   via: Via
+}
+
+export interface HerramientasVista {
+  prefijo: string
+  lista: string[]
+  detalle: string[]
+  apoyo: string[]
+  escritura: Partial<Record<Accion, string>>
+  negar: number
+}
+
+export interface ConectorPropioVista {
+  id: string
+  nombre: string
+  aceptado: boolean
+  hash: string
+  herramientas: HerramientasVista
+  pistaLista: string
 }
 
 export interface ConectorInfo {
@@ -128,6 +149,8 @@ export interface TicketsSnapshot {
   lastRepo?: string
   /** Si el conector elegido no está en esta versión, al que se puede volver. */
   porDefecto?: { id: string; nombre: string }
+  /** Conectores propios o del equipo que no se cargaron, y por qué. */
+  avisosPropios?: string[]
 }
 
 /** La primera lista que tenga la clave gana; si ninguna la tiene, 'pendiente'. */
