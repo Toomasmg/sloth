@@ -1,4 +1,4 @@
-/* Tickets de Gruv: pantalla de lista + detalle (artboard Tickets.dc.html).
+/* Tickets: pantalla de lista + detalle (artboard Tickets.dc.html).
    Medidas en px literales del artboard. Colores por tokens de themes.css / styles.css;
    los tonos intermedios del artboard se derivan con color-mix() de esos tokens (tema claro incluido). */
 
@@ -703,7 +703,7 @@
   opacity: 0.85;
   cursor: not-allowed;
 }
-.f-gruv-prio-val {
+.f-gruv-val {
   display: inline-flex;
   align-items: center;
   gap: 7px;

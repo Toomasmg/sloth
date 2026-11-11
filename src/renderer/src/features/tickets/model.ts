@@ -1,82 +1,22 @@
 import { useSyncExternalStore } from 'react'
+import type { Detalle, TicketsSnapshot as Snapshot, Ticket } from '../../../../shared/tickets'
 
-/** Lo que manda main (`feat:tickets:state` / `feat:tickets:changed`). Ver src/main/features/tickets/index.ts. */
-export interface GruvCriterio {
-  /** UUID en Gruv: viene con el detalle y hace falta para tildarlo. */
-  id?: string
-  texto: string
-  hecho: boolean
-}
-
-export interface Ticket {
-  id: string
-  titulo: string
-  /** Clave de estado de Gruv (`abierto`, `en_curso`, `en_revision`…). */
-  estado?: string
-  prioridad?: string
-  proyecto?: string
-  url?: string
-  responsable?: string
-  responsableId?: string
-  descripcion?: string
-  criterios?: GruvCriterio[]
-}
-
-export interface GruvEstado {
-  clave: string
-  nombre: string
-}
-
-export interface GruvComentario {
-  autor: string
-  cuerpo: string
-  fecha?: string
-}
-
-/** Detalle del ticket (al abrirlo). `minutos` null = sin registro. */
-export interface GruvDetalle {
-  criterios: GruvCriterio[]
-  comentarios: GruvComentario[]
-  minutos: number | null
-}
-
-/** Escrituras que la app le pide a Gruv (una herramienta cada una). */
-export type Accion = 'estado' | 'tomar' | 'soltar' | 'comentar' | 'criterio' | 'horas'
+export type { Accion, Categoria, ConectorInfo, Detalle, Estado, EstadoBase, Ticket, TicketsSnapshot as Snapshot } from '../../../../shared/tickets'
 
 /** Lo que se muestra del detalle: datos, carga o error. */
 export interface DetView {
-  data?: GruvDetalle
+  data?: Detalle
   loading?: boolean
   error?: string
 }
 
 /**
  * Cambio optimista de una escritura: el ticket (campos) y/o el detalle se muestran ya y se
- * revierten si Gruv no lo acepta.
+ * revierten si el conector no lo acepta.
  */
 export interface WriteOpt {
   ticket?: Partial<Ticket>
-  det?: (d: GruvDetalle) => GruvDetalle
-}
-
-export interface Snapshot {
-  tickets: Ticket[]
-  /** Estados en el orden del flujo de Gruv. */
-  estados: GruvEstado[]
-  me?: { id?: string; nombre: string }
-  fetchedAt?: number
-  fetchedBy?: string
-  lastRun?: { tokens?: number; costUsd?: number; durationMs?: number }
-  lastError?: string
-  config: {
-    queryAccountId?: string
-    model: 'haiku' | 'sonnet' | 'opus'
-    assigneeId: string
-    confirmRefresh: boolean
-  }
-  running: boolean
-  /** Acciones que esta cuenta no puede hacer, con el motivo. */
-  noDisponible?: Partial<Record<Accion, string>>
+  det?: (d: Detalle) => Detalle
 }
 
 /** Sin tildes y en minúsculas: para buscar «revision» y encontrar «Revisión». */
@@ -140,8 +80,12 @@ export const setBoardOpen = (v: boolean): void => {
   open = v
   notify()
 }
+export const getSnapshot = (): Snapshot | null => snap
 export const useSnapshot = (): Snapshot | null => useSyncExternalStore(subscribe, () => snap)
 export const useBoardOpen = (): boolean => useSyncExternalStore(subscribe, () => open)
+
+/** «Tickets de Gruv»; sin snapshot o con un conector que esta versión no tiene, solo «Tickets». */
+export const etiquetaTablero = (s: Snapshot | null): string => (s?.conector.disponible ? `Tickets de ${s.conector.nombre}` : 'Tickets')
 
 export function timeAgo(ts: number, now = Date.now()): string {
   const m = Math.round((now - ts) / 60000)

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import gruv from '../main/features/tickets/conectores/gruv'
 import { categoriaDe, type Categoria, type Estado } from './tickets'
 
-/** estadoKind de renderer/src/features/gruv/parts.tsx en 0.6.4, tal cual. */
+/** estadoKind de renderer/src/features/tickets/parts.tsx en 0.6.4 (antes de las categorías), tal cual. */
 function estadoKindViejo(k?: string): 'todo' | 'doing' | 'review' | 'error' {
   if (k === 'en_curso') return 'doing'
   if (k === 'en_revision' || k === 'en_qa' || k === 'pre_rtd') return 'review'

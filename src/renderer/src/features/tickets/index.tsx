@@ -2,10 +2,10 @@ import { useEffect, lazy, Suspense } from 'react'
 import { useUi, type FeatureUi } from '../host'
 import { TicketIcon } from '../../icons/SlothIcons'
 const Board = lazy(() => import('./Board').then((m) => ({ default: m.Board })))
-import { isMine, setBoardOpen, setSnapshot, useBoardOpen, useSnapshot, type Snapshot } from './model'
-import './gruv.css'
+import { etiquetaTablero, getSnapshot, isMine, norm, setBoardOpen, setSnapshot, useBoardOpen, useSnapshot, type Snapshot } from './model'
+import './tickets.css'
 
-/** Chip «Tickets» en la barra de título, con cuántos tickets son míos (los que Gruv trajo). */
+/** Chip «Tickets» en la barra de título, con cuántos tickets son míos (los que trajo el conector). */
 function TitlebarChip(): React.JSX.Element {
   const snap = useSnapshot()
   const open = useBoardOpen()
@@ -16,7 +16,7 @@ function TitlebarChip(): React.JSX.Element {
       className="tb-chip f-gruv-chip-tb"
       aria-pressed={open}
       onClick={() => setBoardOpen(!open)}
-      title="Tickets de Gruv"
+      title={etiquetaTablero(snap)}
     >
       <TicketIcon size={12} />
       Tickets
@@ -47,19 +47,22 @@ function Global(): React.JSX.Element | null {
 }
 
 const ui: FeatureUi = {
-  name: 'gruv',
+  name: 'tickets',
   Titlebar: TitlebarChip,
   Global,
-  commands: () => [
-    {
-      id: 'gruv:board',
-      title: 'Tickets de Gruv',
-      subtitle: 'Tus tickets y los del equipo: empezar uno crea su espacio',
-      group: 'Tickets',
-      keywords: 'gruv kanban tck tickets tablero lista',
-      run: () => setBoardOpen(true)
-    }
-  ]
+  commands: () => {
+    const snap = getSnapshot()
+    return [
+      {
+        id: 'tickets:board',
+        title: etiquetaTablero(snap),
+        subtitle: 'Tus tickets y los del equipo: empezar uno crea su espacio',
+        group: 'Tickets',
+        keywords: `tickets kanban tck tablero lista ${snap ? norm(snap.conector.nombre) : ''}`.trim(),
+        run: () => setBoardOpen(true)
+      }
+    ]
+  }
 }
 
 export default ui

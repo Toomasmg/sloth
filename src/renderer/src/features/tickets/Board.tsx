@@ -4,7 +4,9 @@ import { cleanError } from '../../format'
 import { SPACE_CHIP, SPACE_LABEL, spaceStatus } from '../broadcast/state'
 import { CloseIcon, SearchIcon, SpaceIcon } from '../../icons/SlothIcons'
 import type { Workspace } from '../../../../shared/types'
+import { categoriaDe } from '../../../../shared/tickets'
 import {
+  etiquetaTablero,
   isMine,
   norm,
   prioRank,
@@ -14,8 +16,8 @@ import {
   useSnapshot,
   type Accion,
   type DetView,
-  type GruvDetalle,
-  type GruvEstado,
+  type Detalle,
+  type EstadoBase,
   type Snapshot,
   type Ticket,
   type WriteOpt
@@ -42,14 +44,15 @@ const usesTicket = (t: TemplateLite): boolean =>
   [t.namePattern, t.initialPrompt, t.useWorktree?.branchPattern].some((s) => Boolean(s && /\{ticket(min)?\}/.test(s)))
 
 /** Mensaje del toast al terminar una escritura. */
-const DONE: Record<Accion, string> = {
-  estado: 'Estado actualizado en Gruv',
-  tomar: 'Ticket tomado',
-  soltar: 'Ticket soltado',
-  comentar: 'Comentario publicado',
-  criterio: 'Criterio actualizado',
-  horas: 'Horas sumadas'
-}
+const doneMessage = (a: Accion, nombre: string): string =>
+  ({
+    estado: `Estado actualizado en ${nombre}`,
+    tomar: 'Ticket tomado',
+    soltar: 'Ticket soltado',
+    comentar: 'Comentario publicado',
+    criterio: 'Criterio actualizado',
+    horas: 'Horas sumadas'
+  })[a]
 
 const byIdDesc = (a: Ticket, b: Ticket): number => {
   const na = Number(a.id.split('-').pop())
@@ -88,7 +91,7 @@ export function Board(): React.JSX.Element {
   const [tpls, setTpls] = useState<TemplateLite[]>([])
   /** Detalle por ticket (criterios, comentarios, horas) leído al abrirlo. */
   const [det, setDet] = useState<Record<string, DetView>>({})
-  /** Cambios optimistas en curso, por ticket: se muestran ya y se revierten si Gruv no los acepta. */
+  /** Cambios optimistas en curso, por ticket: se muestran ya y se revierten si el conector no los acepta. */
   const [over, setOver] = useState<Record<string, Partial<Ticket>>>({})
   /** Escritura en curso por ticket (una por ticket). */
   const [wbusy, setWbusy] = useState<Record<string, Accion>>({})
@@ -130,10 +133,15 @@ export function Board(): React.JSX.Element {
   }, [toast])
 
   const running = Boolean(snap?.running) || busy === 'refresh'
-  // Lo que se ve: la lista de Gruv con los cambios optimistas encima.
+  // Lo que se ve: la lista del conector con los cambios optimistas encima.
   const tickets = (snap?.tickets ?? []).map((t) => (over[t.id] ? { ...t, ...over[t.id] } : t))
   const me = snap?.me
   const estados = snap?.estados ?? []
+  const n = snap?.conector.nombre ?? 'el conector'
+  const unavailable = Boolean(snap) && !snap?.conector.disponible
+  const kindOf = (k?: string): ReturnType<typeof estadoKind> => estadoKind(categoriaDe(k, estados, snap?.conector.estados ?? []))
+  const ticketTpls = tpls.filter(usesTicket)
+  const ticketTpl = ticketTpls.find((x) => x.name.toLowerCase().includes(n.toLowerCase())) ?? ticketTpls[0]
   const estadoName = (k?: string): string => estados.find((e) => e.clave === k)?.nombre ?? (k ? k.replace(/_/g, ' ') : 'Sin estado')
   const wsOf = (id: string): Workspace | undefined => ui.workspaces.find((w) => w.ticket?.toUpperCase() === id)
   const accLabel = (id?: string): string | undefined => ui.accounts.find((a) => a.id === id)?.label
@@ -162,10 +170,10 @@ export function Board(): React.JSX.Element {
 
   // Detalle del ticket abierto: se pide al abrirlo (no en la lista).
   useEffect(() => {
-    if (!curId) return
+    if (!curId || !snap?.conector.leeDetalle) return
     let alive = true
     setDet((d) => ({ ...d, [curId]: { ...d[curId], loading: true, error: undefined } }))
-    ui.invoke<GruvDetalle>('feat:tickets:detail', curId).then(
+    ui.invoke<Detalle>('feat:tickets:detail', curId).then(
       (data) => {
         if (alive) setDet((d) => ({ ...d, [curId]: { data } }))
       },
@@ -177,14 +185,14 @@ export function Board(): React.JSX.Element {
       alive = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [curId, detTick])
+  }, [curId, detTick, snap?.conector.leeDetalle])
 
-  // Chips de estado: los del flujo de Gruv que tienen tickets (y los que no estén en el flujo).
+  // Chips de estado: los del flujo del conector que tienen tickets (y los que no estén en el flujo).
   const estadoKeys = [
     ...estados.filter((e) => tickets.some((t) => t.estado === e.clave)),
     ...[...new Set(tickets.map((t) => t.estado).filter((k): k is string => Boolean(k)))]
       .filter((k) => !estados.some((e) => e.clave === k))
-      .map((k): GruvEstado => ({ clave: k, nombre: k.replace(/_/g, ' ') }))
+      .map((k): EstadoBase => ({ clave: k, nombre: k.replace(/_/g, ' ') }))
   ]
   const prioOpts = [...new Set(tickets.map((t) => t.prioridad).filter((p): p is string => Boolean(p)))].sort(
     (a, b) => prioRank(a) - prioRank(b) || a.localeCompare(b)
@@ -200,7 +208,7 @@ export function Board(): React.JSX.Element {
     setBusy('refresh')
     try {
       const r = await ui.invoke<{ count: number }>('feat:tickets:refresh')
-      setInfo(`Gruv trajo ${r.count} ${r.count === 1 ? 'ticket' : 'tickets'}.`)
+      setInfo(`${n} trajo ${r.count} ${r.count === 1 ? 'ticket' : 'tickets'}.`)
     } catch (e) {
       setErr(cleanError(e))
     } finally {
@@ -214,8 +222,8 @@ export function Board(): React.JSX.Element {
   }
 
   /**
-   * Una escritura en Gruv, pedida por un clic sobre un ticket. Aplica el cambio optimista, espera a
-   * Gruv y, si no lo acepta, lo revierte con el error. Devuelve si salió bien.
+   * Una escritura en el conector, pedida por un clic sobre un ticket. Aplica el cambio optimista, espera
+   * a que responda y, si no lo acepta, lo revierte con el error. Devuelve si salió bien.
    */
   const write = async (id: string, a: Accion, payload: Record<string, unknown>, opt: WriteOpt): Promise<boolean> => {
     if (lock.current.has(id)) return false
@@ -226,9 +234,9 @@ export function Board(): React.JSX.Element {
     if (opt.ticket) setOver((o) => ({ ...o, [id]: { ...o[id], ...opt.ticket } }))
     if (opt.det && prev) setDet((d) => ({ ...d, [id]: { data: opt.det!(prev) } }))
     try {
-      const r = await ui.invoke<{ detail: GruvDetalle | null }>('feat:tickets:accion', a, id, payload)
+      const r = await ui.invoke<{ detail: Detalle | null }>('feat:tickets:accion', a, id, payload)
       if (r?.detail) setDet((d) => ({ ...d, [id]: { data: r.detail! } }))
-      setToast(DONE[a])
+      setToast(doneMessage(a, n))
       return true
     } catch (e) {
       if (opt.det && prev) setDet((d) => ({ ...d, [id]: { data: prev } }))
@@ -260,9 +268,8 @@ export function Board(): React.JSX.Element {
     }
     setBusy(`start:${t.id}`)
     try {
-      const tpl = tpls.find((x) => usesTicket(x) && /gruv/i.test(x.name)) ?? tpls.find(usesTicket)
-      if (tpl) {
-        await ui.invoke('feat:templates:create', tpl.id, { ticket: t.id })
+      if (ticketTpl) {
+        await ui.invoke('feat:templates:create', ticketTpl.id, { ticket: t.id })
         close()
         return
       }
@@ -294,14 +301,17 @@ export function Board(): React.JSX.Element {
   const anyLogged = ui.accounts.some((a) => ui.statuses[a.id]?.loggedIn)
   type Tone = 'ok' | 'busy' | 'bad' | 'idle'
   let tone: Tone = 'idle'
-  let connText = 'Gruv todavía no se consultó'
+  let connText = `${n} todavía no se consultó`
   if (!snap) connText = 'Cargando…'
   else if (running) {
     tone = 'busy'
-    connText = `Consultando Gruv con ${accLabel(snap.config.queryAccountId) ?? 'una cuenta'}…`
+    connText = `Consultando ${n} con ${accLabel(snap.config.queryAccountId) ?? 'una cuenta'}…`
+  } else if (unavailable) {
+    tone = 'bad'
+    connText = `${n} no está disponible`
   } else if (snap.lastError) {
     tone = 'bad'
-    connText = 'Sin conexión con Gruv'
+    connText = `Sin conexión con ${n}`
   } else if (!anyLogged) {
     tone = 'bad'
     connText = 'Ninguna cuenta tiene sesión iniciada'
@@ -309,7 +319,7 @@ export function Board(): React.JSX.Element {
     tone = 'ok'
     connText = `Conectado con ${accLabel(snap.fetchedBy) ?? 'una cuenta'} · actualizado ${timeAgo(snap.fetchedAt)}`
   }
-  const offline = Boolean(snap?.lastError) && !running
+  const offline = Boolean(snap?.lastError) && !running && !unavailable
 
   const bodyLoading = !snap || (running && tickets.length === 0)
   const showRows = !bodyLoading && visible.length > 0
@@ -336,8 +346,8 @@ export function Board(): React.JSX.Element {
           type="button"
           className="f-gruv-b f-gruv-b--sm"
           onClick={askRefresh}
-          disabled={running || !snap}
-          title="Lee los tickets de Gruv con la cuenta que la consulta (solo lectura)"
+          disabled={running || !snap || unavailable}
+          title={`Lee los tickets de ${n} con la cuenta que la consulta (solo lectura)`}
         >
           <RefreshGlyph />
           {running ? 'Actualizando…' : 'Actualizar'}
@@ -347,16 +357,16 @@ export function Board(): React.JSX.Element {
       <main className="f-gruv-main">
         <div>
           <h1 id="f-gruv-title" className="f-gruv-h1">
-            Tickets de Gruv
+            {etiquetaTablero(snap)}
           </h1>
           <p className="f-gruv-lead">Tus tickets y los del equipo. Empezá uno y Sloth arma el espacio para trabajarlo.</p>
         </div>
 
         {confirming && (
-          <div className="f-gruv-alert f-gruv-confirm" role="alertdialog" aria-label="Confirmar consulta a Gruv">
+          <div className="f-gruv-alert f-gruv-confirm" role="alertdialog" aria-label={`Confirmar consulta a ${n}`}>
             <span>
-              Para leer Gruv se abre Claude sin ventana con <b>{accLabel(snap?.config.queryAccountId) ?? 'una cuenta'}</b> (modelo{' '}
-              {snap?.config.model}) y usa tokens de esa cuenta. Solo lee: no cambia nada en Gruv.
+              Para leer {n} se abre Claude sin ventana con <b>{accLabel(snap?.config.queryAccountId) ?? 'una cuenta'}</b> (modelo{' '}
+              {snap?.config.model}) y usa tokens de esa cuenta. Solo lee: no cambia nada en {n}.
             </span>
             <label className="check f-gruv-inline-check">
               <input type="checkbox" onChange={(e) => setConfirmRefresh(!e.target.checked)} />
@@ -433,7 +443,7 @@ export function Board(): React.JSX.Element {
                     <button
                       key={e.clave}
                       type="button"
-                      className={`f-gruv-chipf f-gruv-st-${estadoKind(e.clave)} ${on ? 'on' : ''}`}
+                      className={`f-gruv-chipf f-gruv-st-${kindOf(e.clave)} ${on ? 'on' : ''}`}
                       aria-pressed={on}
                       onClick={() => setStSel((s) => (on ? s.filter((x) => x !== e.clave) : [...s, e.clave]))}
                     >
@@ -476,10 +486,16 @@ export function Board(): React.JSX.Element {
             </div>
 
             <div aria-busy={running} className="f-gruv-body">
+              {unavailable && (
+                <div className="f-gruv-alert f-gruv-offline" role="alert">
+                  <span className="f-gruv-alert-text">{snap?.lastError}</span>
+                </div>
+              )}
+
               {offline && (
                 <div className="f-gruv-alert f-gruv-offline" role="alert">
                   <span className="f-gruv-alert-text">
-                    No pudimos hablar con Gruv. Mostramos lo último que cargamos.
+                    No pudimos hablar con {n}. Mostramos lo último que cargamos.
                     {snap?.lastError && <span className="f-gruv-alert-detail">{snap.lastError}</span>}
                   </span>
                   <button type="button" className="f-gruv-b f-gruv-b--xs f-gruv-b--solid-danger" onClick={() => void refresh()} disabled={running}>
@@ -494,11 +510,11 @@ export function Board(): React.JSX.Element {
                   <div />
                   <div />
                   <div />
-                  <span>Cargando tickets de Gruv…</span>
+                  <span>{snap ? `Cargando tickets de ${n}…` : 'Cargando tickets…'}</span>
                 </div>
               )}
 
-              {!bodyLoading && snap && tickets.length === 0 && (
+              {!bodyLoading && snap && !unavailable && tickets.length === 0 && (
                 <div className="f-gruv-empty">
                   {snap.lastError ? (
                     <>
@@ -508,10 +524,10 @@ export function Board(): React.JSX.Element {
                       </button>
                     </>
                   ) : snap.fetchedAt ? (
-                    <span className="f-gruv-empty-title">No hay tickets activos en Gruv.</span>
+                    <span className="f-gruv-empty-title">No hay tickets activos en {n}.</span>
                   ) : (
                     <>
-                      <span className="f-gruv-empty-title">Todavía no se consultó Gruv.</span>
+                      <span className="f-gruv-empty-title">Todavía no se consultó {n}.</span>
                       <span className="f-gruv-muted">Actualizá para traer tus tickets y los del equipo.</span>
                       <button type="button" className="f-gruv-b f-gruv-b--sm f-gruv-b--pri" onClick={askRefresh} disabled={running}>
                         Actualizar
@@ -549,7 +565,7 @@ export function Board(): React.JSX.Element {
                           </span>
                           <span className="f-gruv-row-title">{t.titulo}</span>
                           <span className="f-gruv-row-meta">
-                            <span className={`f-gruv-st f-gruv-st-${estadoKind(t.estado)}`}>{estadoName(t.estado)}</span>
+                            <span className={`f-gruv-st f-gruv-st-${kindOf(t.estado)}`}>{estadoName(t.estado)}</span>
                             {t.prioridad && (
                               <span className="f-gruv-prio" style={{ color: prioTone(t.prioridad) }}>
                                 <PrioGlyph p={t.prioridad} />
@@ -594,7 +610,7 @@ export function Board(): React.JSX.Element {
 
           {/* DETALLE */}
           <section className="f-gruv-panel f-gruv-det" aria-labelledby="f-gruv-det-t">
-            {!current ? (
+            {!current || !snap ? (
               <p className="f-gruv-muted">{snap ? 'Elegí un ticket de la lista.' : 'Cargando…'}</p>
             ) : (
               <Detail
@@ -603,14 +619,15 @@ export function Board(): React.JSX.Element {
                 mine={isMineT(current)}
                 me={me}
                 estados={estados}
+                conector={snap.conector}
                 estadoName={estadoName}
                 view={det[current.id]}
                 wbusy={wbusy[current.id]}
-                noDisp={snap?.noDisponible ?? {}}
-                sinCuenta={!snap?.config.queryAccountId}
+                noDisp={snap.noDisponible ?? {}}
+                sinCuenta={!snap.config.queryAccountId}
                 startBusy={busy === `start:${current.id}`}
                 disabledAll={Boolean(busy)}
-                tplName={tpls.find((x) => usesTicket(x) && /gruv/i.test(x.name))?.name ?? tpls.find(usesTicket)?.name}
+                tplName={ticketTpl?.name}
                 onStart={() => void start(current)}
                 onOpenSpace={openSpace}
                 onWrite={(a, payload, opt) => write(current.id, a, payload, opt)}
