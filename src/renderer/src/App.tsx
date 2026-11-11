@@ -58,7 +58,7 @@ import { onEqualize, safeStorage, setViewMode, useViewMode } from './layout/stor
 import { useReorderDrag } from './layout/useReorderDrag'
 import { Separators } from './layout/Separators'
 import { SIDE_DEFAULT, SideResizer, clampSide, sideMax } from './layout/SideResizer'
-import { PaneInput, PaneMenu, type PaneMenuItem } from './layout/PaneMenu'
+import { PaneMenu, type PaneMenuItem } from './layout/PaneMenu'
 import { CrumbMenu, type CrumbGroup, type CrumbItem } from './layout/CrumbMenu'
 import { openRamas } from './features/worktrees/store'
 import { openHistory } from './features/history/index'
@@ -1308,7 +1308,6 @@ export function App(): React.JSX.Element {
                     )}
                     <PaneBannerSlot paneId={paneId} />
                     <TerminalView id={paneId} generation={generations[paneId] ?? 0} onError={onTermError} />
-                    {ws && <PaneInput paneId={paneId} name={ws.name} onError={onTermError} />}
                   </section>
                 )
               })}

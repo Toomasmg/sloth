@@ -48,6 +48,8 @@ function setAgent(wsId: string, status: AgentStatus): void {
 }
 
 app.setName('Sloth')
+// Instancia de prueba al lado de la instalada: otra carpeta de datos = otro lock, otro daemon, otras cuentas.
+if (process.env.SLOTH_USER_DATA) app.setPath('userData', process.env.SLOTH_USER_DATA)
 if (!app.requestSingleInstanceLock()) app.quit()
 
 // Bajo consumo: apagamos lo que Chromium trae y Sloth no usa (renderer de repuesto precargado,
