@@ -131,6 +131,7 @@
 }
 
 /* ---------- Revisión a pantalla completa ---------- */
+.modal-backdrop:has(> .pr-modal),
 .pr-backdrop {
   place-items: center;
   padding: var(--s-3);
@@ -184,6 +185,8 @@
 }
 .pr-head {
   display: flex;
+  margin: 0;
+  height: auto;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--s-2) var(--s-3);
@@ -203,6 +206,21 @@
 .pr-head-text {
   flex: 1 1 220px;
   min-width: 0;
+}
+.pr-head-text h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.pr-head-text p {
+  margin: 2px 0 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+}
+.pr-queue-row {
+  padding: 0 var(--s-4);
 }
 .pr-title {
   font-size: var(--fs-lg);
@@ -502,7 +520,7 @@
 .pd-modal .switch input:not(:checked) + .switch-track {
   background: var(--seg-on, #3a4152);
 }
-.pd-head .seg > button[aria-pressed='true'] {
+.pd-tabs .seg > button[aria-pressed='true'] {
   background: var(--seg-on, #3a4152);
 }
 .pd-dnd .switch-track::after {
@@ -533,11 +551,21 @@
 }
 .pd-head {
   display: flex;
+  margin: 0;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--s-2);
   padding: var(--s-3) var(--s-3) var(--s-2) var(--s-4);
   box-shadow: inset 0 -1px 0 var(--line);
+}
+.pd-tabs {
+  padding: var(--s-2) var(--s-4);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.pd-title h2 {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
 }
 .pd-title {
   flex: 1 1 100px;

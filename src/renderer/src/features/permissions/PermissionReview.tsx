@@ -1,7 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { Account, PermissionPrompt, Workspace } from '../../../../shared/types'
 import { alwaysLabel, changesOf, explanationOf, filesOf, kindOf, titleOf, type FileChange } from '../../../../main/features/permissions-core'
-import { CloseIcon, PermissionIcon } from '../../icons/SlothIcons'
+import { Modal } from '../../Modal'
+import { PermissionIcon } from '../../icons/SlothIcons'
 import { CheckGlyph } from '../git/glyphs'
 import { cleanError } from '../../format'
 import { decidePermission, rejectAndTell } from './api'
@@ -73,7 +74,6 @@ export function PermissionReview({ prompts, workspaces, accounts, initialId, onC
   const [sending, setSending] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const titleId = useId()
-  const dialogRef = useRef<HTMLDivElement>(null)
   const msgRef = useRef<HTMLTextAreaElement>(null)
 
   const n = prompts.length
@@ -91,10 +91,6 @@ export function PermissionReview({ prompts, workspaces, accounts, initialId, onC
   useEffect(() => {
     if (msgOpen) msgRef.current?.focus()
   }, [msgOpen])
-
-  useEffect(() => {
-    dialogRef.current?.focus()
-  }, [])
 
   const ws = useMemo(() => (p ? workspaces.find((w) => w.id === p.workspaceId) : undefined), [p, workspaces])
   const acc = useMemo(() => (ws ? accounts.find((a) => a.id === ws.accountId) : undefined), [ws, accounts])
@@ -118,13 +114,7 @@ export function PermissionReview({ prompts, workspaces, accounts, initialId, onC
     setSending(null)
   }
 
-  const onKey = (e: KeyboardEvent<HTMLDivElement>): void => {
-    if (e.key === 'Escape') {
-      e.stopPropagation()
-      if (msgOpen) setMsgOpen(false)
-      else onClose()
-      return
-    }
+  const onKey = (e: KeyboardEvent<HTMLElement>): void => {
     if (isText(e.target) || n < 2) return
     if (e.key === 'ArrowLeft') go(-1)
     if (e.key === 'ArrowRight') go(1)
@@ -146,173 +136,165 @@ export function PermissionReview({ prompts, workspaces, accounts, initialId, onC
   }, [p, kind])
 
   return (
-    <div className="modal-backdrop pr-backdrop">
-      <div
-        ref={dialogRef}
-        className="modal pr-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        onKeyDown={onKey}
-      >
-        <header className="pr-head">
-          <span className="pr-head-icon" aria-hidden="true">
-            <PermissionIcon size={18} strokeWidth={1.8} />
+    <Modal
+      title={p ? titleOf(kind, p.tool, p.input) : 'Pedidos de permiso'}
+      subtitle={p ? 'Claude está esperando tu respuesta para seguir.' : 'Sloth no tiene pedidos para mostrar.'}
+      icon={
+        <span className="pr-head-icon" aria-hidden="true">
+          <PermissionIcon size={18} strokeWidth={1.8} />
+        </span>
+      }
+      onClose={() => (msgOpen ? setMsgOpen(false) : onClose())}
+      className="pr-modal"
+      headClassName="pr-head"
+      titlesClassName="pr-head-text"
+      onKeyDown={onKey}
+    >
+      {n > 0 && (
+        <div className="pr-queue pr-queue-row" role="group" aria-label="Cola de pedidos">
+          <button type="button" className="icon-btn pr-nav" onClick={() => go(-1)} disabled={n < 2} aria-label="Pedido anterior">
+            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 5l-7 7 7 7" />
+            </svg>
+          </button>
+          <span className="pr-queue-label" aria-live="polite">
+            {idx + 1} de {n} {n === 1 ? 'pedido' : 'pedidos'}
           </span>
-          <div className="pr-head-text">
-            <div id={titleId} className="pr-title">
-              {p ? titleOf(kind, p.tool, p.input) : 'Pedidos de permiso'}
+          <button type="button" className="icon-btn pr-nav" onClick={() => go(1)} disabled={n < 2} aria-label="Pedido siguiente">
+            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {!p ? (
+        <div className="pr-empty">
+          <span className="pr-empty-icon" aria-hidden="true">
+            <CheckGlyph size={18} />
+          </span>
+          <div className="pr-empty-title">No hay pedidos pendientes</div>
+          <div className="pr-empty-sub">Claude no espera nada de vos. Los pedidos nuevos aparecen acá.</div>
+          <button type="button" className="btn primary" onClick={onClose}>
+            Volver a los espacios
+          </button>
+        </div>
+      ) : (
+        <div className="pr-body">
+          <dl className="pr-meta">
+            <div>
+              <dt>Espacio</dt>
+              <dd>{ws?.name ?? 'Espacio borrado'}</dd>
             </div>
-            <div className="pr-sub">{p ? 'Claude está esperando tu respuesta para seguir.' : 'Sloth no tiene pedidos para mostrar.'}</div>
-          </div>
-          {n > 0 && (
-            <div className="pr-queue" role="group" aria-label="Cola de pedidos">
-              <button type="button" className="icon-btn pr-nav" onClick={() => go(-1)} disabled={n < 2} aria-label="Pedido anterior">
-                <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M15 5l-7 7 7 7" />
-                </svg>
-              </button>
-              <span className="pr-queue-label" aria-live="polite">
-                {idx + 1} de {n} {n === 1 ? 'pedido' : 'pedidos'}
+            <div>
+              <dt>Cuenta</dt>
+              <dd>{acc?.label ?? 'Cuenta borrada'}</dd>
+            </div>
+            <div>
+              <dt>Carpeta</dt>
+              <dd className="mono">{ws?.cwd ?? '—'}</dd>
+            </div>
+          </dl>
+
+          {kind === 'cmd' && <code className="pr-code mono">{cmd}</code>}
+          {kind === 'net' && <code className="pr-code mono">{domain || 'Sin dirección'}</code>}
+          {kind === 'edit' && (
+            <>
+              {files.length === 0 && changes.length === 0 && <p className="pr-note">El pedido no dice qué archivos toca.</p>}
+              {(files.length > 0 || changes.length > 0) && (
+                <Changes changes={changes.length ? changes : files.map((f) => ({ path: f, add: 0, del: 0, isNew: false, lines: [] }))} />
+              )}
+            </>
+          )}
+          {kind === 'other' && otherJson && otherJson !== '{}' && <pre className="pr-code mono">{otherJson}</pre>}
+
+          <section className="pr-expl">
+            <h3 className="pr-expl-title">Qué va a hacer (lo cuenta Claude)</h3>
+            <p className="pr-expl-text">{explanation ?? 'Claude no dejó una explicación en este pedido.'}</p>
+          </section>
+
+          {p && (
+            <div className="pr-risk">
+              <span className="pr-risk-label">Riesgo</span>
+              <span className={`pr-risk-pill ${riskOf(kind, changes.length || files.length).cls}`}>
+                {riskOf(kind, changes.length || files.length).label}
               </span>
-              <button type="button" className="icon-btn pr-nav" onClick={() => go(1)} disabled={n < 2} aria-label="Pedido siguiente">
-                <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
             </div>
           )}
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Cerrar revisión">
-            <CloseIcon size={14} />
-          </button>
-        </header>
 
-        {!p ? (
-          <div className="pr-empty">
-            <span className="pr-empty-icon" aria-hidden="true">
-              <CheckGlyph size={18} />
-            </span>
-            <div className="pr-empty-title">No hay pedidos pendientes</div>
-            <div className="pr-empty-sub">Claude no espera nada de vos. Los pedidos nuevos aparecen acá.</div>
-            <button type="button" className="btn primary" onClick={onClose}>
-              Volver a los espacios
+          {msgOpen && (
+            <label className="pr-msg">
+              <span>Decile a Claude qué hacer en cambio</span>
+              <textarea
+                ref={msgRef}
+                rows={2}
+                value={msg}
+                disabled={sending !== null}
+                placeholder="Ej.: usá la base de dev, no staging"
+                onChange={(e) => setMsg(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    const text = msg.trim()
+                    if (!text || !p) return
+                    void run('text', async () => {
+                      await rejectAndTell(p, text)
+                      setMsg('')
+                    })
+                  } else if (e.key === 'Escape') {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setMsgOpen(false)
+                  }
+                }}
+              />
+              <span className="pr-hint">Enter envía · Shift + Enter hace un salto de línea · Esc cierra</span>
+            </label>
+          )}
+
+          <div className="pr-actions">
+            <button
+              type="button"
+              className="btn primary"
+              data-perm-primary
+              disabled={sending !== null}
+              onClick={() => void run('allow', () => decidePermission(p, 'allow'))}
+            >
+              {sending === 'allow' ? 'Permitiendo…' : 'Permitir una vez'}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={sending !== null}
+              aria-describedby={`${titleId}-always`}
+              onClick={() => void run('always', () => decidePermission(p, 'allowAlways'))}
+            >
+              {alwaysLabel(kind)}
+            </button>
+            <span className="spacer" />
+            <button type="button" className="btn ghost danger" disabled={sending !== null} onClick={() => void run('deny', () => decidePermission(p, 'deny'))}>
+              {sending === 'deny' ? 'Rechazando…' : 'Rechazar'}
+            </button>
+            <button
+              type="button"
+              className="btn ghost"
+              aria-expanded={msgOpen}
+              disabled={sending !== null}
+              onClick={() => setMsgOpen((o) => !o)}
+            >
+              Rechazar y decirle algo a Claude
             </button>
           </div>
-        ) : (
-          <div className="pr-body">
-            <dl className="pr-meta">
-              <div>
-                <dt>Espacio</dt>
-                <dd>{ws?.name ?? 'Espacio borrado'}</dd>
-              </div>
-              <div>
-                <dt>Cuenta</dt>
-                <dd>{acc?.label ?? 'Cuenta borrada'}</dd>
-              </div>
-              <div>
-                <dt>Carpeta</dt>
-                <dd className="mono">{ws?.cwd ?? '—'}</dd>
-              </div>
-            </dl>
-
-            {kind === 'cmd' && <code className="pr-code mono">{cmd}</code>}
-            {kind === 'net' && <code className="pr-code mono">{domain || 'Sin dirección'}</code>}
-            {kind === 'edit' && (
-              <>
-                {files.length === 0 && changes.length === 0 && <p className="pr-note">El pedido no dice qué archivos toca.</p>}
-                {(files.length > 0 || changes.length > 0) && (
-                  <Changes changes={changes.length ? changes : files.map((f) => ({ path: f, add: 0, del: 0, isNew: false, lines: [] }))} />
-                )}
-              </>
-            )}
-            {kind === 'other' && otherJson && otherJson !== '{}' && <pre className="pr-code mono">{otherJson}</pre>}
-
-            <section className="pr-expl">
-              <h3 className="pr-expl-title">Qué va a hacer (lo cuenta Claude)</h3>
-              <p className="pr-expl-text">{explanation ?? 'Claude no dejó una explicación en este pedido.'}</p>
-            </section>
-
-            {p && (
-              <div className="pr-risk">
-                <span className="pr-risk-label">Riesgo</span>
-                <span className={`pr-risk-pill ${riskOf(kind, changes.length || files.length).cls}`}>
-                  {riskOf(kind, changes.length || files.length).label}
-                </span>
-              </div>
-            )}
-
-            {msgOpen && (
-              <label className="pr-msg">
-                <span>Decile a Claude qué hacer en cambio</span>
-                <textarea
-                  ref={msgRef}
-                  rows={2}
-                  value={msg}
-                  disabled={sending !== null}
-                  placeholder="Ej.: usá la base de dev, no staging"
-                  onChange={(e) => setMsg(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      const text = msg.trim()
-                      if (!text || !p) return
-                      void run('text', async () => {
-                        await rejectAndTell(p, text)
-                        setMsg('')
-                      })
-                    } else if (e.key === 'Escape') {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      setMsgOpen(false)
-                    }
-                  }}
-                />
-                <span className="pr-hint">Enter envía · Shift + Enter hace un salto de línea · Esc cierra</span>
-              </label>
-            )}
-
-            <div className="pr-actions">
-              <button
-                type="button"
-                className="btn primary"
-                data-perm-primary
-                disabled={sending !== null}
-                onClick={() => void run('allow', () => decidePermission(p, 'allow'))}
-              >
-                {sending === 'allow' ? 'Permitiendo…' : 'Permitir una vez'}
-              </button>
-              <button
-                type="button"
-                className="btn"
-                disabled={sending !== null}
-                title="Guarda una regla para este espacio: los pedidos iguales se aprueban solos"
-                onClick={() => void run('always', () => decidePermission(p, 'allowAlways'))}
-              >
-                {alwaysLabel(kind)}
-              </button>
-              <span className="spacer" />
-              <button type="button" className="btn ghost danger" disabled={sending !== null} onClick={() => void run('deny', () => decidePermission(p, 'deny'))}>
-                {sending === 'deny' ? 'Rechazando…' : 'Rechazar'}
-              </button>
-              <button
-                type="button"
-                className="btn ghost"
-                aria-expanded={msgOpen}
-                disabled={sending !== null}
-                onClick={() => setMsgOpen((o) => !o)}
-              >
-                Rechazar y decirle algo a Claude
-              </button>
-            </div>
-            {error && (
-              <p className="pr-error" role="alert">
-                No se pudo enviar la respuesta: {error}
-              </p>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+          <p id={`${titleId}-always`} className="pr-hint">
+            «{alwaysLabel(kind)}» crea una regla en este espacio: los pedidos iguales se aprueban solos. Se quita desde Decisiones.
+          </p>
+          {error && (
+            <p className="pr-error" role="alert">
+              No se pudo enviar la respuesta: {error}
+            </p>
+          )}
+        </div>
+      )}
+    </Modal>
   )
 }

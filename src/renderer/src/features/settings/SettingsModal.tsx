@@ -31,7 +31,8 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
   const flash = useCallback((text: string, err = false) => {
     setToast({ text, err })
     clearTimeout(timer.current)
-    timer.current = setTimeout(() => setToast(null), err ? 4000 : 2000)
+    // Un error no se va solo: quien miraba para otro lado se perdería qué falló.
+    if (!err) timer.current = setTimeout(() => setToast(null), 2000)
   }, [])
 
   const run: SaveFn = useCallback(
@@ -68,6 +69,13 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null
+    return () => {
+      if (opener?.isConnected) opener.focus()
+    }
+  }, [])
 
   // Foco al entrar: el título de la sección (sin recuadro de foco, y no el buscador ni «Volver»).
   useEffect(() => {
@@ -168,6 +176,11 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
               <path d="M5 12.5l4.5 4.5L19 7.5" />
             </svg>}
           {toast.text}
+          {toast.err && (
+            <button type="button" className="f-set-toast-x" aria-label="Cerrar aviso" onClick={() => setToast(null)}>
+              ×
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -198,14 +198,14 @@ function ListBody({ snap, onModal, ui }: { snap: ChatSnapshot; onModal(k: Modal)
     return (
       <div className="f-chat-block">
         <p>
-          El chat del equipo usa un Supabase propio del equipo. Cargá la URL y la clave pública en Configuración → Equipo y datos.
+          Para usar el chat, cargá la URL y la clave publicable del proyecto de Supabase de tu equipo en Configuración → Equipo y chat.
         </p>
         <button
           type="button"
           className="btn primary sm"
           onClick={() => {
             closeChat()
-            openSettings('datos')
+            openSettings('equipo')
           }}
         >
           Configurar
