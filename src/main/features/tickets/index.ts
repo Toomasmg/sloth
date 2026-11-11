@@ -7,10 +7,13 @@ import { accountStatus } from '../../accounts'
 import { baseEnv } from '../../ptys'
 import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, ticketId } from './acciones'
 import { resolveClaudeExe, runClaude } from './claude-run'
-import type { ConectorDef } from './conector'
+import type { ConectorDef, ConectorGh } from './conector'
 import { crearAlmacen, type Almacen, type FsTickets } from './almacen'
-import { CONECTOR_POR_DEFECTO, conectorPorId } from './conectores'
+import { CONECTOR_POR_DEFECTO, CONECTORES, conectorPorId } from './conectores'
 import { ASSIGNEE_MAX, assigneeValido, conConector, type TicketsState } from './estado'
+import { ghAccion, ghDetalle, ghLista, ghYo, repoValido, type GhRun } from './gh'
+import { GitError, run as correr } from '../git-run'
+import { githubRepoOf } from '../team-github'
 import {
   accionesSoportadas,
   buildAccionArgs,
@@ -24,6 +27,7 @@ import {
   estadosPorDefecto,
   HerramientaFaltaError,
   info,
+  leeDetalle,
   mismaHerramienta,
   parseAccion,
   parseClaudeOutput,
@@ -31,8 +35,9 @@ import {
 } from './motor'
 
 /**
- * Tickets del conector elegido (Gruv, por ahora). Los conectores son de claude.ai, así que todo se
- * pide a Claude headless (`claude -p`) con la cuenta que consultó la última vez:
+ * Tickets del conector elegido. Los de vía mcp son conectores de claude.ai, así que todo se pide a
+ * Claude headless (`claude -p`) con la cuenta que consultó la última vez; los de vía gh van directo
+ * con GitHub CLI y la sesión de la persona, sin Claude. En los dos casos:
  * - La lista se lee solo cuando el usuario toca «Actualizar» (solo lectura).
  * - El detalle de un ticket (criterios, comentarios, horas) se lee al abrirlo.
  * - Cada escritura (estado, tomar, soltar, comentar, tildar criterio, sumar horas) es UNA llamada
@@ -92,6 +97,7 @@ function snapshot(): TicketsSnapshot {
   const def = conectorPorId(id)
   return {
     conector: info(def, id),
+    conectores: CONECTORES.map((c) => ({ id: c.id, nombre: c.nombre, verificado: c.verificado, via: c.via })),
     tickets: def ? state.tickets : [],
     estados: def ? conCategoria(def, estados(def)) : [],
     me: state.me,
@@ -206,9 +212,58 @@ function cuenta(def: ConectorDef): Ejecucion {
   return ejecucion(def, id)
 }
 
+const ghRun: GhRun = async (args, input) => {
+  try {
+    return await correr('gh', args, { input, timeoutMs: 30_000 })
+  } catch (e) {
+    if (e instanceof GitError && e.motivo === 'falta') return { code: -1, stdout: '', stderr: '', missing: true }
+    if (e instanceof GitError && e.motivo === 'tiempo') return { code: -1, stdout: '', stderr: '', timedOut: true }
+    throw e
+  }
+}
+
+/** `dueño/repo` del remoto de la carpeta elegida en los ajustes o, si no hay, la del último espacio. */
+async function repoGh(): Promise<string> {
+  for (const p of [state.config.defaultRepo, lastRepo()]) {
+    const repo = p ? await githubRepoOf(p) : undefined
+    if (repo) return repoValido(repo)
+  }
+  throw new Error('Elegí la carpeta de un repo de GitHub en los ajustes de Tickets.')
+}
+
+async function refreshGh(def: ConectorGh): Promise<{ count: number }> {
+  const ac = new AbortController()
+  running = ac
+  ctx.emit('changed', snapshot())
+  const inicio = Date.now()
+  try {
+    const repo = await repoGh()
+    const me = await ghYo(ghRun)
+    const tickets = await ghLista(ghRun, def, repo)
+    // gh no se puede cortar a mitad de camino: si cancelaron, se descarta lo leído.
+    if (ac.signal.aborted) throw new Error('Consulta cancelada.')
+    state.tickets = tickets
+    delete state.estados
+    state.me = me
+    state.fetchedAt = Date.now()
+    delete state.fetchedBy
+    state.lastRun = { durationMs: Date.now() - inicio }
+    delete state.lastError
+    noDisponible = {}
+    return { count: tickets.length }
+  } catch (e) {
+    state.lastError = (e as Error).message
+    throw e
+  } finally {
+    running = null
+    changed()
+  }
+}
+
 async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: number }> {
   if (running) throw new Error('Ya hay una consulta en curso.')
   const def = activo()
+  if (def.via === 'gh') return refreshGh(def)
   const requested = typeof rawAccount === 'string' && rawAccount ? rawAccount : undefined
   const run = ejecucion(def, requested ?? state.config.queryAccountId ?? (await pickAccount()))
   const ac = new AbortController()
@@ -306,9 +361,14 @@ function ticketEnLista(def: ConectorDef, id: string): Ticket {
 /** Lectura del detalle al abrir un ticket (criterios con id, comentarios, horas cargadas). */
 async function detalle(rawId: unknown): Promise<Detalle> {
   const def = activo()
-  if (!def.herramientas.detalle.length) throw new Error(`${def.nombre} no tiene detalle de tickets en Sloth.`)
+  if (!leeDetalle(def)) throw new Error(`${def.nombre} no tiene detalle de tickets en Sloth.`)
   const id = ticketId(def, rawId)
   ticketEnLista(def, id)
+  if (def.via === 'gh') {
+    const d = await ghDetalle(ghRun, await repoGh(), id)
+    if (state.config.conectorId === def.id) detalles.set(id, d)
+    return d
+  }
   const c = cuenta(def)
   try {
     const d = await runClaude({
@@ -331,7 +391,7 @@ async function detalle(rawId: unknown): Promise<Detalle> {
 }
 
 /**
- * Valida una acción pedida con un clic y la hace con Claude: una llamada, una herramienta.
+ * Valida una acción pedida con un clic y la hace con Claude (una llamada, una herramienta) o con gh.
  * Devuelve el detalle actualizado (si estaba cargado) para que la UI reemplace lo optimista.
  */
 async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ detail: Detalle | null }> {
@@ -347,20 +407,25 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
   const input = entradaDeAccion(def, a, t, rawIn, { estados: estados(def), me: state.me, detalle: detalles.get(id) })
   if (!input) return { detail: detalles.get(id) ?? null }
 
-  const c = cuenta(def)
+  const c = def.via === 'mcp' ? cuenta(def) : undefined
   escribiendo.add(id)
   try {
-    const r = await runClaude({
-      exe: c.exe,
-      args: buildAccionArgs(def, state.config.model, a),
-      prompt: buildAccionPrompt(def, a, input),
-      cwd: c.cwd,
-      env: c.env,
-      quien: def.nombre,
-      timeoutMs: DETALLE_TIMEOUT_MS,
-      parse: (s) => parseAccion(def, s, a)
-    })
-    aplicarAccion(a, t, input, { me: state.me, detalle: detalles.get(id), minutosTotal: r.minutosTotal, fecha: new Date().toISOString() })
+    let minutosTotal: number | undefined
+    if (def.via === 'gh') await ghAccion(ghRun, await repoGh(), a, input, state.me)
+    else if (c) {
+      const r = await runClaude({
+        exe: c.exe,
+        args: buildAccionArgs(def, state.config.model, a),
+        prompt: buildAccionPrompt(def, a, input),
+        cwd: c.cwd,
+        env: c.env,
+        quien: def.nombre,
+        timeoutMs: DETALLE_TIMEOUT_MS,
+        parse: (s) => parseAccion(def, s, a)
+      })
+      minutosTotal = r.minutosTotal
+    }
+    aplicarAccion(a, t, input, { me: state.me, detalle: detalles.get(id), minutosTotal, fecha: new Date().toISOString() })
     ctx.log(`tickets(${def.id}): accion ${a} en ${id}: ok`)
     return { detail: detalles.get(id) ?? null }
   } catch (e) {
