@@ -68,7 +68,7 @@ export interface RunOptions<T> {
   prompt: string
   cwd: string
   env: Record<string, string>
-  /** A quién se le pregunta, para el mensaje de timeout («Gruv no respondió en…»). */
+  /** A quién se le pregunta, para el mensaje de timeout («{conector} no respondió en…»). */
   quien: string
   timeoutMs?: number
   signal?: AbortSignal

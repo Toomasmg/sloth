@@ -70,6 +70,8 @@ export interface TicketsConfig {
   model: Modelo
   /** Vacío = la persona dueña de la cuenta que consulta. */
   assigneeId: string
+  /** El id de persona que se tenía en cada conector que se dejó (id de conector → assigneeId), para recuperarlo al volver. */
+  assigneePrevios?: Record<string, string>
   defaultRepo?: string
   projectRepos: Record<string, string>
   confirmRefresh: boolean
@@ -136,7 +138,7 @@ export interface ConectorInfo {
   ejemploId: string
   /** Los del conector, incluidos los de categoría 'hecho'. */
   estados: Estado[]
-  /** Si los espacios de sus tickets arrancan con `/ticket <id>` (la skill es de Gruv). */
+  /** Si los espacios de sus tickets arrancan con `/ticket <id>` (la skill `/ticket` es propia de un solo conector: gruv). */
   comandoTicket: boolean
 }
 
@@ -168,8 +170,12 @@ export interface TicketsSnapshot {
   /** Acciones que esta cuenta no puede hacer, con el motivo. */
   noDisponible?: Partial<Record<Accion, string>>
   lastRepo?: string
+  /** Con gh, la carpeta de cada ticket (id → carpeta): el #12 de otro repo es otro ticket. */
+  carpetas?: Record<string, string>
   /** Conectores propios o del equipo que no se cargaron, y por qué. */
   avisosPropios?: string[]
+  /** El id del conector del equipo elegido que cambió en el repo y hay que volver a aceptar. */
+  pendienteAceptar?: string
 }
 
 /** La primera lista que tenga la clave gana; si ninguna la tiene, 'pendiente'. */

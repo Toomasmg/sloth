@@ -32,6 +32,13 @@ export interface Almacen {
   guardar(state: TicketsState): boolean
   /** Para mostrar: por qué esta sesión no guarda, si falló el último guardado o si se reemplazó tickets.json. */
   aviso(): string | undefined
+  /** Los repos de tickets.json, sin escribir ni migrar nada: para buscar conectores del equipo antes de cargar. */
+  configCruda(): ConfigCruda | undefined
+}
+
+export interface ConfigCruda {
+  defaultRepo?: string
+  projectRepos: Record<string, string>
 }
 
 const NO_SE_GUARDA = 'Lo que cambies en esta sesión no se guarda'
@@ -40,6 +47,17 @@ const AVISOS = {
   'version-futura': `El archivo tickets.json es de una versión más nueva de Sloth. ${NO_SE_GUARDA}, para no pisarlo: actualizá Sloth.`,
   'gruv-ilegible': `No pude leer gruv.json (puede estar abierto en otro programa). ${NO_SE_GUARDA}, para no perder los tickets de antes: cerrá Sloth y volvé a abrirlo.`,
   'sin-respaldo': `No pude apartar el tickets.json anterior antes de reemplazarlo. ${NO_SE_GUARDA}: cerrá Sloth y volvé a abrirlo.`
+}
+
+const esObjeto = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+
+function reposDe(json: unknown): ConfigCruda | undefined {
+  if (!esObjeto(json)) return undefined
+  const c = esObjeto(json.config) ? json.config : {}
+  const repos = esObjeto(c.projectRepos) ? c.projectRepos : {}
+  const out: ConfigCruda = { projectRepos: Object.fromEntries(Object.entries(repos).filter((e): e is [string, string] => typeof e[1] === 'string')) }
+  if (typeof c.defaultRepo === 'string' && c.defaultRepo) out.defaultRepo = c.defaultRepo
+  return out
 }
 
 const codigo = (e: unknown): unknown => (e && typeof e === 'object' && 'code' in e ? e.code : undefined)
@@ -112,6 +130,10 @@ export function crearAlmacen(o: OpcionesAlmacen): Almacen {
       }
       return escribir(state)
     },
-    aviso: () => [soloLectura, fallo, remigrado].filter(Boolean).join(' ') || undefined
+    aviso: () => [soloLectura, fallo, remigrado].filter(Boolean).join(' ') || undefined,
+    configCruda() {
+      const l = leer(archivo)
+      return l.kind === 'ok' ? reposDe(l.json) : undefined
+    }
   }
 }

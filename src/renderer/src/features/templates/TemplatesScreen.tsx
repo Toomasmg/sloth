@@ -579,7 +579,7 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
                       value={ed.name}
                       maxLength={80}
                       onChange={(e) => setField('name', e.target.value)}
-                      placeholder="Ej.: Ticket de Gruv"
+                      placeholder="Ej.: Ticket del tablero"
                       aria-invalid={Boolean(nameErr)}
                       aria-describedby={nameErr ? 'tp-name-err' : undefined}
                     />

@@ -241,3 +241,20 @@ test('si no se puede apartar tickets.json, no se guarda en toda la sesión', () 
     gruvIntacto(f, GRUV_V1)
   }
 })
+
+test('configCruda lee los repos de tickets.json sin escribir ni migrar', () => {
+  const texto = JSON.stringify({ version: 2, tickets: [], config: { conectorId: 'gruv', defaultRepo: 'C:/repo', projectRepos: { Web: 'C:/web', Malo: 7 } } })
+  const f = fsFalso({ [TICKETS]: { texto, mtimeMs: 1 }, [GRUV]: { texto: GRUV_V1, mtimeMs: 500 } })
+  assert.deepEqual(almacen(f).configCruda(), { defaultRepo: 'C:/repo', projectRepos: { Web: 'C:/web' } })
+  assert.deepEqual(f.ops, [])
+})
+
+test('configCruda sin tickets.json, dañado o raro da undefined', () => {
+  for (const inicial of [{}, { [TICKETS]: { texto: '{roto', mtimeMs: 1 } }, { [TICKETS]: { texto: '[1]', mtimeMs: 1 } }]) {
+    const f = fsFalso(inicial)
+    assert.equal(almacen(f).configCruda(), undefined)
+    assert.deepEqual(f.ops, [])
+  }
+  const f = fsFalso({ [TICKETS]: { texto: JSON.stringify({ version: 2, config: { defaultRepo: 3 } }), mtimeMs: 1 } })
+  assert.deepEqual(almacen(f).configCruda(), { projectRepos: {} })
+})
