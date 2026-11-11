@@ -8,8 +8,9 @@ import { baseEnv } from '../../ptys'
 import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, ticketId } from './acciones'
 import { resolveClaudeExe, runClaude } from './claude-run'
 import type { ConectorDef } from './conector'
-import { conectorPorId } from './conectores'
-import { ASSIGNEE_MAX, assigneeValido, conConector, parsearArchivo, resolverEstado, type Lectura, type TicketsState } from './estado'
+import { crearAlmacen, type Almacen, type FsTickets } from './almacen'
+import { CONECTOR_POR_DEFECTO, conectorPorId } from './conectores'
+import { ASSIGNEE_MAX, assigneeValido, conConector, type TicketsState } from './estado'
 import {
   accionesSoportadas,
   buildAccionArgs,
@@ -43,7 +44,7 @@ const DETALLE_TIMEOUT_MS = 90_000
 
 let ctx: FeatureContext
 let state: TicketsState
-let file = ''
+let almacen: Almacen
 let running: AbortController | null = null
 /** Detalle de la última lectura por ticket (criterios con id, comentarios, horas). Solo en memoria. */
 const detalles = new Map<string, Detalle>()
@@ -56,51 +57,31 @@ const carpeta = (): string => join(app.getPath('userData'), 'features')
 const noEsta = (id: string): string => `El conector «${id}» no está en esta versión de Sloth.`
 const sinConector = (def: ConectorDef): string => `Esta cuenta no tiene el conector de ${def.nombre}. Hacelo desde ${def.nombre}.`
 
-// ---------- archivo ----------
-function leer(f: string): Lectura {
-  if (!existsSync(f)) return { kind: 'falta' }
-  try {
-    return parsearArchivo(readFileSync(f, 'utf8'), statSync(f).mtimeMs)
-  } catch (e) {
-    ctx.log(`tickets: no pude leer ${f}: ${(e as Error).message}`)
-    return { kind: 'corrupto' }
-  }
+const fsReal: FsTickets = {
+  leer: (f) => readFileSync(f, 'utf8'),
+  mtimeMs: (f) => statSync(f).mtimeMs,
+  renombrar: (de, a) => renameSync(de, a),
+  escribir: (f, datos) => writeFileSync(f, datos, 'utf8'),
+  crearCarpeta: (d) => mkdirSync(d, { recursive: true })
 }
 
-/** tickets.json, o gruv.json migrado (gruv.json nunca se escribe). Uno ilegible se guarda aparte. */
-function cargar(): void {
-  const r = resolverEstado({ tickets: leer(file), gruv: leer(join(carpeta(), 'gruv.json')) }, conectorPorId, Date.now())
-  if (r.respaldar) {
-    const destino = `${file}.corrupt-${Date.now()}`
-    try {
-      renameSync(file, destino)
-      ctx.log(`tickets: tickets.json ${r.respaldar === 'corrupto' ? 'ilegible' : 'de una versión más nueva'}, quedó en ${destino}`)
-    } catch (e) {
-      ctx.log(`tickets: no pude respaldar tickets.json: ${(e as Error).message}`)
-    }
-  }
-  state = r.state
-  if (r.origen === 'gruv') ctx.log('tickets: estado migrado desde gruv.json')
-  if (r.guardar) save()
-}
+const save = (): void => void almacen.guardar(state)
 
-/** Si falla, el estado queda en memoria (y gruv.json se vuelve a migrar en el próximo arranque). */
-function save(): void {
-  try {
-    mkdirSync(carpeta(), { recursive: true })
-    const tmp = `${file}.tmp`
-    writeFileSync(tmp, JSON.stringify(state, null, 2), 'utf8')
-    renameSync(tmp, file)
-  } catch (e) {
-    ctx.log(`tickets: no pude guardar tickets.json: ${(e as Error).message}`)
-  }
-}
-
-// ---------- conector ----------
 function activo(): ConectorDef {
   const def = conectorPorId(state.config.conectorId)
   if (!def) throw new Error(noEsta(state.config.conectorId))
   return def
+}
+
+/** El conector por defecto, para volver a él si el elegido no está en esta versión. */
+function alternativa(): { id: string; nombre: string } | undefined {
+  const def = conectorPorId(CONECTOR_POR_DEFECTO)
+  return def && { id: def.id, nombre: def.nombre }
+}
+
+/** Para crear espacios (también desde Equipo, que es de Gruv): el activo o, si no está, el por defecto. */
+function paraEspacios(): ConectorDef {
+  return conectorPorId(state.config.conectorId) ?? conectorPorId(CONECTOR_POR_DEFECTO) ?? activo()
 }
 
 /** Columnas del flujo (si la última consulta no trajo, las del conector). */
@@ -117,11 +98,12 @@ function snapshot(): TicketsSnapshot {
     fetchedAt: state.fetchedAt,
     fetchedBy: state.fetchedBy,
     lastRun: state.lastRun,
-    lastError: def ? state.lastError : noEsta(id),
+    lastError: [def ? state.lastError : noEsta(id), almacen.aviso()].filter(Boolean).join(' ') || undefined,
     config: state.config,
     running: Boolean(running),
     noDisponible,
-    lastRepo: lastRepo()
+    lastRepo: lastRepo(),
+    porDefecto: def ? undefined : alternativa()
   }
 }
 
@@ -137,7 +119,6 @@ function dir(v: unknown, name: string): string | undefined {
   return s
 }
 
-// ---------- espacios ----------
 function lastRepo(): string | undefined {
   const ws = [...ctx.store.workspaces].sort((a, b) => b.createdAt - a.createdAt)
   return ws.find((w) => existsSync(w.repoPath))?.repoPath
@@ -165,13 +146,13 @@ async function pickAccount(): Promise<string> {
 
 /** ¿Hay una carpeta de repo para crear el espacio de este ticket? (sin crear nada). */
 function hasRepo(rawId: unknown): boolean {
-  const id = ticketId(activo(), rawId)
+  const id = ticketId(paraEspacios(), rawId)
   return Boolean(repoFor(state.tickets.find((t) => t.id === id)))
 }
 
 /** «Empezar en Sloth»: crea el espacio del ticket con `/ticket <id>`. */
 async function start(rawId: unknown, rawAccount?: unknown): Promise<{ id: string; created: boolean }> {
-  const id = ticketId(activo(), rawId)
+  const id = ticketId(paraEspacios(), rawId)
   const existing = ctx.store.workspaces.find((w) => w.ticket?.toUpperCase() === id)
   if (existing) {
     ctx.ui({ type: 'open-pane', id: existing.id })
@@ -198,7 +179,6 @@ async function start(rawId: unknown, rawAccount?: unknown): Promise<{ id: string
   return { id: ws.id, created: true }
 }
 
-// ---------- consultas ----------
 interface Ejecucion {
   accountId: string
   label: string
@@ -316,7 +296,6 @@ function setConfig(raw: unknown): TicketsSnapshot {
   return snapshot()
 }
 
-// ---------- detalle y escrituras (un clic = una llamada con una sola herramienta) ----------
 function ticketEnLista(def: ConectorDef, id: string): Ticket {
   const t = state.tickets.find((x) => x.id === id)
   if (!t) throw new Error(`Ese ticket ya no está en la lista. Actualizá ${def.nombre}.`)
@@ -398,8 +377,8 @@ const feature: Feature = {
   name: 'tickets',
   register(c) {
     ctx = c
-    file = join(carpeta(), 'tickets.json')
-    cargar()
+    almacen = crearAlmacen({ fs: fsReal, carpeta: carpeta(), buscar: conectorPorId, log: (m) => c.log(m), ahora: Date.now })
+    state = almacen.cargar()
     c.handle('state', () => snapshot())
     c.handle('refresh', (acc: unknown) => refresh(acc))
     c.handle('cancel', () => {

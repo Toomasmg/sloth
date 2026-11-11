@@ -108,6 +108,8 @@ export interface TicketsSnapshot {
   /** Acciones que esta cuenta no puede hacer, con el motivo. */
   noDisponible?: Partial<Record<Accion, string>>
   lastRepo?: string
+  /** Si el conector elegido no está en esta versión, al que se puede volver. */
+  porDefecto?: { id: string; nombre: string }
 }
 
 /** La primera lista que tenga la clave gana; si ninguna la tiene, 'pendiente'. */
