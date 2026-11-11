@@ -9,6 +9,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.5',
+    date: '2026-11-11',
+    title: 'Tickets de cualquier servicio, y fotos y archivos en la terminal',
+    items: [
+      'Tickets: además de Gruv, conectá GitHub Issues, Jira, Linear, Asana, Notion, ClickUp, monday.com, Azure DevOps, GitLab, Shortcut o YouTrack, y elegí conector, cuenta y modelo desde el tablero.',
+      'Pegá con Ctrl+V archivos copiados en el Explorador (un .zip, fotos, carpetas) o una captura de pantalla: se pegan sus rutas y Claude adjunta las imágenes. También podés arrastrarlos sobre la terminal.',
+      'Los recuadros de Claude se ven sin cortes: la altura de línea de la terminal vuelve a 1, como en Windows Terminal.',
+      'El cursor ya no salta por la pantalla mientras Claude escribe.',
+      'Dormir espacios inactivos (Configuración › General): libera memoria y los despertás con un clic, con la conversación como estaba.',
+      'Al cerrar con la X, Sloth pregunta si cerrar o seguir en la bandeja.',
+      'Los menús se despliegan hacia abajo desde su botón.'
+    ]
+  },
+  {
     version: '0.6.4',
     date: '2026-11-11',
     title: 'Un solo lugar para escribir',
