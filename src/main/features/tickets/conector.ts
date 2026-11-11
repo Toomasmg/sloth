@@ -87,7 +87,6 @@ const CLAVE_ESTADO_RE = /^[a-z0-9_]{1,40}$/
 const CLAVE_FALTA_RE = /^[a-z_]{3,40}$/
 const PREFIJO_RE = /^mcp__[A-Za-z0-9_-]+__$/
 const CORTO_RE = /^[A-Za-z0-9_-]{1,64}$/
-const COMPLETO_RE = /^mcp__[A-Za-z0-9_-]+__[A-Za-z0-9_-]+$/
 const ARG_RE = /^[a-z_][a-z0-9_]{0,40}$/
 const PLACEHOLDER_RE = /^\{([A-Za-z]+)\}$/
 // Lo que va dentro de un JSON de ejemplo del prompt: sin nada que lo pueda cerrar o escapar.
@@ -154,15 +153,11 @@ function sinRepetidos(xs: readonly string[], ruta: string): void {
   if (r !== undefined) fallar(ruta, `«${r}» está repetido`)
 }
 
-function herramienta(v: unknown, ruta: string, prefijo: string): string {
-  const corto = texto(v, ruta, 64, CORTO_RE)
-  const completo = prefijo + corto
-  if (completo.length > 128 || !COMPLETO_RE.test(completo)) fallar(ruta, 'el nombre completo es inválido')
-  return corto
-}
+// Con prefijo y nombre corto de hasta 64 cada uno, el nombre completo ya es válido y entra en 128.
+const herramienta = (v: unknown, ruta: string): string => texto(v, ruta, 64, CORTO_RE)
 
-function herramientas(v: unknown, ruta: string, prefijo: string, min: number, max: number): string[] {
-  const xs = lista(v, ruta, min, max).map((x, i) => herramienta(x, `${ruta}[${i}]`, prefijo))
+function herramientas(v: unknown, ruta: string, min: number, max: number): string[] {
+  const xs = lista(v, ruta, min, max).map((x, i) => herramienta(x, `${ruta}[${i}]`))
   sinRepetidos(xs, ruta)
   return xs
 }
@@ -240,12 +235,12 @@ function validar(raw: unknown): void {
 
   const H = `${R}.herramientas`
   const h = objeto(o.herramientas, H, ['prefijo', 'lista', 'detalle', 'escritura', 'negar'])
-  const prefijo = texto(h.prefijo, `${H}.prefijo`, 64, PREFIJO_RE)
-  const deLista = herramientas(h.lista, `${H}.lista`, prefijo, 1, 20)
-  const deDetalle = herramientas(h.detalle, `${H}.detalle`, prefijo, 0, 20)
-  const negar = herramientas(h.negar, `${H}.negar`, prefijo, 0, 100)
+  texto(h.prefijo, `${H}.prefijo`, 64, PREFIJO_RE)
+  const deLista = herramientas(h.lista, `${H}.lista`, 1, 20)
+  const deDetalle = herramientas(h.detalle, `${H}.detalle`, 0, 20)
+  const negar = herramientas(h.negar, `${H}.negar`, 0, 100)
   const escritura = objeto(h.escritura, `${H}.escritura`, [], ACCIONES)
-  const deEscritura = Object.entries(escritura).map(([a, t]) => herramienta(t, `${H}.escritura.${a}`, prefijo))
+  const deEscritura = Object.entries(escritura).map(([a, t]) => herramienta(t, `${H}.escritura.${a}`))
   const lectura = new Set([...deLista, ...deDetalle])
   const choca = [...negar, ...deEscritura].find((t) => lectura.has(t))
   if (choca) fallar(H, `«${choca}» no puede ser de lectura y estar negada o escribir`)
