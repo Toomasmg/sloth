@@ -49,7 +49,7 @@ export function resolveClaudeExe(env: NodeJS.ProcessEnv = process.env): string |
   return undefined
 }
 
-export function killTree(pid: number | undefined): void {
+function killTree(pid: number | undefined): void {
   if (!pid) return
   if (process.platform === 'win32') {
     execFile('taskkill', ['/pid', String(pid), '/T', '/F'], { windowsHide: true }, () => {})

@@ -128,7 +128,7 @@ function objeto(v: unknown, ruta: string, claves: readonly string[], opcionales:
   return v
 }
 
-function texto(v: unknown, ruta: string, max: number, forma?: RegExp): string {
+function campo(v: unknown, ruta: string, max: number, forma?: RegExp): string {
   if (typeof v !== 'string' || !v) fallar(ruta, 'tiene que ser un texto no vacío')
   // El largo antes que la forma: ninguna regex corre sobre textos enormes.
   if (v.length > max) fallar(ruta, `más de ${max} caracteres`)
@@ -154,7 +154,7 @@ function sinRepetidos(xs: readonly string[], ruta: string): void {
 }
 
 // Con prefijo y nombre corto de hasta 64 cada uno, el nombre completo ya es válido y entra en 128.
-const herramienta = (v: unknown, ruta: string): string => texto(v, ruta, 64, CORTO_RE)
+const herramienta = (v: unknown, ruta: string): string => campo(v, ruta, 64, CORTO_RE)
 
 function herramientas(v: unknown, ruta: string, min: number, max: number): string[] {
   const xs = lista(v, ruta, min, max).map((x, i) => herramienta(x, `${ruta}[${i}]`))
@@ -171,7 +171,7 @@ function args(v: unknown, ruta: string, permitidos: readonly string[]): void {
     if (!ARG_RE.test(k)) fallar(r, 'nombre de argumento inválido')
     const x = v[k]
     if (x === null || typeof x === 'number' || typeof x === 'boolean') continue
-    const s = texto(x, r, 200)
+    const s = campo(x, r, 200)
     if (!LLAVES.test(s)) continue
     const m = PLACEHOLDER_RE.exec(s)
     if (!m || !permitidos.includes(m[1])) fallar(r, `solo admite ${permitidos.map((p) => `{${p}}`).join(', ')} como valor completo`)
@@ -179,7 +179,7 @@ function args(v: unknown, ruta: string, permitidos: readonly string[]): void {
 }
 
 function soloTicket(v: unknown, ruta: string): void {
-  if (LLAVES.test(texto(v, ruta, PISTA_MAX).replaceAll('{ticket}', ''))) fallar(ruta, 'solo admite {ticket}')
+  if (LLAVES.test(campo(v, ruta, PISTA_MAX).replaceAll('{ticket}', ''))) fallar(ruta, 'solo admite {ticket}')
 }
 
 function compilar(idRegex: string): RegExp {
@@ -187,7 +187,7 @@ function compilar(idRegex: string): RegExp {
 }
 
 function idRegex(v: unknown, ruta: string): RegExp {
-  const s = texto(v, ruta, 200)
+  const s = campo(v, ruta, 200)
   const fin = /(\\*)\$$/.exec(s)
   if (!s.startsWith('^') || !fin || fin[1].length % 2) fallar(ruta, 'tiene que estar anclada con ^…$')
   if (/\)[*+?{]/.test(s)) fallar(ruta, 'no admite grupos cuantificados')
@@ -207,8 +207,8 @@ function validar(raw: unknown): void {
   if (!esPlano(raw)) fallar(R, 'tiene que ser un objeto')
   if (raw.via !== 'mcp') fallar(`${R}.via`, 'vía no soportada todavía')
   const o = objeto(raw, R, ['id', 'nombre', 'via', 'verificado', 'idRegex', 'idMayusculas', 'ejemplo', 'estados', 'faltaConector', 'herramientas', 'pistas'])
-  texto(o.id, `${R}.id`, 32, ID_CONECTOR_RE)
-  texto(o.nombre, `${R}.nombre`, 40, NOMBRE_RE)
+  campo(o.id, `${R}.id`, 32, ID_CONECTOR_RE)
+  campo(o.nombre, `${R}.nombre`, 40, NOMBRE_RE)
   booleano(o.verificado, `${R}.verificado`)
   const mayusculas = booleano(o.idMayusculas, `${R}.idMayusculas`)
   const re = idRegex(o.idRegex, `${R}.idRegex`)
@@ -216,26 +216,26 @@ function validar(raw: unknown): void {
   const claves = lista(o.estados, `${R}.estados`, 1, 30).map((x, i) => {
     const r = `${R}.estados[${i}]`
     const e = objeto(x, r, ['clave', 'nombre', 'categoria'])
-    texto(e.nombre, `${r}.nombre`, 40, SIN_ESCAPE)
+    campo(e.nombre, `${r}.nombre`, 40, SIN_ESCAPE)
     if (!en(CATEGORIAS, e.categoria)) fallar(`${r}.categoria`, `tiene que ser una de ${CATEGORIAS.join(', ')}`)
-    return texto(e.clave, `${r}.clave`, 40, CLAVE_ESTADO_RE)
+    return campo(e.clave, `${r}.clave`, 40, CLAVE_ESTADO_RE)
   })
   sinRepetidos(claves, `${R}.estados`)
   if ((o.estados as Estado[]).every((e) => e.categoria === 'hecho')) fallar(`${R}.estados`, "hace falta al menos uno que no sea 'hecho'")
 
   const ej = objeto(o.ejemplo, `${R}.ejemplo`, ['id', 'estado', 'prioridad', 'proyecto'])
-  for (const k of Object.keys(ej)) texto(ej[k], `${R}.ejemplo.${k}`, 60, SIN_ESCAPE)
+  for (const k of Object.keys(ej)) campo(ej[k], `${R}.ejemplo.${k}`, 60, SIN_ESCAPE)
   const ejId = ej.id as string
   if ((mayusculas && ejId !== ejId.toUpperCase()) || ejId.length > ID_MAX || !re.test(ejId)) fallar(`${R}.ejemplo.id`, 'no cumple idRegex')
   if (!claves.includes(ej.estado as string)) fallar(`${R}.ejemplo.estado`, 'no es la clave de ningún estado')
 
   const falta = objeto(o.faltaConector, `${R}.faltaConector`, ['clave', 'mensaje'])
-  texto(falta.clave, `${R}.faltaConector.clave`, 40, CLAVE_FALTA_RE)
-  texto(falta.mensaje, `${R}.faltaConector.mensaje`, 300)
+  campo(falta.clave, `${R}.faltaConector.clave`, 40, CLAVE_FALTA_RE)
+  campo(falta.mensaje, `${R}.faltaConector.mensaje`, 300)
 
   const H = `${R}.herramientas`
   const h = objeto(o.herramientas, H, ['prefijo', 'lista', 'detalle', 'escritura', 'negar'])
-  texto(h.prefijo, `${H}.prefijo`, 64, PREFIJO_RE)
+  campo(h.prefijo, `${H}.prefijo`, 64, PREFIJO_RE)
   const deLista = herramientas(h.lista, `${H}.lista`, 1, 20)
   const deDetalle = herramientas(h.detalle, `${H}.detalle`, 0, 20)
   const negar = herramientas(h.negar, `${H}.negar`, 0, 100)
@@ -249,11 +249,11 @@ function validar(raw: unknown): void {
   const P = `${R}.pistas`
   const p = objeto(o.pistas, P, ['yo', 'lista', 'detalle', 'acciones'], ['estados'])
   const yo = objeto(p.yo, `${P}.yo`, ['conId', 'sinId'])
-  const conId = texto(yo.conId, `${P}.yo.conId`, PISTA_MAX)
+  const conId = campo(yo.conId, `${P}.yo.conId`, PISTA_MAX)
   if (conId.split('{id}').length !== 2 || LLAVES.test(conId.replace('{id}', ''))) fallar(`${P}.yo.conId`, 'tiene que llevar {id} una sola vez y ninguna otra llave')
-  texto(yo.sinId, `${P}.yo.sinId`, PISTA_MAX)
-  texto(p.lista, `${P}.lista`, PISTA_MAX)
-  if ('estados' in p) texto(p.estados, `${P}.estados`, PISTA_MAX)
+  campo(yo.sinId, `${P}.yo.sinId`, PISTA_MAX)
+  campo(p.lista, `${P}.lista`, PISTA_MAX)
+  if ('estados' in p) campo(p.estados, `${P}.estados`, PISTA_MAX)
 
   const pasos = lista(p.detalle, `${P}.detalle`, 0, 20)
   if (!pasos.length !== !deDetalle.length) fallar(`${P}.detalle`, 'hay pasos de detalle sin herramientas de detalle o al revés')
