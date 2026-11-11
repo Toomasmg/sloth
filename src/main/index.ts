@@ -19,6 +19,7 @@ import { FEATURES } from './features'
 import { currentSettings, initialChrome } from './features/settings'
 import { validateWorkspacePatch } from './workspace-patch'
 import { loadWindowState, trackWindowState } from './window-state'
+import { zoomFor } from './zoom-keys'
 import type { FeatureContext } from './features/context'
 import type { UiCommand } from '../shared/features'
 import {
@@ -560,6 +561,14 @@ function createWindow(onShown?: () => void): void {
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', (e) => e.preventDefault())
+
+  win.webContents.on('before-input-event', (e, input) => {
+    const wc = win?.webContents
+    const next = wc ? zoomFor(input, wc.getZoomLevel()) : null
+    if (!wc || next === null) return
+    e.preventDefault()
+    wc.setZoomLevel(next)
+  })
 
   if (process.env.ELECTRON_RENDERER_URL) void win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else void win.loadURL('app://ui/index.html')

@@ -9,6 +9,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.6',
+    date: '2026-11-11',
+    title: 'Zoom con Ctrl y +',
+    items: [
+      'Ctrl y + vuelve a agrandar la ventana también con el teclado en español y con el numérico. Ctrl y - la achica y Ctrl y 0 la deja al 100 %.'
+    ]
+  },
+  {
     version: '0.6.5',
     date: '2026-11-11',
     title: 'Tickets de cualquier servicio, y fotos y archivos en la terminal',
