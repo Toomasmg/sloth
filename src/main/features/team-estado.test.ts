@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { avisoSoloLectura, cargarTeam, estadoTeamVacio } from './team-estado'
+import { adoptarLegado, avisoSoloLectura, cargarTeam, estadoTeamVacio, mappingDe } from './team-estado'
 
 const PR = {
   repo: 'org/app',
@@ -90,4 +90,32 @@ test('v1 con tickets o cuenta de Gruv: queda marcado que usaba Gruv, y la marca 
 test('avisoSoloLectura explica cada motivo', () => {
   for (const m of ['futuro', 'ilegible', 'sin-respaldo'] as const) assert.match(avisoSoloLectura(m), /no se guarda/i)
   assert.match(avisoSoloLectura('futuro'), /más nueva/)
+})
+
+test('mapeo por conector: se carga limpio y no se mezcla entre conectores', () => {
+  const r = cargarTeam(
+    JSON.stringify({ version: 2, mappings: { gruv: { ana: 'g:1', mala: 'x' }, gh: { ana: '-' }, '': { ana: 'g:2' }, roto: 4 } })
+  )
+  assert.ok(r.kind === 'ok' && !r.migrado)
+  assert.deepEqual(r.state.mappings, { gruv: { ana: 'g:1' }, gh: { ana: '-' } })
+  assert.deepEqual(mappingDe(r.state, 'gruv'), { ana: 'g:1' })
+  assert.deepEqual(mappingDe(r.state, 'otro'), {})
+})
+
+test('adoptarLegado: el mapeo viejo pasa al conector activo sin pisar lo que ya tenía', () => {
+  const s = estadoTeamVacio()
+  s.mapping = { ana: 'g:1', beto: 'g:2' }
+  s.mappings = { gruv: { beto: '-' } }
+  assert.equal(adoptarLegado(s, 'gruv'), true)
+  assert.deepEqual(s.mappings, { gruv: { ana: 'g:1', beto: '-' } })
+  assert.deepEqual(s.mapping, {})
+  assert.equal(adoptarLegado(s, 'gruv'), false)
+})
+
+test('adoptarLegado: sin conector activo o sin mapeo viejo no toca nada', () => {
+  const s = estadoTeamVacio()
+  s.mapping = { ana: 'g:1' }
+  assert.equal(adoptarLegado(s, null), false)
+  assert.deepEqual(s.mapping, { ana: 'g:1' })
+  assert.equal(adoptarLegado(estadoTeamVacio(), 'gh'), false)
 })
