@@ -224,12 +224,13 @@ export function idValido(def: ConectorDef, v: unknown): string | null {
   return s.length <= ID_MAX && ID_SEGURO_RE.test(s) && regexDeId(def).test(s) ? s : null
 }
 
-/** La skill `/ticket` que arranca un espacio solo entiende tickets de Gruv. */
+/** La skill `/ticket` es propia de un solo conector (gruv): solo ese arranca el espacio con ella. */
 export const usaComandoTicket = (def: ConectorDef): boolean => def.id === 'gruv'
 
 export const leeDetalle = (def: ConectorDef): boolean => def.via === 'gh' || def.herramientas.detalle.length > 0
 
-export function info(def: ConectorDef | undefined, idPedido: string): ConectorInfo {
+/** `soloLectura`: un incluido sin probar se puede leer pero no ofrece acciones. */
+export function info(def: ConectorDef | undefined, idPedido: string, soloLectura = false): ConectorInfo {
   if (!def)
     return { id: idPedido, nombre: idPedido === SIN_CONECTOR ? 'Sin conector' : idPedido, verificado: false, via: 'mcp', disponible: false, acciones: [], leeDetalle: false, ejemploId: '', estados: [], comandoTicket: false }
   return {
@@ -238,7 +239,7 @@ export function info(def: ConectorDef | undefined, idPedido: string): ConectorIn
     verificado: def.verificado,
     via: def.via,
     disponible: true,
-    acciones: accionesSoportadas(def),
+    acciones: soloLectura ? [] : accionesSoportadas(def),
     leeDetalle: leeDetalle(def),
     ejemploId: def.ejemplo.id,
     estados: def.estados.map((e) => ({ ...e })),
@@ -262,6 +263,9 @@ export function buildArgs(model: string, o: { allow: string[]; deny: string[]; s
     o.deny.join(','),
     '--no-session-persistence',
     // Si la cuenta tiene bypassPermissions o acceptEdits, un texto de un ticket podría usar herramientas sin preguntar.
+    // Las reglas permissions.allow del settings.json de la cuenta siguen sumándose a --allowedTools. No se cortan con
+    // --setting-sources project,local porque ese flag también esconde los MCP de alcance usuario (.claude.json), que
+    // es donde están los conectores que no son de claude.ai (Azure DevOps, propios sobre un MCP local).
     '--permission-mode',
     'default',
     // Sin hooks: los de Sloth esperan un espacio y el de permisos bloquearía la consulta.

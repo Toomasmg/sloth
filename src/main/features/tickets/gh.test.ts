@@ -161,7 +161,7 @@ test('el detalle y las escrituras van al repo de donde salió el issue', async (
 
 test('los errores de gh se explican', async () => {
   const casos: Array<[Partial<GhOut>, string]> = [
-    [{ missing: true, code: -1 }, 'No encontré GitHub CLI (gh). Instalalo y corré `gh auth login`.'],
+    [{ missing: true, code: -1 }, github.faltaConector.mensaje],
     [{ code: 1, stderr: 'To get started with GitHub CLI, please run:  gh auth login' }, 'gh no tiene sesión iniciada: corré `gh auth login`.'],
     [{ code: 4, stderr: 'HTTP 401: Bad credentials' }, 'gh no tiene sesión iniciada: corré `gh auth login`.'],
     [{ timedOut: true, code: -1 }, 'gh tardó demasiado.'],

@@ -5,6 +5,7 @@ import type { Accion } from '../../../shared/tickets'
 import { ACCIONES_GH, nombreCompleto, validarConector, type ConectorMcp } from './conector'
 import { CONECTORES } from './conectores'
 import github from './conectores/github'
+import asana from './conectores/asana'
 import gruv from './conectores/gruv'
 import {
   ACCION_SCHEMA,
@@ -269,4 +270,11 @@ test('permisosPorConsulta es exactamente lo que va a --allowedTools en cada cons
     assert.deepEqual(Object.keys(p.acciones), accionesSoportadas(def), def.id)
     for (const a of accionesSoportadas(def)) assert.deepEqual(permitidas(buildAccionArgs(def, 'haiku', a)), full(p.acciones[a]), `${def.id} ${a}`)
   }
+})
+
+test('un conector en solo lectura no ofrece acciones y sus escrituras siguen negadas', () => {
+  assert.ok(accionesSoportadas(asana).length > 0)
+  assert.deepEqual(info(asana, 'asana', true).acciones, [])
+  assert.deepEqual(info(asana, 'asana').acciones, accionesSoportadas(asana))
+  assert.ok(negadas(asana as ConectorMcp).includes(nombreCompleto(asana as ConectorMcp, 'add_comment')))
 })
