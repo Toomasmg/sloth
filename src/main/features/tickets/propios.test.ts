@@ -9,12 +9,12 @@ import linear from './conectores/linear'
 import {
   armarRegistro,
   EQUIPO_MAX,
-  esVerboEscritura,
   IMPORT_MAX_BYTES,
   jsonCanonico,
   parsearArchivoPropios,
   parsearConectoresEquipo,
   parsearImport,
+  pareceDeLectura,
   textoExport,
   validarPropio
 } from './propios'
@@ -52,9 +52,32 @@ test('los conectores propios de vía gh se rechazan', () => {
   rechazaEn({ ...github, id: 'mi-github' }, 'conector.via')
 })
 
-test('esVerboEscritura', () => {
-  for (const n of ['list_comments', 'get_issue', 'getJiraIssue', 'settings_get', 'login', 'setup']) assert.equal(esVerboEscritura(n), false, n)
-  for (const n of ['createJiraIssue', 'add_comment', 'editJiraIssue', 'transition_issue', 'delete', 'Update-item']) assert.equal(esVerboEscritura(n), true, n)
+test('pareceDeLectura: las de lectura de los incluidos pasan', () => {
+  for (const c of CONECTORES) {
+    if (c.via !== 'mcp' || c.id === 'jira' || c.id === 'azure-devops') continue
+    const h = c.herramientas
+    for (const n of [...h.lista, ...h.detalle, ...(h.apoyo ?? [])]) assert.equal(pareceDeLectura(n), true, `${c.id}: ${n}`)
+  }
+  for (const n of ['list_comments', 'get_issue', 'getJiraIssue', 'settings_get', 'atlassianUserInfo', 'notion-fetch', 'users-get-current', 'getJQLIssues']) assert.equal(pareceDeLectura(n), true, n)
+})
+
+test('pareceDeLectura: lo que escribe en cualquier parte del nombre, o no se reconoce como lectura, no pasa', () => {
+  const casos = [
+    'executeWrite', 'executeDestructive', 'executeRead', 'jira_create_issue', 'jira_delete_issue', 'push_files', 'run_workflow', 'fork_repository', 'bulkDelete', 'publishArtifact',
+    'createJiraIssue', 'add_comment', 'editJiraIssue', 'transition_issue', 'delete', 'Update-item', 'get_and_delete', 'confluence_update_page', 'issue_set_assignee', 'mergePullRequest', 'closeIssue', 'assign_issue',
+    'login', 'setup', 'createissue', 'do_things'
+  ]
+  for (const n of casos) assert.equal(pareceDeLectura(n), false, n)
+})
+
+test('revisarNoConfiable: en lista, detalle, apoyo y apoyoEn', () => {
+  rechazaEn(propio('mi-linear', { lista: ['get_user', 'executeWrite'] }), 'conector.herramientas.lista[1]')
+  const enDetalle = propio('mi-linear', { detalle: ['get_issue', 'jira_create_issue'] })
+  enDetalle.pistas = { ...enDetalle.pistas, detalle: [{ herramienta: 'jira_create_issue', args: { id: '{ticket}' } }] }
+  rechazaEn(enDetalle, 'conector.herramientas.detalle[1]')
+  const conApoyoEn = propio('mi-linear', { escritura: { comentar: 'save_comment' }, apoyo: ['get_issue'], apoyoEn: { comentar: ['search_issues', 'executeWrite'] } })
+  conApoyoEn.pistas = { ...conApoyoEn.pistas, apoyo: 'Usala si hace falta', acciones: { comentar: { args: { issueId: '{ticket}', body: '{cuerpo}' } } } }
+  rechazaEn(conApoyoEn, 'conector.herramientas.apoyoEn.comentar[1]')
 })
 
 test('armarRegistro: un id de incluido no entra y queda el aviso', () => {

@@ -1,7 +1,7 @@
 /**
  * Conectores que no vienen con Sloth: los que arma la persona y los que trae el .sloth/conectores.json de un
  * repo. Pasan por el mismo validador que los incluidos y además nunca son «verificados» ni pueden
- * leer con una herramienta que parezca de escritura.
+ * leer con una herramienta que no parezca de lectura.
  * Módulo puro y sin `node:*`: también lo importa la interfaz. El hash se inyecta desde main.
  */
 import type { OrigenConector } from '../../../shared/tickets'
@@ -34,19 +34,32 @@ const CLAVE_ACEPTADO_MAX = 1100
 const HASH_RE = /^[0-9a-f]{16}$/
 const PROHIBIDAS = ['__proto__', 'constructor', 'prototype']
 
-// Un nombre corto que empieza con alguno de estos (y sigue con _, -, mayúscula o nada) se trata como de escritura.
-const VERBOS = ['create', 'update', 'delete', 'remove', 'add', 'edit', 'set', 'move', 'transition', 'assign', 'unassign', 'save', 'post', 'put', 'patch', 'write', 'close', 'reopen', 'merge', 'upload', 'send', 'archive', 'complete', 'toggle', 'log', 'duplicate']
+// Heurística, no garantía: una herramienta de lectura tiene que tener alguna parte de LECTURA y
+// ninguna de ESCRITURA. Lo que no se reconoce como lectura se trata como escritura.
+const LECTURA = new Set(['get', 'list', 'search', 'find', 'fetch', 'read', 'query', 'lookup', 'view', 'show', 'describe', 'count', 'filter', 'info', 'whoami', 'retrieve', 'listar', 'ver', 'buscar', 'leer', 'obtener', 'consultar', 'traer', 'mostrar'])
+const ESCRITURA = new Set([
+  'create', 'update', 'delete', 'remove', 'add', 'edit', 'set', 'move', 'transition', 'assign', 'unassign', 'save', 'post', 'put', 'patch', 'write', 'close', 'reopen', 'merge', 'upload', 'send', 'archive', 'complete', 'toggle', 'log', 'duplicate',
+  'execute', 'exec', 'run', 'push', 'fork', 'bulk', 'publish', 'submit', 'import', 'invite', 'share', 'approve', 'reject', 'cancel', 'trigger', 'deploy', 'rollback', 'rename', 'insert', 'upsert', 'drop', 'batch', 'replace', 'dismiss',
+  'destroy', 'trash', 'purge', 'revoke', 'grant', 'restore', 'reset', 'clear', 'mark', 'modify', 'mutate', 'apply', 'sync', 'transfer', 'attach', 'detach', 'enable', 'disable', 'notify', 'subscribe', 'unsubscribe', 'vote', 'pin', 'unpin',
+  'crear', 'actualizar', 'borrar', 'eliminar', 'agregar', 'mover', 'asignar', 'cerrar', 'editar', 'guardar', 'enviar', 'comentar', 'cargar', 'tildar', 'tomar', 'soltar', 'cambiar', 'subir', 'publicar', 'ejecutar'
+])
 
-export function esVerboEscritura(corto: string): boolean {
-  const min = corto.toLowerCase()
-  return VERBOS.some((v) => {
-    if (!min.startsWith(v)) return false
-    const sig = corto.charAt(v.length)
-    return sig === '' || sig === '_' || sig === '-' || /[A-Z]/.test(sig)
-  })
+/** `getJiraIssue` → get, jira, issue; `jira_create_issue` → jira, create, issue. */
+export function partes(corto: string): string[] {
+  return corto
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/[\s_-]+/)
+    .filter(Boolean)
 }
 
-/** Copia con `verificado: false`. Tira si no es de vía mcp o si lee con algo que parece de escritura. */
+export function pareceDeLectura(corto: string): boolean {
+  const xs = partes(corto)
+  return xs.some((x) => LECTURA.has(x)) && !xs.some((x) => ESCRITURA.has(x))
+}
+
+/** Copia con `verificado: false`. Tira si no es de vía mcp o si lee con algo que no parece de lectura. */
 export function revisarNoConfiable(def: ConectorDef): ConectorDef {
   if (def.via !== 'mcp') throw new ConectorInvalidoError('conector.via', 'los conectores propios son de vía mcp')
   const h = def.herramientas
@@ -57,8 +70,8 @@ export function revisarNoConfiable(def: ConectorDef): ConectorDef {
     ...Object.entries(h.apoyoEn ?? {}).map(([a, xs]): [string, readonly string[]] => [`apoyoEn.${a}`, xs ?? []])
   ]
   for (const [g, xs] of grupos) {
-    const i = xs.findIndex(esVerboEscritura)
-    if (i >= 0) throw new ConectorInvalidoError(`conector.herramientas.${g}[${i}]`, `«${xs[i]}» parece de escritura: no puede ser de lectura`)
+    const i = xs.findIndex((x) => !pareceDeLectura(x))
+    if (i >= 0) throw new ConectorInvalidoError(`conector.herramientas.${g}[${i}]`, `«${xs[i]}» no parece de lectura: no puede leer`)
   }
   return { ...structuredClone(def), verificado: false }
 }

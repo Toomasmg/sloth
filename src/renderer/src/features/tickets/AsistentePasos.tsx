@@ -1,6 +1,6 @@
 import { ACCIONES, CATEGORIAS, type Accion, type Categoria } from '../../../../shared/tickets'
 import { PLACEHOLDERS } from '../../../../main/features/tickets/conector'
-import { esVerboEscritura } from '../../../../main/features/tickets/propios'
+import { pareceDeLectura } from '../../../../main/features/tickets/propios'
 import { ACCION_ETIQUETA, argsPorDefecto, FORMATOS, revisarId, type Borrador, type FormatoId, type Rol } from './borrador'
 import type { Cambiar } from './Asistente'
 
@@ -29,7 +29,7 @@ export function PasoHerramientas({ b, cambiar }: { b: Borrador; cambiar: Cambiar
         </thead>
         <tbody>
           {b.herramientas.map((h) => {
-            const escribe = esVerboEscritura(h.nombre)
+            const escribe = !pareceDeLectura(h.nombre)
             return (
               <tr key={h.nombre}>
                 <td>
@@ -38,7 +38,7 @@ export function PasoHerramientas({ b, cambiar }: { b: Borrador; cambiar: Cambiar
                 <td>
                   <select aria-label={`Para qué sirve ${h.nombre}`} value={h.rol} onChange={(e) => setRol(h.nombre, e.target.value as Rol)}>
                     {ROLES.map((r) => (
-                      <option key={r.rol} value={r.rol} disabled={escribe && r.lectura} title={escribe && r.lectura ? 'Parece de escritura' : undefined}>
+                      <option key={r.rol} value={r.rol} disabled={escribe && r.lectura} title={escribe && r.lectura ? 'No parece de lectura' : undefined}>
                         {r.etiqueta}
                       </option>
                     ))}
@@ -49,7 +49,7 @@ export function PasoHerramientas({ b, cambiar }: { b: Borrador; cambiar: Cambiar
           })}
         </tbody>
       </table>
-      <p className="f-tickets-ajustes-nota">Las que no marques quedan bloqueadas.</p>
+      <p className="f-tickets-ajustes-nota">Las que no marques ni elijas para una acción quedan bloqueadas. Solo se puede leer con las que parecen de lectura (es una heurística por el nombre).</p>
 
       {deDetalle.map((h) => (
         <label className="field" key={h.nombre}>
