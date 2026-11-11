@@ -1,3 +1,5 @@
+import { captureOpener } from '../../return-focus'
+import { FOCUSABLE, nextFocusIndex } from '../../focus-trap'
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { ArrowsClockwise, CheckCircle, CircleNotch, Key, Plus, SignIn, SignOut, WarningCircle, X } from '@phosphor-icons/react'
 import type { ChatConnection, ChatSnapshot, ChatTeam, ChatThread } from '../../../../shared/chat'
@@ -35,18 +37,13 @@ export function ChatDrawer(): React.JSX.Element {
   const snap = useChatSnapshot()
   const [modal, setModal] = useState<Modal>(null)
   const ref = useRef<HTMLDivElement>(null)
-  const prevFocus = useRef<HTMLElement | null>(null)
   const key = d.conv ? convKey(d.conv) : 'list'
 
   // Foco: entra al diálogo y, al cerrar, vuelve a donde estaba (el botón Chat).
   useLayoutEffect(() => {
-    const a = document.activeElement
-    prevFocus.current = a instanceof HTMLElement && a !== document.body ? a : null
+    const restore = captureOpener()
     ref.current?.focus()
-    return () => {
-      const el = prevFocus.current
-      if (el?.isConnected) el.focus()
-    }
+    return restore
   }, [])
 
   // Qué mira el usuario (para no leídos y avisos en main). Al cerrar: open false.
@@ -61,6 +58,15 @@ export function ChatDrawer(): React.JSX.Element {
   const close = (): void => setModal(null)
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
+    if (e.key === 'Tab' && !e.defaultPrevented && ref.current) {
+      const list = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0)
+      const i = nextFocusIndex(list.length, list.indexOf(document.activeElement as HTMLElement), e.shiftKey)
+      if (i >= 0) {
+        e.preventDefault()
+        list[i].focus()
+      }
+      return
+    }
     if (e.key !== 'Escape' || e.defaultPrevented) return
     e.stopPropagation()
     // Con un modal abierto, Escape cierra el modal; si no, cierra el drawer.
@@ -198,14 +204,14 @@ function ListBody({ snap, onModal, ui }: { snap: ChatSnapshot; onModal(k: Modal)
     return (
       <div className="f-chat-block">
         <p>
-          El chat del equipo usa un Supabase propio del equipo. Cargá la URL y la clave pública en Configuración → Equipo y datos.
+          Para usar el chat, cargá la URL y la clave publicable del proyecto de Supabase de tu equipo en Configuración → Equipo y chat.
         </p>
         <button
           type="button"
           className="btn primary sm"
           onClick={() => {
             closeChat()
-            openSettings('datos')
+            openSettings('equipo')
           }}
         >
           Configurar

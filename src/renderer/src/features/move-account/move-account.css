@@ -25,16 +25,26 @@ html[data-theme='light'] .f-move-backdrop {
 
 .f-move-head {
   display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.f-move-titles {
+  display: flex;
+  flex: 1;
+  min-width: 0;
   flex-direction: column;
 }
-.f-move-title {
+.f-move-head .icon-btn {
+  margin: -6px -8px 0 0;
+}
+.f-move-titles h2 {
   margin: 0;
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--fg);
 }
-.f-move-lead {
+.f-move-titles p {
   margin: 6px 0 0;
   font-size: 13px;
   color: var(--fg-2);

@@ -6,7 +6,7 @@ export function EmptyState({ onCreate }: { onCreate: () => void }): React.JSX.El
     <div className="sl-empty">
       <h2 className="sl-empty-title">No hay espacios abiertos</h2>
       <button type="button" className="sl-empty-btn" onClick={onCreate}>
-        Crear espacio
+        Nuevo espacio
       </button>
       <p className="sl-empty-hint">O elegí uno de la barra lateral.</p>
     </div>

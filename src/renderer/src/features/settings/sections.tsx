@@ -770,6 +770,8 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [testing, setTesting] = useState(false)
+  const [confirmDel, setConfirmDel] = useState(false)
+  const [tried, setTried] = useState(false)
   const [testRes, setTestRes] = useState<{ ok: boolean; text: string } | null>(null)
 
   /** Consulta real a Supabase con la configuración guardada (feat:chat:test, con 8 s de tope). */
@@ -825,6 +827,8 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
     e.preventDefault()
     const supabaseUrl = url.trim()
     const anonKey = key.trim()
+    setTried(true)
+    if (!supabaseUrl) return setMsg({ ok: false, text: 'Falta la URL del proyecto.' })
     if (!/^https:\/\//.test(supabaseUrl)) return setMsg({ ok: false, text: 'La URL tiene que empezar con https://.' })
     if (!anonKey) return setMsg({ ok: false, text: 'Falta la clave publicable.' })
     void act(async () => {
@@ -930,7 +934,7 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
       <form className="f-set-card f-set-form" onSubmit={saveCfg} noValidate>
         <label className="f-set-stack">
           <span className="f-set-hint">URL del proyecto de Supabase</span>
-          <input className="f-set-input mono" type="url" value={url} placeholder="https://xxxx.supabase.co" autoComplete="off" spellCheck={false} onChange={(e) => setUrl(e.target.value)} />
+          <input className="f-set-input mono" type="url" value={url} placeholder="https://xxxx.supabase.co" autoComplete="off" spellCheck={false} aria-invalid={tried && !url.trim()} onChange={(e) => setUrl(e.target.value)} />
         </label>
         <label className="f-set-stack">
           <span className="f-set-hint">Clave publicable (la que empieza con sb_publishable)</span>
@@ -942,6 +946,7 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
               placeholder={cfg?.active ? `Actual: ${cfg.active.keyPreview}` : 'sb_publishable_…'}
               autoComplete="off"
               spellCheck={false}
+              aria-invalid={tried && !key.trim() && !cfg?.active}
               onChange={(e) => setKey(e.target.value)}
             />
             <button type="button" className="btn sm" aria-pressed={showKey} onClick={() => setShowKey((v) => !v)}>
@@ -951,12 +956,31 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
         </label>
         <p className="f-set-note warn">Nunca pegues acá la clave service_role: Sloth la rechaza porque daría acceso total a la base.</p>
         <div className="f-set-actions">
-          {cfg?.active?.source === 'settings' && (
-            <button type="button" className="btn ghost sm" disabled={busy} onClick={() => void act(() => ui.invoke('feat:chat:setConfig', null), 'Configuración borrada.')}>
+          {cfg?.active?.source === 'settings' && !confirmDel && (
+            <button type="button" className="btn ghost sm" disabled={busy} onClick={() => setConfirmDel(true)}>
               Borrar configuración
             </button>
           )}
-          <button type="submit" className="btn primary sm" disabled={busy || !url.trim() || !key.trim()}>
+          {confirmDel && (
+            <span className="f-set-confirm" role="alertdialog" aria-labelledby="f-set-del-t">
+              <span id="f-set-del-t">¿Borrar la configuración del chat? Hay que volver a cargar la URL y la clave.</span>
+              <button type="button" className="btn ghost sm" data-autofocus onClick={() => setConfirmDel(false)}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn danger sm"
+                disabled={busy}
+                onClick={() => {
+                  setConfirmDel(false)
+                  void act(() => ui.invoke('feat:chat:setConfig', null), 'Configuración borrada.')
+                }}
+              >
+                Sí, borrar
+              </button>
+            </span>
+          )}
+          <button type="submit" className="btn primary sm" disabled={busy}>
             Guardar
           </button>
         </div>
@@ -994,7 +1018,7 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
       <Group id="g-tc" title="Plantillas del equipo">
         <ToggleLikeButton
           title="Importar o actualizar las plantillas del equipo"
-          hint="Las trae del archivo .sloth	eam.json del repo de tus espacios."
+          hint="Las trae del archivo .sloth/team.json del repo de tus espacios."
           onClick={goAfterClose(onClose, () => runFeatureCommand('team-config:import', ui))}
         />
         <ToggleLikeButton

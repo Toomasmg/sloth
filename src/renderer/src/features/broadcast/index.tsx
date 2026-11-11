@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { ModalLoading } from '../../Modal'
 import { useUi, type FeatureUi } from '../host'
 import { comboLabel, isCapturingShortcut, matchShortcut } from '../../shortcuts'
 import { releaseQueued } from './store'
@@ -73,7 +74,7 @@ function Global(): React.JSX.Element | null {
   return (
     <>
       {open && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<ModalLoading />}>
           <BroadcastDialog onClose={() => setOpen(false)} />
         </Suspense>
       )}

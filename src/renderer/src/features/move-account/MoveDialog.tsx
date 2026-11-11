@@ -3,6 +3,8 @@ import { loginPaneId, type Account } from '../../../../shared/types'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
 import { CheckIcon, PermissionIcon, TerminalIcon } from '../../icons/SlothIcons'
+import { Modal } from '../../Modal'
+import { openSettings } from '../settings/bus'
 import { closeMove, spacesTxt, type Phase, type MoveRes } from './state'
 
 export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
@@ -19,6 +21,7 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
   const [err, setErr] = useState<string | null>(null)
   /** Desmarcado por defecto: el resumen es opcional. */
   const [keep, setKeep] = useState(false)
+  const [edited, setEdited] = useState(false)
   /** Tras un fallo al copiar la conversación: se ofrece seguir sin ella. */
   const [copyFailed, setCopyFailed] = useState(false)
   const [resumed, setResumed] = useState(false)
@@ -60,18 +63,6 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
   // Foco inicial: la primera opción, o «Cancelar» si no hay ninguna.
   useEffect(() => {
     ;(firstRef.current ?? cancelRef.current)?.focus()
-  }, [])
-
-  // Escape cierra (salvo mientras se mueve). Captura: la terminal no se entera.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape') return
-      e.stopPropagation()
-      e.preventDefault()
-      if (!busyRef.current) closeMove()
-    }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
   }, [])
 
   if (!ws) return <></>
@@ -140,23 +131,18 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
   }
 
   return (
-    <div className="modal-backdrop f-move-backdrop" onMouseDown={() => !busyRef.current && closeMove()}>
-      <form
-        className="modal f-move-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="f-move-title"
-        aria-busy={phase === 'moving' || undefined}
-        onMouseDown={(e) => e.stopPropagation()}
-        onSubmit={(e) => void confirm(e)}
-      >
-        <div className="f-move-head">
-          <h2 id="f-move-title" className="f-move-title">
-            Mover espacio a otra cuenta
-          </h2>
-          <p className="f-move-lead">Vos elegís la cuenta. Sloth no cambia de cuenta sola ni detecta límites.</p>
-        </div>
-
+    <Modal
+      backdropClassName="modal-backdrop f-move-backdrop"
+      className="f-move-modal"
+      headClassName="f-move-head"
+      titlesClassName="f-move-titles"
+      title="Mover espacio a otra cuenta"
+      subtitle="Vos elegís la cuenta. Sloth no cambia de cuenta sola ni detecta límites."
+      dirty={phase === 'form' && keep && edited}
+      locked={phase === 'moving'}
+      onClose={closeMove}
+      onSubmit={(e) => void confirm(e)}
+    >
         <div className="f-move-space">
           <span className="f-move-space-icon" aria-hidden="true">
             <TerminalIcon size={18} strokeWidth={1.8} />
@@ -181,7 +167,19 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
                 Cuenta destino
               </h3>
               {accounts.length < 2 ? (
-                <p className="f-move-hint">Necesitás al menos otra cuenta. Creala desde la barra lateral.</p>
+                <p className="f-move-hint">
+                  Necesitás al menos otra cuenta. Agregala en Configuración → Cuentas.{' '}
+                  <button
+                    type="button"
+                    className="f-move-btn"
+                    onClick={() => {
+                      closeMove()
+                      openSettings('cuentas')
+                    }}
+                  >
+                    Ir a Configuración
+                  </button>
+                </p>
               ) : (
                 <div role="radiogroup" aria-labelledby="f-move-dest" className="f-move-list">
                   {rows.map((r, i) => {
@@ -256,7 +254,10 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
                     value={summary ?? ''}
                     disabled={summary === null}
                     placeholder={summary === null ? 'Preparando el resumen…' : ''}
-                    onChange={(e) => setSummary(e.target.value)}
+                    onChange={(e) => {
+                      setSummary(e.target.value)
+                      setEdited(true)
+                    }}
                   />
                 </label>
               )}
@@ -363,7 +364,6 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
             </div>
           </div>
         )}
-      </form>
-    </div>
+    </Modal>
   )
 }

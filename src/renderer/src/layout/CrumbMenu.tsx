@@ -118,8 +118,8 @@ export function CrumbMenu({
                   className={`pane-menu-item crumb-menu-item ${it.current ? 'current' : ''}`}
                   onClick={() => {
                     setOpen(false)
-                    it.onSelect()
                     btnRef.current?.focus()
+                    it.onSelect()
                   }}
                 >
                   {it.body}

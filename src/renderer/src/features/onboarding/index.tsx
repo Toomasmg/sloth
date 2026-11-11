@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { DoneIcon, ErrorIcon, ChangesIcon, ExportIcon, AccountIcon, AddAccountIcon, HelpIcon, IdleIcon, FolderIcon, TeamIcon, EditorIcon, CloseIcon, KeyboardIcon, PermissionIcon, NewSpaceIcon, UpdateIcon } from '../../icons/SlothIcons'
 import { loginPaneId, type AccountStatus, type Workspace } from '../../../../shared/types'
 import { useUi, type Command, type FeatureUi } from '../host'
+import { captureOpener } from '../../return-focus'
 import { LogoMark } from '../../Logo'
+import { FOCUSABLE, nextFocusIndex } from '../../focus-trap'
 import { useVisiblePolling } from '../../visibility'
 import { applyTeamSettings, cleanMsg, importTeam, repoName, scanTeams, settingsText, type ImportPlan, type TeamStatus } from '../team-config/store'
 import { onOpen, requestOpen } from './bus'
@@ -278,7 +280,7 @@ function RepoStep({ repo, setRepo }: { repo: string; setRepo: (p: string) => voi
     ui.invoke<{ list: string[] }>('feat:onboarding:suggestRepos').then((r) => {
       setList(r.list)
       if (!repo && r.list[0]) setRepo(r.list[0])
-    })
+    }, () => setList([]))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -404,14 +406,14 @@ function RepoStep({ repo, setRepo }: { repo: string; setRepo: (p: string) => voi
           )}
         </div>
       )}
-      {err && <p className="form-error f-onboarding-pre">{err}</p>}
+      {err && <p className="form-error f-onboarding-pre" role="alert">{err}</p>}
     </>
   )
 }
 
 // ---------- Paso 4: primer espacio y tour ----------
 
-function SpaceStep({ repo, statuses, onCreated }: { repo: string; statuses: Record<string, AccountStatus>; onCreated: (ws: Workspace) => void }): React.JSX.Element {
+function SpaceStep({ repo, statuses, onCreated, onGoAccounts }: { repo: string; statuses: Record<string, AccountStatus>; onCreated: (ws: Workspace) => void; onGoAccounts: () => void }): React.JSX.Element {
   const ui = useUi()
   const logged = ui.accounts.filter((a) => statuses[a.id]?.loggedIn)
   const [name, setName] = useState(repo ? repoName(repo) : '')
@@ -437,7 +439,17 @@ function SpaceStep({ repo, statuses, onCreated }: { repo: string; statuses: Reco
     }
   }
 
-  if (!ui.accounts.length) return <p className="f-onboarding-warn">Agregá una cuenta primero (paso 2) para poder crear un espacio.</p>
+  if (!ui.accounts.length)
+    return (
+      <>
+        <p className="f-onboarding-warn">Agregá una cuenta primero (paso 2) para poder crear un espacio.</p>
+        <div>
+          <button type="button" className="btn primary" onClick={onGoAccounts}>
+            Ir al paso 2
+          </button>
+        </div>
+      </>
+    )
   return (
     <>
       <div className="f-onboarding-grid2">
@@ -457,7 +469,7 @@ function SpaceStep({ repo, statuses, onCreated }: { repo: string; statuses: Reco
           </select>
         </div>
       </div>
-      {err && <p className="form-error">{err}</p>}
+      {err && <p className="form-error" role="alert">{err}</p>}
       <div>
         <button type="button" className="btn primary" disabled={!can || busy} onClick={() => void create()}>
           <NewSpaceIcon size={13} /> {busy ? 'Creando…' : 'Crear espacio'}
@@ -547,6 +559,18 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
     if (!docked) headRef.current?.focus()
   }, [step, tour, docked])
   useEffect(() => {
+    return captureOpener()
+  }, [])
+  const rootRef = useRef<HTMLDivElement>(null)
+  const trapTab = (e: React.KeyboardEvent<HTMLDivElement>): void => {
+    if (e.key !== 'Tab' || e.defaultPrevented || !rootRef.current) return
+    const list = [...rootRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0)
+    const i = nextFocusIndex(list.length, list.indexOf(document.activeElement as HTMLElement), e.shiftKey)
+    if (i < 0) return
+    e.preventDefault()
+    list[i].focus()
+  }
+  useEffect(() => {
     const on = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape' || docked || document.querySelector('.modal-backdrop')) return
       onClose(false)
@@ -573,6 +597,7 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
           <Tour created={created} accounts={ui.accounts} repo={repo} />
         ) : (
           <SpaceStep
+            onGoAccounts={() => setStep(1)}
             repo={repo}
             statuses={statuses}
             onCreated={(ws) => {
@@ -597,12 +622,12 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
         </button>
       ) : last ? (
         <button type="button" className="btn ghost" onClick={() => setTour(true)}>
-          {ui.workspaces.length ? 'Ver los tips' : 'Saltar paso'}
+          {ui.workspaces.length ? 'Ver los tips' : 'Saltar'}
         </button>
       ) : (
         <>
           <button type="button" className="btn ghost" onClick={() => setStep(step + 1)}>
-            Saltear por ahora
+            Saltar
           </button>
           <button type="button" className="btn primary" onClick={() => setStep(step + 1)}>
             Siguiente
@@ -613,7 +638,7 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
   )
 
   return (
-    <div className="f-onboarding" role="dialog" aria-modal="true" aria-labelledby="f-ob-title">
+    <div ref={rootRef} className="f-onboarding" role="dialog" aria-modal="true" aria-labelledby="f-ob-title" onKeyDown={trapTab}>
       <div className="f-onboarding-card">
         <div className="f-onboarding-hero">
           <img className="f-onboarding-hero-img" src={heroUrl} alt="" aria-hidden="true" draggable={false} />
@@ -630,11 +655,11 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
               </span>
               <div className="f-onboarding-progress" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} aria-label={progressLabel}>
                 {STEPS.map((s, i) => (
-                  <span key={s.title} className={tour || doneFlags[i] ? 'on' : ''} />
+                  <span key={s.title} className={tour || i <= step ? 'on' : ''} />
                 ))}
               </div>
             </div>
-            <button type="button" className="icon-btn" onClick={() => onClose(false)} aria-label="Cerrar el asistente (seguís después desde Ctrl+K)" title="Cerrar (Esc)">
+            <button type="button" className="icon-btn" onClick={() => onClose(false)} aria-label="Cerrar el asistente (seguís después desde Ctrl+K)" title="Cerrar (se vuelve a abrir desde Ctrl+K)">
               <CloseIcon size={16} />
             </button>
           </div>
@@ -659,7 +684,7 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
                     <span className={`f-onboarding-n${done ? ' ok' : cur ? ' on' : ''}`} aria-hidden="true">
                       {done ? <DoneIcon size={12} /> : i + 1}
                     </span>
-                    <span className="item-title">{s.title}</span>
+                    <span className="item-title" title={s.title}>{s.title}</span>
                   </button>
                 </li>
               )
@@ -682,7 +707,7 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
               <kbd>Ctrl K</kbd> buscar cualquier cosa · <kbd>Ctrl ,</kbd> configuración · <kbd>?</kbd> atajos
             </p>
             <button type="button" className="f-onboarding-skip" onClick={() => finish(true)}>
-              Saltar asistente
+              No mostrar más el asistente
             </button>
           </div>
         </section>

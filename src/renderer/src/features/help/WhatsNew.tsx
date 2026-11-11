@@ -12,7 +12,6 @@ export function WhatsNewModal({
 }): React.JSX.Element {
   return (
     <Dialog
-      labelId="f-help-whatsnew-title"
       title="Novedades"
       icon={<UpdateIcon size={18} />}
       onClose={onClose}

@@ -27,6 +27,7 @@ import { openPermissionReview } from './features/permissions/store'
 import { PaletteBar, PALETTE_REMOVE_EVENT, PALETTE_RENAME_EVENT, runFeatureCommand } from './features/palette'
 import { TerminalView } from './TerminalView'
 import { NewWorkspaceDialog } from './NewWorkspaceDialog'
+import { ConfirmDialog, type ConfirmRequest } from './ConfirmDialog'
 import { EmptyState } from './EmptyState'
 import { StateIcon, StatePill } from './StateIcon'
 import { PermissionCard, toolLabel } from './PermissionCard'
@@ -175,6 +176,8 @@ export function App(): React.JSX.Element {
   const [focused, setFocused] = useState<string | null>(null)
   const [maximized, setMaximized] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [confirmReq, setConfirmReq] = useState<ConfirmRequest | null>(null)
+  const askConfirm = (o: Omit<ConfirmRequest, 'resolve'>): Promise<boolean> => new Promise((resolve) => setConfirmReq({ ...o, resolve }))
   const [newWsMode, setNewWsMode] = useState<null | 'normal' | 'ticket'>(null)
   const [newWsPreset, setNewWsPreset] = useState<NewWorkspacePreset | undefined>(undefined)
   const [loaded, setLoaded] = useState(false)
@@ -377,7 +380,7 @@ export function App(): React.JSX.Element {
     if (await allowPaneAction(id, 'hide')) closePane(id)
   }
   const requestClosePane = async (id: string): Promise<void> => {
-    if (agents[id]?.state === 'working' && !window.confirm('Claude está trabajando en este panel. ¿Cerrarlo y cortar la terminal?')) return
+    if (agents[id]?.state === 'working' && !(await askConfirm({ title: '¿Cerrar el panel?', body: 'Claude está trabajando en este panel. Si lo cerrás, se corta la terminal y lo que está haciendo.', yes: 'Cerrar panel', no: 'Seguir trabajando' }))) return
     if (!(await allowPaneAction(id, 'hide'))) return
     closePane(id)
     try {
@@ -392,7 +395,9 @@ export function App(): React.JSX.Element {
 
 
   const removeAccount = async (acc: Account): Promise<void> => {
-    if (!window.confirm(`¿Quitar la cuenta «${acc.label}» de Sloth?`)) return
+    const n = workspaces.filter((w) => w.accountId === acc.id).length
+    const body = n === 0 ? 'Se saca de Sloth. Podés volver a agregarla cuando quieras.' : `Sus ${n === 1 ? '1 espacio queda' : `${n} espacios quedan`} sin cuenta: podés moverlos a otra cuenta o quitarlos.`
+    if (!(await askConfirm({ title: `¿Quitar la cuenta «${acc.label}»?`, body, yes: 'Quitar cuenta' }))) return
     try {
       await api.removeAccount(acc.id)
       setAccounts((a) => a.filter((x) => x.id !== acc.id))
@@ -413,11 +418,16 @@ export function App(): React.JSX.Element {
   }
 
   const removeWorkspace = async (ws: Workspace): Promise<void> => {
-    const extra = ws.branch ? `\n\nEl worktree en ${ws.cwd} queda en disco.` : ''
-    if (!window.confirm(`¿Quitar el espacio «${ws.name}»? Se cierra su terminal.${extra}`)) return
-    await api.removeWorkspace(ws.id)
-    setWorkspaces((w) => w.filter((x) => x.id !== ws.id))
-    setOpenPanesState((p) => p.filter((x) => x !== ws.id))
+    const files = ws.branch ? `El worktree en ${ws.cwd} queda en disco.` : 'Los archivos de la carpeta no se tocan.'
+    const working = agents[ws.id]?.state === 'working' ? ' Claude está trabajando ahí: se corta lo que hace.' : ''
+    if (!(await askConfirm({ title: `¿Quitar el espacio «${ws.name}»?`, body: `Se cierra su terminal. ${files}${working}`, yes: 'Quitar espacio' }))) return
+    try {
+      await api.removeWorkspace(ws.id)
+      setWorkspaces((w) => w.filter((x) => x.id !== ws.id))
+      setOpenPanesState((p) => p.filter((x) => x !== ws.id))
+    } catch (e) {
+      setError(cleanError(e))
+    }
   }
 
   // v0.5 · espacios: cambios por IPC (validados en main), abrir en VS Code / carpeta, soltar carpeta.
@@ -1046,7 +1056,7 @@ export function App(): React.JSX.Element {
                   {open && (
                     <div id={bodyId} className="sl-acc-body">
                       {shown.length > 0 && <ul className="sl-list">{shown.map(renderWs)}</ul>}
-                      {shown.length === 0 && <p className="sl-acc-empty">{mine.length ? 'Ningún espacio coincide.' : 'Sin espacios. Usá + para crear uno.'}</p>}
+                      {shown.length === 0 && <p className="sl-acc-empty">{mine.length ? 'Ningún espacio coincide.' : 'Sin espacios. Usá el botón + de esta cuenta para crear uno.'}</p>}
                     </div>
                   )}
                 </section>
@@ -1063,7 +1073,7 @@ export function App(): React.JSX.Element {
             <ToolsSection ctx={uiCtx} />
 
             <div className="sl-foot">
-              <button type="button" className="sl-newbtn" disabled={accounts.length === 0} onClick={() => setNewWsMode('normal')}>
+              <button type="button" className="sl-newbtn" onClick={() => (accounts.length ? setNewWsMode('normal') : openSettings('cuentas'))} title={accounts.length ? undefined : 'Primero agregá una cuenta de Claude'}>
                 <Plus size={15} weight="bold" aria-hidden="true" />
                 Nuevo espacio
                 <kbd>{comboLabel('new')}</kbd>
@@ -1129,12 +1139,11 @@ export function App(): React.JSX.Element {
                     <button
                       type="button"
                       className="sl-bcast"
-                      disabled={workspaces.length === 0}
-                      onClick={() => runFeatureCommand('broadcast:open', uiCtx)}
-                      title="Mandar un mensaje a los espacios con terminal"
+                      onClick={() => (workspaces.length ? runFeatureCommand('broadcast:open', uiCtx) : setError('Abrí un espacio con la terminal para mandarle un mensaje.'))}
+                      title="Mandar un mensaje a varios espacios con terminal"
                     >
                       <BroadcastIcon size={14} aria-hidden="true" />
-                      Enviar a todos
+                      Enviar a varios
                     </button>
                   </div>
                 </div>
@@ -1247,7 +1256,6 @@ export function App(): React.JSX.Element {
                     label: 'Cerrar panel',
                     hint: 'corta la terminal',
                     icon: <CloseIcon size={15} aria-hidden="true" />,
-                    danger: true,
                     onSelect: () => void requestClosePane(paneId)
                   }
                 ]
@@ -1440,6 +1448,16 @@ export function App(): React.JSX.Element {
               setIconPick(null)
               requestAnimationFrame(back)
               void patchWorkspace(ws, { icon })
+            }}
+          />
+        )}
+
+        {confirmReq && (
+          <ConfirmDialog
+            req={confirmReq}
+            onDone={(ok) => {
+              confirmReq.resolve(ok)
+              setConfirmReq(null)
             }}
           />
         )}

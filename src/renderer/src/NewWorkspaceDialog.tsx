@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Account, AccountStatus, AccountUsage, NewWorkspaceInput, Workspace } from '../../shared/types'
 import { api } from './api'
+import { Modal } from './Modal'
 import { cleanError, emptyTotals, totalTok } from './format'
 import type { NewWorkspacePreset } from './features/host'
 import { useUi } from './features/host'
@@ -78,6 +79,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
 
   const [ticket, setTicket] = useState('')
   const [carpeta, setCarpeta] = useState(props.preset?.repoPath ?? (ticketMode ? props.defaultRepo : ''))
+  const initialCarpeta = useRef(carpeta)
   const [nameRaw, setNameRaw] = useState(props.preset?.name ?? '')
   const [nameTouched, setNameTouched] = useState(Boolean(props.preset?.name))
   const [accountId, setAccountId] = useState(() => (props.preset?.accountId && accounts.some((a) => a.id === props.preset?.accountId) ? props.preset.accountId : suggested))
@@ -260,15 +262,6 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
     }
   }
 
-  // Escape cierra; Enter (en los campos) crea.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   const pick = async (): Promise<void> => {
     const p = await api.pickFolder()
     if (!p) return
@@ -333,6 +326,12 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
     )
   }
 
+  const dirty =
+    (carpetaTrim !== '' && carpeta !== initialCarpeta.current) ||
+    (nameTouched && nameRaw.trim() !== (props.preset?.name ?? '').trim()) ||
+    ticket.trim() !== '' ||
+    (msgEdit ?? '').trim() !== ''
+
   const previewBranch = wtOn ? branchResolved || 'rama nueva' : cur ? (cur.isGit ? (cur.branch ?? 'sin rama') : 'sin Git') : 'sin carpeta'
   const previewName = name.trim() || 'Sin nombre'
   const previewIni = (name.trim().charAt(0) || '?').toUpperCase()
@@ -340,24 +339,27 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
   const accStatus = acc ? statuses[acc.id] : undefined
 
   return (
-    <div className="nw-backdrop" onMouseDown={onClose}>
-      <form
-        className="nw-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="nw-title"
-        noValidate
-        onMouseDown={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
-          e.preventDefault()
-          void submit()
-        }}
-      >
-        <div className="nw-head">
-          <h2 id="nw-title">{ticketMode ? 'Espacio desde ticket' : 'Nuevo espacio'}</h2>
-          <p>{ticketMode ? (tk?.conector.comandoTicket ? 'Arranca Claude con /ticket. Tu skill se encarga del worktree, el PR y las horas.' : 'Crea un espacio con el id del ticket en el nombre.') : 'Una carpeta, una cuenta de Claude y su propia terminal.'}</p>
-        </div>
-
+    <Modal
+      bare
+      backdropClassName="nw-backdrop"
+      className="nw-sheet"
+      headClassName="nw-head"
+      titlesClassName="nw-titles"
+      title={ticketMode ? 'Espacio desde ticket' : 'Nuevo espacio'}
+      subtitle={ticketMode ? (tk?.conector.comandoTicket ? 'Arranca Claude con /ticket. Tu skill se encarga del worktree, el PR y las horas.' : 'Crea un espacio con el id del ticket en el nombre.') : 'Una carpeta, una cuenta de Claude y su propia terminal.'}
+      dirty={dirty}
+      locked={busy}
+      onClose={onClose}
+      onEscape={() => {
+        if (!pickerOpen) return false
+        setPickerOpen(false)
+        return true
+      }}
+      onSubmit={(e) => {
+        e.preventDefault()
+        void submit()
+      }}
+    >
         <div className="nw-body">
           <div className="nw-main">
             {ticketMode && (
@@ -717,7 +719,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
         </div>
 
         <footer className="nw-foot">
-          <span className="nw-keys">Enter crea · Esc cancela</span>
+          <span className="nw-keys">Enter crea · Esc cierra</span>
           <span className="nw-grow" />
           <button type="button" className="nw-btn" onClick={onClose}>
             Cancelar
@@ -726,7 +728,6 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
             {busy ? 'Creando…' : 'Crear espacio'}
           </button>
         </footer>
-      </form>
-    </div>
+    </Modal>
   )
 }

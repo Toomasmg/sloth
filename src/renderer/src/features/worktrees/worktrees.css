@@ -511,8 +511,12 @@
   max-height: calc(100vh - 24px);
   overflow-y: auto;
   box-sizing: border-box;
-  padding: 20px;
+  padding: 0 20px 20px;
   border-radius: 14px;
+}
+.modal.f-wt-dialog .modal-head {
+  margin: 0 -20px var(--s-1);
+  padding: 0 12px 0 20px;
 }
 .modal.f-wt-dialog.wide {
   width: min(560px, calc(100vw - 32px));
@@ -521,11 +525,6 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-}
-.f-wt-dialog h2 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
 }
 .f-wt-lead {
   margin: 0;

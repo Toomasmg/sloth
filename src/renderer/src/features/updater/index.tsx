@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
+import { ModalLoading } from '../../Modal'
 import type { FeatureUi } from '../host'
 import { useUi } from '../host'
 import { UpdateIcon } from '../../icons/SlothIcons'
-import { onOpenAbout, onUpdateToast, openAbout } from './bus'
+import { onOpenAbout, onUpdateToast, openAbout, showUpdateToast } from './bus'
 import { setPhase, usePhase } from './phase'
 import { useUpdateDot, useUpdateStatus } from './useUpdateStatus'
 import './updater.css'
@@ -42,7 +43,7 @@ function UpdateBanner(): React.JSX.Element | null {
           <button type="button" className="btn primary sm" onClick={() => setPhase('notes')}>
             Ver novedades
           </button>
-          <button type="button" className="btn ghost sm" onClick={() => void ui.invoke('feat:updater:later').catch(() => {})}>
+          <button type="button" className="btn ghost sm" onClick={() => void ui.invoke('feat:updater:later').catch(() => showUpdateToast('No se pudo dejar el aviso para más tarde'))}>
             Más tarde
           </button>
         </>
@@ -92,12 +93,12 @@ function Global(): React.JSX.Element {
   return (
     <>
       {phase && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<ModalLoading />}>
           <UpdateDialogs />
         </Suspense>
       )}
       {open && (
-        <Suspense fallback={null}>
+        <Suspense fallback={<ModalLoading />}>
           <AboutModal onClose={() => setOpen(false)} />
         </Suspense>
       )}
