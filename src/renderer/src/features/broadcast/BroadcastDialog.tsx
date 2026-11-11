@@ -3,9 +3,10 @@ import { isLoginPane } from '../../../../shared/types'
 import { useUi, type UiCtx } from '../host'
 import { resolveAccountColor } from '../settings/store'
 import { shortPath } from '../../format'
-import { CloseIcon, DoneIcon, WaitingIcon, PermissionIcon, IdleIcon, WorkingIcon, TerminalIcon } from '../../icons/SlothIcons'
+import { DoneIcon, WaitingIcon, PermissionIcon, IdleIcon, WorkingIcon, TerminalIcon } from '../../icons/SlothIcons'
 import { cancelQueued, startBatch, useBatches, type Batch } from './store'
 import { canReceive, isReady, SPACE_CHIP, SPACE_LABEL, spaceStatus, type SpaceStatus } from './state'
+import { Modal } from '../../Modal'
 import { colorHex } from '../templates/catalog'
 
 const CONFIRM_OVER = 3
@@ -230,46 +231,31 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
     : 'Enviar'
 
   return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <form
-        className="modal f-broadcast-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="f-broadcast-title"
-        onMouseDown={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
+    <Modal
+      className="f-broadcast-modal"
+      headClassName="f-broadcast-head"
+      titlesClassName="f-broadcast-titles"
+      icon={
+        <span className="f-broadcast-badge" aria-hidden="true">
+          <PaperPlane size={18} />
+        </span>
+      }
+      title="Enviar a varios espacios"
+      subtitle={batch ? 'Sloth lo manda espacio por espacio.' : 'El mismo mensaje llega a cada Claude que elijas, cada uno en su propia terminal.'}
+      dirty={!batch && trimmed !== ''}
+      onClose={onClose}
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (batch) return
+        send()
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !batch) {
           e.preventDefault()
-          if (batch) return
           send()
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.preventDefault()
-            e.stopPropagation()
-            onClose()
-          } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !batch) {
-            e.preventDefault()
-            send()
-          }
-        }}
-      >
-        <header className="f-broadcast-head">
-          <span className="f-broadcast-badge" aria-hidden="true">
-            <PaperPlane size={18} />
-          </span>
-          <div className="f-broadcast-titles">
-            <h2 id="f-broadcast-title">Enviar a varios espacios</h2>
-            <p>
-              {batch
-                ? 'Sloth lo manda espacio por espacio.'
-                : 'El mismo mensaje llega a cada Claude que elijas, cada uno en su propia terminal.'}
-            </p>
-          </div>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Cerrar">
-            <CloseIcon size={16} />
-          </button>
-        </header>
-
+        }
+      }}
+    >
         {batch ? (
           <Progress batch={batch} onAgain={newSend} onClose={onClose} />
         ) : (
@@ -508,8 +494,7 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
             )}
           </>
         )}
-      </form>
-    </div>
+    </Modal>
   )
 }
 

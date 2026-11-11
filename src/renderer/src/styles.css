@@ -1467,3 +1467,27 @@ html[data-lite='true'] .spin {
   background: transparent !important;
   box-shadow: none !important;
 }
+
+.modal-titles {
+  flex: 1;
+  min-width: 0;
+}
+.modal-titles h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+.modal-titles p {
+  margin: 4px 0 0;
+  color: var(--fg-2);
+}
+.modal-confirm {
+  position: absolute;
+  width: min(380px, calc(100vw - 32px));
+  padding: var(--s-5);
+}
+.modal-confirm-title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
