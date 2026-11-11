@@ -31,6 +31,7 @@ import {
   claveAceptado,
   EQUIPO_ARCHIVO,
   EQUIPO_MAX_BYTES,
+  estaAceptado,
   IMPORT_MAX_BYTES,
   parsearArchivoPropios,
   parsearConectoresEquipo,
@@ -121,9 +122,17 @@ const registrado = (id: string): ConectorRegistrado | undefined => registro.find
 /** Un incluido que nadie probó todavía contra el sistema real: se lee, pero no se escribe. */
 const sinProbar = (r?: ConectorRegistrado): boolean => r?.origen.tipo === 'incluido' && !r.def.verificado
 
-function aceptado(r: ConectorRegistrado): boolean {
-  if (r.origen.tipo !== 'equipo') return true
-  return archivoPropios.aceptados[claveAceptado(repoKey(r.origen.repo), r.def.id)] === r.hash
+const aceptado = (r: ConectorRegistrado): boolean => estaAceptado(r, archivoPropios.aceptados, repoKey)
+
+/** El del equipo elegido que cambió en el repo desde que se aceptó: hay que volver a aceptarlo. */
+function cambiado(id: string): ConectorRegistrado | undefined {
+  const r = registrado(id)
+  return r?.origen.tipo === 'equipo' && !aceptado(r) ? r : undefined
+}
+
+const noDisponibleConector = (id: string): string => {
+  const r = cambiado(id)
+  return r ? `El conector «${r.def.nombre}» del equipo cambió en el repo: revisalo y aceptalo de nuevo en los ajustes de Tickets.` : noEsta(id)
 }
 
 /** Un conector del equipo sin aceptar (o que cambió desde que se aceptó) no está disponible. */
@@ -212,7 +221,7 @@ function guardarArchivo(a: ArchivoPropios): void {
 function activo(): ConectorDef {
   if (state.config.conectorId === SIN_CONECTOR) throw new Error('Todavía no elegiste un conector. Elegilo en los ajustes de Tickets.')
   const def = buscar(state.config.conectorId)
-  if (!def) throw new Error(noEsta(state.config.conectorId))
+  if (!def) throw new Error(noDisponibleConector(state.config.conectorId))
   return def
 }
 
@@ -238,7 +247,8 @@ function snapshot(): TicketsSnapshot {
     fetchedAt: state.fetchedAt,
     fetchedBy: state.fetchedBy,
     lastRun: state.lastRun,
-    lastError: def ? state.lastError : id === SIN_CONECTOR ? undefined : `${noEsta(id)} Elegí otro en los ajustes.`,
+    lastError: def ? state.lastError : id === SIN_CONECTOR ? undefined : cambiado(id) ? noDisponibleConector(id) : `${noEsta(id)} Elegí otro en los ajustes.`,
+    pendienteAceptar: def ? undefined : cambiado(id)?.def.id,
     aviso: almacen.aviso(),
     config: state.config,
     running: Boolean(running),

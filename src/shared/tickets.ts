@@ -172,6 +172,8 @@ export interface TicketsSnapshot {
   lastRepo?: string
   /** Conectores propios o del equipo que no se cargaron, y por qué. */
   avisosPropios?: string[]
+  /** El id del conector del equipo elegido que cambió en el repo y hay que volver a aceptar. */
+  pendienteAceptar?: string
 }
 
 /** La primera lista que tenga la clave gana; si ninguna la tiene, 'pendiente'. */
