@@ -4,16 +4,16 @@
  * Si Gruv no quedó registrado, importar esto no tira: falla recién al usarlo, con un mensaje claro.
  * Lo carga `node --test` con type stripping: sin enums, namespaces ni parameter properties.
  */
-import type { ConectorDef } from './conector'
+import type { ConectorMcp } from './conector'
 import { conectorPorId } from './conectores'
 import { ConectorFaltaError, negadas } from './motor'
 
 export { extractJson, normEstado } from './motor'
 export { resolveClaudeExe } from './claude-run'
 
-function gruv(): ConectorDef {
+function gruv(): ConectorMcp {
   const def = conectorPorId('gruv')
-  if (!def) throw new Error('El conector de Gruv no está en esta versión de Sloth: Equipo no puede consultar tickets.')
+  if (def?.via !== 'mcp') throw new Error('El conector de Gruv no está en esta versión de Sloth: Equipo no puede consultar tickets.')
   return def
 }
 

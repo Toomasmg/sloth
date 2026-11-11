@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import type { Detalle, Ticket } from '../../../shared/tickets'
 import { aplicarAccion, entradaDeAccion, esAccion, esMio, MAX_HORAS, texto, textoObligatorio, ticketId, type Contexto } from './acciones'
 import { validarConector } from './conector'
+import github from './conectores/github'
 import gruv from './conectores/gruv'
 import { estadosPorDefecto } from './motor'
 
@@ -101,4 +102,14 @@ test('aplicarAccion sin detalle cargado no rompe', () => {
   const t = libre()
   for (const a of ['comentar', 'criterio', 'horas'] as const) aplicarAccion(a, t, { ticket: 'TCK-1', cuerpo: 'x', criterioId: CRIT, minutos: 5 }, { fecha: '' })
   assert.deepEqual(t, libre())
+})
+
+test('con gh, cerrar es un estado válido; con Gruv, cerrado sigue fuera del tablero', () => {
+  const GH = validarConector(github)
+  const issue: Ticket = { id: '42', titulo: 'Uno', estado: 'abierto' }
+  const c = ctx({ estados: estadosPorDefecto(GH) })
+  assert.deepEqual(entradaDeAccion(GH, 'estado', issue, { estado: 'cerrado' }, c), { ticket: '42', estado: 'cerrado' })
+  assert.equal(entradaDeAccion(GH, 'estado', issue, { estado: 'abierto' }, c), null)
+  falla(() => entradaDeAccion(GH, 'estado', issue, { estado: 'en_curso' }, c), 'Ese estado no está en el flujo de GitHub Issues.')
+  falla(() => entradaDeAccion(GRUV, 'estado', libre(), { estado: 'cerrado' }, ctx()), 'Ese estado no está en el flujo de Gruv.')
 })

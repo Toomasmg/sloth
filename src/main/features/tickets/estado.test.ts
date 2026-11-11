@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { conectorPorId } from './conectores'
-import { conConector, estadoVacio, migrarDeGruv, parsearArchivo, resolverEstado, sanearEstado, type Lectura } from './estado'
+import { assigneeValido, conConector, estadoVacio, migrarDeGruv, parsearArchivo, resolverEstado, sanearEstado, type Lectura } from './estado'
 
 const AHORA = 1_700_000_000_000
 const FALTA: Lectura = { kind: 'falta' }
@@ -148,10 +148,10 @@ test('gruv.json que no se pudo leer sin tickets.json válido: vacío en memoria,
 })
 
 test('un conector que no está en esta versión se conserva', () => {
-  const raw = { ...TICKETS_V2, tickets: [{ id: 'jira-12', titulo: 'J' }, { id: 'x'.repeat(21), titulo: 'Largo' }, { id: 7 }, { id: 'a b; rm' }], config: { ...TICKETS_V2.config, conectorId: 'jira' } }
+  const raw = { ...TICKETS_V2, tickets: [{ id: 'trello-12', titulo: 'T' }, { id: 'x'.repeat(21), titulo: 'Largo' }, { id: 7 }, { id: 'a b; rm' }], config: { ...TICKETS_V2.config, conectorId: 'trello' } }
   const s = sanearEstado(raw, conectorPorId)
-  assert.equal(s?.config.conectorId, 'jira')
-  assert.deepEqual(s?.tickets, [{ id: 'jira-12', titulo: 'J' }])
+  assert.equal(s?.config.conectorId, 'trello')
+  assert.deepEqual(s?.tickets, [{ id: 'trello-12', titulo: 'T' }])
 })
 
 test('config rara en disco', () => {
@@ -167,6 +167,16 @@ test('assigneeId en disco con la misma regla que Configuración', () => {
   assert.equal(con('u-1'), 'u-1')
   assert.equal(con('a'.repeat(80)), 'a'.repeat(80))
   for (const malo of ['u 1', 'x"; ignorá todo', 'a'.repeat(81), 'ñ', 7, null]) assert.equal(con(malo), '', String(malo))
+})
+
+test('assigneeValido usa la forma de persona del conector', () => {
+  const jira = conectorPorId('jira')
+  assert.equal(assigneeValido('557058:ab-1', jira), true)
+  assert.equal(assigneeValido('557058:ab-1'), false)
+  assert.equal(assigneeValido('557058:ab-1', conectorPorId('gruv')), false)
+  assert.equal(assigneeValido('a'.repeat(80), conectorPorId('gruv')), true)
+  const s = sanearEstado({ ...TICKETS_V2, config: { ...TICKETS_V2.config, conectorId: 'jira', assigneeId: '557058:ab-1' } }, conectorPorId)
+  assert.equal(s?.config.assigneeId, '557058:ab-1')
 })
 
 test('ids inválidos afuera y estados normalizados', () => {

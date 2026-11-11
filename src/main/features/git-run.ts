@@ -56,7 +56,7 @@ export function run(cmd: 'git' | 'gh', args: string[], opts: RunOpts = {}): Prom
       if (done) return
       done = true
       child.kill()
-      reject(new GitError(`${cmd} tardó demasiado y se canceló (${Math.round((opts.timeoutMs ?? 30000) / 1000)} s).`))
+      reject(new GitError(`${cmd} tardó demasiado y se canceló (${Math.round((opts.timeoutMs ?? 30000) / 1000)} s).`, 'tiempo'))
     }, opts.timeoutMs ?? 30000)
     child.stdout.on('data', (b: Buffer) => {
       if (outLen >= maxBytes) return
@@ -70,7 +70,7 @@ export function run(cmd: 'git' | 'gh', args: string[], opts: RunOpts = {}): Prom
       if (done) return
       done = true
       clearTimeout(timer)
-      if (e.code === 'ENOENT') reject(new GitError(`No encontré «${cmd}» en el PATH.`))
+      if (e.code === 'ENOENT') reject(new GitError(`No encontré «${cmd}» en el PATH.`, 'falta'))
       else reject(e)
     })
     child.on('close', (code) => {
@@ -85,7 +85,14 @@ export function run(cmd: 'git' | 'gh', args: string[], opts: RunOpts = {}): Prom
   })
 }
 
-export class GitError extends Error {}
+export class GitError extends Error {
+  /** Para quien tenga que distinguir «no está instalado» o «se pasó de tiempo» de un error de git/gh. */
+  motivo?: 'falta' | 'tiempo'
+  constructor(mensaje: string, motivo?: 'falta' | 'tiempo') {
+    super(mensaje)
+    this.motivo = motivo
+  }
+}
 
 /** Mensaje legible a partir del stderr de git/gh. */
 export function readable(r: RunResult, what: string): string {

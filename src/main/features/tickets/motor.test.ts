@@ -2,7 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import type { Accion } from '../../../shared/tickets'
-import { nombreCompleto, validarConector, type ConectorDef } from './conector'
+import { ACCIONES_GH, nombreCompleto, validarConector, type ConectorMcp } from './conector'
+import github from './conectores/github'
 import gruv from './conectores/gruv'
 import {
   ACCION_SCHEMA,
@@ -57,7 +58,7 @@ interface Golden {
 }
 
 const golden = JSON.parse(readFileSync(new URL('./__golden__/gruv-0.6.4.json', import.meta.url), 'utf8')) as Golden
-const GRUV = validarConector(gruv)
+const GRUV = validarConector(gruv) as ConectorMcp
 
 /** La versión vieja pedía `horas` en minutos; ahora se llama `minutos`. */
 function entrada(viejo: unknown): AccionInput {
@@ -171,8 +172,10 @@ test('idValido exige caracteres seguros aunque la regex del conector acepte cual
 test('info de un conector que existe y de uno que no', () => {
   const i = info(GRUV, 'gruv')
   assert.equal(i.disponible, true)
+  assert.equal(i.via, 'mcp')
   assert.equal(i.leeDetalle, true)
   assert.equal(i.ejemploId, 'TCK-1234')
+  assert.equal(i.comandoTicket, true)
   assert.deepEqual(i.acciones, ['estado', 'tomar', 'soltar', 'comentar', 'criterio', 'horas'])
   assert.equal(i.estados.length, 8)
   assert.notEqual(i.estados[0], GRUV.estados[0])
@@ -180,18 +183,34 @@ test('info de un conector que existe y de uno que no', () => {
     id: 'jira',
     nombre: 'jira',
     verificado: false,
+    via: 'mcp',
     disponible: false,
     acciones: [],
     leeDetalle: false,
     ejemploId: '',
-    estados: []
+    estados: [],
+    comandoTicket: false
   })
 })
 
-function variante(cambiar: (d: ConectorDef) => void): ConectorDef {
+test('info de GitHub: vía gh, con detalle y las acciones de gh', () => {
+  const def = validarConector(github)
+  const i = info(def, 'github')
+  assert.equal(i.via, 'gh')
+  assert.equal(i.leeDetalle, true)
+  assert.equal(i.comandoTicket, false)
+  assert.deepEqual(i.acciones, ACCIONES_GH)
+  assert.deepEqual(accionesSoportadas(def), ACCIONES_GH)
+  assert.deepEqual(mismaHerramienta(def, 'tomar'), ['tomar'])
+  assert.deepEqual(clavesOcultas(def), ['cerrado'])
+  assert.equal(idValido(def, ' 42 '), '42')
+  for (const malo of ['0', '-1', '1;x', '12345678']) assert.equal(idValido(def, malo), null)
+})
+
+function variante(cambiar: (d: ConectorMcp) => void): ConectorMcp {
   const d = structuredClone(GRUV)
   cambiar(d)
-  return validarConector(d)
+  return validarConector(d) as ConectorMcp
 }
 
 test('sin pistas.estados no hay paso 3 ni "estados" en el ejemplo', () => {
