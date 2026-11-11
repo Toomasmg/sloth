@@ -48,7 +48,7 @@ async function desdeBoton(page: Page, nombre: string): Promise<Locator> {
 
 const dialogo = (nombre: string | RegExp) => (page: Page): Locator => page.getByRole('dialog', { name: nombre })
 const botonCerrar = (page: Page): Locator => page.getByRole('dialog').getByRole('button', { name: /^Cerrar/ }).first()
-const volver = (page: Page): Locator => page.getByRole('dialog').getByRole('button', { name: '‹ Espacios' })
+const volver = (page: Page): Locator => page.getByRole('dialog').getByRole('button', { name: 'Volver a los espacios' })
 const pagina = (page: Page): Locator => page.locator('.page-shell')
 
 const PANTALLAS: Pantalla[] = [
@@ -158,7 +158,7 @@ test('Reportar: con texto escrito, Esc y «‹ Espacios» preguntan antes de des
   await expect(page.getByRole('button', { name: 'Seguir editando' })).toBeFocused()
   await page.getByRole('button', { name: 'Seguir editando' }).click()
   await expect(alerta).toBeHidden()
-  await page.getByRole('button', { name: '‹ Espacios' }).click()
+  await page.getByRole('button', { name: 'Volver a los espacios' }).click()
   await expect(alerta).toBeVisible()
   await page.getByRole('button', { name: 'Descartar', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Reportar un problema' })).toBeHidden()
