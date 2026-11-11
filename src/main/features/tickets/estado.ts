@@ -150,10 +150,12 @@ export function conConector(s: TicketsState, conectorId: string): TicketsState {
 
 export function resolverEstado(e: { tickets: Lectura; gruv: Lectura }, buscar: Buscar, ahora: number): ResultadoCarga {
   const { tickets, gruv } = e
+  // Quien tiene gruv.json (aunque esté dañado o no se pueda leer) ya usaba Gruv: no queda sin conector.
+  const vacioSegunGruv = (): TicketsState => estadoVacio(gruv.kind === 'falta' ? SIN_CONECTOR : CONECTOR_LEGADO)
   const migrar = (): TicketsState | null => (gruv.kind === 'ok' ? migrarDeGruv(gruv.json, buscar, ahora, gruv.mtimeMs) : null)
   const enMemoria = (soloLectura: NonNullable<ResultadoCarga['soloLectura']>): ResultadoCarga => {
     const m = migrar()
-    return { state: m ?? estadoVacio(), origen: m ? 'gruv' : 'vacio', respaldar: null, guardar: false, soloLectura }
+    return { state: m ?? vacioSegunGruv(), origen: m ? 'gruv' : 'vacio', respaldar: null, guardar: false, soloLectura }
   }
 
   if (tickets.kind === 'error') return enMemoria('ilegible')
@@ -175,5 +177,5 @@ export function resolverEstado(e: { tickets: Lectura; gruv: Lectura }, buscar: B
   if (gruv.kind === 'error') return enMemoria('gruv-ilegible')
   const m = migrar()
   if (m) return { state: m, origen: 'gruv', respaldar, guardar: true, soloLectura: null }
-  return { state: estadoVacio(), origen: 'vacio', respaldar, guardar: false, soloLectura: null }
+  return { state: vacioSegunGruv(), origen: 'vacio', respaldar, guardar: false, soloLectura: null }
 }

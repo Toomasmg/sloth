@@ -27,5 +27,11 @@ test('una carpeta que no se puede leer se saltea', () => {
   const hijos = (): string[] => {
     throw new Error('EACCES')
   }
-  assert.deepEqual(repoCandidates('C:\no\existe', [], () => true, hijos), [])
+  assert.deepEqual(repoCandidates('C:\\no\\existe', [], () => true, hijos), [])
+})
+
+test('busca repos en las rutas comunes de Windows con barras bien escapadas', () => {
+  const vistos: string[] = []
+  repoCandidates(String.raw`C:\Users\x`, [], () => false, (p) => (vistos.push(p), []))
+  for (const p of [String.raw`C:\dev\work`, String.raw`C:\dev`, String.raw`D:\dev\work`]) assert.ok(vistos.includes(p), p)
 })

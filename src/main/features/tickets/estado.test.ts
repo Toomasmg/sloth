@@ -119,7 +119,7 @@ test('tickets.json corrupto: se respalda y se migra gruv.json', () => {
 
 test('ambos corruptos: respaldo y vacío', () => {
   const r = resolverEstado({ tickets: CORRUPTO, gruv: CORRUPTO }, conectorPorId, AHORA)
-  assert.deepEqual(r, { state: estadoVacio(), origen: 'vacio', respaldar: 'corrupto', guardar: false, soloLectura: null })
+  assert.deepEqual(r, { state: estadoVacio('gruv'), origen: 'vacio', respaldar: 'corrupto', guardar: false, soloLectura: null })
 })
 
 test('versión futura: no se toca y se trabaja en memoria', () => {
@@ -143,7 +143,7 @@ test('tickets.json que no se pudo leer: no es corrupto, se trabaja en memoria', 
 test('gruv.json que no se pudo leer sin tickets.json válido: vacío en memoria, la migración queda pendiente', () => {
   for (const tickets of [FALTA, CORRUPTO, ok({ version: 1 })]) {
     const r = resolverEstado({ tickets, gruv: { kind: 'error', mensaje: 'EBUSY' } }, conectorPorId, AHORA)
-    assert.deepEqual(r, { state: estadoVacio(), origen: 'vacio', respaldar: null, guardar: false, soloLectura: 'gruv-ilegible' })
+    assert.deepEqual(r, { state: estadoVacio('gruv'), origen: 'vacio', respaldar: null, guardar: false, soloLectura: 'gruv-ilegible' })
   }
 })
 
@@ -220,4 +220,12 @@ test('cambiar de conector limpia lo leído y conserva cuenta, modelo y repos', (
   assert.deepEqual(antes, copia)
   assert.equal(conConector(antes, 'gruv'), antes)
   assert.deepEqual(sanearEstado(despues, conectorPorId), despues)
+})
+
+test('quien tiene gruv.json dañado o ilegible sigue en Gruv, no queda sin conector', () => {
+  for (const gruv of [CORRUPTO, { kind: 'error' } as Lectura]) {
+    const r = resolverEstado({ tickets: FALTA, gruv }, conectorPorId, AHORA)
+    assert.equal(r.state.config.conectorId, 'gruv')
+  }
+  assert.equal(resolverEstado({ tickets: FALTA, gruv: FALTA }, conectorPorId, AHORA).state.config.conectorId, '')
 })

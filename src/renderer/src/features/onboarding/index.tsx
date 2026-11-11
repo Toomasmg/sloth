@@ -347,7 +347,7 @@ function RepoStep({ repo, setRepo }: { repo: string; setRepo: (p: string) => voi
         )}
       </div>
       <div className="input-row">
-        <input aria-label="Carpeta del repo" className="mono" value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="C:uta	u-repo" />
+        <input aria-label="Carpeta del repo" className="mono" value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="C:\ruta\a\tu-repo" />
         <button type="button" className="btn" onClick={() => void pick()}>
           <FolderIcon size={15} /> Elegir
         </button>
