@@ -31,8 +31,8 @@ function Global(): React.JSX.Element | null {
   const open = useBoardOpen()
   useEffect(() => {
     let alive = true
-    void ui.invoke<Snapshot>('feat:gruv:state').then((s) => alive && setSnapshot(s))
-    const off = ui.on('feat:gruv:changed', (s: Snapshot) => setSnapshot(s))
+    void ui.invoke<Snapshot>('feat:tickets:state').then((s) => alive && setSnapshot(s))
+    const off = ui.on('feat:tickets:changed', (s: Snapshot) => setSnapshot(s))
     return () => {
       alive = false
       off()

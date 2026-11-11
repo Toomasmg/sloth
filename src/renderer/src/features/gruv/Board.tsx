@@ -165,7 +165,7 @@ export function Board(): React.JSX.Element {
     if (!curId) return
     let alive = true
     setDet((d) => ({ ...d, [curId]: { ...d[curId], loading: true, error: undefined } }))
-    ui.invoke<GruvDetalle>('feat:gruv:detail', curId).then(
+    ui.invoke<GruvDetalle>('feat:tickets:detail', curId).then(
       (data) => {
         if (alive) setDet((d) => ({ ...d, [curId]: { data } }))
       },
@@ -199,7 +199,7 @@ export function Board(): React.JSX.Element {
     setErr(null)
     setBusy('refresh')
     try {
-      const r = await ui.invoke<{ count: number }>('feat:gruv:refresh')
+      const r = await ui.invoke<{ count: number }>('feat:tickets:refresh')
       setInfo(`Gruv trajo ${r.count} ${r.count === 1 ? 'ticket' : 'tickets'}.`)
     } catch (e) {
       setErr(cleanError(e))
@@ -226,7 +226,7 @@ export function Board(): React.JSX.Element {
     if (opt.ticket) setOver((o) => ({ ...o, [id]: { ...o[id], ...opt.ticket } }))
     if (opt.det && prev) setDet((d) => ({ ...d, [id]: { data: opt.det!(prev) } }))
     try {
-      const r = await ui.invoke<{ detail: GruvDetalle | null }>('feat:gruv:accion', a, id, payload)
+      const r = await ui.invoke<{ detail: GruvDetalle | null }>('feat:tickets:accion', a, id, payload)
       if (r?.detail) setDet((d) => ({ ...d, [id]: { data: r.detail! } }))
       setToast(DONE[a])
       return true
@@ -266,13 +266,13 @@ export function Board(): React.JSX.Element {
         close()
         return
       }
-      if (!(await ui.invoke<boolean>('feat:gruv:hasRepo', t.id))) {
+      if (!(await ui.invoke<boolean>('feat:tickets:hasRepo', t.id))) {
         // No hay carpeta para tomar (ni por defecto ni de un espacio anterior): se elige en «Nuevo espacio».
         close()
         ui.openNewWorkspace('ticket')
         return
       }
-      await ui.invoke('feat:gruv:start', t.id)
+      await ui.invoke('feat:tickets:start', t.id)
       close()
     } catch (e) {
       setErr(cleanError(e))
@@ -287,7 +287,7 @@ export function Board(): React.JSX.Element {
   }
 
   const setConfirmRefresh = (ask: boolean): void => {
-    void ui.invoke<Snapshot>('feat:gruv:setConfig', { confirmRefresh: ask }).then(setSnapshot, (e) => setErr(cleanError(e)))
+    void ui.invoke<Snapshot>('feat:tickets:setConfig', { confirmRefresh: ask }).then(setSnapshot, (e) => setErr(cleanError(e)))
   }
 
   // ---------- estado de conexión (real: lo que dejó la última consulta) ----------
@@ -328,7 +328,7 @@ export function Board(): React.JSX.Element {
         </span>
         <span className="f-gruv-grow" />
         {running ? (
-          <button type="button" className="f-gruv-b f-gruv-b--sm" onClick={() => void ui.invoke('feat:gruv:cancel')}>
+          <button type="button" className="f-gruv-b f-gruv-b--sm" onClick={() => void ui.invoke('feat:tickets:cancel')}>
             <CloseIcon size={13} /> Cancelar consulta
           </button>
         ) : null}

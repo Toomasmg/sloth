@@ -107,7 +107,7 @@ test('con Gruv, cada caso del golden 0.6.4 sale igual', async (t) => {
   }
 })
 
-test('constantes iguales a las de gruv-claude.ts', () => {
+test('constantes iguales a las de Gruv 0.6.4', () => {
   const k = golden.constantes
   assert.deepEqual(negadas(GRUV), k.WRITE_TOOLS)
   assert.deepEqual(GRUV.herramientas.lista.map((t) => nombreCompleto(GRUV, t)), k.READ_TOOLS)

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 
-/** Lo que manda main (`feat:gruv:state` / `feat:gruv:changed`). Ver src/main/features/gruv.ts. */
+/** Lo que manda main (`feat:tickets:state` / `feat:tickets:changed`). Ver src/main/features/tickets/index.ts. */
 export interface GruvCriterio {
   /** UUID en Gruv: viene con el detalle y hace falta para tildarlo. */
   id?: string
