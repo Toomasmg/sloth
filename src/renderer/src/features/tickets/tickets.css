@@ -1,23 +1,23 @@
-/* Tickets de Gruv: pantalla de lista + detalle (artboard Tickets.dc.html).
+/* Tickets: pantalla de lista + detalle (artboard Tickets.dc.html).
    Medidas en px literales del artboard. Colores por tokens de themes.css / styles.css;
    los tonos intermedios del artboard se derivan con color-mix() de esos tokens (tema claro incluido). */
 
 /* Chip en la barra de título */
-.f-gruv-chip-tb {
+.f-tickets-chip-tb {
   color: var(--fg-2);
   background: var(--hover);
   cursor: pointer;
 }
-.f-gruv-chip-tb:hover,
-.f-gruv-chip-tb[aria-pressed='true'] {
+.f-tickets-chip-tb:hover,
+.f-tickets-chip-tb[aria-pressed='true'] {
   background: var(--press);
   color: var(--fg);
 }
-.f-gruv-chip-tb:focus-visible {
+.f-tickets-chip-tb:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
-.f-gruv-chip-n {
+.f-tickets-chip-n {
   min-width: 16px;
   padding: 0 4px;
   border-radius: 999px;
@@ -28,7 +28,7 @@
 }
 
 /* ---------- Página ---------- */
-.f-gruv-page {
+.f-tickets-page {
   /* Tonos del artboard que no tienen token propio: mezcla de tokens (se adapta al tema). */
   --g-c9: color-mix(in srgb, var(--fg) 50%, var(--fg-2)); /* #c9cdd6 en oscuro */
   --g-dc: color-mix(in srgb, var(--fg) 80%, var(--fg-2)); /* #dcdfe6 en oscuro */
@@ -43,7 +43,7 @@
   overflow: auto;
   animation: fade var(--t-fast) var(--ease);
 }
-.f-gruv-bar {
+.f-tickets-bar {
   flex: none;
   display: flex;
   flex-wrap: wrap;
@@ -53,7 +53,7 @@
   background: var(--surface);
   box-shadow: inset 0 -1px 0 var(--line);
 }
-.f-gruv-back {
+.f-tickets-back {
   height: 30px;
   padding: 0 10px 0 6px;
   border: 0;
@@ -66,25 +66,25 @@
   gap: 6px;
   cursor: pointer;
 }
-.f-gruv-back:hover {
+.f-tickets-back:hover {
   background: var(--card);
   color: var(--fg);
 }
-.f-gruv-back:focus-visible {
+.f-tickets-back:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
-.f-gruv-sep {
+.f-tickets-sep {
   width: 1px;
   height: 18px;
   background: var(--line-strong);
 }
-.f-gruv-grow {
+.f-tickets-grow {
   flex: 1 1 0;
 }
 
 /* Estado de conexión: píldora de 26 px con punto de 7 px */
-.f-gruv-conn {
+.f-tickets-conn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -100,37 +100,37 @@
   font-weight: 500;
   white-space: nowrap;
 }
-.f-gruv-conn[data-tone='ok'] {
+.f-tickets-conn[data-tone='ok'] {
   background: var(--success-soft);
   color: var(--success-fg);
 }
-.f-gruv-conn[data-tone='bad'] {
+.f-tickets-conn[data-tone='bad'] {
   background: var(--danger-soft);
   color: var(--danger-fg);
 }
-.f-gruv-conn[data-tone='busy'] {
+.f-tickets-conn[data-tone='busy'] {
   background: var(--info-soft);
   color: var(--info);
 }
-.f-gruv-conn-dot {
+.f-tickets-conn-dot {
   width: 7px;
   height: 7px;
   flex: none;
   border-radius: 50%;
   background: var(--fg-muted);
 }
-.f-gruv-conn[data-tone='ok'] .f-gruv-conn-dot {
+.f-tickets-conn[data-tone='ok'] .f-tickets-conn-dot {
   background: var(--success);
 }
-.f-gruv-conn[data-tone='bad'] .f-gruv-conn-dot {
+.f-tickets-conn[data-tone='bad'] .f-tickets-conn-dot {
   background: var(--danger);
 }
-.f-gruv-conn[data-tone='busy'] .f-gruv-conn-dot {
+.f-tickets-conn[data-tone='busy'] .f-tickets-conn-dot {
   background: var(--accent);
 }
 
 /* Botones (artboard: 28 / 30 / 32 / 34 px, radio 7–8, borde interno 1 px) */
-.f-gruv-b {
+.f-tickets-b {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -151,46 +151,46 @@
   box-shadow: inset 0 0 0 1px var(--line);
   transition: filter var(--t-fast);
 }
-.f-gruv-b:hover:not(:disabled) {
+.f-tickets-b:hover:not(:disabled) {
   filter: brightness(1.12);
 }
-.f-gruv-b:focus-visible,
-.f-gruv-link:focus-visible,
-.f-gruv-row:focus-visible,
-.f-gruv-chipf:focus-visible {
+.f-tickets-b:focus-visible,
+.f-tickets-link:focus-visible,
+.f-tickets-row:focus-visible,
+.f-tickets-chipf:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
-.f-gruv-b:disabled {
+.f-tickets-b:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
-.f-gruv-b--md {
+.f-tickets-b--md {
   height: 32px;
 }
-.f-gruv-b--sm {
+.f-tickets-b--sm {
   height: 30px;
   padding: 0 12px;
 }
-.f-gruv-b--xs {
+.f-tickets-b--xs {
   height: 28px;
   padding: 0 12px;
   border-radius: 7px;
 }
-.f-gruv-b--pri {
+.f-tickets-b--pri {
   background: var(--accent);
   color: var(--accent-fg);
   font-weight: 600;
   box-shadow: none;
 }
-.f-gruv-b--solid-danger {
+.f-tickets-b--solid-danger {
   background: var(--danger-fg);
   color: var(--bg);
   font-weight: 600;
   box-shadow: none;
 }
 
-.f-gruv-main {
+.f-tickets-main {
   flex: 1;
   box-sizing: border-box;
   width: 100%;
@@ -201,20 +201,20 @@
   flex-direction: column;
   gap: 18px;
 }
-.f-gruv-h1 {
+.f-tickets-h1 {
   margin: 0;
   font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
-.f-gruv-lead {
+.f-tickets-lead {
   margin: 6px 0 0;
   color: var(--fg-2);
   line-height: 1.5;
 }
 
 /* ---------- Avisos ---------- */
-.f-gruv-alert {
+.f-tickets-alert {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -224,10 +224,10 @@
   font-size: var(--fs-md);
   line-height: 1.45;
 }
-.f-gruv-alert-text {
+.f-tickets-alert-text {
   flex: 1 1 260px;
 }
-.f-gruv-alert-detail {
+.f-tickets-alert-detail {
   display: block;
   margin-top: 3px;
   font-size: var(--fs-sm);
@@ -235,34 +235,41 @@
   overflow-wrap: anywhere;
 }
 /* Sin conexión: dentro de la lista, arriba de las filas (artboard). */
-.f-gruv-offline {
+.f-tickets-offline {
   margin: 0 0 8px;
   background: color-mix(in srgb, var(--danger) 10%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 30%, transparent);
   color: var(--danger-fg-strong);
 }
-.f-gruv-confirm {
+/* Guardado de tickets.json: aparte del estado de conexión. */
+.f-tickets-aviso {
+  margin: 0 0 8px;
   background: var(--warn-tint);
   box-shadow: inset 0 0 0 1px var(--warn-ring);
   color: var(--fg);
 }
-.f-gruv-inline-check {
+.f-tickets-confirm {
+  background: var(--warn-tint);
+  box-shadow: inset 0 0 0 1px var(--warn-ring);
+  color: var(--fg);
+}
+.f-tickets-inline-check {
   margin: 0;
 }
-.f-gruv-ok {
+.f-tickets-ok {
   margin: 0;
   color: var(--success-fg);
   font-size: var(--fs-sm);
 }
 
 /* ---------- Grilla lista + detalle ---------- */
-.f-gruv-grid {
+.f-tickets-grid {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 16px;
 }
-.f-gruv-panel {
+.f-tickets-panel {
   box-sizing: border-box;
   min-width: 0;
   max-width: 100%;
@@ -271,10 +278,10 @@
   box-shadow: inset 0 0 0 1px var(--line);
   overflow: hidden;
 }
-.f-gruv-list {
+.f-tickets-list {
   flex: 1 1 380px;
 }
-.f-gruv-det {
+.f-tickets-det {
   flex: 1.35 1 440px;
   padding: 20px;
   display: flex;
@@ -283,14 +290,14 @@
 }
 
 /* Pestañas */
-.f-gruv-tabs {
+.f-tickets-tabs {
   display: flex;
   gap: 2px;
   padding: 8px 8px 0;
   box-shadow: inset 0 -1px 0 var(--line);
   overflow-x: auto;
 }
-.f-gruv-tab {
+.f-tickets-tab {
   flex: 1 0 auto;
   height: 36px;
   padding: 0 12px;
@@ -307,19 +314,19 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.f-gruv-tab:hover {
+.f-tickets-tab:hover {
   filter: brightness(1.12);
 }
-.f-gruv-tab.on {
+.f-tickets-tab.on {
   color: var(--fg);
   font-weight: 600;
   box-shadow: inset 0 -2px 0 var(--accent);
 }
-.f-gruv-tab:focus-visible {
+.f-tickets-tab:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: -2px;
 }
-.f-gruv-badge {
+.f-tickets-badge {
   min-width: 22px;
   height: 18px;
   padding: 0 6px;
@@ -332,19 +339,19 @@
   display: grid;
   place-items: center;
 }
-.f-gruv-tab.on .f-gruv-badge {
+.f-tickets-tab.on .f-tickets-badge {
   background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: color-mix(in srgb, var(--accent) 35%, var(--fg));
 }
 
 /* Filtros */
-.f-gruv-filters {
+.f-tickets-filters {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 12px 14px;
 }
-.f-gruv-search {
+.f-tickets-search {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -356,10 +363,10 @@
   color: var(--fg-muted);
   box-shadow: inset 0 0 0 1px var(--line-strong);
 }
-.f-gruv-search:focus-within {
+.f-tickets-search:focus-within {
   box-shadow: inset 0 0 0 1px var(--ring), 0 0 0 3px var(--accent-soft);
 }
-.f-gruv-search input {
+.f-tickets-search input {
   flex: 1;
   min-width: 0;
   width: auto;
@@ -372,16 +379,16 @@
   outline: none;
   box-shadow: none;
 }
-.f-gruv-search input::placeholder {
+.f-tickets-search input::placeholder {
   color: var(--placeholder);
 }
-.f-gruv-chips {
+.f-tickets-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 /* Chip de estado: fuera de filtro, gris; dentro, con el color de su estado (--st-*). */
-.f-gruv-chipf {
+.f-tickets-chipf {
   height: 26px;
   padding: 0 11px;
   box-sizing: border-box;
@@ -395,29 +402,29 @@
   cursor: pointer;
   box-shadow: inset 0 0 0 1px var(--line);
 }
-.f-gruv-chipf:hover {
+.f-tickets-chipf:hover {
   filter: brightness(1.12);
 }
-.f-gruv-chipf.on {
+.f-tickets-chipf.on {
   background: var(--st-bg, var(--accent-soft));
   color: var(--st-fg, var(--accent));
   box-shadow: inset 0 0 0 1px var(--st-fg, var(--accent));
 }
-.f-gruv-filter-row {
+.f-tickets-filter-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
 }
-.f-gruv-prio-field {
+.f-tickets-prio-field {
   display: flex;
   align-items: center;
   gap: 8px;
   color: var(--fg-2);
   font-size: var(--fs-sm);
 }
-.f-gruv-prio-field select,
-.f-gruv-field select {
+.f-tickets-prio-field select,
+.f-tickets-field select {
   appearance: none;
   background-color: var(--input-bg);
   background-image: linear-gradient(45deg, transparent 50%, var(--fg-muted) 50%),
@@ -430,14 +437,14 @@
   font: inherit;
   box-shadow: inset 0 0 0 1px var(--line-strong);
 }
-.f-gruv-prio-field select {
+.f-tickets-prio-field select {
   height: 30px;
   min-width: 150px;
   padding-left: 10px;
   border: 0;
   border-radius: 8px;
 }
-.f-gruv-link {
+.f-tickets-link {
   height: 28px;
   padding: 0 10px;
   border: 0;
@@ -452,11 +459,11 @@
   display: inline-flex;
   align-items: center;
 }
-.f-gruv-link:hover {
+.f-tickets-link:hover {
   background: var(--hover);
 }
 
-.f-gruv-countbar {
+.f-tickets-countbar {
   display: flex;
   align-items: center;
   padding: 8px 16px;
@@ -464,28 +471,28 @@
   font-size: var(--fs-sm);
   color: var(--fg-2);
 }
-.f-gruv-body {
+.f-tickets-body {
   min-height: 120px;
   padding: 8px 8px 10px;
 }
-.f-gruv-skel {
+.f-tickets-skel {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.f-gruv-skel > div {
+.f-tickets-skel > div {
   height: 66px;
   border-radius: 9px;
   background: var(--card-hover);
   /* Esqueleto de carga: unas pocas pasadas y queda quieto (nada de animación infinita en listas). */
   animation: fade var(--t-med) var(--ease) 2 alternate both;
 }
-.f-gruv-skel span {
+.f-tickets-skel span {
   padding: 0 6px;
   font-size: var(--fs-sm);
   color: var(--fg-muted);
 }
-.f-gruv-empty {
+.f-tickets-empty {
   padding: 28px 16px;
   display: flex;
   flex-direction: column;
@@ -493,19 +500,19 @@
   gap: 10px;
   text-align: center;
 }
-.f-gruv-empty-title {
+.f-tickets-empty-title {
   font-weight: 600;
 }
-.f-gruv-muted {
+.f-tickets-muted {
   font-size: var(--fs-sm);
   color: var(--fg-muted);
 }
-.f-gruv-strong {
+.f-tickets-strong {
   font-weight: 600;
 }
 
 /* Filas */
-.f-gruv-rows {
+.f-tickets-rows {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -513,7 +520,7 @@
   flex-direction: column;
   gap: 2px;
 }
-.f-gruv-row {
+.f-tickets-row {
   width: 100%;
   box-sizing: border-box;
   display: flex;
@@ -528,56 +535,56 @@
   text-align: left;
   cursor: pointer;
 }
-.f-gruv-row:hover {
+.f-tickets-row:hover {
   background: var(--card-hover);
 }
-.f-gruv-row.sel {
+.f-tickets-row.sel {
   background: var(--accent-soft);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent);
 }
-.f-gruv-row-top {
+.f-tickets-row-top {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
-.f-gruv-row-title {
+.f-tickets-row-title {
   font-weight: 500;
   line-height: 1.4;
 }
-.f-gruv-row-meta {
+.f-tickets-row-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
 }
-.f-gruv-code {
+.f-tickets-code {
   flex: none;
   font-size: 12px;
   color: var(--warn);
 }
-.f-gruv-code-lg {
+.f-tickets-code-lg {
   font-size: 12px;
 }
 
 /* Estado de un ticket (fila y detalle): mismo color que su chip de filtro. */
-.f-gruv-st-todo {
+.f-tickets-st-todo {
   --st-bg: var(--btn-2);
   --st-fg: var(--g-c9);
 }
-.f-gruv-st-doing {
+.f-tickets-st-doing {
   --st-bg: var(--info-soft);
   --st-fg: var(--info);
 }
-.f-gruv-st-review {
+.f-tickets-st-review {
   --st-bg: var(--team-soft);
   --st-fg: var(--team-fg);
 }
-.f-gruv-st-error {
+.f-tickets-st-error {
   --st-bg: var(--danger-soft);
   --st-fg: var(--danger-fg);
 }
-.f-gruv-st {
+.f-tickets-st {
   display: inline-flex;
   align-items: center;
   height: 20px;
@@ -592,7 +599,7 @@
 }
 
 /* Chip de espacio (broadcast): en la fila, 20 px; en el detalle, 26 px. */
-.f-gruv-space {
+.f-tickets-space {
   margin-left: auto;
   min-width: 0;
   max-width: 62%;
@@ -603,37 +610,37 @@
   font-size: var(--fs-xs);
   font-weight: 500;
 }
-.f-gruv-space > svg {
+.f-tickets-space > svg {
   width: 11px;
   height: 11px;
 }
-.f-gruv-space-lg {
+.f-tickets-space-lg {
   max-width: 100%;
   height: 26px;
   padding: 0 9px;
   gap: 6px;
   font-size: var(--fs-sm);
 }
-.f-gruv-ellipsis {
+.f-tickets-ellipsis {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.f-gruv-prio {
+.f-tickets-prio {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   font-size: var(--fs-sm);
 }
-.f-gruv-who {
+.f-tickets-who {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: var(--fs-sm);
   color: var(--g-c9);
 }
-.f-gruv-av {
+.f-tickets-av {
   width: 26px;
   height: 26px;
   flex: none;
@@ -645,30 +652,30 @@
   display: grid;
   place-items: center;
 }
-.f-gruv-av.sm {
+.f-tickets-av.sm {
   width: 20px;
   height: 20px;
   font-size: 10px;
   background: var(--team-soft);
   color: var(--team-fg);
 }
-.f-gruv-av.sm[data-mine='true'] {
+.f-tickets-av.sm[data-mine='true'] {
   background: var(--accent-soft);
   color: var(--info);
 }
-.f-gruv-av.lg {
+.f-tickets-av.lg {
   width: 32px;
   height: 32px;
   font-size: var(--fs-sm);
 }
 
 /* ---------- Detalle ---------- */
-.f-gruv-det-head {
+.f-tickets-det-head {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.f-gruv-det-title {
+.f-tickets-det-title {
   margin: 0;
   font-size: 20px;
   font-weight: 700;
@@ -676,34 +683,34 @@
   letter-spacing: -0.01em;
   overflow-wrap: anywhere;
 }
-.f-gruv-fields {
+.f-tickets-fields {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 12px 18px;
 }
-.f-gruv-field {
+.f-tickets-field {
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
-.f-gruv-field > label,
-.f-gruv-lbl {
+.f-tickets-field > label,
+.f-tickets-lbl {
   font-size: var(--fs-sm);
   color: var(--fg-2);
 }
-.f-gruv-field select {
+.f-tickets-field select {
   height: 34px;
   min-width: 170px;
   padding-left: 10px;
   border: 0;
   border-radius: 8px;
 }
-.f-gruv-field select:disabled {
+.f-tickets-field select:disabled {
   opacity: 0.85;
   cursor: not-allowed;
 }
-.f-gruv-prio-val {
+.f-tickets-val {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -715,13 +722,13 @@
   box-shadow: inset 0 0 0 1px var(--line);
   font-weight: 500;
 }
-.f-gruv-why {
+.f-tickets-why {
   font-size: var(--fs-sm);
   color: var(--fg-muted);
   line-height: 1.4;
 }
 
-.f-gruv-assign {
+.f-tickets-assign {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -731,20 +738,20 @@
   background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--line);
 }
-.f-gruv-assign-text {
+.f-tickets-assign-text {
   flex: 1 1 160px;
   min-width: 0;
 }
-.f-gruv-owner {
+.f-tickets-owner {
   font-size: var(--fs-sm);
   color: var(--fg-2);
 }
-.f-gruv-assign .f-gruv-why {
+.f-tickets-assign .f-tickets-why {
   flex-basis: 100%;
 }
 
 /* Acciones: fila de botones y, debajo, la ayuda (artboard: caja en columna). */
-.f-gruv-actions {
+.f-tickets-actions {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -753,74 +760,74 @@
   background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--line);
 }
-.f-gruv-actions-row {
+.f-tickets-actions-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
-.f-gruv-help {
+.f-tickets-help {
   margin: 0;
   font-size: var(--fs-sm);
   color: var(--fg-2);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
-.f-gruv-acc {
+.f-tickets-acc {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-size: var(--fs-sm);
   color: var(--fg-2);
 }
-.f-gruv-dot {
+.f-tickets-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   flex: none;
 }
 
-.f-gruv-sec {
+.f-tickets-sec {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.f-gruv-sec h3 {
+.f-tickets-sec h3 {
   margin: 0;
   font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--fg-2);
 }
-.f-gruv-sec-head {
+.f-tickets-sec-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
-.f-gruv-prog-label {
+.f-tickets-prog-label {
   font-size: var(--fs-sm);
   font-weight: 500;
   color: var(--g-c9);
 }
-.f-gruv-desc {
+.f-tickets-desc {
   margin: 0;
   line-height: 1.6;
   color: var(--g-dc);
   overflow-wrap: anywhere;
 }
-.f-gruv-progress {
+.f-tickets-progress {
   height: 4px;
   border-radius: 2px;
   background: var(--seg-on);
   overflow: hidden;
 }
-.f-gruv-progress > span {
+.f-tickets-progress > span {
   display: block;
   height: 100%;
   border-radius: 2px;
   background: var(--ok);
 }
-.f-gruv-crit {
+.f-tickets-crit {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -828,7 +835,7 @@
   flex-direction: column;
   gap: 2px;
 }
-.f-gruv-crit label {
+.f-tickets-crit label {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -837,7 +844,7 @@
   line-height: 1.45;
 }
 /* Casilla de 18 px, radio 5, borde interno 1.5 px; marcada en verde con tilde. */
-.f-gruv-crit input {
+.f-tickets-crit input {
   appearance: none;
   position: relative;
   width: 18px;
@@ -850,11 +857,11 @@
   box-shadow: inset 0 0 0 1.5px var(--g-box);
   opacity: 1;
 }
-.f-gruv-crit input:checked {
+.f-tickets-crit input:checked {
   background: var(--ok);
   box-shadow: none;
 }
-.f-gruv-crit input:checked::after {
+.f-tickets-crit input:checked::after {
   content: '';
   position: absolute;
   left: 6px;
@@ -865,36 +872,36 @@
   border-width: 0 2.25px 2.25px 0;
   transform: rotate(45deg);
 }
-.f-gruv-crit input:disabled {
+.f-tickets-crit input:disabled {
   cursor: not-allowed;
 }
-.f-gruv-crit input:checked + span {
+.f-tickets-crit input:checked + span {
   color: var(--fg-muted);
 }
 
-.f-gruv-inline {
+.f-tickets-inline {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
-.f-gruv-hours {
+.f-tickets-hours {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
   gap: 10px;
   margin-top: 4px;
 }
-.f-gruv-hours-field {
+.f-tickets-hours-field {
   display: flex;
   flex-direction: column;
   gap: 5px;
 }
-.f-gruv-hours-field > span {
+.f-tickets-hours-field > span {
   font-size: var(--fs-sm);
   color: var(--fg-2);
 }
-.f-gruv-input {
+.f-tickets-input {
   flex: 1 1 220px;
   min-width: 0;
   height: 34px;
@@ -907,27 +914,27 @@
   font: inherit;
   box-shadow: inset 0 0 0 1px var(--line-strong);
 }
-.f-gruv-input.narrow {
+.f-tickets-input.narrow {
   flex: 0 0 160px;
   width: 160px;
 }
-.f-gruv-input::placeholder {
+.f-tickets-input::placeholder {
   color: var(--placeholder);
 }
-.f-gruv-input:disabled {
+.f-tickets-input:disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .f-gruv-page,
-  .f-gruv-skel > div {
+  .f-tickets-page,
+  .f-tickets-skel > div {
     animation: none;
   }
 }
 
 /* ---------- Escrituras (0.6.2): toast, comentarios ---------- */
-.f-gruv-toast {
+.f-tickets-toast {
   position: fixed;
   left: 50%;
   bottom: 24px;
@@ -942,7 +949,7 @@
   font-size: var(--fs-sm);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
-.f-gruv-comments {
+.f-tickets-comments {
   list-style: none;
   margin: 0 0 10px;
   padding: 0;
@@ -950,26 +957,74 @@
   flex-direction: column;
   gap: 10px;
 }
-.f-gruv-comment {
+.f-tickets-comment {
   display: flex;
   gap: 8px;
   align-items: flex-start;
 }
-.f-gruv-comment-body {
+.f-tickets-comment-body {
   min-width: 0;
   flex: 1;
 }
-.f-gruv-comment-head {
+.f-tickets-comment-head {
   display: flex;
   gap: 8px;
   align-items: baseline;
   flex-wrap: wrap;
   font-size: var(--fs-sm);
 }
-.f-gruv-comment-body p {
+.f-tickets-comment-body p {
   margin: 2px 0 0;
   font-size: var(--fs-sm);
   color: var(--fg-2);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* ---------- Ajustes (conector, cuenta o repo) ---------- */
+.f-tickets-ajustes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.f-tickets-ajustes-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 14px;
+}
+.f-tickets-ajustes-campo {
+  margin: 0;
+  min-width: 180px;
+}
+.f-tickets-ajustes-campo > span {
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+}
+.f-tickets-ajustes-repo {
+  flex: 1 1 280px;
+}
+.f-tickets-ajustes-ruta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.f-tickets-ajustes-ruta code {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  color: var(--fg-2);
+}
+.f-tickets-ajustes-nota {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
 }

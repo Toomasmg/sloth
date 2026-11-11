@@ -1,4 +1,4 @@
-import { prioRank, tintFor } from './model'
+import { prioRank, tintFor, type Categoria } from './model'
 
 /** Piezas compartidas por la lista y el detalle de tickets. */
 
@@ -13,13 +13,10 @@ export const prioPath = (p?: string): string => PRIO_PATH[(Math.min(prioRank(p),
 export const prioTone = (p?: string): string =>
   prioRank(p) === 0 ? 'var(--danger-fg)' : prioRank(p) === 1 ? 'var(--warn-fg)' : prioRank(p) === 2 ? 'var(--g-c9)' : 'var(--fg-2)'
 
-/** Clase de color por estado de Gruv (`f-gruv-st-*`). El texto va siempre: el color solo no alcanza. */
-export function estadoKind(k?: string): 'todo' | 'doing' | 'review' | 'error' {
-  if (k === 'en_curso') return 'doing'
-  if (k === 'en_revision' || k === 'en_qa' || k === 'pre_rtd') return 'review'
-  if (k === 'bloqueado' || k === 'rechazado') return 'error'
-  return 'todo'
-}
+const KIND = { pendiente: 'todo', en_curso: 'doing', revision: 'review', bloqueado: 'error', hecho: 'todo' } as const
+
+/** Clase de color por categoría del estado (`f-tickets-st-*`). El texto va siempre: el color solo no alcanza. */
+export const estadoKind = (cat: Categoria): (typeof KIND)[Categoria] => KIND[cat]
 
 export const initials = (name: string): string =>
   name
@@ -49,7 +46,7 @@ export function ExternalGlyph(): React.JSX.Element {
 /** Avatar con iniciales y color estable por persona (hash del nombre). */
 export function Av({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' | 'lg' }): React.JSX.Element {
   const tint = tintFor(name)
-  const cls = size === 'md' ? 'f-gruv-av' : `f-gruv-av ${size}`
+  const cls = size === 'md' ? 'f-tickets-av' : `f-tickets-av ${size}`
   return (
     <span className={cls} style={{ background: tint.bg, color: tint.fg }} aria-hidden="true">
       {initials(name)}

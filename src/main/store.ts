@@ -17,6 +17,8 @@ const EMPTY: PersistedState = { version: 1, accounts: [], workspaces: [], openPa
  * se mueve la carpeta entera (logins de las cuentas incluidos).
  */
 function migrateFromAntiRea(): void {
+  // Instancia de prueba o tests (SLOTH_USER_DATA): nunca se traen datos reales a su carpeta.
+  if (process.env.SLOTH_USER_DATA) return
   const oldDir = join(app.getPath('appData'), 'AntiRea')
   const newDir = app.getPath('userData')
   if (!existsSync(oldDir) || existsSync(join(newDir, 'sloth-state.json')) || existsSync(join(newDir, 'accounts'))) return

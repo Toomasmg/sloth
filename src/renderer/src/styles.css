@@ -517,7 +517,8 @@ textarea {
   flex: none;
 }
 .ic-none,
-.ic-idle {
+.ic-idle,
+.ic-sleeping {
   color: var(--fg-muted);
 }
 .ic-working {
@@ -1005,6 +1006,39 @@ kbd,
   flex: 1;
   min-height: 0;
   padding: var(--s-2) var(--s-1) 0 var(--s-3);
+}
+/* Arrastrando archivos sobre la terminal: se van a pegar sus rutas ahí. */
+.terminal-host.drop-on {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+  border-radius: var(--r-md);
+}
+
+/* Espacio dormido: ocupa el lugar de la terminal. */
+.sleeping-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  padding: var(--s-5);
+  text-align: center;
+}
+.sleeping-ico {
+  color: var(--fg-muted);
+}
+.sleeping-title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  color: var(--fg);
+}
+.sleeping-lead {
+  max-width: 340px;
+  margin: 0 0 var(--s-2);
+  color: var(--fg-2);
 }
 
 /* ---------- Vacío ---------- */

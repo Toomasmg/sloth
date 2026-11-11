@@ -91,7 +91,8 @@ export interface NewWorkspaceInput {
   ticket?: string
 }
 
-export type AgentState = 'idle' | 'working' | 'waiting' | 'done' | 'exited'
+/** «sleeping»: Sloth cerró su Claude por inactividad; al despertarlo retoma la conversación (`--continue`). */
+export type AgentState = 'idle' | 'working' | 'waiting' | 'done' | 'exited' | 'sleeping'
 
 export interface AgentStatus {
   state: AgentState

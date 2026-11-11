@@ -6,8 +6,8 @@ import type { NewWorkspacePreset } from './features/host'
 import { useUi } from './features/host'
 import { useTemplates, openDialog, peekPreselect, takePreselect, usesTicket, type TemplateDto } from './features/templates/store'
 import { TEMPLATE_COLORS, colorHex } from './features/templates/catalog'
-import { setBoardOpen } from './features/gruv/model'
-import { applyVars, folderLabel, missingVars, TEMPLATE_COLOR_KEYS, TICKET_RE, today, validBranch, type VarValues } from '../../shared/templates-shared'
+import { setBoardOpen, useSnapshot } from './features/tickets/model'
+import { applyVars, folderLabel, missingVars, normTicketId, TEMPLATE_COLOR_KEYS, TICKET_RE, today, validBranch, type VarValues } from '../../shared/templates-shared'
 import './NewWorkspaceDialog.css'
 
 interface Props {
@@ -55,6 +55,7 @@ function branchError(raw: string, resolved: string, values: VarValues): string {
 
 export function NewWorkspaceDialog(props: Props): React.JSX.Element {
   const ctx = useUi()
+  const tk = useSnapshot()
   const { accounts, statuses, usage, mode, onClose } = props
   const ticketMode = mode === 'ticket'
   const tplState = useTemplates()
@@ -151,8 +152,10 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cur?.path, cur?.isGit])
 
-  const ticketId = ticket.trim().toUpperCase()
-  const ticketOk = TICKET_RE.test(ticketId)
+  // Con Gruv el espacio arranca con `/ticket <id>`, que solo entiende ids tipo TCK-1234.
+  const normId = normTicketId(ticket) ?? ''
+  const ticketId = tk?.conector.comandoTicket && !TICKET_RE.test(normId) ? '' : normId
+  const ticketOk = ticketId !== ''
 
   // Valores de las variables (los que ya se conocen).
   const branchPattern = wtOn ? branchRaw.trim() : ''
@@ -188,7 +191,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
   else if (info && info.path === carpetaTrim && !info.exists) errs.carpeta = 'No encontramos esa carpeta en esta PC.'
   if (!name.trim()) errs.nombre = ticketMode ? '' : 'Ponele un nombre al espacio.'
   if (ticketMode || tplTicket) {
-    if (!ticketOk) errs.ticket = ticket.trim() ? 'Tiene que ser tipo TCK-1234.' : ticketMode ? 'Poné el ticket.' : 'Esta plantilla usa {ticket}: poné el ticket.'
+    if (!ticketOk) errs.ticket = ticket.trim() ? `Tiene que ser un id como ${tk?.conector.ejemploId || 'TCK-1234'}.` : ticketMode ? 'Poné el ticket.' : 'Esta plantilla usa {ticket}: poné el ticket.'
   }
   if (!ticketMode && wtOn) {
     if (cur && cur.exists && !cur.isGit) errs.rama = 'Las ramas aparte solo sirven en repositorios Git.'
@@ -231,8 +234,8 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
             accountId,
             autoStartClaude: true,
             ticket: ticketId,
-            // La skill /ticket ya abre su propio worktree desde origin/staging.
-            initialPrompt: `/ticket ${ticketId}`,
+            // La skill /ticket (de Gruv) ya abre su propio worktree desde origin/staging.
+            initialPrompt: !tk || tk.conector.comandoTicket ? `/ticket ${ticketId}` : undefined,
             resume: true,
             color: colorKey
           }
@@ -299,8 +302,8 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
     onClose()
     openDialog({ kind: 'manage' })
   }
-  // Tickets de Gruv: el tablero crea el espacio desde el ticket elegido. Cierra este diálogo para no encimarlo.
-  const openGruv = (): void => {
+  // Tickets: el tablero crea el espacio desde el ticket elegido. Cierra este diálogo para no encimarlo.
+  const openTickets = (): void => {
     onClose()
     setBoardOpen(true)
   }
@@ -366,7 +369,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
                   autoFocus
                   value={ticket}
                   onChange={(e) => setTicket(e.target.value)}
-                  placeholder="TCK-1234"
+                  placeholder={tk?.conector.ejemploId || 'TCK-1234'}
                   aria-invalid={invalidOf('ticket')}
                   aria-describedby={showErr('ticket') ? 'nw-ticket-err' : undefined}
                 />
@@ -557,8 +560,8 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
                     <button type="button" className="nw-link" onClick={openTemplates}>
                       Administrar plantillas…
                     </button>
-                    <button type="button" className="nw-link" onClick={openGruv}>
-                      Desde un ticket de Gruv…
+                    <button type="button" className="nw-link" onClick={openTickets}>
+                      {tk?.conector.disponible ? `Desde un ticket de ${tk.conector.nombre}…` : 'Desde un ticket…'}
                     </button>
                   </div>
                   {tpl?.description && <span className="nw-hint">{tpl.description}</span>}
@@ -594,7 +597,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
                       className="nw-input mono"
                       value={ticket}
                       onChange={(e) => setTicket(e.target.value)}
-                      placeholder="TCK-1234"
+                      placeholder={tk?.conector.ejemploId || 'TCK-1234'}
                       aria-invalid={invalidOf('ticket')}
                       aria-describedby="nw-ticket-hint"
                     />

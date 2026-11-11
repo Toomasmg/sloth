@@ -143,7 +143,7 @@ export function TeamView(): React.JSX.Element {
   }
   const start = async (id: string): Promise<void> => {
     // Igual que el tablero de Gruv: crea el espacio y arranca Claude con /ticket.
-    const r = await run(`start:${id}`, () => ui.invoke<{ id: string; created: boolean }>('feat:gruv:start', id))
+    const r = await run(`start:${id}`, () => ui.invoke<{ id: string; created: boolean }>('feat:tickets:start', id))
     if (r) {
       setStarting(null)
       await ui.reload()

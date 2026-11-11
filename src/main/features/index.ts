@@ -7,7 +7,7 @@ import templates from './templates'
 import tray from './tray'
 import updater from './updater'
 import exportImport from './export-import'
-import gruv from './gruv'
+import tickets from './tickets'
 import settings from './settings'
 import onboarding from './onboarding'
 import teamConfig from './team-config'
@@ -17,6 +17,7 @@ import help from './help'
 import report from './report'
 import moveAccount from './move-account'
 import permissions from './permissions'
+import sleep from './sleep'
 
 /** Todas las funciones del lado main. Para sumar una: crear su archivo y agregarla acá. */
-export const FEATURES: Feature[] = [history, git, worktrees, broadcast, templates, tray, updater, exportImport, gruv, settings, onboarding, teamConfig, team, chat, help, report, moveAccount, permissions]
+export const FEATURES: Feature[] = [history, git, worktrees, broadcast, templates, tray, updater, exportImport, tickets, settings, onboarding, teamConfig, team, chat, help, report, moveAccount, permissions, sleep]

@@ -1066,7 +1066,24 @@ body.is-resizing-side .panes {
   border-radius: 10px;
   background: var(--card-hover);
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55), inset 0 0 0 1px var(--line-strong);
-  animation: pal-in var(--t-fast) var(--ease);
+  transform-origin: top right;
+  animation: menu-in var(--t-fast) var(--ease);
+}
+/* El menú de la app sale del logo: crece desde su esquina de arriba a la izquierda. */
+.pane-menu.app-menu {
+  transform-origin: top left;
+}
+/* Los menús se despliegan hacia abajo desde su botón (no de costado). */
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pane-menu {
+    animation: none;
+  }
 }
 .pane-menu-item {
   display: flex;

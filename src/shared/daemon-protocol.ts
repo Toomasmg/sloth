@@ -9,7 +9,7 @@ import type { PtyChunk, PtyStartResult } from './types'
 export const DAEMON_PROTOCOL_VERSION = 1
 
 /** Eventos de Claude Code que llegan por /hook (fire-and-forget). */
-export const HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'Notification', 'Stop'] as const
+export const HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'Notification', 'Stop', 'SessionEnd'] as const
 export type HookEventName = (typeof HOOK_EVENTS)[number]
 
 export interface HookEventPayload {

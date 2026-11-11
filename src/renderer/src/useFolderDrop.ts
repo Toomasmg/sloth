@@ -12,9 +12,11 @@ export interface FolderDropOptions {
 const hasFiles = (e: DragEvent): boolean => Array.from(e.dataTransfer?.types ?? []).includes('Files')
 const baseName = (p: string): string => p.split(/[\\/]/).filter(Boolean).pop() ?? ''
 const inModal = (t: EventTarget | null): boolean => t instanceof Element && t.closest('[aria-modal="true"]') !== null
+/** Sobre una terminal, soltar pega las rutas ahí (TerminalView): no se crea un espacio. */
+const inTerminal = (t: EventTarget | null): boolean => t instanceof Element && t.closest('.terminal-host') !== null
 
 /**
- * Soltar una carpeta sobre la ventana para crear un espacio. Devuelve si hay que mostrar el overlay.
+ * Soltar una carpeta sobre la ventana para crear un espacio. Sobre una terminal no: ahí se pegan las rutas. Devuelve si hay que mostrar el overlay.
  * Solo reacciona a archivos del sistema (`types` incluye 'Files'). Los drops dentro de un modal no
  * se interceptan (solo se evita que Electron navegue al archivo). La validación real la hace main.
  */
@@ -29,7 +31,7 @@ export function useFolderDrop(opts: FolderDropOptions): boolean {
       if (!hasFiles(e)) return
       e.preventDefault()
       depth++
-      setActive(!inModal(e.target))
+      setActive(!inModal(e.target) && !inTerminal(e.target))
     }
     const onOver = (e: DragEvent): void => {
       if (!hasFiles(e)) return
@@ -46,7 +48,7 @@ export function useFolderDrop(opts: FolderDropOptions): boolean {
       e.preventDefault()
       depth = 0
       setActive(false)
-      if (inModal(e.target)) return
+      if (inModal(e.target) || inTerminal(e.target)) return
       const o = optsRef.current
       const file = e.dataTransfer?.files?.[0]
       if (!file) {
@@ -70,7 +72,7 @@ export function useFolderDrop(opts: FolderDropOptions): boolean {
       const name = baseName(path)
       // Heurística: un nombre con extensión y tipo MIME es un archivo. Main igual valida que sea carpeta.
       if (file.type !== '' && /\.[^.\\/]+$/.test(name)) {
-        o.onError('Soltá una carpeta, no un archivo.')
+        o.onError('Para crear un espacio soltá una carpeta. Para pasarle un archivo a Claude, soltalo sobre la terminal del espacio.')
         return
       }
       o.onFolder(path, name)

@@ -17,7 +17,7 @@ import { useUpdateDot } from '../updater/useUpdateStatus'
 import { SoundTest } from '../sound/SoundTest'
 import { resolveAccountColor, pickProjectsDir, projectsDirOf, updateSettings, useSettings } from './store'
 import { errText, Group, Row, Seg, Slider, ToggleRow, useSave, SectionHint } from './ui'
-import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, EDITORS, LINE_HEIGHT, PLAN_SUGGESTIONS, SCROLLBACK, SHELLS, TERM_FONTS, TERM_FONT, UI_FONT, UPDATE_CHANNELS, type AccentChoice, type CursorShape, type Density, type EditorChoice, type ShellChoice, type ShortcutId, type SoundName, type TermFont, type ThemeChoice, type UpdateChannel } from '../../../../main/features/settings-model'
+import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, EDITORS, LINE_HEIGHT, PLAN_SUGGESTIONS, SCROLLBACK, SHELLS, SLEEP_MINUTES, TERM_FONTS, TERM_FONT, UI_FONT, UPDATE_CHANNELS, type AccentChoice, type CursorShape, type Density, type EditorChoice, type ShellChoice, type ShortcutId, type SleepMinutes, type SoundName, type TermFont, type ThemeChoice, type UpdateChannel } from '../../../../main/features/settings-model'
 
 /* ---------- General ---------- */
 
@@ -59,6 +59,30 @@ export function GeneralSection(): React.JSX.Element {
           checked={s.keepTerminalsAlive}
           onChange={(keepTerminalsAlive) => save({ keepTerminalsAlive })}
         />
+        <ToggleRow
+          title="Preguntar antes de cerrar Sloth"
+          hint="Al tocar la X con terminales abiertas, avisa qué pasa con ellas antes de cerrar."
+          checked={s.confirmQuit}
+          onChange={(confirmQuit) => save({ confirmQuit })}
+        />
+        <Row
+          title="Dormir espacios inactivos"
+          hint="Cierra el Claude de un espacio sin uso para liberar memoria. Al volver, retoma la misma conversación. Nunca duerme uno que está trabajando, esperando un permiso o con texto sin enviar."
+          htmlFor="f-set-sleep"
+        >
+          <select
+            id="f-set-sleep"
+            className="f-set-select"
+            value={s.sleepAfterMin}
+            onChange={(e) => save({ sleepAfterMin: Number(e.target.value) as SleepMinutes })}
+          >
+            {SLEEP_MINUTES.map((m) => (
+              <option key={m} value={m}>
+                {m === 0 ? 'Nunca' : m < 60 ? `Tras ${m} minutos` : `Tras ${m / 60} ${m === 60 ? 'hora' : 'horas'}`}
+              </option>
+            ))}
+          </select>
+        </Row>
         <ToggleRow
           title="Abrir Sloth al iniciar Windows"
           hint={p.loginItemSupported ? 'Arranca minimizado en la bandeja del sistema.' : 'Solo en la app instalada (esta es una versión de desarrollo).'}
@@ -532,7 +556,7 @@ export function TerminalSection(): React.JSX.Element {
         <Row title={<label htmlFor="f-set-tsize">Tamaño de letra</label>}>
           <Slider id="f-set-tsize" label="Tamaño de letra de la terminal" value={t.fontSize} min={TERM_FONT.min} max={TERM_FONT.max} format={(v) => `${v} px`} onChange={(fontSize) => save({ terminal: { fontSize } })} />
         </Row>
-        <Row title={<label htmlFor="f-set-tline">Altura de línea</label>}>
+        <Row title={<label htmlFor="f-set-tline">Altura de línea</label>} hint="Con más de 1, los recuadros de Claude se ven con cortes.">
           <Slider
             id="f-set-tline"
             label="Altura de línea"

@@ -1,4 +1,5 @@
 import { CircleIcon, DoneIcon, MinusCircleIcon, WaitingIcon, WorkingIcon } from './icons/SlothIcons'
+import { MoonIcon } from '@phosphor-icons/react'
 import type { AgentState } from '../../shared/types'
 import { STATE_LABEL } from './format'
 
@@ -13,6 +14,8 @@ export function StateIcon({ state, size = 14 }: { state?: AgentState; size?: num
       return <DoneIcon size={size} className="ic ic-done" />
     case 'exited':
       return <MinusCircleIcon size={size} className="ic ic-exited" />
+    case 'sleeping':
+      return <MoonIcon size={size} weight="fill" className="ic ic-sleeping" />
     case 'idle':
       return <CircleIcon size={size} className="ic ic-idle" />
     default:

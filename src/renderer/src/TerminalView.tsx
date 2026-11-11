@@ -2,6 +2,7 @@ import { memo, useEffect, useRef } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import type { PtyChunk } from '../../shared/types'
+import { joinPaths } from '../../shared/paste-paths'
 import { api, onPtyData, onPtyExit } from './api'
 import { subscribeSettings, termOptions } from './features/settings/store'
 import { usePaneVisible } from './visibility'
@@ -36,6 +37,30 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
       cursorBlink: opts.cursorBlink && document.visibilityState === 'visible',
       allowProposedApi: true
     })
+    // Claude Code dibuja su propio cursor en la caja de texto. El cursor real lo vuelve a mostrar ConPTY
+    // en cada cuadro, a veces a mitad del redibujo, y salta por la pantalla. Mientras Claude está abierto
+    // (?2031h al arrancar, ?2031l al salir) se ignora el «mostrar cursor» (?25h); en la shell vuelve a verse.
+    // Claude no usa la pantalla alternativa y vim, nvim o nano sí (algunos también activan 2031): ahí el
+    // cursor se deja tal cual.
+    let claudeUi = false
+    const inNormalBuffer = (): boolean => term.buffer.active.type === 'normal'
+    const ALT_SCREEN = [47, 1047, 1049]
+    term.parser.registerCsiHandler({ prefix: '?', final: 'h' }, (params) => {
+      if (params.includes(2031) && !claudeUi && inNormalBuffer()) {
+        claudeUi = true
+        term.write('\x1b[?25l')
+      }
+      return claudeUi && inNormalBuffer() && params.length === 1 && params[0] === 25
+    })
+    term.parser.registerCsiHandler({ prefix: '?', final: 'l' }, (params) => {
+      if (params.includes(2031) && claudeUi && inNormalBuffer()) {
+        claudeUi = false
+        term.write('\x1b[?25h')
+      }
+      // Volviendo de un editor abierto desde Claude: el cursor que mostró el editor se vuelve a ocultar.
+      if (claudeUi && params.some((p) => typeof p === 'number' && ALT_SCREEN.includes(p))) term.write('\x1b[?25l')
+      return false
+    })
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(el)
@@ -45,6 +70,8 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
       /* el panel todavía no tiene tamaño */
     }
     live.current = { term, fit }
+    // Pruebas de Playwright: leen el buffer y el estado del cursor desde acá (e2e/terminal.ts).
+    if (navigator.webdriver) (el as HTMLDivElement & { __xterm?: Terminal }).__xterm = term
     // xterm mide la letra al abrir: si la webfont todavía no llegó, se vuelve a medir cuando carga.
     if (!document.fonts.check(`${opts.fontSize}px "JetBrains Mono Variable"`)) {
       void document.fonts.load(`${opts.fontSize}px "JetBrains Mono Variable"`).then(
@@ -97,20 +124,61 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
     term.onData((d) => api.ptyWrite(id, d))
     term.onResize(({ cols, rows }) => api.ptyResize(id, cols, rows))
 
-    // Ctrl+Shift+C / Ctrl+Shift+V copian y pegan; Ctrl+C sigue siendo interrumpir.
+    // Pegar: texto, rutas de archivos copiados (un .zip, una carpeta) o una imagen, que main guarda
+    // como PNG y pega su ruta para que Claude Code la adjunte.
+    const pasteClipboard = (): void => {
+      void api.clipboardRead().then((t) => t && term.paste(t))
+    }
+    // Ctrl+V y Ctrl+Shift+V pegan; Ctrl+Shift+C copia; Ctrl+C sigue siendo interrumpir. En la pantalla
+    // alternativa (vim, nano) Ctrl+V solo llega como ^V: allá es bloque visual o «literal siguiente».
     term.attachCustomKeyEventHandler((ev) => {
-      if (ev.type !== 'keydown' || !ev.ctrlKey || !ev.shiftKey) return true
-      if (ev.code === 'KeyC') {
+      if (ev.type !== 'keydown' || !ev.ctrlKey || ev.altKey || ev.metaKey) return true
+      if (ev.code === 'KeyV' && (ev.shiftKey || inNormalBuffer())) {
+        // Sin preventDefault el navegador también dispararía su «paste» (solo texto) y pegaría dos veces.
+        ev.preventDefault()
+        pasteClipboard()
+        return false
+      }
+      if (ev.shiftKey && ev.code === 'KeyC') {
         const sel = term.getSelection()
         if (sel) api.clipboardWrite(sel)
         return false
       }
-      if (ev.code === 'KeyV') {
-        void api.clipboardRead().then((t) => t && term.paste(t))
-        return false
-      }
       return true
     })
+    // Soltar archivos o carpetas sobre la terminal pega sus rutas (las fotos y los .zip incluidos).
+    const onDragOver = (ev: DragEvent): void => {
+      if (!Array.from(ev.dataTransfer?.types ?? []).includes('Files')) return
+      ev.preventDefault()
+      if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'copy'
+      el.classList.add('drop-on')
+    }
+    const onDragLeave = (ev: DragEvent): void => {
+      if (!el.contains(ev.relatedTarget as Node | null)) el.classList.remove('drop-on')
+    }
+    const onDropFiles = (ev: DragEvent): void => {
+      el.classList.remove('drop-on')
+      const files = Array.from(ev.dataTransfer?.files ?? [])
+      if (!files.length) return
+      ev.preventDefault()
+      const paths = files.map((f) => {
+        try {
+          return api.pathForFile(f)
+        } catch {
+          return ''
+        }
+      })
+      const text = joinPaths(paths)
+      if (!text) {
+        onErrorRef.current('No pude leer la ruta de lo que soltaste. Probá de nuevo desde el Explorador.')
+        return
+      }
+      term.paste(text)
+      term.focus()
+    }
+    el.addEventListener('dragover', onDragOver)
+    el.addEventListener('dragleave', onDragLeave)
+    el.addEventListener('drop', onDropFiles)
     // Clic derecho: copia si hay selección, si no pega (como Windows Terminal).
     const onContext = (ev: MouseEvent): void => {
       ev.preventDefault()
@@ -118,7 +186,7 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
       if (sel) {
         api.clipboardWrite(sel)
         term.clearSelection()
-      } else void api.clipboardRead().then((t) => t && term.paste(t))
+      } else pasteClipboard()
     }
     el.addEventListener('contextmenu', onContext)
 
@@ -186,6 +254,9 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
       document.removeEventListener('visibilitychange', onVis)
       offSettings()
       el.removeEventListener('contextmenu', onContext)
+      el.removeEventListener('dragover', onDragOver)
+      el.removeEventListener('dragleave', onDragLeave)
+      el.removeEventListener('drop', onDropFiles)
       offData()
       offExit()
       term.dispose()

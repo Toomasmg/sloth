@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { BroadcastIcon, HistoryIcon, TeamIcon, TemplatesIcon, TicketIcon, TrashIcon, WorktreeIcon } from '../icons/SlothIcons'
 import type { UiCtx } from '../features/host'
 import { runFeatureCommand } from '../features/palette'
-import { setBoardOpen, useSnapshot, isMine } from '../features/gruv/model'
+import { etiquetaTablero, setBoardOpen, useSnapshot, isMine } from '../features/tickets/model'
 import { openHistory } from '../features/history/index'
 import { openRamas, useRamas } from '../features/worktrees/store'
 import { openDialog } from '../features/templates/store'
@@ -84,7 +84,7 @@ export function ToolsSection({ ctx }: { ctx: UiCtx }): React.JSX.Element {
         </button>
       </h2>
       <div id="tools-body" className="tools-body" hidden={!open}>
-        <ToolRow icon={<TicketIcon size={16} />} label="Tickets de Gruv" badge={mine} onClick={() => setBoardOpen(true)} />
+        <ToolRow icon={<TicketIcon size={16} />} label={etiquetaTablero(snap)} badge={mine} onClick={() => setBoardOpen(true)} />
         <ToolRow icon={<HistoryIcon size={16} />} label="Historial de sesiones" onClick={() => openHistory()} />
         <ToolRow icon={<TemplatesIcon size={16} />} label="Plantillas" onClick={() => openDialog({ kind: 'manage' })} />
         <ToolRow icon={<WorktreeIcon size={16} />} label="Ramas aparte" onClick={() => openRamas()} />
