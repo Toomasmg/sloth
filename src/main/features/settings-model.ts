@@ -144,7 +144,7 @@ export const DEFAULT_SETTINGS: SlothSettings = {
   terminal: {
     fontSize: 12.5,
     fontFamily: 'JetBrains Mono',
-    lineHeight: 1.7,
+    lineHeight: 1,
     cursorStyle: 'barra',
     cursorBlink: true,
     shell: 'PowerShell 7',

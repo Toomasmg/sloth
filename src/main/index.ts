@@ -10,6 +10,7 @@ import { accountStatus, createAccount } from './accounts'
 import { installInto, stateForEvent, writeHookScript, type HookEventPayload } from './hooks'
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
 import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
+import { clipboardForPaste } from './clipboard-paste'
 import { createWorktree } from './git'
 import { normTicketId, TEMPLATE_COLOR_KEYS, validBranch } from '../shared/templates-shared'
 import { baseSettingsFor, syncSharedSetup, unshareSetup } from './setup'
@@ -444,7 +445,8 @@ app.whenReady().then(async () => {
     if (store.workspace(id)) setAgent(id, { state: 'exited', at: Date.now() })
   })
 
-  ipcMain.handle('clipboard:read', () => clipboard.readText())
+  // Texto, rutas de archivos copiados o una imagen guardada como PNG (src/main/clipboard-paste.ts).
+  ipcMain.handle('clipboard:read', () => clipboardForPaste())
   ipcMain.on('clipboard:write', (_e, text: string) => clipboard.writeText(String(text)))
 
   // Funciones (features): cada una con sus canales feat:<nombre>:<op>.

@@ -556,7 +556,7 @@ export function TerminalSection(): React.JSX.Element {
         <Row title={<label htmlFor="f-set-tsize">Tamaño de letra</label>}>
           <Slider id="f-set-tsize" label="Tamaño de letra de la terminal" value={t.fontSize} min={TERM_FONT.min} max={TERM_FONT.max} format={(v) => `${v} px`} onChange={(fontSize) => save({ terminal: { fontSize } })} />
         </Row>
-        <Row title={<label htmlFor="f-set-tline">Altura de línea</label>}>
+        <Row title={<label htmlFor="f-set-tline">Altura de línea</label>} hint="Con más de 1, los recuadros de Claude se ven con cortes.">
           <Slider
             id="f-set-tline"
             label="Altura de línea"
