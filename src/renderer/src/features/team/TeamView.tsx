@@ -6,7 +6,6 @@ import {
   ChatCircleDots,
   CircleDashed,
   CircleNotch,
-  GearSix,
   GitPullRequest,
   LinkSimple,
   Play,
@@ -19,6 +18,7 @@ import {
   XCircle
 } from '@phosphor-icons/react'
 import { useUi } from '../host'
+import { SettingsIcon } from '../../icons/SlothIcons'
 import { cleanError, fmtTok } from '../../format'
 import type { Workspace } from '../../../../shared/types'
 import {
@@ -333,7 +333,7 @@ export function TeamView(): React.JSX.Element {
               <LinkSimple size={14} aria-hidden="true" /> Vincular
             </button>
             <button type="button" className="icon-btn" aria-label="Configuración de Gruv para el equipo" title="Configuración de Gruv" aria-expanded={panel === 'gruv'} onClick={() => setPanel(panel === 'gruv' ? 'none' : 'gruv')}>
-              <GearSix size={16} aria-hidden="true" />
+              <SettingsIcon size={16} aria-hidden="true" />
             </button>
             <button type="button" className="icon-btn" aria-label="Cerrar equipo (Esc)" title="Cerrar (Esc)" onClick={close}>
               <X size={16} aria-hidden="true" />
