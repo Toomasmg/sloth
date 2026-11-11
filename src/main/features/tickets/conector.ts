@@ -104,8 +104,8 @@ const PISTA_MAX = 1000
 const NOMBRE_RE = /^[\p{L}\p{N}][\p{L}\p{N} ._&-]{0,39}$/u
 const CLAVE_ESTADO_RE = /^[a-z0-9_]{1,40}$/
 const CLAVE_FALTA_RE = /^[a-z_]{3,40}$/
-const PREFIJO_RE = /^mcp__[A-Za-z0-9_-]+__$/
-const CORTO_RE = /^[A-Za-z0-9_-]{1,64}$/
+export const PREFIJO_RE = /^mcp__[A-Za-z0-9_-]+__$/
+export const CORTO_RE = /^[A-Za-z0-9_-]{1,64}$/
 const ARG_RE = /^[a-z_][A-Za-z0-9_]{0,40}$/
 const ARGS_PROF_MAX = 3
 const PLACEHOLDER_RE = /^\{([A-Za-z]+)\}$/
@@ -188,7 +188,7 @@ function args(v: unknown, ruta: string, permitidos: readonly string[], prof = 1)
   if (claves.length < 1 || claves.length > 10) fallar(ruta, 'tiene que tener entre 1 y 10 argumentos')
   for (const k of claves) {
     const r = `${ruta}.${k}`
-    if (!ARG_RE.test(k)) fallar(r, 'nombre de argumento inválido')
+    if (!ARG_RE.test(k) || k === '__proto__') fallar(r, 'nombre de argumento inválido')
     const x = v[k]
     if (x === null || typeof x === 'number' || typeof x === 'boolean') continue
     if (esPlano(x)) {

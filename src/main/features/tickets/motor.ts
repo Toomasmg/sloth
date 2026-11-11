@@ -311,8 +311,24 @@ export function buildPrompt(def: ConectorMcp, assigneeId: string): string {
   ].join('\n')
 }
 
+export interface PermisosConsulta {
+  lista: string[]
+  detalle: string[]
+  /** La de escritura va primero. */
+  acciones: Partial<Record<Accion, string[]>>
+}
+
+/** Lo que va a --allowedTools en cada consulta y en cada acción, en nombres cortos. Lo mismo se le muestra a la persona antes de aceptar un conector. */
+export function permisosPorConsulta(def: ConectorMcp): PermisosConsulta {
+  const acciones: Partial<Record<Accion, string[]>> = {}
+  for (const a of accionesSoportadas(def)) acciones[a] = dedupe([herramientaDe(def, a), ...apoyo(def, a)])
+  return { lista: [...def.herramientas.lista], detalle: dedupe([...def.herramientas.detalle, ...apoyo(def)]), acciones }
+}
+
+const completos = (def: ConectorMcp, xs: readonly string[]): string[] => xs.map((t) => nombreCompleto(def, t))
+
 export const buildListaArgs = (def: ConectorMcp, model: string): string[] =>
-  buildArgs(model, { allow: def.herramientas.lista.map((t) => nombreCompleto(def, t)), deny: negadas(def), schema: OUTPUT_SCHEMA })
+  buildArgs(model, { allow: completos(def, permisosPorConsulta(def).lista), deny: negadas(def), schema: OUTPUT_SCHEMA })
 
 export function buildDetallePrompt(def: ConectorMcp, id: string): string {
   const n = def.nombre
@@ -337,7 +353,7 @@ export function buildDetallePrompt(def: ConectorMcp, id: string): string {
 }
 
 export const buildDetalleArgs = (def: ConectorMcp, model: string): string[] =>
-  buildArgs(model, { allow: dedupe([...def.herramientas.detalle, ...apoyo(def)]).map((t) => nombreCompleto(def, t)), deny: negadas(def), schema: DETAIL_SCHEMA })
+  buildArgs(model, { allow: completos(def, permisosPorConsulta(def).detalle), deny: negadas(def), schema: DETAIL_SCHEMA })
 
 const NOTA_HORAS = 'En dato.minutos_total poné el total del reloj del ticket que devuelve la herramienta, en minutos enteros; si no lo trae, null.'
 
@@ -377,7 +393,7 @@ export function buildAccionPrompt(def: ConectorMcp, a: Accion, i: AccionInput): 
 export function buildAccionArgs(def: ConectorMcp, model: string, a: Accion): string[] {
   const tool = nombreCompleto(def, herramientaDe(def, a))
   return buildArgs(model, {
-    allow: dedupe([tool, ...apoyo(def, a).map((t) => nombreCompleto(def, t))]),
+    allow: completos(def, permisosPorConsulta(def).acciones[a] ?? []),
     deny: negadas(def).filter((t) => t !== tool),
     schema: ACCION_SCHEMA
   })
