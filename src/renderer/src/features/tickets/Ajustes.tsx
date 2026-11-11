@@ -78,6 +78,16 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
 
   return (
     <section className="f-tickets-ajustes" aria-label="Ajustes de tickets">
+      {snap.pendienteAceptar && (
+        <div className="f-tickets-aviso" role="alert">
+          <p>
+            El equipo cambió el conector «{snap.conectores.find((c) => c.id === snap.pendienteAceptar)?.nombre ?? snap.pendienteAceptar}»: revisalo y aceptalo de nuevo.
+          </p>
+          <button type="button" className="btn" onClick={() => pedirAceptar(snap.pendienteAceptar as string)}>
+            Revisar y aceptar
+          </button>
+        </div>
+      )}
       <div className="f-tickets-ajustes-fila">
         <label className="field f-tickets-ajustes-campo">
           <span>Conector</span>

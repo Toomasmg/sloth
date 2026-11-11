@@ -97,7 +97,8 @@ function snapshot(): unknown {
       lastError: tp.lastError,
       running: tp.running,
       model: tp.model,
-      confirmar: tp.confirmar
+      confirmar: tp.confirmar,
+      carpetaGh: tp.carpetaGh
     },
     githubRunning: Boolean(ghRun)
   }

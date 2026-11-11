@@ -5,7 +5,7 @@ import { SPACE_CHIP, SPACE_LABEL, spaceStatus } from '../broadcast/state'
 import { CloseIcon, SearchIcon, SettingsIcon, SpaceIcon } from '../../icons/SlothIcons'
 import type { Workspace } from '../../../../shared/types'
 import { categoriaDe, SIN_CONECTOR } from '../../../../shared/tickets'
-import { mismoTicket } from '../../../../shared/templates-shared'
+import { espacioDelTicket } from '../../../../shared/templates-shared'
 import {
   etiquetaTablero,
   isMine,
@@ -153,7 +153,10 @@ export function Board(): React.JSX.Element {
   const sirveDeComodin = (x: TemplateLite): boolean => Boolean(snap?.conector.comandoTicket) || !/(^|\s)\/ticket\b/.test(x.initialPrompt ?? '')
   const ticketTpl = ticketTpls.find((x) => x.name.toLowerCase().includes(n.toLowerCase())) ?? ticketTpls.find(sirveDeComodin)
   const estadoName = (k?: string): string => estados.find((e) => e.clave === k)?.nombre ?? (k ? k.replace(/_/g, ' ') : 'Sin estado')
-  const wsOf = (id: string): Workspace | undefined => ui.workspaces.find((w) => mismoTicket(w.ticket, id))
+  const wsOf = (t: Ticket): Workspace | undefined => {
+    const carpeta = snap?.config.projectRepos[t.proyecto ?? ''] ?? snap?.config.defaultRepo ?? snap?.lastRepo
+    return espacioDelTicket(ui.workspaces, t.id, carpeta, snap?.conector.via === 'gh')
+  }
   const accLabel = (id?: string): string | undefined => ui.accounts.find((a) => a.id === id)?.label
 
   const isMineT = (t: Ticket): boolean => isMine(t, me)
@@ -270,7 +273,7 @@ export function Board(): React.JSX.Element {
   /** «Empezar en Sloth»: con la plantilla de ticket si existe; si no, el flujo de siempre (`/ticket`). */
   const start = async (t: Ticket): Promise<void> => {
     setErr(null)
-    const ws = wsOf(t.id)
+    const ws = wsOf(t)
     if (ws) {
       ui.openPane(ws.id)
       close()
@@ -586,7 +589,7 @@ export function Board(): React.JSX.Element {
               {showRows && (
                 <ul className="f-tickets-rows">
                   {visible.map((t) => {
-                    const ws = wsOf(t.id)
+                    const ws = wsOf(t)
                     const sel = current?.id === t.id
                     const mine = isMineT(t)
                     const st = ws ? spaceStatus(ws.id, ui.agents, ui.permissions) : null
@@ -661,7 +664,7 @@ export function Board(): React.JSX.Element {
             ) : (
               <Detail
                 t={current}
-                ws={wsOf(current.id)}
+                ws={wsOf(current)}
                 mine={isMineT(current)}
                 me={me}
                 estados={estados}

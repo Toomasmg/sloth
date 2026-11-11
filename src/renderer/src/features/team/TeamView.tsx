@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ArrowClockwise,
   ArrowSquareOut,
@@ -20,6 +20,7 @@ import {
 import { useUi } from '../host'
 import { cleanError, fmtTok } from '../../format'
 import type { Workspace } from '../../../../shared/types'
+import { espacioDelTicket } from '../../../../shared/templates-shared'
 import {
   age,
   initials,
@@ -84,11 +85,8 @@ export function TeamView(): React.JSX.Element {
     return () => document.removeEventListener('keydown', onKey)
   }, [confirmar, starting, panel])
 
-  const wsByTicket = useMemo(() => {
-    const m = new Map<string, Workspace>()
-    for (const w of ui.workspaces) if (w.ticket) m.set(w.ticket.toUpperCase(), w)
-    return m
-  }, [ui.workspaces])
+  const espacioDe = (t: TeamTicket): Workspace | undefined =>
+    espacioDelTicket(ui.workspaces, t.id, snap?.tickets.carpetaGh, snap?.tickets.conector?.via === 'gh')
 
   const run = async <T,>(label: string, fn: () => Promise<T>): Promise<T | undefined> => {
     setBusy(label)
@@ -126,7 +124,7 @@ export function TeamView(): React.JSX.Element {
     void run(`pr:${p.url}`, () => ui.invoke('feat:team:openPr', p.url))
   }
   const clickTicket = (t: TeamTicket): void => {
-    const ws = wsByTicket.get(t.id)
+    const ws = espacioDe(t)
     if (ws) {
       ui.openPane(ws.id)
       close()
@@ -159,7 +157,7 @@ export function TeamView(): React.JSX.Element {
   const repoErrors = Object.entries(snap.github.errors)
 
   const ticketRow = (t: TeamTicket): React.JSX.Element => {
-    const ws = wsByTicket.get(t.id)
+    const ws = espacioDe(t)
     const E = ESTADO_CLS[t.categoria]
     return (
       <li key={t.id} className="f-team-row">

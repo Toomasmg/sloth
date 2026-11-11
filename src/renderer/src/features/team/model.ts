@@ -64,6 +64,7 @@ export interface TeamSnapshot {
     running: boolean
     model: string
     confirmar: boolean
+    carpetaGh?: string
   }
   githubRunning: boolean
 }
