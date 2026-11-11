@@ -75,10 +75,15 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
           <div className="field f-tickets-ajustes-campo f-tickets-ajustes-repo">
             <span>Carpeta del repo</span>
             <div className="f-tickets-ajustes-ruta">
-              <code title={snap.config.defaultRepo}>{snap.config.defaultRepo ?? snap.lastRepo ?? 'Sin elegir'}</code>
+              <code title={snap.config.defaultRepo ?? snap.lastRepo}>{snap.config.defaultRepo ?? snap.lastRepo ?? 'Sin elegir'}</code>
               <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => void elegirCarpeta()}>
                 Elegir carpeta…
               </button>
+              {snap.config.defaultRepo && (
+                <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => set({ defaultRepo: '' })} title="Usar la carpeta del último espacio">
+                  Quitar
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -99,10 +104,10 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
       {pendiente && (
         <div className="f-tickets-alert f-tickets-confirm" role="alertdialog" aria-label="Confirmar cambio de conector">
           <span className="f-tickets-alert-text">Cambiar de conector borra la lista actual. ¿Seguimos?</span>
-          <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" autoFocus onClick={confirmar}>
+          <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={confirmar}>
             Cambiar
           </button>
-          <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => setPendiente(null)}>
+          <button type="button" className="f-tickets-b f-tickets-b--sm" autoFocus onClick={() => setPendiente(null)}>
             Cancelar
           </button>
         </div>
