@@ -243,6 +243,9 @@ export function buildArgs(model: string, o: { allow: string[]; deny: string[]; s
     '--disallowedTools',
     o.deny.join(','),
     '--no-session-persistence',
+    // Si la cuenta tiene bypassPermissions o acceptEdits, un texto de un ticket podría usar herramientas sin preguntar.
+    '--permission-mode',
+    'default',
     // Sin hooks: los de Sloth esperan un espacio y el de permisos bloquearía la consulta.
     '--settings',
     J({ disableAllHooks: true }),
