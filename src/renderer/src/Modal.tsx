@@ -180,3 +180,52 @@ export function ModalLoading(): React.JSX.Element {
     </div>
   )
 }
+
+/** La misma pregunta de descarte que hace `Modal`, para las páginas a pantalla completa (PageShell). */
+export function DiscardConfirm({ onKeep, onDiscard }: { onKeep: () => void; onDiscard: () => void }): React.JSX.Element {
+  const id = useId()
+  const boxRef = useRef<HTMLDivElement>(null)
+  const keepRef = useRef<HTMLButtonElement>(null)
+  const keepFn = useRef(onKeep)
+  keepFn.current = onKeep
+
+  useLayoutEffect(() => {
+    keepRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        keepFn.current()
+        return
+      }
+      if (e.key !== 'Tab') return
+      e.preventDefault()
+      const list = focusables(boxRef.current)
+      const i = nextFocusIndex(list.length, list.indexOf(document.activeElement as HTMLElement), e.shiftKey)
+      if (i >= 0) list[i].focus()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
+  return (
+    <div className="modal-backdrop">
+      <div ref={boxRef} className="modal modal-confirm" role="alertdialog" aria-modal="true" aria-labelledby={id} tabIndex={-1}>
+        <h2 id={id} className="modal-confirm-title">
+          ¿Descartar lo que escribiste?
+        </h2>
+        <div className="modal-actions">
+          <button type="button" className="btn ghost" onClick={onDiscard}>
+            Descartar
+          </button>
+          <button type="button" className="btn primary" ref={keepRef} onClick={onKeep}>
+            Seguir editando
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

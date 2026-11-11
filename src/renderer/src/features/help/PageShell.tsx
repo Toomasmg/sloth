@@ -1,4 +1,5 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { DiscardConfirm } from '../../Modal'
 import './page.css'
 
 /**
@@ -11,6 +12,7 @@ export function PageShell({
   onClose,
   right,
   backLabel = '‹ Espacios',
+  dirty,
   className,
   children
 }: {
@@ -20,11 +22,22 @@ export function PageShell({
   right?: ReactNode
   /** Texto del botón para volver (por defecto «‹ Espacios»). */
   backLabel?: ReactNode
+  /** Con algo escrito, Esc o «‹ Espacios» preguntan antes de descartar. */
+  dirty?: boolean
   className?: string
   children: ReactNode
 }): React.JSX.Element {
   const closeRef = useRef(onClose)
   closeRef.current = onClose
+  const dirtyRef = useRef(false)
+  dirtyRef.current = !!dirty
+  const [asking, setAsking] = useState(false)
+  const request = (): void => {
+    if (dirtyRef.current) setAsking(true)
+    else closeRef.current()
+  }
+  const requestRef = useRef(request)
+  requestRef.current = request
   const backRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -33,7 +46,7 @@ export function PageShell({
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape' && !e.defaultPrevented) {
         e.preventDefault()
-        closeRef.current()
+        requestRef.current()
       }
     }
     window.addEventListener('keydown', onKey)
@@ -46,7 +59,7 @@ export function PageShell({
   return (
     <div className={`page-shell ${className ?? ''}`} role="dialog" aria-modal="true" aria-labelledby={labelId}>
       <header className="page-head">
-        <button ref={backRef} type="button" className="page-back" onClick={() => closeRef.current()}>
+        <button ref={backRef} type="button" className="page-back" onClick={request}>
           {backLabel}
         </button>
         <span className="page-sep" aria-hidden="true" />
@@ -57,6 +70,7 @@ export function PageShell({
         {right}
       </header>
       <div className="page-body">{children}</div>
+      {asking && <DiscardConfirm onKeep={() => setAsking(false)} onDiscard={() => closeRef.current()} />}
     </div>
   )
 }

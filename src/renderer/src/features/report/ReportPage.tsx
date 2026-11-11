@@ -220,8 +220,10 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
     )
   }
 
+  const dirty = title.trim() !== '' || what.trim() !== '' || expect.trim() !== '' || steps.some((x) => x.text.trim() !== '') || shotData !== null
+
   return (
-    <PageShell labelId="rp-title" title="Reportar un problema" onClose={onClose}>
+    <PageShell labelId="rp-title" title="Reportar un problema" onClose={onClose} dirty={dirty}>
       <div className="rp-wrap">
         <header className="rp-head">
           <h1 id="rp-title">Reportar un problema</h1>
