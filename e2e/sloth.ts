@@ -1,4 +1,4 @@
-import { test as base, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
+import { test as base, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -20,6 +20,10 @@ export interface Seed {
 }
 
 export const ACCOUNT_ID = 'acc-e2e'
+/** Prefijo de las carpetas de datos de prueba (global-teardown barre las que queden). */
+export const USERDATA_PREFIX = 'sloth-e2e-'
+/** El proceso de cada app, guardado al abrirla: después de que se cierra sola, Playwright ya no lo da. */
+const procs = new WeakMap<ElectronApplication, ReturnType<ElectronApplication['process']>>()
 
 function seedUserData(dir: string, seed: Seed): void {
   const features = join(dir, 'features')
@@ -50,13 +54,16 @@ function seedUserData(dir: string, seed: Seed): void {
 }
 
 export async function launchSloth(seed: Seed = {}): Promise<{ app: ElectronApplication; page: Page; userData: string }> {
-  const userData = mkdtempSync(join(tmpdir(), 'sloth-e2e-'))
+  const userData = mkdtempSync(join(tmpdir(), USERDATA_PREFIX))
   seedUserData(userData, seed)
   const app = await electron.launch({
     args: ['--force-device-scale-factor=1', '.'],
     env: { ...process.env, SLOTH_USER_DATA: userData, SLOTH_INPROCESS: '1', ELECTRON_RENDERER_URL: '' }
   })
+  procs.set(app, app.process())
   const page = await app.firstWindow()
+  // La ventana arranca oculta y se muestra al terminar de dibujarse (ready-to-show).
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible() ?? false)).toBe(true)
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows()[0]
     w.unmaximize()
@@ -68,19 +75,32 @@ export async function launchSloth(seed: Seed = {}): Promise<{ app: ElectronAppli
   return { app, page, userData }
 }
 
+/** Cierra Sloth sin preguntas (el aviso de la X es nativo y frenaría el cierre) y borra sus datos de prueba. */
+export async function closeSloth(app: ElectronApplication, userData: string): Promise<void> {
+  const proc = procs.get(app)
+  if (proc && proc.exitCode === null) {
+    const closed = new Promise<void>((r) => proc.once('exit', () => r()))
+    await app.evaluate(({ app: a }) => a.exit(0)).catch(() => undefined)
+    // Si no cierra en 5 s, se mata.
+    await Promise.race([closed, new Promise((r) => setTimeout(r, 5000))])
+    if (proc.exitCode === null) proc.kill()
+  }
+  // Los procesos hijos de Chromium tardan un poco más en soltar sus archivos. Lo que quede, lo barre global-teardown.
+  await new Promise((r) => setTimeout(r, 300))
+  try {
+    rmSync(userData, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
+  } catch {
+    /* lo borra global-teardown */
+  }
+}
+
 export const test = base.extend<{ seed: Seed; sloth: { app: ElectronApplication; page: Page } }>({
   seed: [{}, { option: true }],
   sloth: async ({ seed }, use) => {
     const { app, page, userData } = await launchSloth(seed)
     await use({ app, page })
-    // Cerrar sin preguntas (el aviso de la X es nativo y frenaría el cierre). Si no cierra en 5 s, se mata.
-    const proc = app.process()
-    const closed = new Promise<void>((r) => (proc.exitCode !== null ? r() : proc.once('exit', () => r())))
-    await app.evaluate(({ app: a }) => a.exit(0)).catch(() => undefined)
-    await Promise.race([closed, new Promise((r) => setTimeout(r, 5000))])
-    if (proc.exitCode === null) proc.kill()
-    rmSync(userData, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
+    await closeSloth(app, userData)
   }
 })
 
-export { expect } from '@playwright/test'
+export { expect }
