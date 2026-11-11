@@ -79,6 +79,7 @@ import {
   ChangesIcon,
   ChatIcon,
   CloseIcon,
+  HideIcon,
   EditorIcon,
   ErrorIcon,
   FolderIcon,
@@ -374,6 +375,16 @@ export function App(): React.JSX.Element {
   }
   const requestHidePane = async (id: string): Promise<void> => {
     if (await allowPaneAction(id, 'hide')) closePane(id)
+  }
+  const requestClosePane = async (id: string): Promise<void> => {
+    if (agents[id]?.state === 'working' && !window.confirm('Claude está trabajando en este panel. ¿Cerrarlo y cortar la terminal?')) return
+    if (!(await allowPaneAction(id, 'hide'))) return
+    closePane(id)
+    try {
+      await api.ptyKill(id)
+    } catch (e) {
+      setError(cleanError(e))
+    }
   }
   const requestRestartPane = async (id: string): Promise<void> => {
     if (await allowPaneAction(id, 'restart')) await restartPane(id)
@@ -1225,12 +1236,19 @@ export function App(): React.JSX.Element {
                   },
                   {
                     id: 'hide',
-                    label: 'Cerrar panel',
+                    label: 'Ocultar panel',
                     hint: 'la terminal sigue',
-                    icon: <CloseIcon size={15} aria-hidden="true" />,
-                    danger: true,
+                    icon: <HideIcon size={15} aria-hidden="true" />,
                     sepBefore: true,
                     onSelect: () => void requestHidePane(paneId)
+                  },
+                  {
+                    id: 'close',
+                    label: 'Cerrar panel',
+                    hint: 'corta la terminal',
+                    icon: <CloseIcon size={15} aria-hidden="true" />,
+                    danger: true,
+                    onSelect: () => void requestClosePane(paneId)
                   }
                 ]
                 const title = login ? 'Terminal de cuenta' : (ws?.name ?? '')
