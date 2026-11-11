@@ -327,7 +327,9 @@ function setConfig(raw: unknown): TicketsSnapshot {
   }
   if ('assigneeId' in p) {
     const s = texto(p.assigneeId, ASSIGNEE_MAX, 'El id de persona') ?? ''
-    if (!assigneeValido(s)) throw new Error('El id de persona solo lleva letras, números y guiones.')
+    const def = conectorPorId(nuevo?.id ?? state.config.conectorId)
+    if (!assigneeValido(s, def))
+      throw new Error(def ? `Ese id de persona no tiene el formato de ${def.nombre}.` : 'El id de persona solo lleva letras, números y guiones.')
     c.assigneeId = s
   }
   if ('defaultRepo' in p) c.defaultRepo = dir(p.defaultRepo, 'Repo por defecto')

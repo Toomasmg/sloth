@@ -6,9 +6,9 @@
  */
 import { ACCIONES, CATEGORIAS, type Accion, type Estado } from '../../../shared/tickets'
 
-export type ArgValor = string | number | boolean | null
+export type ArgValor = string | number | boolean | null | { [k: string]: ArgValor }
 
-/** Un string que es EXACTAMENTE `{ticket}`, `{estado}`… se reemplaza por el valor tipado; si el valor es undefined, la clave no va. */
+/** Un string que es EXACTAMENTE `{ticket}`, `{estado}`… se reemplaza por el valor tipado; si el valor es undefined, la clave no va. Admite objetos anidados (hasta 3 niveles). */
 export interface PasoLlamada {
   herramienta: string
   args: Record<string, ArgValor>
@@ -16,7 +16,7 @@ export interface PasoLlamada {
 
 export interface PistaAccion {
   args: Record<string, ArgValor>
-  /** Admite solo `{ticket}`. */
+  /** Admite los mismos placeholders que los args de la acción. */
   nota?: string
 }
 
@@ -27,6 +27,8 @@ export interface ConectorBase {
   /** Anclada con ^…$; se compila como ^(?:…)$ para que una alternancia no la desancle. */
   idRegex: string
   idMayusculas: boolean
+  /** Forma del id de persona, anclada como idRegex. Sin esto, letras, números y guiones. */
+  personaId?: string
   ejemplo: { id: string; estado: string; prioridad: string; proyecto: string }
   estados: Estado[]
   /** Lo que responde Claude cuando la cuenta no tiene el conector, y lo que se le muestra a la persona. */
@@ -42,6 +44,8 @@ export interface ConectorMcp extends ConectorBase {
     detalle: string[]
     escritura: Partial<Record<Accion, string>>
     negar: string[]
+    /** De lectura, permitidas también en el detalle y en cada acción (p. ej. para sacar un id de sitio). */
+    apoyo?: string[]
   }
   pistas: {
     /** conId lleva `{id}` una sola vez. */
@@ -50,6 +54,8 @@ export interface ConectorMcp extends ConectorBase {
     /** Sin esto no hay paso 3 ni "estados" en el ejemplo. */
     estados?: string
     detalle: PasoLlamada[]
+    /** Cuándo usar las herramientas de apoyo; admite solo `{ticket}`. */
+    apoyo?: string
     acciones: Partial<Record<Accion, PistaAccion>>
   }
 }
@@ -89,7 +95,8 @@ export class ConectorInvalidoError extends Error {
 
 type Obj = Record<string, unknown>
 
-const PROF_MAX = 6
+// Los args de una pista quedan a 4 niveles de la raíz y admiten 3 más adentro.
+const PROF_MAX = 7
 const TAM_MAX = 64 * 1024
 const PISTA_MAX = 1000
 const NOMBRE_RE = /^[\p{L}\p{N}][\p{L}\p{N} ._&-]{0,39}$/u
@@ -97,7 +104,8 @@ const CLAVE_ESTADO_RE = /^[a-z0-9_]{1,40}$/
 const CLAVE_FALTA_RE = /^[a-z_]{3,40}$/
 const PREFIJO_RE = /^mcp__[A-Za-z0-9_-]+__$/
 const CORTO_RE = /^[A-Za-z0-9_-]{1,64}$/
-const ARG_RE = /^[a-z_][a-z0-9_]{0,40}$/
+const ARG_RE = /^[a-z_][A-Za-z0-9_]{0,40}$/
+const ARGS_PROF_MAX = 3
 const PLACEHOLDER_RE = /^\{([A-Za-z]+)\}$/
 // Lo que va dentro de un JSON de ejemplo del prompt: sin nada que lo pueda cerrar o escapar.
 const SIN_ESCAPE = /^[^"\\{}]*$/
@@ -172,7 +180,7 @@ function herramientas(v: unknown, ruta: string, min: number, max: number): strin
   return xs
 }
 
-function args(v: unknown, ruta: string, permitidos: readonly string[]): void {
+function args(v: unknown, ruta: string, permitidos: readonly string[], prof = 1): void {
   if (!esPlano(v)) fallar(ruta, 'tiene que ser un objeto')
   const claves = Object.keys(v)
   if (claves.length < 1 || claves.length > 10) fallar(ruta, 'tiene que tener entre 1 y 10 argumentos')
@@ -181,6 +189,11 @@ function args(v: unknown, ruta: string, permitidos: readonly string[]): void {
     if (!ARG_RE.test(k)) fallar(r, 'nombre de argumento inválido')
     const x = v[k]
     if (x === null || typeof x === 'number' || typeof x === 'boolean') continue
+    if (esPlano(x)) {
+      if (prof >= ARGS_PROF_MAX) fallar(r, `más de ${ARGS_PROF_MAX} niveles de argumentos`)
+      args(x, r, permitidos, prof + 1)
+      continue
+    }
     const s = campo(x, r, 200)
     if (!LLAVES.test(s)) continue
     const m = PLACEHOLDER_RE.exec(s)
@@ -188,8 +201,9 @@ function args(v: unknown, ruta: string, permitidos: readonly string[]): void {
   }
 }
 
-function soloTicket(v: unknown, ruta: string): void {
-  if (LLAVES.test(campo(v, ruta, PISTA_MAX).replaceAll('{ticket}', ''))) fallar(ruta, 'solo admite {ticket}')
+function soloPlaceholders(v: unknown, ruta: string, permitidos: readonly string[]): void {
+  const resto = permitidos.reduce((s, p) => s.replaceAll(`{${p}}`, ''), campo(v, ruta, PISTA_MAX))
+  if (LLAVES.test(resto)) fallar(ruta, `solo admite ${permitidos.map((p) => `{${p}}`).join(', ')}`)
 }
 
 function compilar(idRegex: string): RegExp {
@@ -214,15 +228,17 @@ const en = (xs: readonly string[], v: unknown): boolean => typeof v === 'string'
 
 const R = 'conector'
 const CLAVES_BASE = ['id', 'nombre', 'via', 'verificado', 'idRegex', 'idMayusculas', 'ejemplo', 'estados', 'faltaConector']
+const OPCIONALES_BASE = ['personaId']
 
 /** Valida lo común a toda vía y devuelve el objeto con las claves de estado. */
 function validarBase(raw: Obj, extras: readonly string[]): { o: Obj; claves: string[] } {
-  const o = objeto(raw, R, [...CLAVES_BASE, ...extras])
+  const o = objeto(raw, R, [...CLAVES_BASE, ...extras], OPCIONALES_BASE)
   campo(o.id, `${R}.id`, 32, ID_CONECTOR_RE)
   campo(o.nombre, `${R}.nombre`, 40, NOMBRE_RE)
   booleano(o.verificado, `${R}.verificado`)
   const mayusculas = booleano(o.idMayusculas, `${R}.idMayusculas`)
   const re = idRegex(o.idRegex, `${R}.idRegex`)
+  if ('personaId' in o) idRegex(o.personaId, `${R}.personaId`)
 
   const claves = lista(o.estados, `${R}.estados`, 1, 30).map((x, i) => {
     const r = `${R}.estados[${i}]`
@@ -257,7 +273,7 @@ function validarGh(raw: Obj): void {
 function validarMcp(raw: Obj): void {
   const { o } = validarBase(raw, ['herramientas', 'pistas'])
   const H = `${R}.herramientas`
-  const h = objeto(o.herramientas, H, ['prefijo', 'lista', 'detalle', 'escritura', 'negar'])
+  const h = objeto(o.herramientas, H, ['prefijo', 'lista', 'detalle', 'escritura', 'negar'], ['apoyo'])
   campo(h.prefijo, `${H}.prefijo`, 64, PREFIJO_RE)
   const deLista = herramientas(h.lista, `${H}.lista`, 1, 20)
   const deDetalle = herramientas(h.detalle, `${H}.detalle`, 0, 20)
@@ -267,16 +283,21 @@ function validarMcp(raw: Obj): void {
   const lectura = new Set([...deLista, ...deDetalle])
   const choca = [...negar, ...deEscritura].find((t) => lectura.has(t))
   if (choca) fallar(H, `«${choca}» no puede ser de lectura y estar negada o escribir`)
+  const apoyo = 'apoyo' in h ? herramientas(h.apoyo, `${H}.apoyo`, 0, 10) : []
+  const apoyoChoca = apoyo.find((t) => negar.includes(t) || deEscritura.includes(t))
+  if (apoyoChoca) fallar(`${H}.apoyo`, `«${apoyoChoca}» no puede ser de apoyo y estar negada o escribir`)
   if ('criterio' in escritura && !deDetalle.length) fallar(`${H}.escritura.criterio`, 'tildar criterios necesita herramientas de detalle (de ahí salen sus ids)')
 
   const P = `${R}.pistas`
-  const p = objeto(o.pistas, P, ['yo', 'lista', 'detalle', 'acciones'], ['estados'])
+  const p = objeto(o.pistas, P, ['yo', 'lista', 'detalle', 'acciones'], ['estados', 'apoyo'])
   const yo = objeto(p.yo, `${P}.yo`, ['conId', 'sinId'])
   const conId = campo(yo.conId, `${P}.yo.conId`, PISTA_MAX)
   if (conId.split('{id}').length !== 2 || LLAVES.test(conId.replace('{id}', ''))) fallar(`${P}.yo.conId`, 'tiene que llevar {id} una sola vez y ninguna otra llave')
   campo(yo.sinId, `${P}.yo.sinId`, PISTA_MAX)
   campo(p.lista, `${P}.lista`, PISTA_MAX)
   if ('estados' in p) campo(p.estados, `${P}.estados`, PISTA_MAX)
+  if ('apoyo' in p) soloPlaceholders(p.apoyo, `${P}.apoyo`, ['ticket'])
+  if (!('apoyo' in p) !== !apoyo.length) fallar(`${P}.apoyo`, 'la pista de apoyo y las herramientas de apoyo van juntas')
 
   const pasos = lista(p.detalle, `${P}.detalle`, 0, 20)
   if (!pasos.length !== !deDetalle.length) fallar(`${P}.detalle`, 'hay pasos de detalle sin herramientas de detalle o al revés')
@@ -292,7 +313,7 @@ function validarMcp(raw: Obj): void {
     const r = `${P}.acciones.${a}`
     const pista = objeto(x, r, ['args'], ['nota'])
     args(pista.args, `${r}.args`, PLACEHOLDERS[a as Accion])
-    if ('nota' in pista) soloTicket(pista.nota, `${r}.nota`)
+    if ('nota' in pista) soloPlaceholders(pista.nota, `${r}.nota`, PLACEHOLDERS[a as Accion])
   }
 }
 
@@ -318,6 +339,16 @@ const regexes = new WeakMap<ConectorDef, RegExp>()
 export function regexDeId(def: ConectorDef): RegExp {
   let re = regexes.get(def)
   if (!re) regexes.set(def, (re = compilar(def.idRegex)))
+  return re
+}
+
+const personas = new WeakMap<ConectorDef, RegExp>()
+export const PERSONA_POR_DEFECTO = /^[A-Za-z0-9-]{1,64}$/
+
+export function regexDePersona(def: ConectorDef): RegExp {
+  if (def.personaId === undefined) return PERSONA_POR_DEFECTO
+  let re = personas.get(def)
+  if (!re) personas.set(def, (re = compilar(def.personaId)))
   return re
 }
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ConectorInvalidoError, nombreCompleto, regexDeId, validarConector, type ConectorMcp } from './conector'
+import { ConectorInvalidoError, nombreCompleto, regexDeId, regexDePersona, validarConector, type ConectorMcp } from './conector'
 import { CONECTORES, conectorPorId } from './conectores'
 import github from './conectores/github'
 import gruv from './conectores/gruv'
@@ -38,13 +38,10 @@ test('Gruv valida y la copia es nueva, igual e idempotente', () => {
 })
 
 test('el registro trae Gruv y GitHub validados', () => {
-  assert.deepEqual(
-    CONECTORES.map((c) => c.id),
-    ['gruv', 'github']
-  )
+  assert.deepEqual(CONECTORES.slice(0, 2).map((c) => c.id), ['gruv', 'github'])
   assert.deepEqual(conectorPorId('github'), github)
   assert.deepEqual(conectorPorId('gruv'), gruv)
-  assert.equal(conectorPorId('jira'), undefined)
+  assert.equal(conectorPorId('trello'), undefined)
 })
 
 test('regexDeId se compila una vez y una alternancia no desancla', () => {
@@ -67,7 +64,7 @@ const RECHAZOS: Array<[string, unknown, RegExp]> = [
   ['Infinity', con('pistas.acciones.horas.args.minutos', Infinity), /no finito/],
   ['Date', con('ejemplo', new Date(0)), /no es plano/],
   ['Map', con('herramientas.escritura', new Map()), /no es plano/],
-  ['demasiado anidado', con('pistas.acciones.horas.args.minutos', { a: { b: 1 } }), /niveles/],
+  ['demasiado anidado', con('pistas.acciones.horas.args.minutos', { a: { b: { c: 1 } } }), /niveles/],
   ['más de 64 KB', con('herramientas.negar', Array.from({ length: 3000 }, (_, i) => `herramienta_${i}_${'x'.repeat(20)}`)), /64 KB/],
   ['clave desconocida arriba', con('extra', 1), /conector\.extra: clave desconocida/],
   ['clave desconocida adentro', con('pistas.yo.otro', 'x'), /pistas\.yo\.otro: clave desconocida/],
@@ -104,7 +101,17 @@ const RECHAZOS: Array<[string, unknown, RegExp]> = [
   ['argumento objeto', con('pistas.acciones.estado.args.id', ['x']), /texto no vacío/],
   ['placeholder de otra acción', con('pistas.acciones.estado.args.id', '{cuerpo}'), /solo admite \{ticket\}, \{estado\}/],
   ['placeholder a medias', con('pistas.acciones.estado.args.id', 'TCK {ticket}'), /como valor completo/],
-  ['nota con otra llave', con('pistas.acciones.estado.nota', 'Para {persona}'), /nota: solo admite \{ticket\}/],
+  ['nota con otra llave', con('pistas.acciones.estado.nota', 'Para {persona}'), /nota: solo admite \{ticket\}, \{estado\}/],
+  ['nota de comentar con {estado}', con('pistas.acciones.comentar.nota', 'Pasalo a {estado}'), /comentar\.nota: solo admite \{ticket\}, \{cuerpo\}/],
+  ['personaId sin anclar', con('personaId', '[a-z]+'), /personaId: tiene que estar anclada/],
+  ['apoyo negado', con('herramientas.apoyo', ['mover_ticket']), /«mover_ticket» no puede ser de apoyo/],
+  ['apoyo que escribe', con('herramientas.apoyo', ['sumar_al_reloj']), /«sumar_al_reloj» no puede ser de apoyo/],
+  ['pista de apoyo sin herramientas', con('pistas.apoyo', 'Antes mirá el ticket {ticket}.'), /pistas\.apoyo: la pista de apoyo/],
+  ['herramientas de apoyo sin pista', con('herramientas.apoyo', ['ver_mi_inicio']), /pistas\.apoyo: la pista de apoyo/],
+  ['pista de apoyo con otra llave', { ...(con('herramientas.apoyo', ['ver_mi_inicio']) as object), pistas: { ...gruv.pistas, apoyo: 'Para {estado}' } }, /pistas\.apoyo: solo admite \{ticket\}/],
+  ['args anidados de más', con('pistas.acciones.tomar.args', { id: '{ticket}', a: { b: { c: { d: '{persona}' } } } }), /niveles/],
+  ['placeholder ajeno anidado', con('pistas.acciones.tomar.args', { id: '{ticket}', a: { b: '{cuerpo}' } }), /tomar\.args\.a\.b: solo admite/],
+  ['lista en los args', con('pistas.acciones.tomar.args', { id: '{ticket}', a: { b: ['x'] } }), /texto no vacío/],
   ['pista de acción que falta', con('pistas.acciones.comentar', BORRAR), /acciones\.comentar: falta/],
   ['pista de acción sin herramienta', con('herramientas.escritura.comentar', BORRAR), /acciones\.comentar: clave desconocida/],
   ['conId sin {id}', con('pistas.yo.conId', 'Tu id es fijo.'), /una sola vez/],
@@ -143,4 +150,23 @@ test('GitHub valida y no lleva herramientas ni pistas', () => {
 test('GitHub solo admite los estados que gh sabe mover', () => {
   rechaza(gh({ estados: [...github.estados, { clave: 'en_curso', nombre: 'En curso', categoria: 'en_curso' }] }), /estados\[2\]\.clave: con gh/)
   rechaza(gh({ estados: [{ clave: 'cerrado', nombre: 'Cerrado', categoria: 'pendiente' }], ejemplo: { ...github.ejemplo, estado: 'cerrado' } }), /hace falta el estado 'abierto'/)
+})
+
+test('acepta args anidados, notas con placeholders de la acción, apoyo y personaId', () => {
+  const d = structuredClone(gruv) as unknown as ConectorMcp
+  d.personaId = '^[A-Za-z0-9:-]{1,128}$'
+  d.herramientas.apoyo = ['ver_mi_inicio', 'buscar_persona']
+  d.pistas.apoyo = 'Mirá antes el ticket {ticket}.'
+  d.pistas.acciones.tomar = { args: { id: '{ticket}', campos: { responsable: { id: '{persona}' } } }, nota: 'Para {persona} en {ticket}.' }
+  d.pistas.acciones.estado = { args: { id: '{ticket}', estado: '{estado}' }, nota: 'Al estado {estado}.' }
+  assert.deepEqual(validarConector(d), d)
+})
+
+test('regexDePersona: la del conector, cacheada, o la de siempre', () => {
+  assert.equal(regexDePersona(validarConector(gruv)).test('a1-b'), true)
+  assert.equal(regexDePersona(validarConector(gruv)).test('557058:abc'), false)
+  const d = validarConector({ ...structuredClone(gruv), personaId: '^[a-z]+|[0-9]+$' })
+  assert.equal(regexDePersona(d), regexDePersona(d))
+  assert.equal(regexDePersona(d).test('abc'), true)
+  assert.equal(regexDePersona(d).test('abc1'), false)
 })

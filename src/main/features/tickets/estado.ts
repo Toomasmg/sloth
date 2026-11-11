@@ -5,7 +5,7 @@
  * properties, y los tipos se importan con `type`.
  */
 import { MODELOS, type Corrida, type EstadoBase, type Modelo, type Ticket, type TicketsConfig, type Yo } from '../../../shared/tickets'
-import { ID_CONECTOR_RE, ID_MAX, ID_SEGURO_RE, type ConectorDef } from './conector'
+import { ID_CONECTOR_RE, ID_MAX, ID_SEGURO_RE, regexDePersona, type ConectorDef } from './conector'
 import { CONECTOR_POR_DEFECTO } from './conectores'
 import { idValido, normalizeEstados, normEstado, normYo } from './motor'
 
@@ -46,8 +46,9 @@ const noVacio = (v: unknown): string | undefined => (typeof v === 'string' && v 
 
 export const ASSIGNEE_MAX = 80
 const ASSIGNEE_RE = /^[A-Za-z0-9-]+$/
-/** El id de persona va al prompt de la lista: vacío o solo letras, números y guiones. */
-export const assigneeValido = (s: string): boolean => s === '' || (s.length <= ASSIGNEE_MAX && ASSIGNEE_RE.test(s))
+/** El id de persona va al prompt de la lista: vacío o con la forma que pide el conector (si no pide ninguna, letras, números y guiones). */
+export const assigneeValido = (s: string, def?: ConectorDef): boolean =>
+  s === '' || (s.length <= ASSIGNEE_MAX && (def?.personaId ? regexDePersona(def) : ASSIGNEE_RE).test(s))
 
 /** Saca las claves undefined: así sanear(sanear(x)) da lo mismo que sanear(x). */
 function sinVacios<T extends object>(o: T): T {
@@ -68,14 +69,15 @@ export function parsearArchivo(texto: string | null, mtimeMs = 0): Lectura {
   }
 }
 
-function sanearConfig(raw: unknown): TicketsConfig {
+function sanearConfig(raw: unknown, buscar: Buscar): TicketsConfig {
   const c = esObjeto(raw) ? raw : {}
   const repos = esObjeto(c.projectRepos) ? c.projectRepos : {}
+  const conectorId = typeof c.conectorId === 'string' && ID_CONECTOR_RE.test(c.conectorId) ? c.conectorId : CONECTOR_POR_DEFECTO
   return sinVacios({
-    conectorId: typeof c.conectorId === 'string' && ID_CONECTOR_RE.test(c.conectorId) ? c.conectorId : CONECTOR_POR_DEFECTO,
+    conectorId,
     queryAccountId: noVacio(c.queryAccountId),
     model: MODELOS.includes(c.model as Modelo) ? (c.model as Modelo) : 'haiku',
-    assigneeId: typeof c.assigneeId === 'string' && assigneeValido(c.assigneeId) ? c.assigneeId : '',
+    assigneeId: typeof c.assigneeId === 'string' && assigneeValido(c.assigneeId, buscar(conectorId)) ? c.assigneeId : '',
     defaultRepo: noVacio(c.defaultRepo),
     projectRepos: Object.fromEntries(Object.entries(repos).filter((e): e is [string, string] => typeof e[1] === 'string')),
     confirmRefresh: c.confirmRefresh !== false
@@ -108,7 +110,7 @@ function armar(o: Obj, config: TicketsConfig, buscar: Buscar, migradoDe: unknown
     version: 2,
     tickets: sanearTickets(o.tickets, def),
     estados: normalizeEstados(def, o.estados),
-    me: normYo(o.me),
+    me: normYo(def, o.me),
     fetchedAt: numero(o.fetchedAt),
     fetchedBy: noVacio(o.fetchedBy),
     lastRun: sanearCorrida(o.lastRun),
@@ -121,13 +123,13 @@ function armar(o: Obj, config: TicketsConfig, buscar: Buscar, migradoDe: unknown
 /** Limpia un tickets.json v2 (puede venir editado a mano). null si no es un v2. */
 export function sanearEstado(raw: unknown, buscar: Buscar): TicketsState | null {
   if (!esObjeto(raw) || raw.version !== 2) return null
-  return armar(raw, sanearConfig(raw.config), buscar, raw.migradoDe)
+  return armar(raw, sanearConfig(raw.config, buscar), buscar, raw.migradoDe)
 }
 
 /** gruv.json v1 → v2 con el conector de Gruv. gruv.json no se toca. */
 export function migrarDeGruv(raw: unknown, buscar: Buscar, ahora: number, gruvMtimeMs: number): TicketsState | null {
   if (!esObjeto(raw)) return null
-  const config = sanearConfig({ ...(esObjeto(raw.config) ? raw.config : {}), conectorId: 'gruv' })
+  const config = sanearConfig({ ...(esObjeto(raw.config) ? raw.config : {}), conectorId: 'gruv' }, buscar)
   return armar(raw, config, buscar, { archivo: 'gruv.json', en: ahora, gruvMtimeMs })
 }
 
