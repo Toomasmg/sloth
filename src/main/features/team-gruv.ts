@@ -1,5 +1,5 @@
 import { execFile, spawn } from 'node:child_process'
-import { extractJson, normEstado, NO_GRUV, NoGruvError, WRITE_TOOLS } from './gruv-claude'
+import { extractJson, normEstado, NO_GRUV, NoGruvError, WRITE_TOOLS } from './tickets/legado-gruv'
 import { ACTIVE_ESTADOS, TICKET_ID_RE, type ActiveEstado, type GruvPersona, type TeamTicket } from './team-core'
 
 /**
