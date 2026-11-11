@@ -168,7 +168,7 @@ export function Propios({ snap }: { snap: Snapshot }): React.JSX.Element {
 
       {aBorrar && (
         <div className="f-tickets-alert f-tickets-confirm" role="alertdialog" aria-label={`Confirmar borrar ${aBorrar.nombre}`}>
-          <span className="f-tickets-alert-text">¿Borrar {aBorrar.nombre}? Si es el que usás, volvés a Gruv.</span>
+          <span className="f-tickets-alert-text">¿Borrar {aBorrar.nombre}? Si es el que usás, Tickets queda sin conector.</span>
           <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--solid-danger" onClick={() => confirmarBorrar(aBorrar.id)}>
             Borrar
           </button>

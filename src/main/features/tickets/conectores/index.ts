@@ -12,7 +12,8 @@ import notion from './notion'
 import shortcut from './shortcut'
 import youtrack from './youtrack'
 
-export const CONECTOR_POR_DEFECTO = 'gruv'
+/** Donde caen gruv.json y los tickets.json viejos sin conector válido: así los usuarios de antes siguen igual. */
+export const CONECTOR_LEGADO = 'gruv'
 
 /** Un conector mal escrito se saltea con un aviso: no tira la app. */
 function registrar(defs: readonly unknown[]): ConectorDef[] {

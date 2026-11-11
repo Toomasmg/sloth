@@ -102,7 +102,7 @@ const feature: Feature = {
     ctx.handle('suggestRepos', () => {
       const fromWs = [...new Set(ctx.store.workspaces.map((w) => w.repoPath))]
       const list = repoCandidates(homedir(), [...(state.repoPath ? [state.repoPath] : []), ...fromWs])
-      return { list, preferred: 'C:\\dev\\work\\Cosmos-Ai' }
+      return { list }
     })
 
     ctx.handle('inspectRepo', (p: unknown) => {

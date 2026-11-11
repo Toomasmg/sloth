@@ -366,7 +366,7 @@ summary:focus-visible {
   background: var(--seg-on);
   color: var(--fg);
 }
-/* Accesos de texto bajo las plantillas («Administrar plantillas…», «Desde un ticket de Gruv…»): links claros. */
+/* Accesos de texto bajo las plantillas («Administrar plantillas…», «Desde un ticket…»): links claros. */
 .nw-links {
   display: flex;
   flex-wrap: wrap;

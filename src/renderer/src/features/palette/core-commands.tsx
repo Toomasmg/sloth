@@ -50,10 +50,10 @@ export function coreCommands(ctx: UiCtx): Command[] {
       {
         id: 'palette:new-ws-ticket',
         title: 'Espacio desde ticket',
-        subtitle: 'Abre Claude con /ticket TCK-…',
+        subtitle: 'Un espacio con el id del ticket',
         group: 'General',
         icon: <TagIcon size={16} />,
-        keywords: 'crear tck gruv',
+        keywords: 'crear ticket issue',
         run: () => ctx.openNewWorkspace('ticket')
       }
     )

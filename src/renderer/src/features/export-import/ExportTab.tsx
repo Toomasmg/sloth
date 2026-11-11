@@ -149,7 +149,7 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
               <input type="checkbox" checked={sel.plantillas} onChange={() => flag('plantillas')} />
               <span className="f-ei-grow">
                 <span className="f-ei-name">Plantillas</span>
-                <span className="f-ei-desc">Las plantillas para crear espacios: migración, revisión de PR y ticket de Gruv.</span>
+                <span className="f-ei-desc">Las plantillas para crear espacios, con sus nombres, ramas y primer mensaje.</span>
               </span>
               <span className="f-ei-size">{ov.plantillas === 0 ? 'Ninguna' : `${ov.plantillas} · ${fmtKb(prev.kb.plantillas)}`}</span>
             </label>

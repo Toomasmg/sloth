@@ -146,6 +146,9 @@ export interface Corrida {
   durationMs?: number
 }
 
+/** conectorId de «todavía no elegiste conector» (usuarios nuevos). */
+export const SIN_CONECTOR = ''
+
 export interface TicketsSnapshot {
   conector: ConectorInfo
   /** Los que se pueden elegir en esta versión. */
@@ -165,8 +168,6 @@ export interface TicketsSnapshot {
   /** Acciones que esta cuenta no puede hacer, con el motivo. */
   noDisponible?: Partial<Record<Accion, string>>
   lastRepo?: string
-  /** Si el conector elegido no está en esta versión, al que se puede volver. */
-  porDefecto?: { id: string; nombre: string }
   /** Conectores propios o del equipo que no se cargaron, y por qué. */
   avisosPropios?: string[]
 }

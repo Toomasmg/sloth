@@ -20,7 +20,7 @@ export function draftFromWorkspace(ws: Workspace): {
   useWorktree?: { branchPattern: string }
 } {
   const tk = ws.ticket
-  // TCK-1234 → {ticket}; tck-1234 → {ticketmin} (respeta cómo está escrito en la rama).
+  // PROJ-123 → {ticket}; proj-123 → {ticketmin} (respeta cómo está escrito en la rama).
   const sub = (s?: string): string | undefined =>
     s && tk ? s.replace(new RegExp(escapeRe(tk), 'g'), '{ticket}').replace(new RegExp(escapeRe(tk.toLowerCase()), 'g'), '{ticketmin}') : s
   const hasTk = Boolean(tk && ws.name.toUpperCase().includes(tk))
