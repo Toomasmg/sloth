@@ -114,6 +114,11 @@ function commit(next: SlothSettings): SettingsPayload {
   return p
 }
 
+/** Cambia la configuración desde main (mismas validaciones que la UI) y avisa a la ventana. */
+export function patchSettings(patch: Partial<SlothSettings>): void {
+  commit(applyPatch(settings, patch))
+}
+
 const feature: Feature = {
   name: 'settings',
   register(ctx) {

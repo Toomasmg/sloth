@@ -13,7 +13,7 @@ export function spaceStatus(
 ): SpaceStatus {
   if (permissions.some((p) => p.workspaceId === wsId)) return 'perm'
   const a = agents[wsId]
-  if (a?.state === 'exited') return 'closed'
+  if (a?.state === 'exited' || a?.state === 'sleeping') return 'closed'
   if (!a || a.state === 'idle') return 'idle'
   return a.state
 }

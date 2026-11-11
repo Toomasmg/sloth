@@ -100,6 +100,7 @@ app.whenReady().then(async () => {
   const hookListeners: ((p: HookEventPayload) => void)[] = []
   const dataListeners: ((id: string, chunks: PtyChunk[]) => void)[] = []
   const exitListeners: ((id: string, code: number) => void)[] = []
+  const writeListeners: ((id: string, data: string) => void)[] = []
   const commandOverrides: ((ws: Workspace, acc: Account) => string | undefined)[] = []
   const safe = (name: string, fn: () => void): void => {
     try {
@@ -160,7 +161,8 @@ app.whenReady().then(async () => {
         b.on('exit', (id: string, code: number) => {
           send('pty:exit', id, code)
           for (const l of exitListeners) safe('pty-exit', () => l(id, code))
-          if (store.workspace(id)) setAgent(id, { state: 'exited', at: Date.now() })
+          // Un espacio dormido sigue «Dormido» (su terminal se cerró a propósito).
+          if (store.workspace(id) && agents.get(id)?.state !== 'sleeping') setAgent(id, { state: 'exited', at: Date.now() })
         })
         b.on('hook', onHook)
         b.on('permission', onPermission)
@@ -432,7 +434,10 @@ app.whenReady().then(async () => {
     if (store.workspace(id) && !agents.has(id)) setAgent(id, { state: 'idle', at: Date.now() })
     return result
   })
-  ipcMain.on('pty:write', (_e, id: string, data: string) => term?.write(id, String(data)))
+  ipcMain.on('pty:write', (_e, id: string, data: string) => {
+    term?.write(id, String(data))
+    for (const l of writeListeners) safe('pty-write', () => l(id, String(data)))
+  })
   ipcMain.on('pty:resize', (_e, id: string, cols: number, rows: number) => term?.resize(id, cols, rows))
   ipcMain.handle('pty:kill', async (_e, id: string) => {
     await (await backend()).kill(id)
@@ -463,6 +468,7 @@ app.whenReady().then(async () => {
       onHook: (cb) => hookListeners.push(cb),
       onPtyData: (cb) => dataListeners.push(cb),
       onPtyExit: (cb) => exitListeners.push(cb),
+      onPtyWrite: (cb) => writeListeners.push(cb),
       agents: () => agents,
       setAgent,
       addWorkspace,

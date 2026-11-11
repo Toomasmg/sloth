@@ -59,6 +59,7 @@ import { useReorderDrag } from './layout/useReorderDrag'
 import { Separators } from './layout/Separators'
 import { SIDE_DEFAULT, SideResizer, clampSide, sideMax } from './layout/SideResizer'
 import { PaneMenu, type PaneMenuItem } from './layout/PaneMenu'
+import { SleepingCard } from './SleepingCard'
 import { CrumbMenu, type CrumbGroup, type CrumbItem } from './layout/CrumbMenu'
 import { openRamas } from './features/worktrees/store'
 import { openHistory } from './features/history/index'
@@ -158,7 +159,8 @@ const STATE_CHIP: Record<AgentStatus['state'], string> = {
   waiting: 'chip-waiting',
   done: 'chip-done',
   exited: 'chip-error',
-  idle: 'chip-idle'
+  idle: 'chip-idle',
+  sleeping: 'chip-idle'
 }
 
 export function App(): React.JSX.Element {
@@ -724,7 +726,7 @@ export function App(): React.JSX.Element {
   const done = countBy('done')
   /** Pedidos de permiso vivos (uno o más por espacio). El chip del resumen los cuenta; no se repiten en otro lado. */
   const pendingPerms = [...permsByWs.values()].reduce((n, q) => n + q.length, 0)
-  const activeTerms = workspaces.filter((w) => agents[w.id] && agents[w.id].state !== 'exited').length
+  const activeTerms = workspaces.filter((w) => agents[w.id] && agents[w.id].state !== 'exited' && agents[w.id].state !== 'sleeping').length
   /** Primer espacio con ese estado (para ir al tocar un resumen). */
   const firstWs = (s: AgentStatus['state']): Workspace | undefined => workspaces.find((w) => agents[w.id]?.state === s)
 
@@ -1307,7 +1309,11 @@ export function App(): React.JSX.Element {
                       />
                     )}
                     <PaneBannerSlot paneId={paneId} />
-                    <TerminalView id={paneId} generation={generations[paneId] ?? 0} onError={onTermError} />
+                    {agents[paneId]?.state === 'sleeping' ? (
+                      <SleepingCard paneId={paneId} name={title} onError={onTermError} />
+                    ) : (
+                      <TerminalView id={paneId} generation={generations[paneId] ?? 0} onError={onTermError} />
+                    )}
                   </section>
                 )
               })}

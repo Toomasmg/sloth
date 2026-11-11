@@ -18,7 +18,8 @@ export const STATE_LABEL: Record<AgentState, string> = {
   working: 'Trabajando',
   waiting: 'Te necesita',
   done: 'Terminó',
-  exited: 'Cerrado'
+  exited: 'Cerrado',
+  sleeping: 'Dormido'
 }
 
 /** Color de identidad por cuenta: así se distingue de un vistazo qué terminal usa qué cuenta. */

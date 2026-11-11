@@ -5,6 +5,7 @@ import type { Feature, FeatureContext } from './context'
 import type { TerminalBackend } from '../daemon-client'
 import { readTraySettings, writeTraySettings, type TraySettings } from './tray-settings'
 import { amberDot } from './tray-dot'
+import { currentSettings, patchSettings } from './settings'
 
 /**
  * Bandeja del sistema + badge en la barra de tareas.
@@ -69,6 +70,42 @@ const feature: Feature = {
       }
       quitting = true
       app.quit()
+    }
+
+    async function confirmClose(win: BrowserWindow, running: number, hasTray: boolean): Promise<'close' | 'tray' | 'cancel'> {
+      const keep = currentSettings().keepTerminalsAlive
+      let busy = 0
+      for (const [id, st] of ctx.agents()) if (st.state === 'working' && ctx.store.workspace(id)) busy++
+      const terms = plural(running, 'terminal abierta', 'terminales abiertas')
+      const busyLine = busy ? ` ${busy === 1 ? 'Claude está trabajando en 1 de ellas' : `Claude está trabajando en ${busy} de ellas`}.` : ''
+      const detail = keep
+        ? `Tenés ${terms}.${busyLine} Siguen corriendo en segundo plano y vuelven tal cual al abrir Sloth.`
+        : `Tenés ${terms}.${busyLine} Se van a cerrar junto con el Claude de cada una, y lo que esté haciendo se corta.`
+      const buttons = hasTray ? ['Cerrar Sloth', 'Ocultar en la bandeja', 'Cancelar'] : ['Cerrar Sloth', 'Cancelar']
+      const r = await dialog.showMessageBox(win, {
+        type: keep ? 'question' : 'warning',
+        title: 'Sloth',
+        message: '¿Cerrar Sloth?',
+        detail,
+        buttons,
+        defaultId: buttons.length - 1,
+        cancelId: buttons.length - 1,
+        noLink: true,
+        checkboxLabel: 'No volver a preguntar'
+      })
+      const choice = r.response === 0 ? 'close' : hasTray && r.response === 1 ? 'tray' : 'cancel'
+      // «No volver a preguntar» recuerda la elección: cerrar directo, o ir siempre a la bandeja.
+      if (r.checkboxChecked && choice !== 'cancel') {
+        try {
+          if (choice === 'tray') {
+            settings = { ...settings, closeToTray: true }
+            writeTraySettings(settings)
+          } else patchSettings({ confirmQuit: false })
+        } catch (e) {
+          ctx.log('no se pudo guardar «Preguntar antes de cerrar»:', (e as Error).message)
+        }
+      }
+      return choice
     }
 
     const quit = (): void => {
@@ -167,10 +204,27 @@ const feature: Feature = {
         win.flashFrame(false)
         refresh()
       })
+      let closeConfirmed = false
       win.on('close', (e) => {
-        if (quitting || !settings.closeToTray || !tray || tray.isDestroyed()) return
+        if (quitting) return
+        const hasTray = !!tray && !tray.isDestroyed()
+        if (settings.closeToTray && hasTray) {
+          e.preventDefault()
+          win.hide()
+          return
+        }
+        if (closeConfirmed || !currentSettings().confirmQuit) return
+        const b = ctx.terminal()
+        const running = b ? ctx.store.workspaces.filter((w) => b.isRunning(w.id)).length : 0
+        if (!running) return
+        // Cerrar de golpe sorprende: se cuenta qué pasa con las terminales y se ofrece la bandeja.
         e.preventDefault()
-        win.hide()
+        void confirmClose(win, running, hasTray).then((choice) => {
+          if (choice === 'close') {
+            closeConfirmed = true
+            win.close()
+          } else if (choice === 'tray') win.hide()
+        })
       })
       win.webContents.once('did-finish-load', refresh)
     })
