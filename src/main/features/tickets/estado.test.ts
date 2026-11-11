@@ -34,17 +34,20 @@ const TICKETS_V2 = {
   config: { conectorId: 'gruv', model: 'opus', assigneeId: '', projectRepos: {}, confirmRefresh: true }
 }
 
+const migradoV2 = (gruvMtimeMs: number): unknown => ({ ...TICKETS_V2, migradoDe: { archivo: 'gruv.json', en: 1, gruvMtimeMs } })
+
 test('sin archivos: vacío con Gruv y sin guardar', () => {
   const r = resolverEstado({ tickets: FALTA, gruv: FALTA }, conectorPorId, AHORA)
-  assert.deepEqual(r, { state: estadoVacio(), origen: 'vacio', respaldar: null, guardar: false })
+  assert.deepEqual(r, { state: estadoVacio(), origen: 'vacio', respaldar: null, guardar: false, soloLectura: null })
   assert.equal(r.state.config.conectorId, 'gruv')
 })
 
-test('gruv.json v1 se migra con todos sus campos', () => {
-  const r = resolverEstado({ tickets: FALTA, gruv: ok(GRUV_V1) }, conectorPorId, AHORA)
+test('gruv.json v1 se migra con todos sus campos y el mtime de gruv.json', () => {
+  const r = resolverEstado({ tickets: FALTA, gruv: ok(GRUV_V1, 42) }, conectorPorId, AHORA)
   assert.equal(r.origen, 'gruv')
   assert.equal(r.guardar, true)
   assert.equal(r.respaldar, null)
+  assert.equal(r.soloLectura, null)
   assert.deepEqual(r.state, {
     version: 2,
     tickets: [
@@ -57,7 +60,7 @@ test('gruv.json v1 se migra con todos sus campos', () => {
     fetchedBy: 'acc-1',
     lastRun: { tokens: 10, costUsd: 0.01, durationMs: 900 },
     lastError: 'falló algo',
-    migradoDe: { archivo: 'gruv.json', en: AHORA },
+    migradoDe: { archivo: 'gruv.json', en: AHORA, gruvMtimeMs: 42 },
     config: {
       conectorId: 'gruv',
       queryAccountId: 'acc-1',
@@ -70,38 +73,71 @@ test('gruv.json v1 se migra con todos sus campos', () => {
   })
 })
 
-test('tickets.json válido manda y no se guarda', () => {
-  const r = resolverEstado({ tickets: ok(TICKETS_V2, 10), gruv: ok(GRUV_V1, 5) }, conectorPorId, AHORA)
-  assert.equal(r.origen, 'tickets')
-  assert.equal(r.guardar, false)
-  assert.deepEqual(r.state.tickets, TICKETS_V2.tickets)
-  assert.equal(r.state.config.model, 'opus')
+test('tickets.json válido manda y no se guarda si gruv.json no cambió desde la migración', () => {
+  for (const gruv of [ok(GRUV_V1, 5), FALTA, CORRUPTO, { kind: 'error', mensaje: 'EBUSY' } as const]) {
+    const r = resolverEstado({ tickets: ok(migradoV2(5), 10), gruv }, conectorPorId, AHORA)
+    assert.equal(r.origen, 'tickets')
+    assert.equal(r.guardar, false)
+    assert.equal(r.respaldar, null)
+    assert.deepEqual(r.state.tickets, TICKETS_V2.tickets)
+    assert.equal(r.state.config.model, 'opus')
+  }
 })
 
-test('gruv.json más nuevo que tickets.json: se vuelve a migrar', () => {
-  const r = resolverEstado({ tickets: ok(TICKETS_V2, 5), gruv: ok(GRUV_V1, 10) }, conectorPorId, AHORA)
-  assert.equal(r.origen, 'gruv')
-  assert.equal(r.guardar, true)
-  assert.equal(r.respaldar, null)
+test('gruv.json con otro mtime que el migrado (más viejo, más nuevo o futuro): se vuelve a migrar respaldando tickets.json', () => {
+  for (const [registrado, actual] of [
+    [5, 10],
+    [10, 5],
+    [5, AHORA + 1e9]
+  ]) {
+    const r = resolverEstado({ tickets: ok(migradoV2(registrado), AHORA), gruv: ok(GRUV_V1, actual) }, conectorPorId, AHORA)
+    assert.equal(r.origen, 'gruv')
+    assert.equal(r.guardar, true)
+    assert.equal(r.respaldar, 'previo')
+    assert.equal(r.state.migradoDe?.gruvMtimeMs, actual)
+  }
+  // Un tickets.json sin el mtime registrado (de antes) también se vuelve a migrar.
+  assert.equal(resolverEstado({ tickets: ok(TICKETS_V2), gruv: ok(GRUV_V1, 3) }, conectorPorId, AHORA).respaldar, 'previo')
+})
+
+test('después de volver a migrar, el mismo gruv.json ya no se migra otra vez', () => {
+  const futuro = AHORA + 1e9
+  const una = resolverEstado({ tickets: ok(TICKETS_V2), gruv: ok(GRUV_V1, futuro) }, conectorPorId, AHORA)
+  const dos = resolverEstado({ tickets: ok(una.state, AHORA), gruv: ok(GRUV_V1, futuro) }, conectorPorId, AHORA + 1)
+  assert.equal(dos.origen, 'tickets')
+  assert.equal(dos.guardar, false)
 })
 
 test('tickets.json corrupto: se respalda y se migra gruv.json', () => {
-  for (const tickets of [CORRUPTO, ok([1, 2]), ok({ version: 'dos' }), ok(null)]) {
+  for (const tickets of [CORRUPTO, ok([1, 2]), ok({ version: 'dos' }), ok(null), ok({ version: 1 })]) {
     const r = resolverEstado({ tickets, gruv: ok(GRUV_V1) }, conectorPorId, AHORA)
     assert.equal(r.respaldar, 'corrupto')
     assert.equal(r.origen, 'gruv')
+    assert.equal(r.soloLectura, null)
   }
 })
 
 test('ambos corruptos: respaldo y vacío', () => {
   const r = resolverEstado({ tickets: CORRUPTO, gruv: CORRUPTO }, conectorPorId, AHORA)
-  assert.deepEqual(r, { state: estadoVacio(), origen: 'vacio', respaldar: 'corrupto', guardar: false })
+  assert.deepEqual(r, { state: estadoVacio(), origen: 'vacio', respaldar: 'corrupto', guardar: false, soloLectura: null })
 })
 
-test('versión futura: se respalda aparte', () => {
-  const r = resolverEstado({ tickets: ok({ ...TICKETS_V2, version: 3 }), gruv: FALTA }, conectorPorId, AHORA)
-  assert.equal(r.respaldar, 'version-futura')
-  assert.equal(r.origen, 'vacio')
+test('versión futura: no se toca y se trabaja en memoria', () => {
+  const vacio = resolverEstado({ tickets: ok({ ...TICKETS_V2, version: 3 }), gruv: FALTA }, conectorPorId, AHORA)
+  assert.deepEqual(vacio, { state: estadoVacio(), origen: 'vacio', respaldar: null, guardar: false, soloLectura: 'version-futura' })
+  const r = resolverEstado({ tickets: ok({ ...TICKETS_V2, version: 7 }), gruv: ok(GRUV_V1, 9) }, conectorPorId, AHORA)
+  assert.equal(r.origen, 'gruv')
+  assert.equal(r.respaldar, null)
+  assert.equal(r.guardar, false)
+  assert.equal(r.soloLectura, 'version-futura')
+})
+
+test('tickets.json que no se pudo leer: no es corrupto, se trabaja en memoria', () => {
+  const r = resolverEstado({ tickets: { kind: 'error', mensaje: 'EBUSY' }, gruv: ok(GRUV_V1, 9) }, conectorPorId, AHORA)
+  assert.equal(r.origen, 'gruv')
+  assert.equal(r.respaldar, null)
+  assert.equal(r.guardar, false)
+  assert.equal(r.soloLectura, 'ilegible')
 })
 
 test('un conector que no está en esta versión se conserva', () => {
@@ -116,7 +152,7 @@ test('config rara en disco', () => {
   assert.deepEqual(s, { version: 2, tickets: [], config: { conectorId: 'gruv', model: 'haiku', assigneeId: '', projectRepos: {}, confirmRefresh: true } })
   assert.deepEqual(sanearEstado({ version: 2 }, conectorPorId), estadoVacio())
   assert.equal(sanearEstado({ version: 1 }, conectorPorId), null)
-  assert.equal(migrarDeGruv('x', conectorPorId, AHORA), null)
+  assert.equal(migrarDeGruv('x', conectorPorId, AHORA, 1), null)
 })
 
 test('assigneeId en disco con la misma regla que Configuración', () => {
@@ -141,21 +177,21 @@ test('parsearArchivo saca el BOM y distingue falta de corrupto', () => {
 })
 
 test('sanear dos veces da lo mismo', () => {
-  const una = migrarDeGruv(GRUV_V1, conectorPorId, AHORA)
+  const una = migrarDeGruv(GRUV_V1, conectorPorId, AHORA, 1)
   assert.deepEqual(sanearEstado(una, conectorPorId), una)
   const v2 = sanearEstado(TICKETS_V2, conectorPorId)
   assert.deepEqual(sanearEstado(v2, conectorPorId), v2)
 })
 
 test('cambiar de conector limpia lo leído y conserva cuenta, modelo y repos', () => {
-  const antes = migrarDeGruv(GRUV_V1, conectorPorId, AHORA)
+  const antes = migrarDeGruv(GRUV_V1, conectorPorId, AHORA, 1)
   assert.ok(antes)
   const copia = structuredClone(antes)
   const despues = conConector(antes, 'jira')
   assert.deepEqual(despues, {
     version: 2,
     tickets: [],
-    migradoDe: { archivo: 'gruv.json', en: AHORA },
+    migradoDe: { archivo: 'gruv.json', en: AHORA, gruvMtimeMs: 1 },
     config: { ...antes.config, conectorId: 'jira', assigneeId: '' }
   })
   assert.notEqual(despues.config.projectRepos, antes.config.projectRepos)

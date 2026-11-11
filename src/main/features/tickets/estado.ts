@@ -1,6 +1,6 @@
 /**
  * Estado persistido de tickets (tickets.json v2) y la migración desde gruv.json v1. Sin fs: quien
- * llama lee los archivos y hace lo que diga resolverEstado.
+ * llama lee los archivos y hace lo que diga resolverEstado (ver almacen.ts).
  * Módulo puro (lo corre `node --test` con type stripping): sin enums, namespaces ni parameter
  * properties, y los tipos se importan con `type`.
  */
@@ -9,7 +9,8 @@ import { ID_CONECTOR_RE, ID_MAX, ID_SEGURO_RE, type ConectorDef } from './conect
 import { CONECTOR_POR_DEFECTO } from './conectores'
 import { idValido, normalizeEstados, normEstado, normYo } from './motor'
 
-export type Lectura = { kind: 'falta' } | { kind: 'corrupto' } | { kind: 'ok'; json: unknown; mtimeMs: number }
+/** 'error': el archivo está pero no se pudo leer (bloqueado, sin permiso…); no es lo mismo que corrupto. */
+export type Lectura = { kind: 'falta' } | { kind: 'corrupto' } | { kind: 'error'; mensaje: string } | { kind: 'ok'; json: unknown; mtimeMs: number }
 
 export interface TicketsState {
   version: 2
@@ -21,18 +22,22 @@ export interface TicketsState {
   fetchedBy?: string
   lastRun?: Corrida
   lastError?: string
-  migradoDe?: { archivo: 'gruv.json'; en: number }
+  /** gruvMtimeMs: el mtime del gruv.json migrado; si gruv.json cambia, se vuelve a migrar. */
+  migradoDe?: { archivo: 'gruv.json'; en: number; gruvMtimeMs?: number }
   config: TicketsConfig
 }
 
 export interface ResultadoCarga {
   state: TicketsState
   origen: 'tickets' | 'gruv' | 'vacio'
-  respaldar: null | 'corrupto' | 'version-futura'
+  /** Antes de guardar, tickets.json se aparta: ilegible (.corrupt) o válido pero reemplazado (.bak). */
+  respaldar: null | 'corrupto' | 'previo'
   guardar: boolean
+  /** Si no es null, tickets.json no se toca en toda la sesión: se trabaja en memoria. */
+  soloLectura: null | 'ilegible' | 'version-futura'
 }
 
-type Buscar = (id: string) => ConectorDef | undefined
+export type Buscar = (id: string) => ConectorDef | undefined
 type Obj = Record<string, unknown>
 
 const esObjeto = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -98,6 +103,7 @@ function sanearCorrida(raw: unknown): Corrida | undefined {
 function armar(o: Obj, config: TicketsConfig, buscar: Buscar, migradoDe: unknown): TicketsState {
   const def = buscar(config.conectorId)
   const m = esObjeto(migradoDe) && migradoDe.archivo === 'gruv.json' ? numero(migradoDe.en) : undefined
+  const gruvMtimeMs = esObjeto(migradoDe) ? numero(migradoDe.gruvMtimeMs) : undefined
   return sinVacios({
     version: 2,
     tickets: sanearTickets(o.tickets, def),
@@ -107,7 +113,7 @@ function armar(o: Obj, config: TicketsConfig, buscar: Buscar, migradoDe: unknown
     fetchedBy: noVacio(o.fetchedBy),
     lastRun: sanearCorrida(o.lastRun),
     lastError: noVacio(o.lastError),
-    migradoDe: m === undefined ? undefined : { archivo: 'gruv.json', en: m },
+    migradoDe: m === undefined ? undefined : sinVacios({ archivo: 'gruv.json' as const, en: m, gruvMtimeMs }),
     config
   })
 }
@@ -119,10 +125,10 @@ export function sanearEstado(raw: unknown, buscar: Buscar): TicketsState | null 
 }
 
 /** gruv.json v1 → v2 con el conector de Gruv. gruv.json no se toca. */
-export function migrarDeGruv(raw: unknown, buscar: Buscar, ahora: number): TicketsState | null {
+export function migrarDeGruv(raw: unknown, buscar: Buscar, ahora: number, gruvMtimeMs: number): TicketsState | null {
   if (!esObjeto(raw)) return null
   const config = sanearConfig({ ...(esObjeto(raw.config) ? raw.config : {}), conectorId: 'gruv' })
-  return armar(raw, config, buscar, { archivo: 'gruv.json', en: ahora })
+  return armar(raw, config, buscar, { archivo: 'gruv.json', en: ahora, gruvMtimeMs })
 }
 
 /**
@@ -141,17 +147,28 @@ export function conConector(s: TicketsState, conectorId: string): TicketsState {
 
 export function resolverEstado(e: { tickets: Lectura; gruv: Lectura }, buscar: Buscar, ahora: number): ResultadoCarga {
   const { tickets, gruv } = e
-  let respaldar: ResultadoCarga['respaldar'] = null
+  const migrar = (): TicketsState | null => (gruv.kind === 'ok' ? migrarDeGruv(gruv.json, buscar, ahora, gruv.mtimeMs) : null)
+  const enMemoria = (soloLectura: 'ilegible' | 'version-futura'): ResultadoCarga => {
+    const m = migrar()
+    return { state: m ?? estadoVacio(), origen: m ? 'gruv' : 'vacio', respaldar: null, guardar: false, soloLectura }
+  }
+
+  if (tickets.kind === 'error') return enMemoria('ilegible')
+  let respaldar: ResultadoCarga['respaldar'] = tickets.kind === 'corrupto' ? 'corrupto' : null
   if (tickets.kind === 'ok') {
     const v = esObjeto(tickets.json) ? tickets.json.version : undefined
-    if (v === 2) {
-      // Si gruv.json es más nuevo, se volvió a usar una versión vieja de Sloth: manda gruv.json.
-      const state = sanearEstado(tickets.json, buscar)
-      if (state && !(gruv.kind === 'ok' && gruv.mtimeMs > tickets.mtimeMs)) return { state, origen: 'tickets', respaldar, guardar: false }
-    } else respaldar = typeof v === 'number' && v > 2 ? 'version-futura' : 'corrupto'
-  } else if (tickets.kind === 'corrupto') respaldar = 'corrupto'
+    if (typeof v === 'number' && v > 2) return enMemoria('version-futura')
+    const state = sanearEstado(tickets.json, buscar)
+    if (state) {
+      // gruv.json cambió desde que se migró: se volvió a usar una versión vieja de Sloth y manda gruv.json.
+      const m = gruv.kind === 'ok' && gruv.mtimeMs !== state.migradoDe?.gruvMtimeMs ? migrar() : null
+      if (m) return { state: m, origen: 'gruv', respaldar: 'previo', guardar: true, soloLectura: null }
+      return { state, origen: 'tickets', respaldar: null, guardar: false, soloLectura: null }
+    }
+    respaldar = 'corrupto'
+  }
 
-  const migrado = gruv.kind === 'ok' ? migrarDeGruv(gruv.json, buscar, ahora) : null
-  if (migrado) return { state: migrado, origen: 'gruv', respaldar, guardar: true }
-  return { state: estadoVacio(), origen: 'vacio', respaldar, guardar: false }
+  const m = migrar()
+  if (m) return { state: m, origen: 'gruv', respaldar, guardar: true, soloLectura: null }
+  return { state: estadoVacio(), origen: 'vacio', respaldar, guardar: false, soloLectura: null }
 }
