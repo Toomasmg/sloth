@@ -25,7 +25,7 @@ for (const p of PANTALLAS) {
 
 test('inicio sin espacios abiertos', async ({ sloth: { page } }) => {
   await expect(page.getByText('No hay espacios abiertos')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Crear espacio' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Nuevo espacio', exact: true })).toBeVisible()
   await expect(page).toHaveScreenshot('inicio.png')
 })
 

@@ -91,8 +91,7 @@ export function ToolsSection({ ctx }: { ctx: UiCtx }): React.JSX.Element {
         <ToolRow
           icon={<BroadcastIcon size={16} />}
           label="Enviar a varios espacios"
-          disabled={ctx.workspaces.length === 0}
-          onClick={() => runFeatureCommand('broadcast:open', ctx)}
+          onClick={() => (ctx.workspaces.length ? runFeatureCommand('broadcast:open', ctx) : ctx.notifyError('Abrí un espacio con la terminal para mandarle un mensaje.'))}
         />
         <ToolRow icon={<TrashIcon size={16} />} label="Limpiar ramas que ya no se usan" badge={candidates ?? 0} onClick={() => openRamas('limpiar')} />
         <ToolRow icon={<TeamIcon size={16} />} label="Ver equipo" onClick={() => setTeamOpen(true)} />

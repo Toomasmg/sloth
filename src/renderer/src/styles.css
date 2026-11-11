@@ -1499,3 +1499,12 @@ html[data-lite='true'] .spin {
 .modal-loading {
   color: var(--fg-2);
 }
+
+.confirm-dialog {
+  width: min(420px, calc(100vw - 32px));
+}
+.confirm-body {
+  margin: 0;
+  color: var(--fg-2);
+  line-height: 1.5;
+}

@@ -101,7 +101,8 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
   const taRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    void ctx.invoke<SentEntry[]>('feat:broadcast:list').then((l) => setHist(Array.isArray(l) ? l : []), () => {})
+    // El historial de envíos es un extra: si no se puede leer, se manda igual y la lista queda vacía.
+    void ctx.invoke<SentEntry[]>('feat:broadcast:list').then((l) => setHist(Array.isArray(l) ? l : []), () => setHist([]))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   useEffect(() => setConfirming(false), [sel, text])
@@ -172,7 +173,8 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
         ids: chosen.map((t) => t.id),
         names: chosen.map((t) => t.name)
       })
-      .then((l) => setHist(Array.isArray(l) ? l : []), () => {})
+      // Guardar el historial es un extra: el mensaje ya salió.
+      .then((l) => setHist(Array.isArray(l) ? l : []), () => undefined)
   }
 
   const repeat = (h: SentEntry): void => {
@@ -257,7 +259,7 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
       }}
     >
         {batch ? (
-          <Progress batch={batch} onAgain={newSend} onClose={onClose} />
+          <Progress batch={batch} onAgain={newSend} onRetry={(ids) => { setSel(new Set(ids)); setBatchId(null) }} onClose={onClose} />
         ) : (
           <>
             {note && (
@@ -282,7 +284,7 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
               </div>
 
               {targets.length === 0 && (
-                <p className="hint">No hay espacios con la terminal abierta. Abrí alguno desde el sidebar.</p>
+                <p className="hint">No hay espacios con la terminal abierta. Abrí alguno desde la barra lateral.</p>
               )}
 
               {groups.map((g) => (
@@ -499,7 +501,7 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
 }
 
 /** Progreso por destino: Enviado / En cola (se actualiza solo cuando el espacio queda libre). */
-function Progress({ batch, onAgain, onClose }: { batch: Batch; onAgain: () => void; onClose: () => void }): React.JSX.Element {
+function Progress({ batch, onAgain, onRetry, onClose }: { batch: Batch; onAgain: () => void; onRetry: (ids: string[]) => void; onClose: () => void }): React.JSX.Element {
   const sent = batch.targets.filter((t) => t.status === 'sent').length
   const queued = batch.targets.filter((t) => t.status === 'queued').length
   const failed = batch.targets.filter((t) => t.status === 'failed').length
@@ -510,9 +512,9 @@ function Progress({ batch, onAgain, onClose }: { batch: Batch; onAgain: () => vo
       : 'No se pudo enviar a ningún espacio'
   return (
     <div className="f-broadcast-progress">
-      <div className="f-broadcast-result" role="status" aria-live="polite">
+      <div className={`f-broadcast-result${failed ? ' failed' : ''}`} role={failed && !sent ? 'alert' : 'status'} aria-live="polite">
         <span className="f-broadcast-result-ic" aria-hidden="true">
-          <DoneIcon size={15} />
+          {failed ? <PermissionIcon size={15} /> : <DoneIcon size={15} />}
         </span>
         <span className="f-broadcast-result-title">{title}</span>
       </div>
@@ -543,6 +545,11 @@ function Progress({ batch, onAgain, onClose }: { batch: Batch; onAgain: () => vo
         })}
       </ul>
       <footer className="f-broadcast-foot">
+        {failed > 0 && (
+          <button type="button" className="btn" onClick={() => onRetry(batch.targets.filter((t) => t.status === 'failed').map((t) => t.wsId))}>
+            Reintentar con los {failed === 1 ? 'que falló' : 'que fallaron'}
+          </button>
+        )}
         <button type="button" className="btn" onClick={onAgain}>
           Enviar otro
         </button>
