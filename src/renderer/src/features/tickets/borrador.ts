@@ -2,10 +2,10 @@
  * Lo que arma el asistente de conectores propios, en una forma cómoda para editar, y su paso a
  * ConectorMcp. Módulo puro: la validación es la misma que usa main (`validarPropio`).
  */
-import { ACCIONES, type Accion, type Estado, type HerramientasVista } from '../../../../shared/tickets'
-import { ConectorInvalidoError, PLACEHOLDERS, type ConectorDef, type ConectorMcp, type PasoLlamada } from '../../../../main/features/tickets/conector'
+import { ACCIONES, type Accion, type Estado } from '../../../../shared/tickets'
+import { ConectorInvalidoError, PLACEHOLDERS, type ArgValor, type ConectorDef, type ConectorMcp, type PasoLlamada } from '../../../../main/features/tickets/conector'
 import { ESTADO_EN_SNAKE, faltaConector, PISTA_ESTADOS } from '../../../../main/features/tickets/conectores/comun'
-import { validarPropio } from '../../../../main/features/tickets/propios'
+import { jsonCanonico, validarPropio } from '../../../../main/features/tickets/propios'
 
 export type Rol = 'lista' | 'detalle' | 'apoyo' | 'nada'
 export type FormatoId = 'clave-numero' | 'numero' | 'alfanumerico' | 'propio'
@@ -30,6 +30,8 @@ export interface Borrador {
   ejemploId: string
   estados: Estado[]
   pistas: { yoConId: string; yoSinId: string; lista: string; pedirEstados: boolean; apoyo: string }
+  /** El conector que se está editando: lo que el asistente no maneja se toma de acá. */
+  original?: ConectorMcp
 }
 
 export const FORMATOS: Record<Exclude<FormatoId, 'propio'>, { regex: string; mayusculas: boolean; ejemplo: string; etiqueta: string }> = {
@@ -115,12 +117,22 @@ export function conHerramientas(b: Borrador, herramientas: string[]): Borrador {
 const conRol = (b: Borrador, r: Rol): string[] => b.herramientas.filter((h) => h.rol === r).map((h) => h.nombre)
 
 export function regexDe(b: Borrador): { regex: string; mayusculas: boolean } {
-  if (b.formato === 'propio') return { regex: b.regexPropia, mayusculas: false }
+  if (b.formato === 'propio') return { regex: b.regexPropia, mayusculas: b.original?.idRegex === b.regexPropia ? b.original.idMayusculas : false }
   const f = FORMATOS[b.formato]
   return { regex: f.regex, mayusculas: f.mayusculas }
 }
 
+const esPlaceholder = (v: ArgValor): boolean => typeof v === 'string' && PLACEHOLDER_RE.test(v)
+
+/** El argumento de nivel uno que lleva `{ticket}` en los pasos de esa herramienta (el último gana, como en deDef). */
+function argTicket(pasos: readonly PasoLlamada[], h: string): string | undefined {
+  let arg: string | undefined
+  for (const p of pasos) if (p.herramienta === h) arg = Object.entries(p.args).find(([, v]) => v === '{ticket}')?.[0] ?? arg
+  return arg
+}
+
 export function aDef(b: Borrador): ConectorMcp {
+  const o = b.original
   const lista = conRol(b, 'lista')
   const detalle = conRol(b, 'detalle')
   const apoyo = conRol(b, 'apoyo')
@@ -130,18 +142,35 @@ export function aDef(b: Borrador): ConectorMcp {
     const x = b.acciones[a]
     if (!x?.herramienta) continue
     escritura[a] = x.herramienta
-    const args = Object.entries(x.args)
+    const puestos = Object.entries(x.args)
       .filter(([, n]) => n.trim())
       .map(([p, n]) => [n.trim(), `{${p}}`])
-    acciones[a] = { args: Object.fromEntries(args), ...(x.nota.trim() ? { nota: x.nota.trim() } : {}) }
+    const previa = o?.herramientas.escritura[a] === x.herramienta ? o.pistas.acciones[a] : undefined
+    // Los literales y los objetos anidados no se editan en el asistente: se conservan.
+    const resto = Object.entries(structuredClone(previa?.args ?? {})).filter(([, v]) => !esPlaceholder(v))
+    acciones[a] = { args: Object.fromEntries([...resto, ...puestos]), ...(x.nota.trim() ? { nota: x.nota.trim() } : {}) }
   }
-  const usadas = new Set([...lista, ...detalle, ...apoyo, ...Object.values(escritura)])
+  const escribe = Object.values(escritura)
+  const apoyoEn: Partial<Record<Accion, string[]>> = {}
+  if (apoyo.length)
+    for (const a of ACCIONES) {
+      const xs = (o?.herramientas.apoyoEn?.[a] ?? []).filter((t) => !escribe.includes(t))
+      if (escritura[a] && xs.length) apoyoEn[a] = xs
+    }
+  const usadas = new Set([...lista, ...detalle, ...apoyo, ...escribe, ...Object.values(apoyoEn).flat()])
   const negar = b.herramientas
     .map((h) => h.nombre)
     .filter((h) => !usadas.has(h))
     .slice(0, NEGAR_MAX)
-  const pasos: PasoLlamada[] = detalle.map((h) => ({ herramienta: h, args: { [b.detalleArg[h]?.trim() || 'id']: '{ticket}' } }))
+  const previos = o?.pistas.detalle ?? []
+  const argDe = (h: string): string => b.detalleArg[h]?.trim() || 'id'
+  const conservar = new Set(detalle.filter((h) => previos.some((p) => p.herramienta === h) && argDe(h) === (argTicket(previos, h) ?? 'id')))
+  const pasos: PasoLlamada[] = [
+    ...structuredClone(previos.filter((p) => conservar.has(p.herramienta))),
+    ...detalle.filter((h) => !conservar.has(h)).map((h) => ({ herramienta: h, args: { [argDe(h)]: '{ticket}' } }))
+  ]
   const { regex, mayusculas } = regexDe(b)
+  const estadoEj = o && b.estados.some((e) => e.clave === o.ejemplo.estado) ? o.ejemplo.estado : (b.estados.find((e) => e.categoria !== 'hecho')?.clave ?? '')
   return {
     id: b.id,
     nombre: b.nombre,
@@ -149,14 +178,15 @@ export function aDef(b: Borrador): ConectorMcp {
     verificado: false,
     idRegex: regex,
     idMayusculas: mayusculas,
-    ejemplo: { id: b.ejemploId, estado: b.estados.find((e) => e.categoria !== 'hecho')?.clave ?? '', prioridad: 'prioridad', proyecto: 'proyecto' },
+    ...(o?.personaId !== undefined ? { personaId: o.personaId } : {}),
+    ejemplo: { id: b.ejemploId, estado: estadoEj, prioridad: o?.ejemplo.prioridad ?? 'prioridad', proyecto: o?.ejemplo.proyecto ?? 'proyecto' },
     estados: b.estados.map((e) => ({ ...e })),
-    faltaConector: faltaConector(b.id, b.nombre),
-    herramientas: { prefijo: b.prefijo, lista, detalle, escritura, negar, ...(apoyo.length ? { apoyo } : {}) },
+    faltaConector: o && o.nombre === b.nombre ? { ...o.faltaConector } : faltaConector(b.id, b.nombre),
+    herramientas: { prefijo: b.prefijo, lista, detalle, escritura, negar, ...(apoyo.length ? { apoyo } : {}), ...(Object.keys(apoyoEn).length ? { apoyoEn } : {}) },
     pistas: {
       yo: { conId: b.pistas.yoConId, sinId: b.pistas.yoSinId },
       lista: b.pistas.lista,
-      ...(b.pistas.pedirEstados ? { estados: PISTA_ESTADOS } : {}),
+      ...(b.pistas.pedirEstados ? { estados: o?.pistas.estados ?? PISTA_ESTADOS } : {}),
       detalle: pasos,
       ...(apoyo.length ? { apoyo: b.pistas.apoyo } : {}),
       acciones
@@ -169,7 +199,7 @@ function formatoDe(def: ConectorMcp): FormatoId {
   return f ?? 'propio'
 }
 
-/** Las pistas con argumentos anidados se pierden: el asistente solo arma argumentos planos. */
+/** Guarda el conector como `original`: aDef conserva lo que el asistente no muestra. */
 export function deDef(def: ConectorMcp): Borrador {
   const h = def.herramientas
   const roles = new Map<string, Rol>()
@@ -191,8 +221,8 @@ export function deDef(def: ConectorMcp): Borrador {
 
   const detalleArg: Record<string, string> = {}
   for (const paso of def.pistas.detalle) {
-    const arg = Object.entries(paso.args).find(([, v]) => v === '{ticket}')
-    if (arg) detalleArg[paso.herramienta] = arg[0]
+    const arg = argTicket(def.pistas.detalle, paso.herramienta)
+    if (arg) detalleArg[paso.herramienta] = arg
   }
 
   const formato = formatoDe(def)
@@ -213,7 +243,17 @@ export function deDef(def: ConectorMcp): Borrador {
       lista: def.pistas.lista,
       pedirEstados: def.pistas.estados !== undefined,
       apoyo: def.pistas.apoyo ?? ''
-    }
+    },
+    original: structuredClone(def)
+  }
+}
+
+/** Si pasar el conector por el asistente lo deja igual. Si no (p. ej. una herramienta con dos roles), no se edita con el asistente. */
+export function seEditaSinPerder(def: ConectorMcp): boolean {
+  try {
+    return jsonCanonico(validarPropio(aDef(deDef(def)))) === jsonCanonico(validarPropio(def))
+  } catch {
+    return false
   }
 }
 
@@ -239,9 +279,4 @@ export function revisarId(b: Borrador): string | null {
   } catch {
     return 'La regex no compila.'
   }
-}
-
-export function herramientasVista(def: ConectorMcp): HerramientasVista {
-  const h = def.herramientas
-  return { prefijo: h.prefijo, lista: [...h.lista], detalle: [...h.detalle], apoyo: [...(h.apoyo ?? [])], escritura: { ...h.escritura }, negar: h.negar.length }
 }

@@ -1159,3 +1159,11 @@
   font-size: var(--fs-sm);
   white-space: pre-wrap;
 }
+.f-tickets-aviso-h summary {
+  cursor: pointer;
+}
+.f-tickets-aviso-h details[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}

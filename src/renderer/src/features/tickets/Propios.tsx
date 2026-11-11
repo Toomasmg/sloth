@@ -1,15 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useUi, type UiCtx } from '../host'
 import { cleanError } from '../../format'
 import { ACCIONES, type ConectorPropioVista, type HerramientasVista, type OrigenConector } from '../../../../shared/tickets'
-import { ID_CONECTOR_RE, type ConectorDef } from '../../../../main/features/tickets/conector'
-import { ACCION_ETIQUETA, deDef, herramientasVista, type Borrador } from './borrador'
-import { Asistente, type Paso } from './Asistente'
+import { ID_CONECTOR_RE, type ConectorDef, type ConectorMcp } from '../../../../main/features/tickets/conector'
+import { vistaHerramientas } from '../../../../main/features/tickets/propios'
+import { ACCION_ETIQUETA, deDef, seEditaSinPerder, type Borrador } from './borrador'
+import { Asistente } from './Asistente'
 import { setSnapshot, type Snapshot } from './model'
 
 type Lista = { lista: ConectorPropioVista[]; avisos: string[] }
-type Abierto = { inicial?: Borrador; idAnterior?: string; paso?: Paso }
-type Importado = { def: ConectorDef; choca: 'incluido' | 'propio' | null }
+type Abierto = { inicial?: Borrador; idAnterior?: string }
+type Choca = 'incluido' | 'propio' | 'equipo' | null
+type Importado = { def: ConectorDef; choca: Choca }
+/** Un conector que no armó la persona y se va a guardar como suyo (importado o copiado del equipo): se revisa antes. */
+type ComoMio = { def: ConectorMcp; origen: string; choca: Choca; idInicial: string }
 
 export const etiquetaOrigen = (o: OrigenConector): string => (o.tipo === 'equipo' ? `Del equipo ${o.equipo}` : o.tipo === 'usuario' ? 'Tuyo' : 'Incluido')
 
@@ -29,7 +33,7 @@ export function Propios({ snap }: { snap: Snapshot }): React.JSX.Element {
   const [borrar, setBorrar] = useState<string | null>(null)
   const [abierto, setAbierto] = useState<Abierto | null>(null)
   const [revisar, setRevisar] = useState<ConectorPropioVista | null>(null)
-  const [importado, setImportado] = useState<Importado | null>(null)
+  const [comoMio, setComoMio] = useState<ComoMio | null>(null)
   const [nota, setNota] = useState<string | null>(null)
 
   const fallo = (e: unknown): void => setErr(cleanError(e))
@@ -44,14 +48,24 @@ export function Propios({ snap }: { snap: Snapshot }): React.JSX.Element {
     recargar()
   }
 
-  const editar = (id: string, mio: boolean): void => {
+  const traer = (id: string, f: (def: ConectorMcp) => void): void => {
     setErr(null)
+    setNota(null)
     ui.invoke<ConectorDef>('feat:tickets:propio', id).then((def) => {
-      if (def.via !== 'mcp') return
-      const b = deDef(def)
-      setAbierto(mio ? { inicial: b, idAnterior: id } : { inicial: { ...b, id: `${id.slice(0, 28)}-mio` }, paso: 4 })
+      if (def.via === 'mcp') f(def)
     }, fallo)
   }
+
+  const editar = (id: string): void =>
+    traer(id, (def) => {
+      if (seEditaSinPerder(def)) return setAbierto({ inicial: deDef(def), idAnterior: id })
+      setNota(
+        `${def.nombre} tiene partes que el asistente no sabe editar (por ejemplo, una herramienta con dos roles) y se perderían. Exportalo, cambiá el archivo e importalo: con el mismo id reemplaza al tuyo.`
+      )
+    })
+
+  const copiar = (c: ConectorPropioVista): void =>
+    traer(c.id, (def) => setComoMio({ def, origen: deDondeViene(c.origen), choca: 'equipo', idInicial: `${c.id.slice(0, 28)}-mio` }))
 
   const confirmarBorrar = (id: string): void => {
     setBorrar(null)
@@ -69,7 +83,22 @@ export function Propios({ snap }: { snap: Snapshot }): React.JSX.Element {
 
   const importar = (): void => {
     setErr(null)
-    ui.invoke<Importado | null>('feat:tickets:importarPropio').then((r) => setImportado(r), fallo)
+    setNota(null)
+    ui.invoke<Importado | null>('feat:tickets:importarPropio').then((r) => {
+      if (r?.def.via !== 'mcp') return
+      const otroId = r.choca === 'incluido' || r.choca === 'equipo'
+      setComoMio({ def: r.def, origen: 'un archivo', choca: r.choca, idInicial: otroId ? `${r.def.id.slice(0, 28)}-imp` : r.def.id })
+    }, fallo)
+  }
+
+  const guardarComoMio = (def: ConectorMcp, id: string, reemplaza: boolean): void => {
+    setErr(null)
+    ui.invoke<Snapshot>('feat:tickets:guardarPropio', { ...def, id }, reemplaza ? id : undefined).then((s) => {
+      setSnapshot(s)
+      setComoMio(null)
+      setNota(`Guardado como «${id}».`)
+      recargar()
+    }, fallo)
   }
 
   const aceptar = (v: ConectorPropioVista): void => {
@@ -108,7 +137,7 @@ export function Propios({ snap }: { snap: Snapshot }): React.JSX.Element {
                 </span>
                 <span className="f-tickets-grow" />
                 {mio ? (
-                  <button type="button" className="f-tickets-b f-tickets-b--xs" onClick={() => editar(c.id, true)}>
+                  <button type="button" className="f-tickets-b f-tickets-b--xs" onClick={() => editar(c.id)}>
                     Editar
                   </button>
                 ) : (
@@ -118,7 +147,7 @@ export function Propios({ snap }: { snap: Snapshot }): React.JSX.Element {
                         Revisar y aceptar
                       </button>
                     )}
-                    <button type="button" className="f-tickets-b f-tickets-b--xs" onClick={() => editar(c.id, false)}>
+                    <button type="button" className="f-tickets-b f-tickets-b--xs" onClick={() => copiar(c)}>
                       Copiar como mío
                     </button>
                   </>
@@ -153,24 +182,13 @@ export function Propios({ snap }: { snap: Snapshot }): React.JSX.Element {
         <AvisoHerramientas
           origen={deDondeViene(revisar.origen)}
           herramientas={revisar.herramientas}
-          pistaLista={revisar.pistaLista}
           aceptar="Aceptar y usar"
           onAceptar={() => aceptar(revisar)}
           onCancelar={() => setRevisar(null)}
         />
       )}
 
-      {importado && importado.def.via === 'mcp' && (
-        <Importar
-          def={importado.def}
-          choca={importado.choca}
-          onSeguir={(b) => {
-            setImportado(null)
-            setAbierto({ inicial: b, paso: 4 })
-          }}
-          onCancelar={() => setImportado(null)}
-        />
-      )}
+      {comoMio && <GuardarComoMio key={`${comoMio.origen}:${comoMio.def.id}`} {...comoMio} onGuardar={guardarComoMio} onCancelar={() => setComoMio(null)} />}
 
       {avisos.length > 0 && (
         <ul className="f-tickets-propios-avisos">
@@ -196,44 +214,52 @@ export function Propios({ snap }: { snap: Snapshot }): React.JSX.Element {
   )
 }
 
-function Importar({
+function GuardarComoMio({
   def,
+  origen,
   choca,
-  onSeguir,
+  idInicial,
+  onGuardar,
   onCancelar
-}: {
-  def: Extract<ConectorDef, { via: 'mcp' }>
-  choca: Importado['choca']
-  onSeguir: (b: Borrador) => void
-  onCancelar: () => void
-}): React.JSX.Element {
-  const [id, setId] = useState(choca ? `${def.id.slice(0, 28)}-imp` : def.id)
-  const idOk = ID_CONECTOR_RE.test(id) && (!choca || id !== def.id)
+}: ComoMio & { onGuardar: (def: ConectorMcp, id: string, reemplaza: boolean) => void; onCancelar: () => void }): React.JSX.Element {
+  const [id, setId] = useState(idInicial)
+  const reemplaza = choca === 'propio' && id === def.id
+  const idOk = ID_CONECTOR_RE.test(id) && (choca === null || reemplaza || id !== def.id)
+  const etiqueta =
+    choca === 'propio' ? `Ya tenés un conector «${def.id}». Con el mismo id lo reemplaza; si no, elegí otro:` : choca ? `Ya hay un conector «${def.id}». Elegí otro id:` : 'Id'
   return (
     <AvisoHerramientas
-      origen="un archivo"
-      herramientas={herramientasVista(def)}
-      pistaLista={def.pistas.lista}
-      aceptar="Revisar y guardar"
+      origen={origen}
+      herramientas={vistaHerramientas(def)}
+      aceptar={reemplaza ? 'Reemplazar el mío' : 'Guardar como mío'}
       listo={idOk}
-      onAceptar={() => onSeguir({ ...deDef(def), id })}
+      onAceptar={() => onGuardar(def, id, reemplaza)}
       onCancelar={onCancelar}
     >
-      {choca && (
-        <label className="field">
-          <span>Ya hay un conector «{def.id}». Elegí otro id:</span>
-          <input value={id} maxLength={32} spellCheck={false} aria-invalid={!idOk} onChange={(e) => setId(e.target.value.trim())} />
-        </label>
-      )}
+      <label className="field">
+        <span>{etiqueta}</span>
+        <input value={id} maxLength={32} spellCheck={false} aria-invalid={!idOk} onChange={(e) => setId(e.target.value.trim())} />
+      </label>
     </AvisoHerramientas>
   )
 }
 
-/** Lo que puede leer y cambiar un conector que no armó la persona, antes de usarlo. */
+function Herramientas({ prefijo, xs }: { prefijo: string; xs: readonly string[] }): React.JSX.Element {
+  return (
+    <ul className="f-tickets-aviso-h-lista">
+      {xs.map((t) => (
+        <li key={t}>
+          <code>{prefijo + t}</code>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/** Lo que puede leer y cambiar un conector que no armó la persona, antes de usarlo: por consulta y por acción, lo mismo que va a --allowedTools. */
 export function AvisoHerramientas({
   origen,
   herramientas: h,
-  pistaLista,
   aceptar,
   listo = true,
   onAceptar,
@@ -242,46 +268,80 @@ export function AvisoHerramientas({
 }: {
   origen: string
   herramientas: HerramientasVista
-  pistaLista: string
   aceptar: string
   listo?: boolean
   onAceptar: () => void
   onCancelar: () => void
   children?: React.ReactNode
 }): React.JSX.Element {
-  const lee = [...h.lista, ...h.detalle, ...h.apoyo]
-  const escribe = ACCIONES.flatMap((a) => (h.escritura[a] ? [[a, h.escritura[a]] as const] : []))
+  const tituloId = useId()
+  const p = h.pistas
+  const libres: [string, string | undefined][] = [
+    ['Quién sos, con tu id', p.yoConId],
+    ['Quién sos, sin tu id', p.yoSinId],
+    ['Estados', p.estados],
+    ['Antes de abrir un ticket o de una acción', p.apoyo],
+    ['Pasos al abrir un ticket', p.detalle.length ? p.detalle.join('\n') : undefined]
+  ]
   return (
-    <div className="f-tickets-alert f-tickets-confirm f-tickets-aviso-h" role="alertdialog" aria-labelledby="f-tickets-aviso-h-titulo">
-      <p id="f-tickets-aviso-h-titulo" className="f-tickets-aviso-h-titulo">
-        Este conector viene de {origen}. Revisá qué puede usar Claude:
+    <div className="f-tickets-alert f-tickets-confirm f-tickets-aviso-h" role="alertdialog" aria-labelledby={tituloId}>
+      <p id={tituloId} className="f-tickets-aviso-h-titulo">
+        Este conector viene de {origen}. Revisá qué puede usar Claude en cada caso:
       </p>
       <div>
-        <strong>Lee con</strong>
-        <ul className="f-tickets-aviso-h-lista">
-          {lee.map((t) => (
-            <li key={t}>
-              <code>{h.prefijo + t}</code>
-            </li>
-          ))}
-        </ul>
+        <strong>Al actualizar la lista, lee con</strong>
+        <Herramientas prefijo={h.prefijo} xs={h.lista} />
       </div>
-      {escribe.length > 0 && (
-        <div className="f-tickets-aviso-h-escribe">
-          <strong>Puede cambiar tickets con</strong>
-          <ul className="f-tickets-aviso-h-lista">
-            {escribe.map(([a, t]) => (
-              <li key={a}>
-                {ACCION_ETIQUETA[a]}: <code>{h.prefijo + t}</code>
-              </li>
-            ))}
-          </ul>
+      {h.detalle.length > 0 && (
+        <div>
+          <strong>Al abrir un ticket, lee con</strong>
+          <Herramientas prefijo={h.prefijo} xs={h.detalle} />
         </div>
       )}
+      {ACCIONES.map((a) => {
+        const xs = h.acciones[a]
+        const escribe = h.escritura[a]
+        if (!xs || !escribe) return null
+        const lee = xs.filter((t) => t !== escribe)
+        const pista = p.acciones[a]
+        return (
+          <div key={a} className="f-tickets-aviso-h-escribe">
+            <strong>{ACCION_ETIQUETA[a]}</strong>: cambia el ticket con <code>{h.prefijo + escribe}</code>
+            {lee.length > 0 && (
+              <>
+                {' '}
+                y además lee con
+                <Herramientas prefijo={h.prefijo} xs={lee} />
+              </>
+            )}
+            {pista && (
+              <ul className="f-tickets-aviso-h-lista">
+                <li>
+                  Argumentos: <code>{pista.args}</code>
+                </li>
+                {pista.nota && <li>Nota para Claude: «{pista.nota}»</li>}
+              </ul>
+            )}
+          </div>
+        )
+      })}
       <p className="f-tickets-ajustes-nota">Bloquea {h.negar} herramientas.</p>
       <pre className="f-tickets-aviso-h-pista" tabIndex={0} aria-label="Pista para traer la lista">
-        {pistaLista}
+        {p.lista}
       </pre>
+      <details>
+        <summary>Las demás pistas que van al prompt</summary>
+        {libres.map(([t, v]) =>
+          v === undefined ? null : (
+            <div key={t}>
+              <strong>{t}</strong>
+              <pre className="f-tickets-aviso-h-pista" tabIndex={0} aria-label={t}>
+                {v}
+              </pre>
+            </div>
+          )
+        )}
+      </details>
       {children}
       <div className="f-tickets-asis-acciones">
         <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={onAceptar} disabled={!listo}>

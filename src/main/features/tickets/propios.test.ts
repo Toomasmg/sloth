@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { ConectorInvalidoError, type ConectorMcp } from './conector'
 import { CONECTORES } from './conectores'
+import { buildAccionArgs } from './motor'
 import github from './conectores/github'
 import linear from './conectores/linear'
 import {
@@ -16,7 +17,8 @@ import {
   parsearImport,
   pareceDeLectura,
   textoExport,
-  validarPropio
+  validarPropio,
+  vistaHerramientas
 } from './propios'
 
 const hash = (t: string): string => createHash('sha256').update(t).digest('hex').slice(0, 16)
@@ -196,4 +198,18 @@ test('parsearArchivoPropios: una versión más nueva no es corrupta ni se toca',
   assert.equal(r.futuro, true)
   assert.match(r.avisos[0], /actualizá Sloth/)
   assert.equal(parsearArchivoPropios(JSON.stringify({ version: 'x' })).corrupto, true)
+})
+
+test('vistaHerramientas: cada acción muestra lo mismo que va a --allowedTools, con apoyoEn y la nota', () => {
+  const def = propio('mi-linear', { escritura: { comentar: 'save_comment' }, apoyo: ['get_issue'], apoyoEn: { comentar: ['search_issues'] } })
+  def.pistas = { ...def.pistas, apoyo: 'Leé {ticket} antes', acciones: { comentar: { args: { issueId: '{ticket}', body: '{cuerpo}' }, nota: 'Pegá lo que encuentres' } } }
+  const v = vistaHerramientas(validarPropio(def) as ConectorMcp)
+  assert.deepEqual(v.acciones.comentar, ['save_comment', 'get_issue', 'search_issues'])
+  const args = buildAccionArgs(def, 'haiku', 'comentar')
+  assert.deepEqual(args[args.indexOf('--allowedTools') + 1].split(','), v.acciones.comentar?.map((t) => def.herramientas.prefijo + t))
+  assert.deepEqual(v.detalle, [...def.herramientas.detalle, 'get_issue'].filter((t, i, xs) => xs.indexOf(t) === i))
+  assert.deepEqual(v.pistas.acciones.comentar, { args: '{"issueId":"{ticket}","body":"{cuerpo}"}', nota: 'Pegá lo que encuentres' })
+  assert.equal(v.pistas.apoyo, 'Leé {ticket} antes')
+  assert.equal(v.pistas.yoConId, def.pistas.yo.conId)
+  assert.equal(v.pistas.detalle.length, def.pistas.detalle.length)
 })

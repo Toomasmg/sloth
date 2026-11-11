@@ -37,6 +37,7 @@ import {
   recortarAvisos,
   textoExport,
   validarPropio,
+  vistaHerramientas,
   type ArchivoPropios,
   type ConectorRegistrado
 } from './propios'
@@ -589,16 +590,7 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
 }
 
 function vista(r: ConectorRegistrado, def: ConectorMcp): ConectorPropioVista {
-  const h = def.herramientas
-  return {
-    id: def.id,
-    nombre: def.nombre,
-    origen: r.origen,
-    aceptado: aceptado(r),
-    hash: r.hash,
-    herramientas: { prefijo: h.prefijo, lista: [...h.lista], detalle: [...h.detalle], apoyo: [...(h.apoyo ?? [])], escritura: { ...h.escritura }, negar: h.negar.length },
-    pistaLista: def.pistas.lista
-  }
+  return { id: def.id, nombre: def.nombre, origen: r.origen, aceptado: aceptado(r), hash: r.hash, herramientas: vistaHerramientas(def) }
 }
 
 function propios(): { lista: ConectorPropioVista[]; avisos: string[] } {
@@ -716,7 +708,7 @@ async function exportarPropio(rawId: unknown): Promise<{ path: string } | null> 
   return { path: r.filePath }
 }
 
-async function importarPropio(): Promise<{ def: ConectorDef; choca: 'incluido' | 'propio' | null } | null> {
+async function importarPropio(): Promise<{ def: ConectorDef; choca: 'incluido' | 'propio' | 'equipo' | null } | null> {
   const win = ctx.window()
   const opts: OpenDialogOptions = {
     title: 'Importar un conector',
@@ -728,7 +720,8 @@ async function importarPropio(): Promise<{ def: ConectorDef; choca: 'incluido' |
   if (!file) return null
   if (statSync(file).size > IMPORT_MAX_BYTES) throw new Error(`El archivo pesa más de ${IMPORT_MAX_BYTES / 1024} KB.`)
   const def = parsearImport(readFileSync(file, 'utf8'))
-  const choca = CONECTORES.some((c) => c.id === def.id) ? 'incluido' : registro.some((c) => c.def.id === def.id) ? 'propio' : null
+  const previo = registrado(def.id)?.origen.tipo
+  const choca = archivoPropios.conectores.some((c) => c.id === def.id) ? 'propio' : previo === 'equipo' ? 'equipo' : previo || CONECTORES.some((c) => c.id === def.id) ? 'incluido' : null
   return { def, choca }
 }
 

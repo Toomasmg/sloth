@@ -91,13 +91,28 @@ export interface ConectorResumen {
   aceptado?: boolean
 }
 
+/** Todo lo que un conector le pide a Claude, para revisarlo antes de aceptarlo. */
 export interface HerramientasVista {
   prefijo: string
+  /** Lo que va a --allowedTools (nombres cortos) al actualizar la lista, al abrir un ticket y en cada acción. */
   lista: string[]
   detalle: string[]
-  apoyo: string[]
+  acciones: Partial<Record<Accion, string[]>>
   escritura: Partial<Record<Accion, string>>
   negar: number
+  pistas: PistasVista
+}
+
+/** Los textos y argumentos que el conector suma a los prompts. */
+export interface PistasVista {
+  yoConId: string
+  yoSinId: string
+  lista: string
+  estados?: string
+  apoyo?: string
+  /** Cada paso del detalle: herramienta y argumentos en JSON. */
+  detalle: string[]
+  acciones: Partial<Record<Accion, { args: string; nota?: string }>>
 }
 
 export interface ConectorPropioVista {
@@ -107,7 +122,6 @@ export interface ConectorPropioVista {
   aceptado: boolean
   hash: string
   herramientas: HerramientasVista
-  pistaLista: string
 }
 
 export interface ConectorInfo {

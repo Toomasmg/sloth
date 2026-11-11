@@ -142,7 +142,6 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
         <AvisoHerramientas
           origen={deDondeViene(revisar.origen)}
           herramientas={revisar.herramientas}
-          pistaLista={revisar.pistaLista}
           aceptar="Aceptar y usar"
           onAceptar={() => aceptar(revisar)}
           onCancelar={() => setRevisar(null)}

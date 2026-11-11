@@ -4,8 +4,9 @@
  * leer con una herramienta que no parezca de lectura.
  * Módulo puro y sin `node:*`: también lo importa la interfaz. El hash se inyecta desde main.
  */
-import type { OrigenConector } from '../../../shared/tickets'
-import { ConectorInvalidoError, validarConector, type ConectorDef } from './conector'
+import { ACCIONES, type HerramientasVista, type OrigenConector } from '../../../shared/tickets'
+import { ConectorInvalidoError, validarConector, type ConectorDef, type ConectorMcp } from './conector'
+import { permisosPorConsulta } from './motor'
 
 export interface ConectorRegistrado {
   def: ConectorDef
@@ -241,3 +242,32 @@ export function parsearConectoresEquipo(texto: string): unknown[] {
 }
 
 export const textoExport = (def: ConectorDef): string => JSON.stringify(def, null, 2) + '\n'
+
+/** Lo que se muestra antes de aceptar o guardar un conector que no armó la persona: sale de lo mismo que usa el motor. */
+export function vistaHerramientas(def: ConectorMcp): HerramientasVista {
+  const h = def.herramientas
+  const p = def.pistas
+  const permisos = permisosPorConsulta(def)
+  const acciones: HerramientasVista['pistas']['acciones'] = {}
+  for (const a of ACCIONES) {
+    const x = p.acciones[a]
+    if (x) acciones[a] = { args: JSON.stringify(x.args), ...(x.nota ? { nota: x.nota } : {}) }
+  }
+  return {
+    prefijo: h.prefijo,
+    lista: permisos.lista,
+    detalle: permisos.detalle,
+    acciones: permisos.acciones,
+    escritura: { ...h.escritura },
+    negar: h.negar.length,
+    pistas: {
+      yoConId: p.yo.conId,
+      yoSinId: p.yo.sinId,
+      lista: p.lista,
+      ...(p.estados !== undefined ? { estados: p.estados } : {}),
+      ...(p.apoyo !== undefined ? { apoyo: p.apoyo } : {}),
+      detalle: p.detalle.map((x) => `${x.herramienta} ${JSON.stringify(x.args)}`),
+      acciones
+    }
+  }
+}
