@@ -34,7 +34,7 @@ export interface ResultadoCarga {
   respaldar: null | 'corrupto' | 'previo'
   guardar: boolean
   /** Si no es null, tickets.json no se toca en toda la sesión: se trabaja en memoria. */
-  soloLectura: null | 'ilegible' | 'version-futura'
+  soloLectura: null | 'ilegible' | 'version-futura' | 'gruv-ilegible'
 }
 
 export type Buscar = (id: string) => ConectorDef | undefined
@@ -148,7 +148,7 @@ export function conConector(s: TicketsState, conectorId: string): TicketsState {
 export function resolverEstado(e: { tickets: Lectura; gruv: Lectura }, buscar: Buscar, ahora: number): ResultadoCarga {
   const { tickets, gruv } = e
   const migrar = (): TicketsState | null => (gruv.kind === 'ok' ? migrarDeGruv(gruv.json, buscar, ahora, gruv.mtimeMs) : null)
-  const enMemoria = (soloLectura: 'ilegible' | 'version-futura'): ResultadoCarga => {
+  const enMemoria = (soloLectura: NonNullable<ResultadoCarga['soloLectura']>): ResultadoCarga => {
     const m = migrar()
     return { state: m ?? estadoVacio(), origen: m ? 'gruv' : 'vacio', respaldar: null, guardar: false, soloLectura }
   }
@@ -168,6 +168,8 @@ export function resolverEstado(e: { tickets: Lectura; gruv: Lectura }, buscar: B
     respaldar = 'corrupto'
   }
 
+  // Sin tickets.json válido, guardar dejaría uno sin migradoDe y el próximo arranque lo pisaría con gruv.json.
+  if (gruv.kind === 'error') return enMemoria('gruv-ilegible')
   const m = migrar()
   if (m) return { state: m, origen: 'gruv', respaldar, guardar: true, soloLectura: null }
   return { state: estadoVacio(), origen: 'vacio', respaldar, guardar: false, soloLectura: null }

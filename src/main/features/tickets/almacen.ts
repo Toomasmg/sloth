@@ -38,6 +38,7 @@ const NO_SE_GUARDA = 'Lo que cambies en esta sesión no se guarda'
 const AVISOS = {
   ilegible: `No pude leer tickets.json (puede estar abierto en otro programa). ${NO_SE_GUARDA}: cerrá Sloth y volvé a abrirlo.`,
   'version-futura': `El archivo tickets.json es de una versión más nueva de Sloth. ${NO_SE_GUARDA}, para no pisarlo: actualizá Sloth.`,
+  'gruv-ilegible': `No pude leer gruv.json (puede estar abierto en otro programa). ${NO_SE_GUARDA}, para no perder los tickets de antes: cerrá Sloth y volvé a abrirlo.`,
   'sin-respaldo': `No pude apartar el tickets.json anterior antes de reemplazarlo. ${NO_SE_GUARDA}: cerrá Sloth y volvé a abrirlo.`
 }
 

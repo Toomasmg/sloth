@@ -140,6 +140,13 @@ test('tickets.json que no se pudo leer: no es corrupto, se trabaja en memoria', 
   assert.equal(r.soloLectura, 'ilegible')
 })
 
+test('gruv.json que no se pudo leer sin tickets.json válido: vacío en memoria, la migración queda pendiente', () => {
+  for (const tickets of [FALTA, CORRUPTO, ok({ version: 1 })]) {
+    const r = resolverEstado({ tickets, gruv: { kind: 'error', mensaje: 'EBUSY' } }, conectorPorId, AHORA)
+    assert.deepEqual(r, { state: estadoVacio(), origen: 'vacio', respaldar: null, guardar: false, soloLectura: 'gruv-ilegible' })
+  }
+})
+
 test('un conector que no está en esta versión se conserva', () => {
   const raw = { ...TICKETS_V2, tickets: [{ id: 'jira-12', titulo: 'J' }, { id: 'x'.repeat(21), titulo: 'Largo' }, { id: 7 }, { id: 'a b; rm' }], config: { ...TICKETS_V2.config, conectorId: 'jira' } }
   const s = sanearEstado(raw, conectorPorId)

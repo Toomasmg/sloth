@@ -172,6 +172,25 @@ test('error al leer gruv.json: tickets.json manda y no se toca', () => {
   assert.equal(a.aviso(), undefined)
 })
 
+test('sin tickets.json válido y gruv.json ilegible: no guarda en la sesión y migra en el próximo arranque', () => {
+  for (const tickets of [{}, { [TICKETS]: { texto: '{roto', mtimeMs: 1 } }]) {
+    const f = fsFalso({ ...tickets, [GRUV]: { texto: GRUV_V1, mtimeMs: 500 } }, { leerFalla: { [GRUV]: 'EBUSY' } })
+    const a = almacen(f)
+    const s = a.cargar()
+    assert.equal(s.tickets.length, 0)
+    assert.match(a.aviso() ?? '', /No pude leer gruv\.json.*no se guarda/)
+    s.tickets.push({ id: 'TCK-77', titulo: 'De esta sesión' })
+    assert.equal(a.guardar(s), false)
+    assert.deepEqual(f.ops, [])
+    const f2 = fsFalso(Object.fromEntries(f.archivos))
+    const b = almacen(f2, AHORA + 1)
+    assert.equal(b.cargar().tickets[0].id, 'TCK-1')
+    assert.equal(enDisco(f2).migradoDe?.gruvMtimeMs, 500)
+    assert.ok(!f2.ops.some((op) => op.includes('.bak')), f2.ops.join(' | '))
+    gruvIntacto(f2, GRUV_V1)
+  }
+})
+
 test('versión futura: no renombra ni escribe en toda la sesión y avisa', () => {
   const futuro = JSON.stringify({ version: 3, cosas: 'nuevas' })
   for (const gruv of [{ [GRUV]: { texto: GRUV_V1, mtimeMs: 2 } }, {}]) {
