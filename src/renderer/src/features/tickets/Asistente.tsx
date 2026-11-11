@@ -42,10 +42,12 @@ export function Asistente({
   }, [paso])
 
   const cambiar: Cambiar = (f) => setB((x) => (x ? f(x) : x))
+  // Las herramientas son del prefijo de la última búsqueda: con otro hay que buscar de nuevo.
+  const otroPrefijo = Boolean(b && b.prefijo !== prefijo)
   const revision = useMemo(() => (b ? validarBorrador(b) : null), [b])
 
   const encontradas = (herramientas: string[]): void => {
-    setB((x) => (x ? conHerramientas(x, herramientas) : borradorNuevo(nombre.trim(), prefijo, herramientas)))
+    setB((x) => (x ? conHerramientas({ ...x, prefijo }, herramientas) : borradorNuevo(nombre.trim(), prefijo, herramientas)))
   }
 
   const siguiente = (): void => {
@@ -81,6 +83,7 @@ export function Asistente({
       {paso === 1 && (
         <PasoServidor nombre={nombre} prefijo={prefijo} setNombre={setNombre} setPrefijo={setPrefijo} editando={Boolean(b)} onEncontradas={encontradas} />
       )}
+      {paso === 1 && otroPrefijo && <p className="f-tickets-ajustes-nota">Cambiaste el prefijo: buscá las herramientas de nuevo para seguir.</p>}
       {paso === 2 && b && <PasoHerramientas b={b} cambiar={cambiar} />}
       {paso === 3 && b && <PasoFormato b={b} cambiar={cambiar} />}
       {paso === 4 && b && <PasoPistas b={b} cambiar={cambiar} />}
@@ -107,7 +110,7 @@ export function Asistente({
           </button>
         )}
         {paso < 4 ? (
-          <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={siguiente} disabled={!b || (paso === 1 && (!nombre.trim() || !PREFIJO_RE.test(prefijo)))}>
+          <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={siguiente} disabled={!b || (paso === 1 && (!nombre.trim() || !PREFIJO_RE.test(prefijo) || otroPrefijo))}>
             Siguiente
           </button>
         ) : (
@@ -191,12 +194,12 @@ function PasoServidor({
         </select>
       </label>
       <p className="f-tickets-ajustes-nota">
-        Cada búsqueda cuesta unos USD 0,34 de esa cuenta: Claude recibe la definición de todas sus herramientas.
+        Cada búsqueda gasta uso de esa cuenta (unos centavos de dólar, según el modelo y cuántas herramientas tenga): Claude recibe la definición de todas.
         {editando ? ' Si buscás de nuevo, se conservan los roles de las herramientas que siguen.' : ''}
       </p>
       <div className="f-tickets-asis-acciones">
         <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={buscar} disabled={buscando || !nombre.trim() || !PREFIJO_RE.test(prefijo)}>
-          {buscando ? 'Preguntándole a Claude (no usa ninguna herramienta)…' : 'Buscar herramientas (≈ USD 0,34)'}
+          {buscando ? 'Preguntándole a Claude (no usa ninguna herramienta)…' : 'Buscar herramientas'}
         </button>
         {res && res.herramientas.length > 0 && (
           <span className="f-tickets-ajustes-nota" role="status">

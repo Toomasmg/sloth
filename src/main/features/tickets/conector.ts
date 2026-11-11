@@ -188,7 +188,7 @@ function args(v: unknown, ruta: string, permitidos: readonly string[], prof = 1)
   if (claves.length < 1 || claves.length > 10) fallar(ruta, 'tiene que tener entre 1 y 10 argumentos')
   for (const k of claves) {
     const r = `${ruta}.${k}`
-    if (!ARG_RE.test(k)) fallar(r, 'nombre de argumento inválido')
+    if (!ARG_RE.test(k) || k === '__proto__') fallar(r, 'nombre de argumento inválido')
     const x = v[k]
     if (x === null || typeof x === 'number' || typeof x === 'boolean') continue
     if (esPlano(x)) {

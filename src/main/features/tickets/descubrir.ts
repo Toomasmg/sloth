@@ -31,8 +31,8 @@ export function buildDescubrirArgs(): string[] {
     // Sin herramientas propias de Claude Code; las MCP siguen listadas en system/init.
     '--tools',
     '',
-    // Con allowedTools vacío y el modo default, en -p cualquier llamada a una herramienta MCP se rechaza:
-    // descubrir no puede leer ni escribir nada del sistema de tickets.
+    // Con allowedTools vacío y el modo default, en -p se rechaza toda llamada a una herramienta MCP que la
+    // cuenta no tenga permitida en sus propios ajustes (permissions.allow); el prompt es fijo y pide no llamar a ninguna.
     '--allowedTools',
     '',
     '--disallowedTools',

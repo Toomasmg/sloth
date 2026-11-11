@@ -160,7 +160,7 @@ export function PasoFormato({ b, cambiar }: { b: Borrador; cambiar: Cambiar }): 
           aria-describedby="f-tickets-asis-ejemplo"
           onChange={(e) => cambiar((x) => ({ ...x, ejemploId: e.target.value.trim() }))}
         />
-        <span id="f-tickets-asis-ejemplo" className={problema ? 'field-error' : 'field-help'} role="status">
+        <span id="f-tickets-asis-ejemplo" className={problema ? 'field-error' : 'field-help'}>
           {problema ?? 'Cumple el formato.'}
         </span>
       </label>

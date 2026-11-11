@@ -1,6 +1,6 @@
 import { app, dialog, type OpenDialogOptions, type SaveDialogOptions } from 'electron'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import {
   MODELOS,
@@ -659,13 +659,16 @@ function guardarPropio(raw: unknown, rawAnterior: unknown): TicketsSnapshot {
   if (ocupado) throw new Error(`Ya hay un conector «${def.id}». Elegí otro id.`)
   if (anterior === undefined && actuales.length >= PROPIOS_MAX) throw new Error(`Podés tener hasta ${PROPIOS_MAX} conectores propios.`)
   const eraActivo = anterior !== undefined && anterior === state.config.conectorId
-  if (eraActivo && def.id !== anterior) sinNadaEnCurso()
+  if (eraActivo) sinNadaEnCurso()
 
   const conectores = anterior === undefined ? [...actuales, def] : actuales.map((c) => (c.id === anterior ? def : c))
   guardarArchivo({ ...archivoPropios, conectores })
   recargarPropios(state.config)
   if (eraActivo && def.id !== anterior) pasarA(def.id)
-  else if (eraActivo) noDisponible = {}
+  else if (eraActivo) {
+    noDisponible = {}
+    detalles.clear()
+  }
   changed()
   return snapshot()
 }
@@ -703,8 +706,13 @@ async function exportarPropio(rawId: unknown): Promise<{ path: string } | null> 
   const r = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
   if (r.canceled || !r.filePath) return null
   const tmp = `${r.filePath}.${process.pid}.tmp`
-  writeFileSync(tmp, textoExport(def), 'utf8')
-  renameSync(tmp, r.filePath)
+  try {
+    writeFileSync(tmp, textoExport(def), 'utf8')
+    renameSync(tmp, r.filePath)
+  } catch (e) {
+    rmSync(tmp, { force: true })
+    throw e
+  }
   return { path: r.filePath }
 }
 

@@ -55,7 +55,14 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
 
   const aceptar = (v: ConectorPropioVista): void => {
     setRevisar(null)
-    aceptarYUsar(ui, v).catch((e) => setErr(cleanError(e)))
+    if (!snap.tickets.length) return void aceptarYUsar(ui, v).catch((e) => setErr(cleanError(e)))
+    ui.invoke<Snapshot>('feat:tickets:aceptar', v.id, v.hash).then(
+      (s) => {
+        setSnapshot(s)
+        setPendiente(v.id)
+      },
+      (e) => setErr(cleanError(e))
+    )
   }
 
   const confirmar = (): void => {
