@@ -223,10 +223,14 @@ export function idValido(def: ConectorDef, v: unknown): string | null {
   return s.length <= ID_MAX && ID_SEGURO_RE.test(s) && regexDeId(def).test(s) ? s : null
 }
 
+/** La skill `/ticket` que arranca un espacio solo entiende tickets de Gruv. */
+export const usaComandoTicket = (def: ConectorDef): boolean => def.id === 'gruv'
+
 export const leeDetalle = (def: ConectorDef): boolean => def.via === 'gh' || def.herramientas.detalle.length > 0
 
 export function info(def: ConectorDef | undefined, idPedido: string): ConectorInfo {
-  if (!def) return { id: idPedido, nombre: idPedido, verificado: false, via: 'mcp', disponible: false, acciones: [], leeDetalle: false, ejemploId: '', estados: [] }
+  if (!def)
+    return { id: idPedido, nombre: idPedido, verificado: false, via: 'mcp', disponible: false, acciones: [], leeDetalle: false, ejemploId: '', estados: [], comandoTicket: false }
   return {
     id: def.id,
     nombre: def.nombre,
@@ -236,7 +240,8 @@ export function info(def: ConectorDef | undefined, idPedido: string): ConectorIn
     acciones: accionesSoportadas(def),
     leeDetalle: leeDetalle(def),
     ejemploId: def.ejemplo.id,
-    estados: def.estados.map((e) => ({ ...e }))
+    estados: def.estados.map((e) => ({ ...e })),
+    comandoTicket: usaComandoTicket(def)
   }
 }
 

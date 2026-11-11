@@ -5,6 +5,7 @@ import { SPACE_CHIP, SPACE_LABEL, spaceStatus } from '../broadcast/state'
 import { CloseIcon, SearchIcon, SettingsIcon, SpaceIcon } from '../../icons/SlothIcons'
 import type { Workspace } from '../../../../shared/types'
 import { categoriaDe } from '../../../../shared/tickets'
+import { mismoTicket } from '../../../../shared/templates-shared'
 import {
   etiquetaTablero,
   isMine,
@@ -149,7 +150,7 @@ export function Board(): React.JSX.Element {
   const ticketTpls = tpls.filter(usesTicket)
   const ticketTpl = ticketTpls.find((x) => x.name.toLowerCase().includes(n.toLowerCase())) ?? ticketTpls[0]
   const estadoName = (k?: string): string => estados.find((e) => e.clave === k)?.nombre ?? (k ? k.replace(/_/g, ' ') : 'Sin estado')
-  const wsOf = (id: string): Workspace | undefined => ui.workspaces.find((w) => w.ticket?.toUpperCase() === id)
+  const wsOf = (id: string): Workspace | undefined => ui.workspaces.find((w) => mismoTicket(w.ticket, id))
   const accLabel = (id?: string): string | undefined => ui.accounts.find((a) => a.id === id)?.label
 
   const isMineT = (t: Ticket): boolean => isMine(t, me)

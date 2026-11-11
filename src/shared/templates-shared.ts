@@ -90,6 +90,21 @@ export function validBranch(b: string): boolean {
 
 export const TICKET_RE = /^[A-Z][A-Z0-9]*-\d+$/
 
+const TICKET_LIBRE_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,19}$/
+
+/**
+ * Ticket de un espacio: los tipo ABC-123 van en mayúsculas; los de otros servicios (123 de GitHub,
+ * 86c0abcd1 de ClickUp), tal cual. Va al PTY y a nombres de rama: solo letras, números, _ . y -.
+ */
+export function normTicketId(raw: string): string | undefined {
+  const t = raw.trim()
+  if (TICKET_RE.test(t.toUpperCase())) return t.toUpperCase()
+  return TICKET_LIBRE_RE.test(t) && !t.includes('..') ? t : undefined
+}
+
+/** Un mismo ticket aunque uno se haya guardado en mayúsculas. */
+export const mismoTicket = (guardado: string | undefined, id: string): boolean => guardado !== undefined && guardado.toUpperCase() === id.toUpperCase()
+
 /** Íconos de plantilla (claves). Los dibujos están en features/templates/catalog.ts. */
 export const TEMPLATE_ICON_KEYS = ['ticket', 'db', 'revision', 'bolt', 'compass', 'rama'] as const
 /** Colores de plantilla y de espacio (claves). */

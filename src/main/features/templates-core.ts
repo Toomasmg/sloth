@@ -10,6 +10,7 @@ import {
   applyVars,
   BRANCH_VARS,
   folderLabel,
+  normTicketId,
   SUGGESTED,
   TEMPLATE_COLOR_KEYS,
   TEMPLATE_ICON_KEYS,
@@ -72,11 +73,10 @@ function checkVars(s: string | undefined, where: string, allowed: readonly strin
 
 export function normTicket(raw: unknown): string | undefined {
   if (raw === undefined || raw === null || raw === '') return undefined
-  if (typeof raw !== 'string' || raw.length > 40) return fail('El ticket tiene que ser tipo TCK-1234.')
-  const t = raw.trim().toUpperCase()
-  if (!t) return undefined
-  if (!TICKET_RE.test(t)) fail('El ticket tiene que ser tipo TCK-1234.')
-  return t
+  const malo = 'El ticket solo lleva letras, números, guiones, puntos o _ (p. ej. TCK-1234 o 123).'
+  if (typeof raw !== 'string' || raw.length > 40) return fail(malo)
+  if (!raw.trim()) return undefined
+  return normTicketId(raw) ?? fail(malo)
 }
 
 const str = (v: unknown, max: number, label: string, required = false): string | undefined => {

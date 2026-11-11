@@ -97,6 +97,8 @@ export interface ConectorInfo {
   ejemploId: string
   /** Los del conector, incluidos los de categoría 'hecho'. */
   estados: Estado[]
+  /** Si los espacios de sus tickets arrancan con `/ticket <id>` (la skill es de Gruv). */
+  comandoTicket: boolean
 }
 
 export interface Corrida {

@@ -175,6 +175,7 @@ test('info de un conector que existe y de uno que no', () => {
   assert.equal(i.via, 'mcp')
   assert.equal(i.leeDetalle, true)
   assert.equal(i.ejemploId, 'TCK-1234')
+  assert.equal(i.comandoTicket, true)
   assert.deepEqual(i.acciones, ['estado', 'tomar', 'soltar', 'comentar', 'criterio', 'horas'])
   assert.equal(i.estados.length, 8)
   assert.notEqual(i.estados[0], GRUV.estados[0])
@@ -187,7 +188,8 @@ test('info de un conector que existe y de uno que no', () => {
     acciones: [],
     leeDetalle: false,
     ejemploId: '',
-    estados: []
+    estados: [],
+    comandoTicket: false
   })
 })
 
@@ -196,6 +198,7 @@ test('info de GitHub: vía gh, con detalle y las acciones de gh', () => {
   const i = info(def, 'github')
   assert.equal(i.via, 'gh')
   assert.equal(i.leeDetalle, true)
+  assert.equal(i.comandoTicket, false)
   assert.deepEqual(i.acciones, ACCIONES_GH)
   assert.deepEqual(accionesSoportadas(def), ACCIONES_GH)
   assert.deepEqual(mismaHerramienta(def, 'tomar'), ['tomar'])

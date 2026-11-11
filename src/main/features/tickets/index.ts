@@ -13,6 +13,7 @@ import { CONECTOR_POR_DEFECTO, CONECTORES, conectorPorId } from './conectores'
 import { ASSIGNEE_MAX, assigneeValido, conConector, type TicketsState } from './estado'
 import { ghAccion, ghDetalle, ghLista, ghYo, repoValido, type GhRun } from './gh'
 import { GitError, run as correr } from '../git-run'
+import { mismoTicket } from '../../../shared/templates-shared'
 import { githubRepoOf } from '../team-github'
 import {
   accionesSoportadas,
@@ -31,7 +32,8 @@ import {
   mismaHerramienta,
   parseAccion,
   parseClaudeOutput,
-  parseDetalle
+  parseDetalle,
+  usaComandoTicket
 } from './motor'
 
 /**
@@ -157,10 +159,11 @@ function hasRepo(rawId: unknown): boolean {
   return Boolean(repoFor(state.tickets.find((t) => t.id === id)))
 }
 
-/** «Empezar en Sloth»: crea el espacio del ticket con `/ticket <id>`. */
+/** «Empezar en Sloth»: crea el espacio del ticket (con Gruv, arranca con `/ticket <id>`). */
 async function start(rawId: unknown, rawAccount?: unknown): Promise<{ id: string; created: boolean }> {
-  const id = ticketId(paraEspacios(), rawId)
-  const existing = ctx.store.workspaces.find((w) => w.ticket?.toUpperCase() === id)
+  const def = paraEspacios()
+  const id = ticketId(def, rawId)
+  const existing = ctx.store.workspaces.find((w) => mismoTicket(w.ticket, id))
   if (existing) {
     ctx.ui({ type: 'open-pane', id: existing.id })
     return { id: existing.id, created: false }
@@ -179,7 +182,7 @@ async function start(rawId: unknown, rawAccount?: unknown): Promise<{ id: string
     accountId,
     autoStartClaude: true,
     ticket: id,
-    initialPrompt: `/ticket ${id}`,
+    initialPrompt: usaComandoTicket(def) ? `/ticket ${id}` : undefined,
     resume: true
   })
   ctx.ui({ type: 'open-pane', id: ws.id })

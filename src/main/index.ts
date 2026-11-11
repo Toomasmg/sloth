@@ -11,7 +11,7 @@ import { installInto, stateForEvent, writeHookScript, type HookEventPayload } fr
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
 import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
 import { createWorktree } from './git'
-import { TEMPLATE_COLOR_KEYS, validBranch } from '../shared/templates-shared'
+import { normTicketId, TEMPLATE_COLOR_KEYS, validBranch } from '../shared/templates-shared'
 import { baseSettingsFor, syncSharedSetup, unshareSetup } from './setup'
 import { UsageScanner } from './usage'
 import { FEATURES } from './features'
@@ -338,8 +338,8 @@ app.whenReady().then(async () => {
     if (!repoPath || !existsSync(repoPath) || !statSync(repoPath).isDirectory())
       throw new Error('Elegí una carpeta de repo válida.')
     requireAccount(input.accountId)
-    const ticket = input.ticket?.trim().toUpperCase() || undefined
-    if (ticket && !/^[A-Z][A-Z0-9]*-\d+$/.test(ticket)) throw new Error('El ticket tiene que ser tipo TCK-1234.')
+    const ticket = input.ticket?.trim() ? normTicketId(input.ticket) : undefined
+    if (input.ticket?.trim() && !ticket) throw new Error('El ticket solo lleva letras, números, guiones, puntos o _ (p. ej. TCK-1234 o 123).')
     const initialPrompt = input.initialPrompt?.trim() || undefined
     if (initialPrompt && initialPrompt.length > 4000) throw new Error('El prompt inicial es demasiado largo.')
     const branch = input.branch?.trim() || undefined
