@@ -370,6 +370,7 @@ export function Board(): React.JSX.Element {
           disabled={!snap}
           aria-label="Ajustes de tickets"
           aria-expanded={ajustes}
+          aria-controls="f-tickets-ajustes"
           title="Ajustes de tickets"
         >
           <SettingsIcon size={14} />
@@ -384,7 +385,11 @@ export function Board(): React.JSX.Element {
           <p className="f-tickets-lead">Tus tickets y los del equipo. Empezá uno y Sloth arma el espacio para trabajarlo.</p>
         </div>
 
-        {ajustes && snap && <Ajustes snap={snap} onClose={() => setAjustes(false)} />}
+        {snap && (
+          <div id="f-tickets-ajustes" hidden={!ajustes}>
+            <Ajustes snap={snap} onClose={() => setAjustes(false)} />
+          </div>
+        )}
 
         {confirming && (
           <div className="f-tickets-alert f-tickets-confirm" role="alertdialog" aria-label={`Confirmar consulta a ${n}`}>

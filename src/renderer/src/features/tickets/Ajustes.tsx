@@ -24,7 +24,8 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
   // Cambiar de conector borra la lista: si hay tickets, se confirma antes.
   const [pendiente, setPendiente] = useState<string | null>(null)
   const [revisar, setRevisar] = useState<ConectorPropioVista | null>(null)
-  const [propiosAbiertos, setPropiosAbiertos] = useState(false)
+  // Una vez abierto queda montado: así cerrar Ajustes o plegar no descarta un asistente a medias.
+  const [propiosVistos, setPropiosVistos] = useState(false)
   const via = snap.conector.via
 
   const set = (p: Record<string, unknown>): void => {
@@ -87,7 +88,7 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
                 {g.conectores.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.nombre}
-                    {c.origen.tipo === 'equipo' && !c.aceptado ? ' (sin aceptar)' : c.verificado || c.origen.tipo !== 'incluido' ? '' : ' (sin probar)'}
+                    {c.origen.tipo === 'equipo' && !c.aceptado ? ' (sin aceptar)' : c.verificado || c.origen.tipo !== 'incluido' ? '' : ' (sin probar: solo lectura)'}
                   </option>
                 ))}
               </optgroup>
@@ -141,9 +142,9 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
         </button>
       </div>
 
-      <details className="f-tickets-propios" onToggle={(e) => setPropiosAbiertos(e.currentTarget.open)}>
+      <details className="f-tickets-propios" onToggle={(e) => e.currentTarget.open && setPropiosVistos(true)}>
         <summary>Conectores propios</summary>
-        {propiosAbiertos && <Propios snap={snap} />}
+        {propiosVistos && <Propios snap={snap} />}
       </details>
 
       {revisar && (
