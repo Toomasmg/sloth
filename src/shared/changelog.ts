@@ -9,6 +9,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.7',
+    date: '2026-11-11',
+    title: 'Conectores de tickets propios',
+    items: [
+      'Armá tu propio conector de tickets con un asistente de cuatro pasos, o editá uno que ya tengas.',
+      'En los ajustes del tablero de Tickets están tus conectores propios: importalos, exportalos o borralos.',
+      'Los conectores del equipo viven en .sloth/conectores.json del repo y el team.json puede traerlos. Antes de usar uno del equipo lo aceptás, después de ver qué herramientas toca.',
+      'Un conector propio solo lee tickets con herramientas de lectura. Al revisarlo ves qué herramientas usa en cada acción, y si no valida queda apartado sin romper los demás.'
+    ]
+  },
+  {
     version: '0.6.6',
     date: '2026-11-11',
     title: 'Zoom con Ctrl y +',
