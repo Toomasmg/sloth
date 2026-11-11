@@ -2,7 +2,20 @@ import { useState } from 'react'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
 import { CloseIcon } from '../../icons/SlothIcons'
+import type { ConectorPropioVista, ConectorResumen } from '../../../../shared/tickets'
 import { setSnapshot, type Snapshot } from './model'
+import { aceptarYUsar, AvisoHerramientas, deDondeViene, etiquetaOrigen, Propios } from './Propios'
+
+function grupos(cs: readonly ConectorResumen[]): { etiqueta: string; conectores: ConectorResumen[] }[] {
+  const out: { etiqueta: string; conectores: ConectorResumen[] }[] = []
+  for (const c of cs) {
+    const etiqueta = c.origen.tipo === 'incluido' ? 'Incluidos' : c.origen.tipo === 'usuario' ? 'Tuyos' : etiquetaOrigen(c.origen)
+    const g = out.find((x) => x.etiqueta === etiqueta)
+    if (g) g.conectores.push(c)
+    else out.push({ etiqueta, conectores: [c] })
+  }
+  return out
+}
 
 /** De qué sistema salen los tickets y, según la vía, con qué cuenta de Claude o qué repo de GitHub. */
 export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void }): React.JSX.Element {
@@ -10,6 +23,8 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
   const [err, setErr] = useState<string | null>(null)
   // Cambiar de conector borra la lista: si hay tickets, se confirma antes.
   const [pendiente, setPendiente] = useState<string | null>(null)
+  const [revisar, setRevisar] = useState<ConectorPropioVista | null>(null)
+  const [propiosAbiertos, setPropiosAbiertos] = useState(false)
   const via = snap.conector.via
 
   const set = (p: Record<string, unknown>): void => {
@@ -19,8 +34,28 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
 
   const elegirConector = (id: string): void => {
     if (id === snap.config.conectorId) return setPendiente(null)
+    if (snap.conectores.some((c) => c.id === id && c.origen.tipo === 'equipo' && !c.aceptado)) return pedirAceptar(id)
     if (snap.tickets.length) return setPendiente(id)
     set({ conectorId: id })
+  }
+
+  // Uno del equipo sin aceptar no se usa hasta que la persona vea qué herramientas toca.
+  const pedirAceptar = (id: string): void => {
+    setErr(null)
+    setPendiente(null)
+    void ui.invoke<{ lista: ConectorPropioVista[] }>('feat:tickets:propios').then(
+      (r) => {
+        const v = r.lista.find((x) => x.id === id)
+        if (v) setRevisar(v)
+        else setErr('Ese conector del equipo ya no está.')
+      },
+      (e) => setErr(cleanError(e))
+    )
+  }
+
+  const aceptar = (v: ConectorPropioVista): void => {
+    setRevisar(null)
+    aceptarYUsar(ui, v).catch((e) => setErr(cleanError(e)))
   }
 
   const confirmar = (): void => {
@@ -39,11 +74,15 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
         <label className="field f-tickets-ajustes-campo">
           <span>Conector</span>
           <select value={pendiente ?? snap.config.conectorId} onChange={(e) => elegirConector(e.target.value)} disabled={snap.running}>
-            {snap.conectores.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.nombre}
-                {c.verificado ? '' : ' (sin probar)'}
-              </option>
+            {grupos(snap.conectores).map((g) => (
+              <optgroup key={g.etiqueta} label={g.etiqueta}>
+                {g.conectores.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                    {c.origen.tipo === 'equipo' && !c.aceptado ? ' (sin aceptar)' : c.verificado || c.origen.tipo !== 'incluido' ? '' : ' (sin probar)'}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
         </label>
@@ -93,6 +132,22 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
           <CloseIcon size={13} />
         </button>
       </div>
+
+      <details className="f-tickets-propios" onToggle={(e) => setPropiosAbiertos(e.currentTarget.open)}>
+        <summary>Conectores propios</summary>
+        {propiosAbiertos && <Propios snap={snap} />}
+      </details>
+
+      {revisar && (
+        <AvisoHerramientas
+          origen={deDondeViene(revisar.origen)}
+          herramientas={revisar.herramientas}
+          pistaLista={revisar.pistaLista}
+          aceptar="Aceptar y usar"
+          onAceptar={() => aceptar(revisar)}
+          onCancelar={() => setRevisar(null)}
+        />
+      )}
 
       {via === 'gh' && (
         <p className="f-tickets-ajustes-nota">
