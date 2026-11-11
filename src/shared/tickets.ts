@@ -86,6 +86,9 @@ export interface ConectorResumen {
   nombre: string
   verificado: boolean
   via: Via
+  origen: OrigenConector
+  /** Solo los del equipo: si la persona aceptó esta versión. Sin aceptar no se puede usar. */
+  aceptado?: boolean
 }
 
 export interface HerramientasVista {
@@ -100,6 +103,7 @@ export interface HerramientasVista {
 export interface ConectorPropioVista {
   id: string
   nombre: string
+  origen: OrigenConector
   aceptado: boolean
   hash: string
   herramientas: HerramientasVista

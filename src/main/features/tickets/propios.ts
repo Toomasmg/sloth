@@ -81,7 +81,7 @@ export const claveAceptado = (repoKey: string, id: string): string => `${repoKey
 
 const motivo = (e: unknown): string => (e instanceof Error ? e.message : 'inválido')
 
-function recortar(avisos: readonly string[]): string[] {
+export function recortarAvisos(avisos: readonly string[]): string[] {
   return avisos.slice(0, AVISOS_MAX).map((a) => (a.length > AVISO_MAX ? `${a.slice(0, AVISO_MAX - 1)}…` : a))
 }
 
@@ -115,7 +115,7 @@ export function parsearArchivoPropios(texto: string | null): { archivo: ArchivoP
   }
   if (esObj(raw.aceptados))
     for (const [k, v] of Object.entries(raw.aceptados)) if (k.length <= CLAVE_ACEPTADO_MAX && typeof v === 'string' && HASH_RE.test(v)) archivo.aceptados[k] = v
-  return { archivo, corrupto: false, avisos: recortar(avisos) }
+  return { archivo, corrupto: false, avisos: recortarAvisos(avisos) }
 }
 
 export function armarRegistro(o: {
@@ -155,14 +155,17 @@ export function armarRegistro(o: {
         avisos.push(`${del}un conector no se cargó: ${motivo(err)}`)
         continue
       }
-      const choca = origenDe(def.id)
-      if (choca === 'incluido') avisos.push(`${del}«${def.id}» usa el id de uno incluido: no se cargó.`)
-      else if (choca === 'usuario') avisos.push(`${del}«${def.id}» tiene el id de uno tuyo: no se cargó.`)
-      else if (choca) avisos.push(`${del}«${def.id}» ya viene de otro repo o está repetido: no se cargó.`)
-      else lista.push({ def, origen: { tipo: 'equipo', repo: e.repo, equipo: e.equipo }, hash: o.hash(jsonCanonico(def)) })
+      const hash = o.hash(jsonCanonico(def))
+      const previo = lista.find((r) => r.def.id === def.id)
+      // El mismo conector en otra copia del repo (p. ej. un worktree): no es un choque.
+      if (previo?.origen.tipo === 'equipo' && previo.hash === hash) continue
+      if (previo?.origen.tipo === 'incluido') avisos.push(`${del}«${def.id}» usa el id de uno incluido: no se cargó.`)
+      else if (previo?.origen.tipo === 'usuario') avisos.push(`${del}«${def.id}» tiene el id de uno tuyo: no se cargó.`)
+      else if (previo) avisos.push(`${del}«${def.id}» ya viene de otro repo o está repetido: no se cargó.`)
+      else lista.push({ def, origen: { tipo: 'equipo', repo: e.repo, equipo: e.equipo }, hash })
     }
   }
-  return { lista, avisos: recortar(avisos) }
+  return { lista, avisos: recortarAvisos(avisos) }
 }
 
 /** El texto de un archivo `.sloth-conector.json`. Tira con un mensaje legible. */

@@ -68,7 +68,7 @@ test('armarRegistro: el del usuario gana al del equipo y entre repos gana el de 
     incluidos: CONECTORES,
     usuario: [propio('mio')],
     equipos: [
-      { repo: 'Z:/b', repoKey: 'z:/b', equipo: 'B', conectores: [propio('compartido')] },
+      { repo: 'Z:/b', repoKey: 'z:/b', equipo: 'B', conectores: [propio('compartido', { lista: ['get_user'] })] },
       { repo: 'Z:/a', repoKey: 'z:/a', equipo: 'A', conectores: [propio('mio'), propio('compartido')] }
     ],
     hash
@@ -125,4 +125,11 @@ test('parsearArchivoPropios', () => {
   )
   assert.equal(r.avisos.length, 1)
   assert.deepEqual(r.archivo.aceptados, { 'z:/a::x': 'a'.repeat(16) })
+})
+
+test('armarRegistro: el mismo conector en otra copia del repo no avisa', () => {
+  const equipo = (k: string): { repo: string; repoKey: string; equipo: string; conectores: unknown[] } => ({ repo: k, repoKey: k, equipo: 'E', conectores: [propio('mio')] })
+  const r = armarRegistro({ incluidos: [], usuario: [], equipos: [equipo('z:/wt'), equipo('z:/repo')], hash })
+  assert.deepEqual(r.avisos, [])
+  assert.deepEqual(r.lista[0].origen, { tipo: 'equipo', repo: 'z:/repo', equipo: 'E' })
 })

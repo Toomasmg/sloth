@@ -1,15 +1,42 @@
-import { app } from 'electron'
+import { app, dialog, type OpenDialogOptions, type SaveDialogOptions } from 'electron'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { MODELOS, type Accion, type Detalle, type EstadoBase, type Modelo, type Ticket, type TicketsConfig, type TicketsSnapshot } from '../../../shared/tickets'
+import {
+  MODELOS,
+  type Accion,
+  type ConectorPropioVista,
+  type Detalle,
+  type EstadoBase,
+  type Modelo,
+  type Ticket,
+  type TicketsConfig,
+  type TicketsSnapshot
+} from '../../../shared/tickets'
 import type { Feature, FeatureContext } from '../context'
 import { accountStatus } from '../../accounts'
 import { baseEnv } from '../../ptys'
+import { readTeamConfig, repoKey } from '../team-config-core'
+import { writeJsonAtomic } from '../tray-settings'
 import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, ticketId } from './acciones'
 import { resolveClaudeExe, runClaude } from './claude-run'
-import type { ConectorDef, ConectorGh } from './conector'
+import type { ConectorDef, ConectorGh, ConectorMcp } from './conector'
 import { crearAlmacen, type Almacen, type FsTickets } from './almacen'
-import { CONECTOR_POR_DEFECTO, CONECTORES, conectorPorId } from './conectores'
+import { CONECTOR_POR_DEFECTO, CONECTORES } from './conectores'
+import { buildDescubrirArgs, buildDescubrirPrompt, parseDescubrir, type Descubiertas } from './descubrir'
+import {
+  armarRegistro,
+  claveAceptado,
+  IMPORT_MAX_BYTES,
+  parsearArchivoPropios,
+  parsearImport,
+  PROPIOS_MAX,
+  recortarAvisos,
+  textoExport,
+  validarPropio,
+  type ArchivoPropios,
+  type ConectorRegistrado
+} from './propios'
 import { ASSIGNEE_MAX, assigneeValido, conConector, type TicketsState } from './estado'
 import { ghAccion, ghDetalle, ghLista, ghYo, repoValido, type GhRun } from './gh'
 import { GitError, run as correr } from '../git-run'
@@ -59,8 +86,17 @@ const detalles = new Map<string, Detalle>()
 const escribiendo = new Set<string>()
 /** Acciones que esta cuenta no puede hacer (herramienta inexistente o sin conector), con el motivo. */
 let noDisponible: Partial<Record<Accion, string>> = {}
+/** Incluidos, propios y del equipo; los del equipo solo se usan aceptados (ver buscar). */
+let registro: ConectorRegistrado[] = []
+let archivoPropios: ArchivoPropios = parsearArchivoPropios(null).archivo
+let avisosPropios: string[] = []
+/** Si tickets-conectores.json no se pudo leer ni respaldar, no se pisa. */
+let propiosIlegible = false
+let descubriendo = false
 
 const carpeta = (): string => join(app.getPath('userData'), 'features')
+const propiosFile = (): string => join(carpeta(), 'tickets-conectores.json')
+const hashCorto = (t: string): string => createHash('sha256').update(t).digest('hex').slice(0, 16)
 const noEsta = (id: string): string => `El conector «${id}» no está en esta versión de Sloth.`
 const sinConector = (def: ConectorDef): string => `Esta cuenta no tiene el conector de ${def.nombre}. Hacelo desde ${def.nombre}.`
 
@@ -74,21 +110,92 @@ const fsReal: FsTickets = {
 
 const save = (): void => void almacen.guardar(state)
 
+const registrado = (id: string): ConectorRegistrado | undefined => registro.find((r) => r.def.id === id)
+
+function aceptado(r: ConectorRegistrado): boolean {
+  if (r.origen.tipo !== 'equipo') return true
+  return archivoPropios.aceptados[claveAceptado(repoKey(r.origen.repo), r.def.id)] === r.hash
+}
+
+/** Un conector del equipo sin aceptar (o que cambió desde que se aceptó) no está disponible. */
+function buscar(id: string): ConectorDef | undefined {
+  const r = registrado(id)
+  return r && aceptado(r) ? r.def : undefined
+}
+
+/** Los repos donde buscar un team.json con conectores: los de los espacios y los de los ajustes de Tickets. */
+function reposDeEquipo(config?: TicketsConfig): string[] {
+  const candidatos = [...ctx.store.workspaces.map((w) => w.repoPath), config?.defaultRepo, ...Object.values(config?.projectRepos ?? {})]
+  const repos = new Map<string, string>()
+  for (const p of candidatos) {
+    if (repos.size >= 30) break
+    if (!p) continue
+    const k = repoKey(p)
+    if (!repos.has(k) && existsSync(p)) repos.set(k, p)
+  }
+  return [...repos.values()]
+}
+
+function leerArchivoPropios(): string[] {
+  const file = propiosFile()
+  let texto: string | null = null
+  propiosIlegible = false
+  try {
+    texto = readFileSync(file, 'utf8')
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
+      propiosIlegible = true
+      archivoPropios = parsearArchivoPropios(null).archivo
+      return [`No pude leer tus conectores propios: ${(e as Error).message}`]
+    }
+  }
+  const r = parsearArchivoPropios(texto)
+  archivoPropios = r.archivo
+  if (!r.corrupto) return r.avisos
+  try {
+    renameSync(file, `${file}.corrupto-${Date.now()}`)
+    return ['Tus conectores propios estaban dañados: guardé el archivo aparte y empezaste sin ninguno.']
+  } catch (e) {
+    propiosIlegible = true
+    return [`Tus conectores propios están dañados y no pude respaldarlos: ${(e as Error).message}`]
+  }
+}
+
+/** Relee los conectores propios y los team.json. Sin config (al arrancar, antes de cargar el estado), solo los repos de los espacios. */
+function recargarPropios(config?: TicketsConfig): void {
+  const avisos = leerArchivoPropios()
+  const equipos: { repo: string; repoKey: string; equipo: string; conectores: readonly unknown[] }[] = []
+  for (const repo of reposDeEquipo(config)) {
+    const t = readTeamConfig(repo)
+    if (t.kind === 'invalid') avisos.push(`El team.json de ${repo} no se pudo leer: ${t.error}`)
+    else if (t.kind === 'ok' && t.config.conectores?.length) equipos.push({ repo, repoKey: repoKey(repo), equipo: t.config.equipo, conectores: t.config.conectores })
+  }
+  const r = armarRegistro({ incluidos: CONECTORES, usuario: archivoPropios.conectores, equipos, hash: hashCorto })
+  registro = r.lista
+  avisosPropios = recortarAvisos([...avisos, ...r.avisos])
+}
+
+function guardarArchivo(a: ArchivoPropios): void {
+  if (propiosIlegible) throw new Error('No puedo guardar: el archivo de tus conectores propios no se pudo leer ni respaldar.')
+  writeJsonAtomic(propiosFile(), a)
+  archivoPropios = a
+}
+
 function activo(): ConectorDef {
-  const def = conectorPorId(state.config.conectorId)
+  const def = buscar(state.config.conectorId)
   if (!def) throw new Error(noEsta(state.config.conectorId))
   return def
 }
 
 /** El conector por defecto, para volver a él si el elegido no está en esta versión. */
 function alternativa(): { id: string; nombre: string } | undefined {
-  const def = conectorPorId(CONECTOR_POR_DEFECTO)
+  const def = buscar(CONECTOR_POR_DEFECTO)
   return def && { id: def.id, nombre: def.nombre }
 }
 
 /** Para crear espacios (también desde Equipo, que es de Gruv): el activo o, si no está, el por defecto. */
 function paraEspacios(): ConectorDef {
-  return conectorPorId(state.config.conectorId) ?? conectorPorId(CONECTOR_POR_DEFECTO) ?? activo()
+  return buscar(state.config.conectorId) ?? buscar(CONECTOR_POR_DEFECTO) ?? activo()
 }
 
 /** Columnas del flujo (si la última consulta no trajo, las del conector). */
@@ -96,10 +203,17 @@ const estados = (def: ConectorDef): EstadoBase[] => (state.estados?.length ? [..
 
 function snapshot(): TicketsSnapshot {
   const id = state.config.conectorId
-  const def = conectorPorId(id)
+  const def = buscar(id)
   return {
     conector: info(def, id),
-    conectores: CONECTORES.map((c) => ({ id: c.id, nombre: c.nombre, verificado: c.verificado, via: c.via })),
+    conectores: registro.map((r) => ({
+      id: r.def.id,
+      nombre: r.def.nombre,
+      verificado: r.def.verificado,
+      via: r.def.via,
+      origen: r.origen,
+      aceptado: r.origen.tipo === 'equipo' ? aceptado(r) : undefined
+    })),
     tickets: def ? state.tickets : [],
     estados: def ? conCategoria(def, estados(def)) : [],
     me: state.me,
@@ -112,7 +226,8 @@ function snapshot(): TicketsSnapshot {
     running: Boolean(running),
     noDisponible,
     lastRepo: lastRepo(),
-    porDefecto: def ? undefined : alternativa()
+    porDefecto: def ? undefined : alternativa(),
+    avisosPropios: avisosPropios.length ? avisosPropios : undefined
   }
 }
 
@@ -197,9 +312,9 @@ interface Ejecucion {
   env: Record<string, string>
 }
 
-function ejecucion(def: ConectorDef, accountId: string): Ejecucion {
+function ejecucion(nombre: string, accountId: string): Ejecucion {
   const acc = ctx.store.account(accountId)
-  if (!acc) throw new Error(`La cuenta para consultar ${def.nombre} ya no existe. Elegí otra en Configuración.`)
+  if (!acc) throw new Error(`La cuenta para consultar ${nombre} ya no existe. Elegí otra en Configuración.`)
   if (!accountStatus(acc).loggedIn) throw new Error(`La cuenta «${acc.label}» no tiene sesión iniciada.`)
   const exe = resolveClaudeExe()
   if (!exe) throw new Error('No encontré el ejecutable de Claude Code (claude.exe) en el PATH.')
@@ -212,7 +327,7 @@ function ejecucion(def: ConectorDef, accountId: string): Ejecucion {
 function cuenta(def: ConectorDef): Ejecucion {
   const id = state.config.queryAccountId
   if (!id) throw new Error(`Actualizá ${def.nombre} primero para elegir la cuenta que lo conecta.`)
-  return ejecucion(def, id)
+  return ejecucion(def.nombre, id)
 }
 
 const ghRun: GhRun = async (args, input) => {
@@ -273,7 +388,7 @@ async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: n
   const def = activo()
   if (def.via === 'gh') return refreshGh(def)
   const requested = typeof rawAccount === 'string' && rawAccount ? rawAccount : undefined
-  const run = ejecucion(def, requested ?? state.config.queryAccountId ?? (await pickAccount()))
+  const run = ejecucion(def.nombre, requested ?? state.config.queryAccountId ?? (await pickAccount()))
   const ac = new AbortController()
   running = ac
   ctx.emit('changed', snapshot())
@@ -310,8 +425,10 @@ async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: n
 
 /** El conector al que se pasa, o undefined si es el mismo. No cambia nada. */
 function conectorNuevo(v: unknown): ConectorDef | undefined {
-  const def = typeof v === 'string' ? conectorPorId(v) : undefined
-  if (!def) throw new Error('Ese conector no está en esta versión de Sloth.')
+  const r = typeof v === 'string' ? registrado(v) : undefined
+  if (!r) throw new Error('Ese conector no está en esta versión de Sloth.')
+  if (!aceptado(r)) throw new Error('Antes de usar un conector del equipo, revisalo y aceptalo.')
+  const def = r.def
   if (def.id === state.config.conectorId) return undefined
   if (running || escribiendo.size) throw new Error('Esperá a que termine lo que está en curso para cambiar de conector.')
   return def
@@ -335,7 +452,7 @@ function setConfig(raw: unknown): TicketsSnapshot {
   }
   if ('assigneeId' in p) {
     const s = texto(p.assigneeId, ASSIGNEE_MAX, 'El id de persona') ?? ''
-    const def = conectorPorId(nuevo?.id ?? state.config.conectorId)
+    const def = buscar(nuevo?.id ?? state.config.conectorId)
     if (!assigneeValido(s, def))
       throw new Error(def ? `Ese id de persona no tiene el formato de ${def.nombre}.` : 'El id de persona solo lleva letras, números y guiones.')
     c.assigneeId = s
@@ -449,12 +566,159 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
   }
 }
 
+function vista(r: ConectorRegistrado, def: ConectorMcp): ConectorPropioVista {
+  const h = def.herramientas
+  return {
+    id: def.id,
+    nombre: def.nombre,
+    origen: r.origen,
+    aceptado: aceptado(r),
+    hash: r.hash,
+    herramientas: { prefijo: h.prefijo, lista: [...h.lista], detalle: [...h.detalle], apoyo: [...(h.apoyo ?? [])], escritura: { ...h.escritura }, negar: h.negar.length },
+    pistaLista: def.pistas.lista
+  }
+}
+
+function propios(): { lista: ConectorPropioVista[]; avisos: string[] } {
+  recargarPropios(state.config)
+  ctx.emit('changed', snapshot())
+  const lista = registro.flatMap((r) => (r.origen.tipo !== 'incluido' && r.def.via === 'mcp' ? [vista(r, r.def)] : []))
+  return { lista, avisos: avisosPropios }
+}
+
+function noIncluido(v: unknown): ConectorRegistrado {
+  const r = typeof v === 'string' ? registrado(v) : undefined
+  if (!r || r.origen.tipo === 'incluido') throw new Error('Ese conector propio ya no existe.')
+  return r
+}
+
+async function descubrir(rawPrefijo: unknown, rawAccount: unknown): Promise<Descubiertas> {
+  if (typeof rawPrefijo !== 'string' || rawPrefijo.length > 64) throw new Error('Prefijo inválido.')
+  const prefijo = rawPrefijo
+  const prompt = buildDescubrirPrompt(prefijo)
+  if (descubriendo) throw new Error('Ya se están buscando herramientas. Esperá a que termine.')
+  const requested = typeof rawAccount === 'string' && rawAccount ? rawAccount : undefined
+  descubriendo = true
+  try {
+    const run = ejecucion('las herramientas', requested ?? state.config.queryAccountId ?? (await pickAccount()))
+    const r = await runClaude({
+      exe: run.exe,
+      args: buildDescubrirArgs(),
+      prompt,
+      cwd: run.cwd,
+      env: run.env,
+      quien: 'Claude',
+      timeoutMs: 90_000,
+      parse: (s) => parseDescubrir(prefijo, s)
+    })
+    ctx.log(`tickets: descubrir: ${r.herramientas.length} herramientas (${r.fuente})`)
+    return r
+  } finally {
+    descubriendo = false
+  }
+}
+
+function idOpcional(v: unknown): string | undefined {
+  if (v === undefined || v === null || v === '') return undefined
+  if (typeof v !== 'string') throw new Error('Id inválido.')
+  return v
+}
+
+/** Si el que se reemplaza o se borra es el activo, hay que esperar a que no haya nada en curso. */
+function sinNadaEnCurso(): void {
+  if (running || escribiendo.size) throw new Error('Esperá a que termine lo que está en curso.')
+}
+
+function pasarA(id: string): void {
+  state = conConector(state, id)
+  noDisponible = {}
+  detalles.clear()
+}
+
+function guardarPropio(raw: unknown, rawAnterior: unknown): TicketsSnapshot {
+  const def = validarPropio(raw)
+  const anterior = idOpcional(rawAnterior)
+  const actuales = archivoPropios.conectores
+  if (anterior !== undefined && !actuales.some((c) => c.id === anterior)) throw new Error('Ese conector propio ya no existe.')
+  if (CONECTORES.some((c) => c.id === def.id)) throw new Error(`«${def.id}» es el id de un conector incluido. Elegí otro.`)
+  const ocupado = def.id !== anterior && (actuales.some((c) => c.id === def.id) || registro.some((r) => r.def.id === def.id))
+  if (ocupado) throw new Error(`Ya hay un conector «${def.id}». Elegí otro id.`)
+  if (anterior === undefined && actuales.length >= PROPIOS_MAX) throw new Error(`Podés tener hasta ${PROPIOS_MAX} conectores propios.`)
+  const eraActivo = anterior !== undefined && anterior === state.config.conectorId
+  if (eraActivo && def.id !== anterior) sinNadaEnCurso()
+
+  const conectores = anterior === undefined ? [...actuales, def] : actuales.map((c) => (c.id === anterior ? def : c))
+  guardarArchivo({ ...archivoPropios, conectores })
+  recargarPropios(state.config)
+  if (eraActivo && def.id !== anterior) pasarA(def.id)
+  else if (eraActivo) noDisponible = {}
+  changed()
+  return snapshot()
+}
+
+function borrarPropio(rawId: unknown): TicketsSnapshot {
+  const id = idOpcional(rawId)
+  if (id === undefined || !archivoPropios.conectores.some((c) => c.id === id)) throw new Error('Ese conector propio ya no existe. Los del equipo se sacan del team.json.')
+  const eraActivo = id === state.config.conectorId
+  if (eraActivo) sinNadaEnCurso()
+  guardarArchivo({ ...archivoPropios, conectores: archivoPropios.conectores.filter((c) => c.id !== id) })
+  recargarPropios(state.config)
+  if (eraActivo) pasarA(CONECTOR_POR_DEFECTO)
+  changed()
+  return snapshot()
+}
+
+function aceptar(rawId: unknown, rawHash: unknown): TicketsSnapshot {
+  recargarPropios(state.config)
+  const r = noIncluido(rawId)
+  if (r.origen.tipo !== 'equipo') throw new Error('Solo se aceptan los conectores del equipo.')
+  if (r.hash !== rawHash) throw new Error('El conector del equipo cambió mientras lo mirabas. Revisalo de nuevo.')
+  guardarArchivo({ ...archivoPropios, aceptados: { ...archivoPropios.aceptados, [claveAceptado(repoKey(r.origen.repo), r.def.id)]: r.hash } })
+  changed()
+  return snapshot()
+}
+
+async function exportarPropio(rawId: unknown): Promise<{ path: string } | null> {
+  const def = noIncluido(rawId).def
+  const win = ctx.window()
+  const opts: SaveDialogOptions = {
+    title: `Exportar el conector ${def.nombre}`,
+    defaultPath: join(app.getPath('documents'), `${def.id}.sloth-conector.json`),
+    filters: [{ name: 'Conector de Sloth', extensions: ['json'] }]
+  }
+  const r = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts)
+  if (r.canceled || !r.filePath) return null
+  const tmp = `${r.filePath}.${process.pid}.tmp`
+  writeFileSync(tmp, textoExport(def), 'utf8')
+  renameSync(tmp, r.filePath)
+  return { path: r.filePath }
+}
+
+async function importarPropio(): Promise<{ def: ConectorDef; choca: 'incluido' | 'propio' | null } | null> {
+  const win = ctx.window()
+  const opts: OpenDialogOptions = {
+    title: 'Importar un conector',
+    properties: ['openFile'],
+    filters: [{ name: 'Conector de Sloth', extensions: ['json'] }]
+  }
+  const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+  const file = r.canceled ? undefined : r.filePaths[0]
+  if (!file) return null
+  if (statSync(file).size > IMPORT_MAX_BYTES) throw new Error(`El archivo pesa más de ${IMPORT_MAX_BYTES / 1024} KB.`)
+  const def = parsearImport(readFileSync(file, 'utf8'))
+  const choca = CONECTORES.some((c) => c.id === def.id) ? 'incluido' : registro.some((c) => c.def.id === def.id) ? 'propio' : null
+  return { def, choca }
+}
+
 const feature: Feature = {
   name: 'tickets',
   register(c) {
     ctx = c
-    almacen = crearAlmacen({ fs: fsReal, carpeta: carpeta(), buscar: conectorPorId, log: (m) => c.log(m), ahora: Date.now })
+    // Antes de cargar el estado: si el conector guardado es propio, tiene que estar en el registro.
+    recargarPropios()
+    almacen = crearAlmacen({ fs: fsReal, carpeta: carpeta(), buscar, log: (m) => c.log(m), ahora: Date.now })
     state = almacen.cargar()
+    recargarPropios(state.config)
     c.handle('state', () => snapshot())
     c.handle('refresh', (acc: unknown) => refresh(acc))
     c.handle('cancel', () => {
@@ -466,6 +730,14 @@ const feature: Feature = {
     c.handle('start', (id: unknown, acc: unknown) => start(id, acc))
     c.handle('detail', (id: unknown) => detalle(id))
     c.handle('accion', (a: unknown, id: unknown, p: unknown) => accion(a, id, p))
+    c.handle('propios', () => propios())
+    c.handle('propio', (id: unknown) => structuredClone(noIncluido(id).def))
+    c.handle('descubrir', (prefijo: unknown, acc: unknown) => descubrir(prefijo, acc))
+    c.handle('guardarPropio', (raw: unknown, anterior: unknown) => guardarPropio(raw, anterior))
+    c.handle('borrarPropio', (id: unknown) => borrarPropio(id))
+    c.handle('aceptar', (id: unknown, hash: unknown) => aceptar(id, hash))
+    c.handle('exportarPropio', (id: unknown) => exportarPropio(id))
+    c.handle('importarPropio', () => importarPropio())
   },
   dispose() {
     running?.abort()
