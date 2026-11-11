@@ -25,7 +25,6 @@ export function InviteModal({ onClose }: { onClose: () => void }): React.JSX.Ele
 
   return (
     <Dialog
-      labelId="f-help-invite-title"
       title="Invitar a un compañero"
       icon={<AddAccountIcon size={18} />}
       onClose={onClose}

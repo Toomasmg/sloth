@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEventHandler, type KeyboardEventHandler, type ReactNode } from 'react'
 import { CloseIcon } from './icons/SlothIcons'
+import { captureOpener } from './return-focus'
 import { FOCUSABLE, nextFocusIndex } from './focus-trap'
 
 export interface ModalProps {
@@ -61,7 +62,7 @@ export function Modal(p: ModalProps): React.JSX.Element {
   requestRef.current = requestClose
 
   // Se lee al renderizar: un `autoFocus` de adentro ya habría movido el foco cuando corre el efecto.
-  const [opener] = useState<HTMLElement | null>(() => (document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null))
+  const [restore] = useState(captureOpener)
 
   useLayoutEffect(() => {
     const root = rootRef.current
@@ -72,9 +73,9 @@ export function Modal(p: ModalProps): React.JSX.Element {
     return () => {
       // Sin esto, la trampa de foco (que todavía está viva) le devolvería el foco al diálogo que se está yendo.
       closingRef.current = true
-      if (opener?.isConnected) opener.focus()
+      restore()
     }
-  }, [opener])
+  }, [restore])
 
   useEffect(() => {
     const layer = (): HTMLElement | null => (askingRef.current ? confirmRef.current : rootRef.current)

@@ -318,7 +318,8 @@ button.f-set-toggle:disabled {
   align-items: stretch;
 }
 .f-set-link {
-  padding: 0;
+  padding: 4px 0;
+  min-height: 24px;
   border: 0;
   background: transparent;
   color: var(--accent);
@@ -634,9 +635,9 @@ button.f-set-toggle:disabled {
   padding: 0 16px 12px 66px;
 }
 .f-set-sw {
-  width: 20px;
-  height: 20px;
-  padding: 2px;
+  width: 24px;
+  height: 24px;
+  padding: 3px;
   border: 0;
   border-radius: 50%;
   background: transparent;
@@ -868,4 +869,24 @@ button.f-set-toggle:disabled {
   .f-set-page {
     overflow-y: auto;
   }
+}
+
+.f-set-confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-right: auto;
+  font-size: var(--fs-sm);
+}
+.f-set-toast-x {
+  min-width: 24px;
+  min-height: 24px;
+  margin-left: 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
