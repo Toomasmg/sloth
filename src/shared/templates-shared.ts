@@ -105,6 +105,24 @@ export function normTicketId(raw: string): string | undefined {
 /** Un mismo ticket aunque uno se haya guardado en mayúsculas. */
 export const mismoTicket = (guardado: string | undefined, id: string): boolean => guardado !== undefined && guardado.toUpperCase() === id.toUpperCase()
 
+const normCarpeta = (p: string): string => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+
+/** Misma carpeta aunque una use \ y otra /, tenga barra final o cambien las mayúsculas (Windows). */
+export const mismaCarpeta = (a: string, b: string): boolean => normCarpeta(a) === normCarpeta(b)
+
+/**
+ * El espacio ya creado para un ticket. Con `porCarpeta` (GitHub), el #12 de un repo no es el #12 de
+ * otro: además del id tiene que coincidir la carpeta.
+ */
+export function espacioDelTicket<W extends { ticket?: string; repoPath: string }>(
+  ws: readonly W[],
+  id: string,
+  carpeta: string | undefined,
+  porCarpeta: boolean
+): W | undefined {
+  return ws.find((w) => mismoTicket(w.ticket, id) && (!porCarpeta || (carpeta !== undefined && mismaCarpeta(w.repoPath, carpeta))))
+}
+
 /** Íconos de plantilla (claves). Los dibujos están en features/templates/catalog.ts. */
 export const TEMPLATE_ICON_KEYS = ['ticket', 'db', 'revision', 'bolt', 'compass', 'rama'] as const
 /** Colores de plantilla y de espacio (claves). */
