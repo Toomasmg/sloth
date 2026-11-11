@@ -1,25 +1,7 @@
 import { app, clipboard } from 'electron'
 import { mkdir, readdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-
-/** Ruta lista para la línea de comandos: entre comillas si tiene espacios (como Windows Terminal). */
-export const quotePath = (p: string): string => (/\s/.test(p) ? `"${p}"` : p)
-
-/** Rutas de una lista text/uri-list (una por línea; las que empiezan con # son comentarios). */
-export function pathsFromUriList(list: string): string[] {
-  const out: string[] = []
-  for (const line of list.split(/\r?\n/)) {
-    const u = line.trim()
-    if (!u || u.startsWith('#') || !u.startsWith('file:')) continue
-    try {
-      out.push(fileURLToPath(u))
-    } catch {
-      /* URI inválida: se saltea */
-    }
-  }
-  return out
-}
+import { joinPaths, pathsFromUriList, quotePath } from './paste-paths'
 
 const PASTED_DIR = (): string => join(app.getPath('temp'), 'Sloth', 'pegados')
 const KEEP_MS = 7 * 24 * 60 * 60 * 1000
@@ -46,7 +28,7 @@ export async function clipboardForPaste(): Promise<string> {
   for (const item of await clipboard.read()) {
     if (item.types.includes('text/uri-list')) {
       const paths = pathsFromUriList(await (await item.getType('text/uri-list')).text())
-      if (paths.length) return paths.map(quotePath).join(' ')
+      if (paths.length) return joinPaths(paths)
     }
     if (item.types.includes('image/png')) {
       const png = Buffer.from(await (await item.getType('image/png')).arrayBuffer())
