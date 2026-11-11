@@ -36,6 +36,24 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
       cursorBlink: opts.cursorBlink && document.visibilityState === 'visible',
       allowProposedApi: true
     })
+    // Claude Code dibuja su propio cursor en la caja de texto. El cursor real lo vuelve a mostrar ConPTY
+    // en cada cuadro, a veces a mitad del redibujo, y salta por la pantalla. Mientras Claude está abierto
+    // (?2031h al arrancar, ?2031l al salir) se ignora el «mostrar cursor» (?25h); en la shell vuelve a verse.
+    let claudeUi = false
+    term.parser.registerCsiHandler({ prefix: '?', final: 'h' }, (params) => {
+      if (params.includes(2031) && !claudeUi) {
+        claudeUi = true
+        term.write('\x1b[?25l')
+      }
+      return claudeUi && params.length === 1 && params[0] === 25
+    })
+    term.parser.registerCsiHandler({ prefix: '?', final: 'l' }, (params) => {
+      if (params.includes(2031) && claudeUi) {
+        claudeUi = false
+        term.write('\x1b[?25h')
+      }
+      return false
+    })
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.open(el)
