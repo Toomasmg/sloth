@@ -222,12 +222,17 @@ const ghRun: GhRun = async (args, input) => {
   }
 }
 
-/** `dueño/repo` del remoto de la carpeta elegida en los ajustes o, si no hay, la del último espacio. */
+/** `dueño/repo` del remoto de la carpeta elegida en los ajustes o, si no se eligió, la del último espacio. */
 async function repoGh(): Promise<string> {
-  for (const p of [state.config.defaultRepo, lastRepo()]) {
-    const repo = p ? await githubRepoOf(p) : undefined
-    if (repo) return repoValido(repo)
+  const elegida = state.config.defaultRepo
+  if (elegida) {
+    const repo = await githubRepoOf(elegida)
+    if (!repo) throw new Error('La carpeta elegida en los ajustes de Tickets no tiene un remoto de GitHub (origin).')
+    return repoValido(repo)
   }
+  const ultima = lastRepo()
+  const repo = ultima ? await githubRepoOf(ultima) : undefined
+  if (repo) return repoValido(repo)
   throw new Error('Elegí la carpeta de un repo de GitHub en los ajustes de Tickets.')
 }
 
