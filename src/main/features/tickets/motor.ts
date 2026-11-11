@@ -193,7 +193,7 @@ function sustituir(args: Record<string, ArgValor>, valor: (nombre: string) => Ar
 }
 
 const dedupe = (xs: string[]): string[] => [...new Set(xs)]
-const apoyo = (def: ConectorMcp): string[] => def.herramientas.apoyo ?? []
+const apoyo = (def: ConectorMcp, a?: Accion): string[] => dedupe([...(def.herramientas.apoyo ?? []), ...((a && def.herramientas.apoyoEn?.[a]) ?? [])])
 const escrituras = (def: ConectorMcp): string[] => Object.values(def.herramientas.escritura).filter((t) => t !== undefined)
 
 /** Lo que se le niega a Claude en toda consulta (nombres completos): lo negado y lo que escribe. */
@@ -354,8 +354,8 @@ export function buildAccionPrompt(def: ConectorMcp, a: Accion, i: AccionInput): 
   const nota = pista?.nota ? ` ${notaCon(pista.nota, i)}` : ''
   const { apoyo: pistaApoyo } = def.pistas
   const segunda =
-    pistaApoyo && apoyo(def).length
-      ? `Podés usar antes ${apoyo(def).join(', ')} solo para leer lo que haga falta (${pistaApoyo.replaceAll('{ticket}', () => i.ticket)}). Después hacé UNA sola llamada de escritura sobre el ticket ${i.ticket}. No cambies nada más.`
+    pistaApoyo && apoyo(def, a).length
+      ? `Podés usar antes ${apoyo(def, a).join(', ')} solo para leer lo que haga falta (${pistaApoyo.replaceAll('{ticket}', () => i.ticket)}). Después hacé UNA sola llamada de escritura sobre el ticket ${i.ticket}. No cambies nada más.`
       : `Hacé SOLO esta llamada, una sola vez, sobre el ticket ${i.ticket}. No busques otros tickets ni cambies nada más.`
   return [
     `Acción puntual en ${def.nombre}, pedida por la persona dueña de esta cuenta con un clic en la app.`,
@@ -372,7 +372,7 @@ export function buildAccionPrompt(def: ConectorMcp, a: Accion, i: AccionInput): 
 export function buildAccionArgs(def: ConectorMcp, model: string, a: Accion): string[] {
   const tool = nombreCompleto(def, herramientaDe(def, a))
   return buildArgs(model, {
-    allow: dedupe([tool, ...apoyo(def).map((t) => nombreCompleto(def, t))]),
+    allow: dedupe([tool, ...apoyo(def, a).map((t) => nombreCompleto(def, t))]),
     deny: negadas(def).filter((t) => t !== tool),
     schema: ACCION_SCHEMA
   })

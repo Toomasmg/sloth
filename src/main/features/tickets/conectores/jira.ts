@@ -15,8 +15,9 @@ export default {
     prefijo: 'mcp__claude_ai_Atlassian_MCP__',
     lista: ['atlassianUserInfo', 'getAccessibleAtlassianResources', 'searchJiraIssuesUsingJql'],
     detalle: ['getJiraIssue', 'listJiraIssueComments'],
-    // executeRead corre operaciones de lectura que no son herramientas propias, como listJiraIssueTransitions.
-    apoyo: ['getAccessibleAtlassianResources', 'executeRead'],
+    apoyo: ['getAccessibleAtlassianResources'],
+    // executeRead corre cualquier operación por nombre: solo hace falta para listJiraIssueTransitions.
+    apoyoEn: { estado: ['executeRead'] },
     escritura: {
       estado: 'transitionJiraIssue',
       tomar: 'editJiraIssue',

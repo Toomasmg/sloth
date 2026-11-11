@@ -162,6 +162,24 @@ test('acepta args anidados, notas con placeholders de la acción, apoyo y person
   assert.deepEqual(validarConector(d), d)
 })
 
+/** Copia de Gruv con apoyo general y `apoyoEn` en las herramientas. */
+function conApoyoEn(apoyoEn: unknown, pista = true): unknown {
+  const d = con('herramientas.apoyoEn', apoyoEn) as ConectorMcp
+  d.herramientas.apoyo = ['ver_mi_inicio']
+  if (pista) d.pistas.apoyo = 'Mirá antes el ticket {ticket}.'
+  else delete d.herramientas.apoyo
+  return d
+}
+
+test('apoyoEn: herramientas de lectura solo para una acción', () => {
+  const d = conApoyoEn({ estado: ['buscar_persona'] }) as ConectorMcp
+  assert.deepEqual(validarConector(d), d)
+  rechaza(conApoyoEn({ estado: ['mover_ticket'] }), /«mover_ticket» no puede ser de apoyo/)
+  rechaza(conApoyoEn({ borrar: ['buscar_persona'] }), /apoyoEn\.borrar: clave desconocida/)
+  rechaza(conApoyoEn({ estado: [] }), /apoyoEn\.estado/)
+  rechaza(conApoyoEn({ estado: ['buscar_persona'] }, false), /apoyoEn: necesita la pista de apoyo/)
+})
+
 test('regexDePersona: la del conector, cacheada, o la de siempre', () => {
   assert.equal(regexDePersona(validarConector(gruv)).test('a1-b'), true)
   assert.equal(regexDePersona(validarConector(gruv)).test('557058:abc'), false)

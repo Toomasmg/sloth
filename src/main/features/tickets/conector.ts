@@ -46,6 +46,8 @@ export interface ConectorMcp extends ConectorBase {
     negar: string[]
     /** De lectura, permitidas también en el detalle y en cada acción (p. ej. para sacar un id de sitio). */
     apoyo?: string[]
+    /** De lectura, permitidas además del apoyo solo en esa acción. */
+    apoyoEn?: Partial<Record<Accion, string[]>>
   }
   pistas: {
     /** conId lleva `{id}` una sola vez. */
@@ -273,7 +275,7 @@ function validarGh(raw: Obj): void {
 function validarMcp(raw: Obj): void {
   const { o } = validarBase(raw, ['herramientas', 'pistas'])
   const H = `${R}.herramientas`
-  const h = objeto(o.herramientas, H, ['prefijo', 'lista', 'detalle', 'escritura', 'negar'], ['apoyo'])
+  const h = objeto(o.herramientas, H, ['prefijo', 'lista', 'detalle', 'escritura', 'negar'], ['apoyo', 'apoyoEn'])
   campo(h.prefijo, `${H}.prefijo`, 64, PREFIJO_RE)
   const deLista = herramientas(h.lista, `${H}.lista`, 1, 20)
   const deDetalle = herramientas(h.detalle, `${H}.detalle`, 0, 20)
@@ -286,6 +288,11 @@ function validarMcp(raw: Obj): void {
   const apoyo = 'apoyo' in h ? herramientas(h.apoyo, `${H}.apoyo`, 0, 10) : []
   const apoyoChoca = apoyo.find((t) => negar.includes(t) || deEscritura.includes(t))
   if (apoyoChoca) fallar(`${H}.apoyo`, `«${apoyoChoca}» no puede ser de apoyo y estar negada o escribir`)
+  const apoyoEn = 'apoyoEn' in h ? objeto(h.apoyoEn, `${H}.apoyoEn`, [], Object.keys(escritura)) : {}
+  for (const [a, x] of Object.entries(apoyoEn)) {
+    const choca = herramientas(x, `${H}.apoyoEn.${a}`, 1, 5).find((t) => negar.includes(t) || deEscritura.includes(t))
+    if (choca) fallar(`${H}.apoyoEn.${a}`, `«${choca}» no puede ser de apoyo y estar negada o escribir`)
+  }
   if ('criterio' in escritura && !deDetalle.length) fallar(`${H}.escritura.criterio`, 'tildar criterios necesita herramientas de detalle (de ahí salen sus ids)')
 
   const P = `${R}.pistas`
@@ -298,6 +305,7 @@ function validarMcp(raw: Obj): void {
   if ('estados' in p) campo(p.estados, `${P}.estados`, PISTA_MAX)
   if ('apoyo' in p) soloPlaceholders(p.apoyo, `${P}.apoyo`, ['ticket'])
   if (!('apoyo' in p) !== !apoyo.length) fallar(`${P}.apoyo`, 'la pista de apoyo y las herramientas de apoyo van juntas')
+  if (Object.keys(apoyoEn).length && !('apoyo' in p)) fallar(`${H}.apoyoEn`, 'necesita la pista de apoyo')
 
   const pasos = lista(p.detalle, `${P}.detalle`, 0, 20)
   if (!pasos.length !== !deDetalle.length) fallar(`${P}.detalle`, 'hay pasos de detalle sin herramientas de detalle o al revés')

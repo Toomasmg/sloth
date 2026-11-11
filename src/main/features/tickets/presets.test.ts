@@ -71,12 +71,14 @@ test('Jira: lista y estado con las herramientas justas', () => {
   const estado = buildAccionArgs(jira, 'haiku', 'estado')
   assert.deepEqual(flag(estado, '--allowedTools'), [`${A}transitionJiraIssue`, `${A}getAccessibleAtlassianResources`, `${A}executeRead`])
   assert.ok(flag(estado, '--disallowedTools').includes(`${A}executeWrite`))
-  assert.deepEqual(flag(buildDetalleArgs(jira, 'haiku'), '--allowedTools'), [
-    `${A}getJiraIssue`,
-    `${A}listJiraIssueComments`,
-    `${A}getAccessibleAtlassianResources`,
-    `${A}executeRead`
-  ])
+  assert.deepEqual(flag(buildDetalleArgs(jira, 'haiku'), '--allowedTools'), [`${A}getJiraIssue`, `${A}listJiraIssueComments`, `${A}getAccessibleAtlassianResources`])
+})
+
+test('Jira: executeRead solo se habilita para cambiar el estado', () => {
+  for (const a of ['tomar', 'soltar', 'comentar'] as const) {
+    assert.ok(!flag(buildAccionArgs(jira, 'haiku', a), '--allowedTools').includes(`${A}executeRead`), a)
+    assert.ok(buildAccionPrompt(jira, a, entrada(a, 'PROJ-1')).includes('Podés usar antes getAccessibleAtlassianResources solo para leer'), a)
+  }
 })
 
 test('Jira: tomar y soltar van en fields.assignee', () => {
