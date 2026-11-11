@@ -5,6 +5,9 @@
   "description": "Sloth: varias cuentas de Claude Code, cada una en su PowerShell y su repo. Liviano a propósito.",
   "private": true,
   "main": "./out/main/index.js",
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "dev": "npm run build:daemon && electron-vite dev",
     "build": "electron-vite build && npm run build:daemon",
