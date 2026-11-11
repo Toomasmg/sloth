@@ -1,8 +1,9 @@
 /**
  * Lógica pura de la vista «Equipo»: parseo de `gh pr list`, resumen de CI y review, y cruce de
- * identidades entre GitHub y Gruv. No importa nada (ni electron ni otros archivos) para poder
- * probarlo con Node solo.
+ * identidades entre GitHub y el conector de tickets. Sin electron, para probarlo con Node solo.
  */
+import type { Estado, Ticket } from '../../shared/tickets'
+import { categoriaDe } from '../../shared/tickets'
 
 export type CiState = 'pass' | 'fail' | 'running' | 'none'
 export type ReviewState = 'approved' | 'changes' | 'pending'
@@ -27,20 +28,22 @@ export interface TeamPr {
   url: string
 }
 
-export const ACTIVE_ESTADOS = ['en_curso', 'en_revision', 'en_qa', 'bloqueado'] as const
-export type ActiveEstado = (typeof ACTIVE_ESTADOS)[number]
+export type CategoriaActiva = 'en_curso' | 'revision' | 'bloqueado'
+export const CATEGORIAS_ACTIVAS: readonly CategoriaActiva[] = ['en_curso', 'revision', 'bloqueado']
 
 export interface TeamTicket {
   id: string
   titulo: string
-  estado: ActiveEstado
+  estado: string
+  estadoNombre: string
+  categoria: CategoriaActiva
   responsable?: string
   responsableId?: string
   proyecto?: string
   url?: string
 }
 
-export interface GruvPersona {
+export interface PersonaConector {
   id?: string
   nombre: string
 }
@@ -50,11 +53,11 @@ export interface Person {
   nombre: string
   /** Logins de GitHub de esta persona (puede tener más de uno). */
   logins: string[]
-  gruvId?: string
-  /** Está en Gruv (tiene tickets o salió en el equipo del proyecto). */
-  inGruv: boolean
+  idConector?: string
+  /** Está en el conector de tickets (tiene tickets activos). */
+  enConector: boolean
   isBot?: boolean
-  /** Cómo se cruzó GitHub con Gruv. */
+  /** Cómo se cruzó GitHub con el conector. */
   matchedBy?: 'manual' | 'auto'
   tickets: TeamTicket[]
   prs: TeamPr[]
@@ -68,10 +71,9 @@ export interface Summary {
   tickets: number
 }
 
-/** Valor del mapeo a mano que dice «este login no es nadie de Gruv». */
-export const NOT_GRUV = '-'
+/** Valor del mapeo a mano que dice «este login no es nadie del conector». */
+export const NADIE = '-'
 
-export const TICKET_ID_RE = /^[A-Z][A-Z0-9]*-\d{1,7}$/
 export const LOGIN_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})(?:\[bot\])?$/
 export const REPO_RE = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/
 export const PR_URL_RE = /^https:\/\/github\.com\/[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}\/pull\/\d{1,9}$/
@@ -216,13 +218,13 @@ export function normName(s: string): string {
 }
 const tokens = (s: string): string[] => normName(s).split(' ').filter((t) => t.length > 1)
 
-/** ¿Este autor de GitHub (login + nombre) parece esta persona de Gruv? */
-export function looksLike(login: string, ghName: string | undefined, gruvName: string): boolean {
-  const g = tokens(gruvName)
+/** ¿Este autor de GitHub (login + nombre) parece esta persona del conector? */
+export function looksLike(login: string, ghName: string | undefined, nombre: string): boolean {
+  const g = tokens(nombre)
   if (!g.length) return false
   if (ghName) {
     const h = tokens(ghName)
-    if (h.length && normName(ghName) === normName(gruvName)) return true
+    if (h.length && normName(ghName) === normName(nombre)) return true
     // «Tomás Muñoz» ↔ «Tomás Ignacio Muñoz»: todas las palabras del más corto están en el otro (2 o más).
     const [short, long] = h.length <= g.length ? [h, g] : [g, h]
     if (short.length >= 2 && short.every((t) => long.includes(t))) return true
@@ -246,34 +248,73 @@ export interface Author {
   isBot?: boolean
 }
 
-export const personaKey = (p: GruvPersona): string => (p.id ? `g:${p.id}` : `n:${normName(p.nombre)}`)
+/** La `g` queda por compatibilidad: así siguen valiendo los mapeos guardados. */
+export const personaKey = (p: PersonaConector): string => (p.id ? `g:${p.id}` : `n:${normName(p.nombre)}`)
+
+/** Los tickets en curso, en revisión o bloqueados, con el nombre y la categoría de su estado. */
+export function ticketsActivos(tickets: readonly Ticket[], estados: readonly Estado[]): TeamTicket[] {
+  const activa = (c: string): c is CategoriaActiva => (CATEGORIAS_ACTIVAS as readonly string[]).includes(c)
+  // Un conector sin estados activos (gh: abierto/cerrado) no dice quién está trabajando: vale lo abierto que tiene responsable.
+  const sinActivos = !estados.some((e) => activa(e.categoria))
+  const out: TeamTicket[] = []
+  for (const t of tickets) {
+    const c = categoriaDe(t.estado, estados)
+    let categoria: CategoriaActiva
+    if (activa(c)) categoria = c
+    else if (sinActivos && c !== 'hecho' && t.responsable) categoria = 'en_curso'
+    else continue
+    const clave = t.estado ?? ''
+    const tt: TeamTicket = { id: t.id, titulo: t.titulo, estado: clave, estadoNombre: estados.find((e) => e.clave === clave)?.nombre ?? clave, categoria }
+    if (t.responsable) tt.responsable = t.responsable
+    if (t.responsableId) tt.responsableId = t.responsableId
+    if (t.proyecto) tt.proyecto = t.proyecto
+    if (t.url) tt.url = t.url
+    out.push(tt)
+  }
+  return out
+}
+
+/** Las personas responsables de esos tickets, sin repetir (por id o por nombre). */
+export function personasDe(tickets: readonly TeamTicket[]): PersonaConector[] {
+  const out: PersonaConector[] = []
+  const vistos = new Set<string>()
+  for (const t of tickets) {
+    const nombre = t.responsable?.trim() ?? ''
+    if (!nombre && !t.responsableId) continue
+    const claves = [t.responsableId ? `g:${t.responsableId}` : '', nombre ? `n:${normName(nombre)}` : ''].filter(Boolean)
+    if (claves.some((k) => vistos.has(k))) continue
+    claves.forEach((k) => vistos.add(k))
+    out.push(t.responsableId ? { id: t.responsableId, nombre } : { nombre })
+  }
+  return out
+}
 
 /**
- * Arma las tarjetas: una por persona de Gruv (con sus tickets) y les suma los PRs de su login de
+ * Arma las tarjetas: una por persona del conector (con sus tickets) y les suma los PRs de su login de
  * GitHub (mapeo a mano primero; si no, por nombre cuando hay un solo candidato). Los autores de
  * GitHub sin pareja quedan como tarjeta propia.
  */
 export function buildPeople(input: {
   prs: TeamPr[]
   tickets: TeamTicket[]
-  personas: GruvPersona[]
+  personas: PersonaConector[]
   mapping: Record<string, string>
 }): { people: Person[]; summary: Summary; unassigned: TeamTicket[] } {
   const people = new Map<string, Person>()
   const byNorm = new Map<string, string>()
-  const addPersona = (p: GruvPersona): Person | undefined => {
+  const addPersona = (p: PersonaConector): Person | undefined => {
     if (!p.nombre && !p.id) return undefined
     const norm = normName(p.nombre || '')
     // Si ya existe (por id o por nombre), es la misma.
     const existingKey = (p.id && people.has(`g:${p.id}`) ? `g:${p.id}` : undefined) ?? (norm ? byNorm.get(norm) : undefined)
     if (existingKey) {
       const e = people.get(existingKey)!
-      if (p.id && !e.gruvId) e.gruvId = p.id
+      if (p.id && !e.idConector) e.idConector = p.id
       return e
     }
     const key = personaKey(p)
-    const person: Person = { key, nombre: p.nombre || p.id!, logins: [], inGruv: true, tickets: [], prs: [] }
-    if (p.id) person.gruvId = p.id
+    const person: Person = { key, nombre: p.nombre || p.id!, logins: [], enConector: true, tickets: [], prs: [] }
+    if (p.id) person.idConector = p.id
     people.set(key, person)
     if (norm) byNorm.set(norm, key)
     return person
@@ -291,7 +332,7 @@ export function buildPeople(input: {
   }
 
   const groups = groupByAuthor(input.prs)
-  const gruvPeople = [...people.values()]
+  const delConector = [...people.values()]
   // Claves de mapeo en minúscula (los logins de GitHub no distinguen mayúsculas).
   const mapping = new Map(Object.entries(input.mapping).map(([k, v]) => [k.toLowerCase(), v]))
   for (const [lower, prs] of groups) {
@@ -299,11 +340,11 @@ export function buildPeople(input: {
     let target: Person | undefined
     let how: Person['matchedBy']
     const manual = mapping.get(lower)
-    if (manual && manual !== NOT_GRUV && people.has(manual)) {
+    if (manual && manual !== NADIE && people.has(manual)) {
       target = people.get(manual)
       how = 'manual'
     } else if (!manual && !a.isBot) {
-      const cands = gruvPeople.filter((p) => looksLike(a.login, a.name, p.nombre))
+      const cands = delConector.filter((p) => looksLike(a.login, a.name, p.nombre))
       if (cands.length === 1) {
         target = cands[0]
         how = 'auto'
@@ -311,7 +352,7 @@ export function buildPeople(input: {
     }
     if (!target) {
       const key = `gh:${lower}`
-      target = { key, nombre: a.name || a.login, logins: [], inGruv: false, tickets: [], prs: [] }
+      target = { key, nombre: a.name || a.login, logins: [], enConector: false, tickets: [], prs: [] }
       if (a.isBot) target.isBot = true
       people.set(key, target)
     } else if (how && target.matchedBy !== 'manual') target.matchedBy = how
@@ -321,7 +362,7 @@ export function buildPeople(input: {
 
   for (const p of people.values()) {
     p.prs.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
-    p.tickets.sort((a, b) => ACTIVE_ESTADOS.indexOf(a.estado) - ACTIVE_ESTADOS.indexOf(b.estado) || a.id.localeCompare(b.id))
+    p.tickets.sort((a, b) => CATEGORIAS_ACTIVAS.indexOf(a.categoria) - CATEGORIAS_ACTIVAS.indexOf(b.categoria) || a.id.localeCompare(b.id))
   }
   const list = [...people.values()].sort((a, b) => {
     if (Boolean(a.isBot) !== Boolean(b.isBot)) return a.isBot ? 1 : -1
@@ -337,7 +378,7 @@ export function summarize(prs: TeamPr[], tickets: TeamTicket[]): Summary {
   return {
     ciFailing: prs.filter((p) => p.ci === 'fail').length,
     waitingReview: prs.filter((p) => !p.isDraft && p.review === 'pending').length,
-    blocked: tickets.filter((t) => t.estado === 'bloqueado').length,
+    blocked: tickets.filter((t) => t.categoria === 'bloqueado').length,
     prs: prs.length,
     tickets: tickets.length
   }
@@ -349,7 +390,7 @@ export function cleanMapping(raw: unknown): Record<string, string> {
   if (!raw || typeof raw !== 'object') return out
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
     if (!LOGIN_RE.test(k) || typeof v !== 'string' || v.length > 200) continue
-    if (v === NOT_GRUV || /^(g|n):.+/.test(v)) out[k.toLowerCase()] = v
+    if (v === NADIE || /^(g|n):.+/.test(v)) out[k.toLowerCase()] = v
     if (Object.keys(out).length >= 500) break
   }
   return out

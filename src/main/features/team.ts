@@ -1,133 +1,105 @@
 import { app, shell } from 'electron'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
-import { accountStatus } from '../accounts'
-import { baseEnv } from '../ptys'
-import { NoGruvError, resolveClaudeExe } from './tickets/legado-gruv'
-import {
-  buildPeople,
-  cleanMapping,
-  LOGIN_RE,
-  NOT_GRUV,
-  PR_URL_RE,
-  type GruvPersona,
-  type TeamPr,
-  type TeamTicket
-} from './team-core'
+import { buildPeople, LOGIN_RE, NADIE, PR_URL_RE, personasDe, ticketsActivos, type TeamTicket } from './team-core'
+import { cargarTeam, type TeamState } from './team-estado'
 import { fetchGithub } from './team-github'
-import { buildTeamArgs, buildTeamPrompt, runTeamClaude } from './team-gruv'
+import { alCambiarTickets, ticketsParaEquipo, type TicketsParaEquipo } from './tickets'
 
 /**
  * Vista «Equipo»: en qué anda cada uno, sin servidor propio. GitHub (gh, solo lectura) se pide al
- * abrir la vista o con «Actualizar»; Gruv (tickets activos de todo el equipo) solo a pedido, porque
- * usa tokens de la cuenta elegida. Nada corre solo con la vista cerrada.
+ * abrir la vista o con «Actualizar». Los tickets son los del conector activo de Tickets: Equipo no
+ * los guarda ni los consulta por su cuenta. Nada corre solo con la vista cerrada.
  */
-
-const MODELS = ['haiku', 'sonnet'] as const
-
-interface TeamConfig {
-  queryAccountId?: string
-  model: (typeof MODELS)[number]
-  espacio?: string
-  proyecto?: string
-  confirmGruv: boolean
-}
-
-interface TeamState {
-  version: 1
-  github: { prs: TeamPr[]; repos: string[]; errors: Record<string, string>; fatal?: string; fetchedAt?: number }
-  gruv: {
-    tickets: TeamTicket[]
-    personas: GruvPersona[]
-    fetchedAt?: number
-    fetchedBy?: string
-    lastRun?: { tokens?: number; costUsd?: number; durationMs?: number }
-    lastError?: string
-  }
-  /** login de GitHub (minúscula) → clave de persona de Gruv, o «-» = no es nadie de Gruv. */
-  mapping: Record<string, string>
-  config: TeamConfig
-}
-
-const emptyState = (): TeamState => ({
-  version: 1,
-  github: { prs: [], repos: [], errors: {} },
-  gruv: { tickets: [], personas: [] },
-  mapping: {},
-  config: { model: 'haiku', confirmGruv: true }
-})
 
 let ctx: FeatureContext
 let state: TeamState
 let file = ''
-let gruvRun: AbortController | null = null
 let ghRun: Promise<unknown> | null = null
+/** team.json es de una versión más nueva de Sloth o no se pudo leer: no se pisa. */
+let soloLectura = false
+let offTickets: (() => void) | null = null
+
+function escribir(destino: string, texto: string): void {
+  const tmp = `${destino}.tmp`
+  writeFileSync(tmp, texto, 'utf8')
+  renameSync(tmp, destino)
+}
 
 function load(): TeamState {
-  const base = emptyState()
+  soloLectura = false
+  let texto: string | null = null
   try {
-    const raw = JSON.parse(readFileSync(file, 'utf8').replace(/^﻿/, '')) as Partial<TeamState>
-    const gh = (raw.github ?? {}) as Partial<TeamState['github']>
-    const gr = (raw.gruv ?? {}) as Partial<TeamState['gruv']>
-    return {
-      version: 1,
-      github: {
-        prs: Array.isArray(gh.prs) ? gh.prs.filter((p) => p && typeof p.url === 'string' && PR_URL_RE.test(p.url)) : [],
-        repos: Array.isArray(gh.repos) ? gh.repos.filter((r) => typeof r === 'string') : [],
-        errors: gh.errors && typeof gh.errors === 'object' ? gh.errors : {},
-        fatal: typeof gh.fatal === 'string' ? gh.fatal : undefined,
-        fetchedAt: typeof gh.fetchedAt === 'number' ? gh.fetchedAt : undefined
-      },
-      gruv: {
-        tickets: Array.isArray(gr.tickets) ? gr.tickets : [],
-        personas: Array.isArray(gr.personas) ? gr.personas : [],
-        fetchedAt: typeof gr.fetchedAt === 'number' ? gr.fetchedAt : undefined,
-        fetchedBy: typeof gr.fetchedBy === 'string' ? gr.fetchedBy : undefined,
-        lastRun: gr.lastRun,
-        lastError: typeof gr.lastError === 'string' ? gr.lastError : undefined
-      },
-      mapping: cleanMapping(raw.mapping),
-      config: { ...base.config, ...(raw.config ?? {}) }
+    texto = readFileSync(file, 'utf8')
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') {
+      soloLectura = true
+      ctx.log(`team: no pude leer team.json, no lo voy a pisar: ${(e as Error).message}`)
     }
-  } catch {
-    return base
   }
+  const r = cargarTeam(texto)
+  if (r.kind === 'corrupto') {
+    const aparte = `${file}.corrupto-${Date.now()}`
+    try {
+      renameSync(file, aparte)
+      ctx.log(`team: team.json dañado, lo guardé en ${aparte}`)
+    } catch (e) {
+      soloLectura = true
+      ctx.log(`team: team.json dañado y no pude respaldarlo: ${(e as Error).message}`)
+    }
+  } else if (r.kind === 'futuro') {
+    soloLectura = true
+    ctx.log('team: team.json es de una versión más nueva de Sloth, no lo voy a pisar')
+  } else if (r.kind === 'ok' && r.migrado && texto !== null) {
+    const bak = `${file}.v1.bak`
+    try {
+      if (!existsSync(bak)) escribir(bak, texto)
+      state = r.state
+      save()
+    } catch (e) {
+      soloLectura = true
+      ctx.log(`team: no pude respaldar team.json antes de migrarlo: ${(e as Error).message}`)
+    }
+  }
+  return r.state
 }
 
 function save(): void {
+  if (soloLectura) return
   mkdirSync(join(app.getPath('userData'), 'features'), { recursive: true })
-  const tmp = `${file}.tmp`
-  writeFileSync(tmp, JSON.stringify(state, null, 2), 'utf8')
-  renameSync(tmp, file)
+  escribir(file, JSON.stringify(state, null, 2))
+}
+
+function delConector(): { tp: TicketsParaEquipo; tickets: TeamTicket[] } {
+  const tp = ticketsParaEquipo()
+  return { tp, tickets: tp.conector ? ticketsActivos(tp.tickets, tp.estados) : [] }
 }
 
 function snapshot(): unknown {
-  const view = buildPeople({
-    prs: state.github.prs,
-    tickets: state.gruv.tickets,
-    personas: state.gruv.personas,
-    mapping: state.mapping
-  })
-  // Personas de Gruv para el selector de «vincular».
-  const gruvPeople = view.people.filter((p) => p.inGruv).map((p) => ({ key: p.key, nombre: p.nombre }))
+  const { tp, tickets } = delConector()
+  const view = buildPeople({ prs: state.github.prs, tickets, personas: personasDe(tickets), mapping: state.mapping })
+  // Personas del conector para el selector de «vincular».
+  const personasConector = view.people.filter((p) => p.enConector).map((p) => ({ key: p.key, nombre: p.nombre }))
   const authors = new Map<string, { login: string; name?: string }>()
   for (const p of state.github.prs) if (!p.isBot) authors.set(p.login.toLowerCase(), { login: p.login, name: p.authorName })
   return {
     ...view,
-    gruvPeople,
+    personasConector,
     authors: [...authors.values()].sort((a, b) => a.login.localeCompare(b.login)),
     mapping: state.mapping,
     github: { repos: state.github.repos, errors: state.github.errors, fatal: state.github.fatal, fetchedAt: state.github.fetchedAt },
-    gruv: {
-      fetchedAt: state.gruv.fetchedAt,
-      fetchedBy: state.gruv.fetchedBy,
-      lastRun: state.gruv.lastRun,
-      lastError: state.gruv.lastError,
-      running: Boolean(gruvRun)
+    tickets: {
+      conector: tp.conector,
+      fetchedAt: tp.fetchedAt,
+      fetchedBy: tp.fetchedBy,
+      lastRun: tp.lastRun,
+      lastError: tp.lastError,
+      running: tp.running,
+      model: tp.model,
+      confirmar: tp.confirmar
     },
-    githubRunning: Boolean(ghRun),
-    config: state.config
+    githubRunning: Boolean(ghRun)
   }
 }
 
@@ -136,7 +108,6 @@ function changed(): void {
   ctx.emit('changed', snapshot())
 }
 
-// ---------- GitHub ----------
 function refreshGithub(): Promise<unknown> {
   if (ghRun) return ghRun
   const dirs = ctx.store.workspaces.map((w) => w.repoPath)
@@ -156,87 +127,17 @@ function refreshGithub(): Promise<unknown> {
   return ghRun
 }
 
-// ---------- Gruv ----------
-async function refreshGruv(rawAccount: unknown): Promise<unknown> {
-  if (gruvRun) throw new Error('Ya hay una consulta a Gruv en curso.')
-  const accountId = typeof rawAccount === 'string' && rawAccount.length < 100 && rawAccount ? rawAccount : state.config.queryAccountId
-  const acc = accountId ? ctx.store.account(accountId) : undefined
-  if (!acc) throw new Error('Elegí la cuenta con la que se consulta Gruv.')
-  if (!accountStatus(acc).loggedIn) throw new Error(`La cuenta «${acc.label}» no tiene sesión iniciada.`)
-  const exe = resolveClaudeExe()
-  if (!exe) throw new Error('No encontré el ejecutable de Claude Code (claude.exe) en el PATH.')
-  const cwd = join(app.getPath('userData'), 'features', 'team-run')
-  mkdirSync(cwd, { recursive: true })
-  const ac = new AbortController()
-  gruvRun = ac
-  ctx.emit('changed', snapshot())
-  try {
-    const r = await runTeamClaude({
-      exe,
-      args: buildTeamArgs(state.config.model),
-      prompt: buildTeamPrompt({ espacio: state.config.espacio, proyecto: state.config.proyecto }),
-      cwd,
-      env: { ...baseEnv(), CLAUDE_CONFIG_DIR: acc.configDir },
-      signal: ac.signal
-    })
-    state.gruv = {
-      tickets: r.tickets,
-      personas: r.personas,
-      fetchedAt: Date.now(),
-      fetchedBy: acc.id,
-      lastRun: { tokens: r.tokens, costUsd: r.costUsd, durationMs: r.durationMs }
-    }
-    state.config.queryAccountId = acc.id
-    return { count: r.tickets.length, people: r.personas.length, tokens: r.tokens }
-  } catch (e) {
-    const msg = e instanceof NoGruvError ? `«${acc.label}»: ${e.message}` : (e as Error).message
-    state.gruv.lastError = msg
-    throw new Error(msg)
-  } finally {
-    gruvRun = null
-    changed()
-  }
-}
-
-// ---------- validación ----------
-function text(v: unknown, max: number, name: string): string | undefined {
-  if (v === undefined || v === null || v === '') return undefined
-  if (typeof v !== 'string') throw new Error(`${name} no es válido.`)
-  const s = v.replace(/\s+/g, ' ').trim()
-  if (s.length > max) throw new Error(`${name} es demasiado largo (máx. ${max}).`)
-  return s || undefined
-}
-
-function setConfig(raw: unknown): unknown {
-  if (!raw || typeof raw !== 'object') throw new Error('Configuración inválida.')
-  const p = raw as Record<string, unknown>
-  const c = state.config
-  if ('queryAccountId' in p) {
-    const id = p.queryAccountId
-    if (id !== undefined && id !== null && id !== '' && (typeof id !== 'string' || !ctx.store.account(id))) throw new Error('Esa cuenta no existe.')
-    c.queryAccountId = (id as string) || undefined
-  }
-  if ('model' in p) {
-    if (!MODELS.includes(p.model as (typeof MODELS)[number])) throw new Error('Modelo inválido.')
-    c.model = p.model as (typeof MODELS)[number]
-  }
-  if ('espacio' in p) c.espacio = text(p.espacio, 80, 'El espacio de Gruv')
-  if ('proyecto' in p) c.proyecto = text(p.proyecto, 80, 'El proyecto de Gruv')
-  if ('confirmGruv' in p) c.confirmGruv = p.confirmGruv !== false
-  changed()
-  return snapshot()
-}
-
-/** Vincula un login de GitHub con una persona de Gruv (null = automático, «-» = no es de Gruv). */
+/** Vincula un login de GitHub con una persona del conector (null = automático, «-» = no es del conector). */
 function setMapping(rawLogin: unknown, rawKey: unknown): unknown {
   if (typeof rawLogin !== 'string' || !LOGIN_RE.test(rawLogin)) throw new Error('Login de GitHub inválido.')
   const login = rawLogin.toLowerCase()
   if (rawKey === null || rawKey === undefined || rawKey === '') delete state.mapping[login]
   else {
     if (typeof rawKey !== 'string' || rawKey.length > 200) throw new Error('Persona inválida.')
-    if (rawKey !== NOT_GRUV) {
-      const view = buildPeople({ prs: [], tickets: state.gruv.tickets, personas: state.gruv.personas, mapping: {} })
-      if (!view.people.some((p) => p.key === rawKey)) throw new Error('Esa persona no está en lo último que trajo Gruv.')
+    if (rawKey !== NADIE) {
+      const { tickets } = delConector()
+      const view = buildPeople({ prs: [], tickets, personas: personasDe(tickets), mapping: {} })
+      if (!view.people.some((p) => p.key === rawKey)) throw new Error('Esa persona no está en lo último que trajo el conector.')
     }
     state.mapping[login] = rawKey
   }
@@ -256,19 +157,15 @@ const feature: Feature = {
     ctx = c
     file = join(app.getPath('userData'), 'features', 'team.json')
     state = load()
+    offTickets = alCambiarTickets(() => ctx.emit('changed', snapshot()))
     c.handle('state', () => snapshot())
     c.handle('refreshGithub', () => refreshGithub())
-    c.handle('refreshGruv', (acc: unknown) => refreshGruv(acc))
-    c.handle('cancelGruv', () => {
-      gruvRun?.abort()
-      return true
-    })
-    c.handle('setConfig', (p: unknown) => setConfig(p))
     c.handle('setMapping', (login: unknown, key: unknown) => setMapping(login, key))
     c.handle('openPr', (url: unknown) => openPr(url))
   },
   dispose() {
-    gruvRun?.abort()
+    offTickets?.()
+    offTickets = null
   }
 }
 

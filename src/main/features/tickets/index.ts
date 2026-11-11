@@ -8,6 +8,7 @@ import {
   type Accion,
   type ConectorPropioVista,
   type Detalle,
+  type Estado,
   type EstadoBase,
   type Modelo,
   type Ticket,
@@ -23,7 +24,7 @@ import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, tick
 import { resolveClaudeExe, runClaude } from './claude-run'
 import type { ConectorDef, ConectorGh, ConectorMcp } from './conector'
 import { crearAlmacen, type Almacen, type FsTickets } from './almacen'
-import { CONECTOR_LEGADO, CONECTORES } from './conectores'
+import { CONECTORES } from './conectores'
 import { buildDescubrirArgs, buildDescubrirPrompt, parseDescubrir, type Descubiertas } from './descubrir'
 import {
   armarRegistro,
@@ -212,11 +213,6 @@ function activo(): ConectorDef {
   return def
 }
 
-/** Para crear espacios: el activo o, si no está, el de Gruv (Equipo todavía es de Gruv). */
-function paraEspacios(): ConectorDef {
-  return buscar(state.config.conectorId) ?? buscar(CONECTOR_LEGADO) ?? activo()
-}
-
 /** Columnas del flujo (si la última consulta no trajo, las del conector). */
 const estados = (def: ConectorDef): EstadoBase[] => (state.estados?.length ? [...state.estados] : estadosPorDefecto(def))
 
@@ -249,9 +245,63 @@ function snapshot(): TicketsSnapshot {
   }
 }
 
+const oyentes = new Set<() => void>()
+
+/** Equipo se entera de cada cambio para rearmar su vista; devuelve la función que lo da de baja. */
+export function alCambiarTickets(fn: () => void): () => void {
+  oyentes.add(fn)
+  return () => oyentes.delete(fn)
+}
+
+function avisar(): void {
+  ctx.emit('changed', snapshot())
+  for (const fn of oyentes) {
+    try {
+      fn()
+    } catch (e) {
+      ctx.log(`tickets: un oyente de Equipo falló: ${(e as Error).message}`)
+    }
+  }
+}
+
 function changed(): void {
   save()
-  ctx.emit('changed', snapshot())
+  avisar()
+}
+
+export interface TicketsParaEquipo {
+  /** null: sin conector elegido, el elegido no está o el estado todavía no cargó. */
+  conector: { id: string; nombre: string; via: 'mcp' | 'gh' } | null
+  tickets: Ticket[]
+  estados: Estado[]
+  fetchedAt?: number
+  fetchedBy?: string
+  lastRun?: { tokens?: number; costUsd?: number; durationMs?: number }
+  lastError?: string
+  running: boolean
+  model: string
+  confirmar: boolean
+}
+
+/** Lo que trajo el conector activo, para la vista Equipo (incluye los estados 'hecho' para poder descartarlos). */
+export function ticketsParaEquipo(): TicketsParaEquipo {
+  if (!state) return { conector: null, tickets: [], estados: [], running: false, model: '', confirmar: true }
+  const def = state.config.conectorId === SIN_CONECTOR ? undefined : buscar(state.config.conectorId)
+  const base = { running: Boolean(running), model: state.config.model, confirmar: state.config.confirmRefresh }
+  if (!def) return { ...base, conector: null, tickets: [], estados: [] }
+  // Primero los que trajo la consulta, con el nombre que se ve en el tablero.
+  const porClave = new Map<string, Estado>()
+  for (const e of [...conCategoria(def, estados(def)), ...def.estados]) if (!porClave.has(e.clave)) porClave.set(e.clave, e)
+  return {
+    ...base,
+    conector: { id: def.id, nombre: def.nombre, via: def.via },
+    tickets: state.tickets,
+    estados: [...porClave.values()],
+    fetchedAt: state.fetchedAt,
+    fetchedBy: state.fetchedBy,
+    lastRun: state.lastRun,
+    lastError: state.lastError
+  }
 }
 
 function dir(v: unknown, name: string): string | undefined {
@@ -288,13 +338,13 @@ async function pickAccount(): Promise<string> {
 
 /** ¿Hay una carpeta de repo para crear el espacio de este ticket? (sin crear nada). */
 function hasRepo(rawId: unknown): boolean {
-  const id = ticketId(paraEspacios(), rawId)
+  const id = ticketId(activo(), rawId)
   return Boolean(repoFor(state.tickets.find((t) => t.id === id)))
 }
 
-/** «Empezar en Sloth»: crea el espacio del ticket (con Gruv, arranca con `/ticket <id>`). */
+/** «Empezar en Sloth»: crea el espacio del ticket (si el conector usa /ticket, arranca con `/ticket <id>`). */
 async function start(rawId: unknown, rawAccount?: unknown): Promise<{ id: string; created: boolean }> {
-  const def = paraEspacios()
+  const def = activo()
   const id = ticketId(def, rawId)
   const existing = ctx.store.workspaces.find((w) => mismoTicket(w.ticket, id))
   if (existing) {
@@ -375,7 +425,7 @@ async function repoGh(): Promise<string> {
 async function refreshGh(def: ConectorGh): Promise<{ count: number }> {
   const ac = new AbortController()
   running = ac
-  ctx.emit('changed', snapshot())
+  avisar()
   const inicio = Date.now()
   try {
     const repo = await repoGh()
@@ -409,7 +459,7 @@ async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: n
   const run = ejecucion(def.nombre, requested ?? state.config.queryAccountId ?? (await pickAccount()))
   const ac = new AbortController()
   running = ac
-  ctx.emit('changed', snapshot())
+  avisar()
   try {
     const r = await runClaude({
       exe: run.exe,
@@ -595,7 +645,7 @@ function vista(r: ConectorRegistrado, def: ConectorMcp): ConectorPropioVista {
 
 function propios(): { lista: ConectorPropioVista[]; avisos: string[] } {
   recargarPropios(state.config)
-  ctx.emit('changed', snapshot())
+  avisar()
   const lista = registro.flatMap((r) => (r.origen.tipo !== 'incluido' && r.def.via === 'mcp' ? [vista(r, r.def)] : []))
   return { lista, avisos: avisosPropios }
 }
