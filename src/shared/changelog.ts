@@ -9,6 +9,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.4',
+    date: '2026-11-11',
+    title: 'Un solo lugar para escribir',
+    items: [
+      'Cada panel tiene un solo campo para escribirle a Claude: el de Claude Code, con comandos con «/», varias líneas, autocompletado e imágenes. Se sacó el campo de abajo, que lo repetía.'
+    ]
+  },
+  {
     version: '0.6.3',
     date: '2026-11-08',
     title: 'Ruta clickeable y arreglos en los paneles',
