@@ -32,4 +32,15 @@ test.describe('cursor de la terminal', () => {
     await emit(page, '[?2031l')
     await expect.poll(() => cursorHidden(page)).toBe(false)
   })
+
+  test('en la pantalla alternativa (vim, nvim) el cursor queda como lo pide el programa', async ({ sloth: { page } }) => {
+    await expect.poll(() => termText(page), { timeout: 30_000 }).toContain('PS ')
+    await emit(page, '[?1049h')
+    // nvim activa 2031 dentro de la pantalla alternativa: no es Claude.
+    await emit(page, '[?2031h')
+    await emit(page, '[?25h')
+    await page.waitForTimeout(500)
+    expect(await cursorHidden(page)).toBe(false)
+    await emit(page, '[?1049l')
+  })
 })

@@ -4,7 +4,7 @@
  * Módulo puro (lo corre `node --test` con type stripping): sin enums, namespaces ni parameter
  * properties, y los tipos se importan con `type`.
  */
-import { ACCIONES, type Accion, type Detalle, type EstadoBase, type Ticket, type Yo } from '../../../shared/tickets'
+import { ACCIONES, esMio, type Accion, type Detalle, type EstadoBase, type Ticket, type Yo } from '../../../shared/tickets'
 import type { ConectorDef } from './conector'
 import { clavesOcultas, idValido, type AccionInput } from './motor'
 
@@ -34,11 +34,8 @@ export function textoObligatorio(v: unknown, max: number, name: string): string 
   return s
 }
 
-export function esMio(me: Yo | undefined, t: Ticket): boolean {
-  if (!me || !t.responsable) return false
-  if (me.id && t.responsableId) return t.responsableId === me.id
-  return t.responsable.trim().toLowerCase() === me.nombre.trim().toLowerCase()
-}
+// La misma regla que usa la UI para «Míos» y «Soltar» (src/shared/tickets.ts).
+export { esMio }
 
 export interface Contexto {
   /** Las columnas del tablero (sin las de categoría 'hecho'). */

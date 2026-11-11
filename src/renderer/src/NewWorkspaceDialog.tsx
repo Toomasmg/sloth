@@ -7,7 +7,7 @@ import { useUi } from './features/host'
 import { useTemplates, openDialog, peekPreselect, takePreselect, usesTicket, type TemplateDto } from './features/templates/store'
 import { TEMPLATE_COLORS, colorHex } from './features/templates/catalog'
 import { setBoardOpen, useSnapshot } from './features/tickets/model'
-import { applyVars, folderLabel, missingVars, normTicketId, TEMPLATE_COLOR_KEYS, today, validBranch, type VarValues } from '../../shared/templates-shared'
+import { applyVars, folderLabel, missingVars, normTicketId, TEMPLATE_COLOR_KEYS, TICKET_RE, today, validBranch, type VarValues } from '../../shared/templates-shared'
 import './NewWorkspaceDialog.css'
 
 interface Props {
@@ -152,7 +152,9 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cur?.path, cur?.isGit])
 
-  const ticketId = normTicketId(ticket) ?? ''
+  // Con Gruv el espacio arranca con `/ticket <id>`, que solo entiende ids tipo TCK-1234.
+  const normId = normTicketId(ticket) ?? ''
+  const ticketId = tk?.conector.comandoTicket && !TICKET_RE.test(normId) ? '' : normId
   const ticketOk = ticketId !== ''
 
   // Valores de las variables (los que ya se conocen).

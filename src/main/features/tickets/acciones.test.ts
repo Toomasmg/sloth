@@ -113,3 +113,8 @@ test('con gh, cerrar es un estado válido; con Gruv, cerrado sigue fuera del tab
   falla(() => entradaDeAccion(GH, 'estado', issue, { estado: 'en_curso' }, c), 'Ese estado no está en el flujo de GitHub Issues.')
   falla(() => entradaDeAccion(GRUV, 'estado', libre(), { estado: 'cerrado' }, ctx()), 'Ese estado no está en el flujo de Gruv.')
 })
+
+test('esMio ignora tildes y espacios de más, igual que «Míos» en la UI', () => {
+  assert.equal(esMio({ nombre: 'José Pérez' }, { ...libre(), responsable: 'Jose Perez ' }), true)
+  assert.equal(esMio({ nombre: 'Jose' }, { ...libre(), responsable: 'José Pérez' }), false)
+})

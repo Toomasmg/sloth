@@ -82,7 +82,13 @@ const feature: Feature = {
     /** ¿Se puede dormir sin perder nada? */
     function canSleep(id: string, now: number, afterMs: number): boolean {
       const b = ctx.terminal()
-      if (!b?.isRunning(id) || asleep.has(id) || draft.has(id)) return false
+      if (!b?.isRunning(id)) return false
+      // Corriendo y marcado como dormido: lo abrió otro reemplazo de comando (Historial, mover de
+      // cuenta) antes que el nuestro. Ya despertó: se limpia la marca para que pueda volver a dormir.
+      if (asleep.delete(id)) save()
+      if (draft.has(id)) return false
+      // Solo con Claude quieto en su prompt. Tras SessionEnd (salió con /exit) la shell puede estar
+      // corriendo cualquier cosa, y dormir la mataría.
       const ev = lastEvent.get(id)
       if (!ev || (ev.event !== 'Stop' && !isIdleNotice(ev))) return false
       if (b.pendingPermissions().some((r) => r.ws === id)) return false

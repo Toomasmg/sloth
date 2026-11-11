@@ -148,7 +148,10 @@ export function Board(): React.JSX.Element {
   const porGh = snap?.conector.via === 'gh'
   const kindOf = (k?: string): ReturnType<typeof estadoKind> => estadoKind(categoriaDe(k, estados, snap?.conector.estados ?? []))
   const ticketTpls = tpls.filter(usesTicket)
-  const ticketTpl = ticketTpls.find((x) => x.name.toLowerCase().includes(n.toLowerCase())) ?? ticketTpls[0]
+  // `/ticket` es la skill de Gruv (main hace el mismo control con usaComandoTicket): con otro conector,
+  // una plantilla que la usa solo vale si se llama como el conector, no como la primera que haya.
+  const sirveDeComodin = (x: TemplateLite): boolean => snap?.conector.id === 'gruv' || !/(^|\s)\/ticket\b/.test(x.initialPrompt ?? '')
+  const ticketTpl = ticketTpls.find((x) => x.name.toLowerCase().includes(n.toLowerCase())) ?? ticketTpls.find(sirveDeComodin)
   const estadoName = (k?: string): string => estados.find((e) => e.clave === k)?.nombre ?? (k ? k.replace(/_/g, ' ') : 'Sin estado')
   const wsOf = (id: string): Workspace | undefined => ui.workspaces.find((w) => mismoTicket(w.ticket, id))
   const accLabel = (id?: string): string | undefined => ui.accounts.find((a) => a.id === id)?.label

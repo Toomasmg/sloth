@@ -2,6 +2,7 @@ import { memo, useEffect, useRef } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import type { PtyChunk } from '../../shared/types'
+import { joinPaths } from '../../shared/paste-paths'
 import { api, onPtyData, onPtyExit } from './api'
 import { subscribeSettings, termOptions } from './features/settings/store'
 import { usePaneVisible } from './visibility'
@@ -39,19 +40,25 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
     // Claude Code dibuja su propio cursor en la caja de texto. El cursor real lo vuelve a mostrar ConPTY
     // en cada cuadro, a veces a mitad del redibujo, y salta por la pantalla. Mientras Claude está abierto
     // (?2031h al arrancar, ?2031l al salir) se ignora el «mostrar cursor» (?25h); en la shell vuelve a verse.
+    // Claude no usa la pantalla alternativa y vim, nvim o nano sí (algunos también activan 2031): ahí el
+    // cursor se deja tal cual.
     let claudeUi = false
+    const inNormalBuffer = (): boolean => term.buffer.active.type === 'normal'
+    const ALT_SCREEN = [47, 1047, 1049]
     term.parser.registerCsiHandler({ prefix: '?', final: 'h' }, (params) => {
-      if (params.includes(2031) && !claudeUi) {
+      if (params.includes(2031) && !claudeUi && inNormalBuffer()) {
         claudeUi = true
         term.write('\x1b[?25l')
       }
-      return claudeUi && params.length === 1 && params[0] === 25
+      return claudeUi && inNormalBuffer() && params.length === 1 && params[0] === 25
     })
     term.parser.registerCsiHandler({ prefix: '?', final: 'l' }, (params) => {
-      if (params.includes(2031) && claudeUi) {
+      if (params.includes(2031) && claudeUi && inNormalBuffer()) {
         claudeUi = false
         term.write('\x1b[?25h')
       }
+      // Volviendo de un editor abierto desde Claude: el cursor que mostró el editor se vuelve a ocultar.
+      if (claudeUi && params.some((p) => typeof p === 'number' && ALT_SCREEN.includes(p))) term.write('\x1b[?25l')
       return false
     })
     const fit = new FitAddon()
@@ -122,10 +129,11 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
     const pasteClipboard = (): void => {
       void api.clipboardRead().then((t) => t && term.paste(t))
     }
-    // Ctrl+V y Ctrl+Shift+V pegan; Ctrl+Shift+C copia; Ctrl+C sigue siendo interrumpir.
+    // Ctrl+V y Ctrl+Shift+V pegan; Ctrl+Shift+C copia; Ctrl+C sigue siendo interrumpir. En la pantalla
+    // alternativa (vim, nano) Ctrl+V solo llega como ^V: allá es bloque visual o «literal siguiente».
     term.attachCustomKeyEventHandler((ev) => {
       if (ev.type !== 'keydown' || !ev.ctrlKey || ev.altKey || ev.metaKey) return true
-      if (ev.code === 'KeyV') {
+      if (ev.code === 'KeyV' && (ev.shiftKey || inNormalBuffer())) {
         // Sin preventDefault el navegador también dispararía su «paste» (solo texto) y pegaría dos veces.
         ev.preventDefault()
         pasteClipboard()
@@ -160,7 +168,7 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
           return ''
         }
       })
-      const text = paths.filter(Boolean).map((p) => (/\s/.test(p) ? `"${p}"` : p)).join(' ')
+      const text = joinPaths(paths)
       if (!text) {
         onErrorRef.current('No pude leer la ruta de lo que soltaste. Probá de nuevo desde el Explorador.')
         return

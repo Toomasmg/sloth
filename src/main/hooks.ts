@@ -50,6 +50,9 @@ export function stateForEvent(p: HookEventPayload): { state: AgentState; detail?
       return { state: 'waiting', detail: p.message }
     case 'Stop':
       return { state: 'done' }
+    case 'SessionEnd':
+      // Claude se cerró pero la shell del espacio sigue abierta.
+      return { state: 'idle', detail: 'Claude cerrado' }
   }
 }
 

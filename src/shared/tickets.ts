@@ -139,3 +139,21 @@ export function categoriaDe(clave: string | undefined, ...listas: readonly (read
   }
   return 'pendiente'
 }
+
+/** Nombre para comparar personas: sin espacios de más, sin tildes y en minúsculas. */
+const nombrePersona = (s: string): string =>
+  s
+    .trim()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+
+/**
+ * El ticket es de la persona que consulta: por id si el conector lo da, si no por nombre. La UI
+ * («Míos», «Soltar») y main (que valida «soltar») usan esta misma regla.
+ */
+export function esMio(me: Yo | undefined, t: Pick<Ticket, 'responsable' | 'responsableId'>): boolean {
+  if (!me || !t.responsable) return false
+  if (me.id && t.responsableId) return t.responsableId === me.id
+  return nombrePersona(t.responsable) === nombrePersona(me.nombre)
+}
