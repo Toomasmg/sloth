@@ -11,6 +11,7 @@
     "build:daemon": "node scripts/build-daemon.mjs",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/test-hooks.mjs --test \"src/**/*.test.ts\"",
     "dist": "npm run build && electron-builder --win",
     "release": "node scripts/release.mjs",
     "test:e2e": "npm run build && playwright test",
