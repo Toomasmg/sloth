@@ -4,9 +4,9 @@
  * Módulo puro (lo corre `node --test` con type stripping): sin enums, namespaces ni parameter
  * properties, y los tipos se importan con `type`.
  */
-import { MODELOS, type Corrida, type EstadoBase, type Modelo, type Ticket, type TicketsConfig, type Yo } from '../../../shared/tickets'
+import { MODELOS, SIN_CONECTOR, type Corrida, type EstadoBase, type Modelo, type Ticket, type TicketsConfig, type Yo } from '../../../shared/tickets'
 import { ID_CONECTOR_RE, ID_MAX, ID_SEGURO_RE, regexDePersona, type ConectorDef } from './conector'
-import { CONECTOR_POR_DEFECTO } from './conectores'
+import { CONECTOR_LEGADO } from './conectores'
 import { idValido, normalizeEstados, normEstado, normYo } from './motor'
 
 /** 'error': el archivo está pero no se pudo leer (bloqueado, sin permiso…); no es lo mismo que corrupto. */
@@ -56,7 +56,7 @@ function sinVacios<T extends object>(o: T): T {
   return o
 }
 
-export function estadoVacio(conectorId = CONECTOR_POR_DEFECTO): TicketsState {
+export function estadoVacio(conectorId: string = SIN_CONECTOR): TicketsState {
   return { version: 2, tickets: [], config: { conectorId, model: 'haiku', assigneeId: '', projectRepos: {}, confirmRefresh: true } }
 }
 
@@ -72,7 +72,8 @@ export function parsearArchivo(texto: string | null, mtimeMs = 0): Lectura {
 function sanearConfig(raw: unknown, buscar: Buscar): TicketsConfig {
   const c = esObjeto(raw) ? raw : {}
   const repos = esObjeto(c.projectRepos) ? c.projectRepos : {}
-  const conectorId = typeof c.conectorId === 'string' && ID_CONECTOR_RE.test(c.conectorId) ? c.conectorId : CONECTOR_POR_DEFECTO
+  const conectorId =
+    c.conectorId === SIN_CONECTOR ? SIN_CONECTOR : typeof c.conectorId === 'string' && ID_CONECTOR_RE.test(c.conectorId) ? c.conectorId : CONECTOR_LEGADO
   return sinVacios({
     conectorId,
     queryAccountId: noVacio(c.queryAccountId),
@@ -129,7 +130,7 @@ export function sanearEstado(raw: unknown, buscar: Buscar): TicketsState | null 
 /** gruv.json v1 → v2 con el conector de Gruv. gruv.json no se toca. */
 export function migrarDeGruv(raw: unknown, buscar: Buscar, ahora: number, gruvMtimeMs: number): TicketsState | null {
   if (!esObjeto(raw)) return null
-  const config = sanearConfig({ ...(esObjeto(raw.config) ? raw.config : {}), conectorId: 'gruv' }, buscar)
+  const config = sanearConfig({ ...(esObjeto(raw.config) ? raw.config : {}), conectorId: CONECTOR_LEGADO }, buscar)
   return armar(raw, config, buscar, { archivo: 'gruv.json', en: ahora, gruvMtimeMs })
 }
 

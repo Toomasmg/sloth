@@ -152,7 +152,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cur?.path, cur?.isGit])
 
-  // Con Gruv el espacio arranca con `/ticket <id>`, que solo entiende ids tipo TCK-1234.
+  // Si el conector usa la skill /ticket, el id tiene que tener la forma ABC-123.
   const normId = normTicketId(ticket) ?? ''
   const ticketId = tk?.conector.comandoTicket && !TICKET_RE.test(normId) ? '' : normId
   const ticketOk = ticketId !== ''
@@ -191,7 +191,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
   else if (info && info.path === carpetaTrim && !info.exists) errs.carpeta = 'No encontramos esa carpeta en esta PC.'
   if (!name.trim()) errs.nombre = ticketMode ? '' : 'Ponele un nombre al espacio.'
   if (ticketMode || tplTicket) {
-    if (!ticketOk) errs.ticket = ticket.trim() ? `Tiene que ser un id como ${tk?.conector.ejemploId || 'TCK-1234'}.` : ticketMode ? 'Poné el ticket.' : 'Esta plantilla usa {ticket}: poné el ticket.'
+    if (!ticketOk) errs.ticket = ticket.trim() ? `Tiene que ser un id como ${tk?.conector.ejemploId || 'PROJ-123'}.` : ticketMode ? 'Poné el ticket.' : 'Esta plantilla usa {ticket}: poné el ticket.'
   }
   if (!ticketMode && wtOn) {
     if (cur && cur.exists && !cur.isGit) errs.rama = 'Las ramas aparte solo sirven en repositorios Git.'
@@ -234,8 +234,8 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
             accountId,
             autoStartClaude: true,
             ticket: ticketId,
-            // La skill /ticket (de Gruv) ya abre su propio worktree desde origin/staging.
-            initialPrompt: !tk || tk.conector.comandoTicket ? `/ticket ${ticketId}` : undefined,
+            // La skill /ticket abre su propio worktree desde origin/staging.
+            initialPrompt: tk?.conector.comandoTicket ? `/ticket ${ticketId}` : undefined,
             resume: true,
             color: colorKey
           }
@@ -355,7 +355,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
       >
         <div className="nw-head">
           <h2 id="nw-title">{ticketMode ? 'Espacio desde ticket' : 'Nuevo espacio'}</h2>
-          <p>{ticketMode ? 'Arranca Claude con /ticket. Tu skill se encarga del worktree, el PR y las horas.' : 'Una carpeta, una cuenta de Claude y su propia terminal.'}</p>
+          <p>{ticketMode ? (tk?.conector.comandoTicket ? 'Arranca Claude con /ticket. Tu skill se encarga del worktree, el PR y las horas.' : 'Crea un espacio con el id del ticket en el nombre.') : 'Una carpeta, una cuenta de Claude y su propia terminal.'}</p>
         </div>
 
         <div className="nw-body">
@@ -369,7 +369,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
                   autoFocus
                   value={ticket}
                   onChange={(e) => setTicket(e.target.value)}
-                  placeholder={tk?.conector.ejemploId || 'TCK-1234'}
+                  placeholder={tk?.conector.ejemploId || 'PROJ-123'}
                   aria-invalid={invalidOf('ticket')}
                   aria-describedby={showErr('ticket') ? 'nw-ticket-err' : undefined}
                 />
@@ -510,7 +510,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
             {ticketMode && (
               <div className="nw-field">
                 <label htmlFor="nw-nombre">Nombre (opcional)</label>
-                <input id="nw-nombre" className="nw-input" value={name} onChange={(e) => { setNameRaw(e.target.value); setNameTouched(true) }} placeholder={ticketId || 'TCK-1234'} />
+                <input id="nw-nombre" className="nw-input" value={name} onChange={(e) => { setNameRaw(e.target.value); setNameTouched(true) }} placeholder={ticketId || 'PROJ-123'} />
               </div>
             )}
 
@@ -597,7 +597,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
                       className="nw-input mono"
                       value={ticket}
                       onChange={(e) => setTicket(e.target.value)}
-                      placeholder={tk?.conector.ejemploId || 'TCK-1234'}
+                      placeholder={tk?.conector.ejemploId || 'PROJ-123'}
                       aria-invalid={invalidOf('ticket')}
                       aria-describedby="nw-ticket-hint"
                     />
