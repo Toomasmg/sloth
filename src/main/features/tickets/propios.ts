@@ -18,6 +18,8 @@ export interface ArchivoPropios {
   conectores: ConectorDef[]
   /** `claveAceptado(repoKey, id)` → hash de la versión del conector del equipo que la persona aceptó. */
   aceptados: Record<string, string>
+  /** Los que no validan (de otra versión de Sloth o tocados a mano), tal cual: no se borran al guardar y se reintentan al leer. */
+  apartados: unknown[]
 }
 
 export const PROPIOS_MAX = 30
@@ -102,37 +104,55 @@ export function recortarAvisos(avisos: readonly string[]): string[] {
   return avisos.slice(0, AVISOS_MAX).map((a) => (a.length > AVISO_MAX ? `${a.slice(0, AVISO_MAX - 1)}…` : a))
 }
 
-const vacio = (): ArchivoPropios => ({ version: 1, conectores: [], aceptados: {} })
+const vacio = (): ArchivoPropios => ({ version: 1, conectores: [], aceptados: {}, apartados: [] })
 
 const sinPrototipos = (k: string, v: unknown): unknown => {
   if (PROHIBIDAS.includes(k)) throw new ConectorInvalidoError('conector', `clave no permitida «${k}»`)
   return v
 }
 
-export function parsearArchivoPropios(texto: string | null): { archivo: ArchivoPropios; corrupto: boolean; avisos: string[] } {
-  if (texto === null) return { archivo: vacio(), corrupto: false, avisos: [] }
+export interface LecturaPropios {
+  archivo: ArchivoPropios
+  /** No se entiende: se aparta el archivo entero. */
+  corrupto: boolean
+  /** De una versión más nueva de Sloth: no se toca ni se aparta. */
+  futuro: boolean
+  avisos: string[]
+}
+
+export function parsearArchivoPropios(texto: string | null): LecturaPropios {
+  const nada = { archivo: vacio(), corrupto: false, futuro: false, avisos: [] }
+  if (texto === null) return nada
   let raw: unknown
   try {
     raw = JSON.parse(texto.replace(/^﻿/, ''), sinPrototipos)
   } catch {
-    return { archivo: vacio(), corrupto: true, avisos: [] }
+    return { ...nada, corrupto: true }
   }
-  if (!esObj(raw) || raw.version !== 1) return { archivo: vacio(), corrupto: true, avisos: [] }
+  if (esObj(raw) && typeof raw.version === 'number' && raw.version > 1)
+    return { ...nada, futuro: true, avisos: ['Tus conectores propios son de una versión más nueva de Sloth: actualizá Sloth. Mientras, no se pueden cambiar.'] }
+  if (!esObj(raw) || raw.version !== 1) return { ...nada, corrupto: true }
   const avisos: string[] = []
   const archivo = vacio()
-  const entradas = Array.isArray(raw.conectores) ? raw.conectores : []
+  const entradas = [...(Array.isArray(raw.conectores) ? raw.conectores : []), ...(Array.isArray(raw.apartados) ? raw.apartados : [])]
   for (const x of entradas) {
     try {
       const def = validarPropio(x)
       if (archivo.conectores.some((c) => c.id === def.id)) throw new Error(`el id «${def.id}» está repetido`)
       archivo.conectores.push(def)
     } catch (e) {
-      avisos.push(`Un conector propio guardado no se cargó: ${motivo(e)}`)
+      if (archivo.apartados.length >= PROPIOS_MAX) {
+        avisos.push(`Hay más de ${PROPIOS_MAX} conectores propios que no se cargan: los que sobran se pierden al guardar.`)
+        continue
+      }
+      archivo.apartados.push(x)
+      const id = esObj(x) && typeof x.id === 'string' ? `«${x.id.slice(0, 32)}» ` : ''
+      avisos.push(`Tu conector ${id}no se cargó (${motivo(e)}). Quedó guardado aparte en el archivo: no se borra.`)
     }
   }
   if (esObj(raw.aceptados))
     for (const [k, v] of Object.entries(raw.aceptados)) if (k.length <= CLAVE_ACEPTADO_MAX && typeof v === 'string' && HASH_RE.test(v)) archivo.aceptados[k] = v
-  return { archivo, corrupto: false, avisos: recortarAvisos(avisos) }
+  return { ...nada, archivo, avisos: recortarAvisos([...new Set(avisos)]) }
 }
 
 export function armarRegistro(o: {

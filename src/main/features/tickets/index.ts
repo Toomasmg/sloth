@@ -93,7 +93,7 @@ let noDisponible: Partial<Record<Accion, string>> = {}
 let registro: ConectorRegistrado[] = []
 let archivoPropios: ArchivoPropios = parsearArchivoPropios(null).archivo
 let avisosPropios: string[] = []
-/** Si tickets-conectores.json no se pudo leer ni respaldar, no se pisa. */
+/** Si tickets-conectores.json no se pudo leer ni respaldar, o es de una versión más nueva, no se pisa. */
 let propiosIlegible = false
 let descubriendo = false
 
@@ -154,6 +154,7 @@ function leerArchivoPropios(): string[] {
   }
   const r = parsearArchivoPropios(texto)
   archivoPropios = r.archivo
+  if (r.futuro) propiosIlegible = true
   if (!r.corrupto) return r.avisos
   try {
     renameSync(file, `${file}.corrupto-${Date.now()}`)
@@ -197,7 +198,7 @@ function recargarPropios(config?: TicketsConfig): void {
 }
 
 function guardarArchivo(a: ArchivoPropios): void {
-  if (propiosIlegible) throw new Error('No puedo guardar: el archivo de tus conectores propios no se pudo leer ni respaldar.')
+  if (propiosIlegible) throw new Error('No puedo guardar: el archivo de tus conectores propios no se pudo leer o es de una versión más nueva de Sloth.')
   writeJsonAtomic(propiosFile(), a)
   archivoPropios = a
 }

@@ -132,9 +132,9 @@ test('parsearImport: ida y vuelta con textoExport, y errores legibles', () => {
 })
 
 test('parsearArchivoPropios', () => {
-  assert.deepEqual(parsearArchivoPropios(null), { archivo: { version: 1, conectores: [], aceptados: {} }, corrupto: false, avisos: [] })
+  assert.deepEqual(parsearArchivoPropios(null), { archivo: { version: 1, conectores: [], aceptados: {}, apartados: [] }, corrupto: false, futuro: false, avisos: [] })
   assert.equal(parsearArchivoPropios('{roto').corrupto, true)
-  assert.equal(parsearArchivoPropios('{"version":2,"conectores":[],"aceptados":{}}').corrupto, true)
+  assert.equal(parsearArchivoPropios('{"version":0,"conectores":[],"aceptados":{}}').corrupto, true)
   const r = parsearArchivoPropios(
     JSON.stringify({
       version: 1,
@@ -172,4 +172,28 @@ test('parsearConectoresEquipo: rechaza formato, versión, claves desconocidas, m
   assert.throws(() => parsearConectoresEquipo(t({ conectores: { id: 'x' } })), /tiene que ser una lista/)
   assert.throws(() => parsearConectoresEquipo('{"formato":"sloth-conectores","versión":1,"conectores":[{"__proto__":{}}]}'), /__proto__/)
   assert.throws(() => parsearConectoresEquipo('{'), /JSON/)
+})
+
+test('parsearArchivoPropios: el que no valida queda apartado tal cual y vuelve a cargarse si después valida', () => {
+  const malo = { ...propio('mi-viejo', { lista: ['get_user', 'executeWrite'] }), _extra: 1 }
+  const bueno = propio('mi-linear')
+  const r = parsearArchivoPropios(JSON.stringify({ version: 1, conectores: [bueno, malo], aceptados: {} }))
+  assert.equal(r.corrupto, false)
+  assert.deepEqual(r.archivo.conectores.map((c) => c.id), ['mi-linear'])
+  assert.deepEqual(r.archivo.apartados, [malo])
+  assert.match(r.avisos[0], /mi-viejo.*no se borra/)
+
+  const otraVez = parsearArchivoPropios(JSON.stringify(r.archivo))
+  assert.deepEqual(otraVez.archivo.apartados, [malo])
+  const arreglado = parsearArchivoPropios(JSON.stringify({ ...r.archivo, apartados: [propio('mi-viejo')] }))
+  assert.deepEqual(arreglado.archivo.conectores.map((c) => c.id), ['mi-linear', 'mi-viejo'])
+  assert.deepEqual(arreglado.archivo.apartados, [])
+})
+
+test('parsearArchivoPropios: una versión más nueva no es corrupta ni se toca', () => {
+  const r = parsearArchivoPropios(JSON.stringify({ version: 2, conectores: [] }))
+  assert.equal(r.corrupto, false)
+  assert.equal(r.futuro, true)
+  assert.match(r.avisos[0], /actualizá Sloth/)
+  assert.equal(parsearArchivoPropios(JSON.stringify({ version: 'x' })).corrupto, true)
 })
