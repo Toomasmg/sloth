@@ -68,6 +68,57 @@ Reglas estrictas para todo el archivo:
 - Las claves que Sloth no conoce son un error. Las que empiezan con `_` o `$` se ignoran, así que sirven para comentar: `"_nota": "…"`.
 - No puede haber dos plantillas con el mismo nombre (sin importar mayúsculas).
 
+## Conectores de tickets (`.sloth/conectores.json`)
+
+Los conectores de **Tickets** para todo el equipo van en un archivo aparte, `<repo>/.sloth/conectores.json`, y no en el `team.json`: así una versión de Sloth que todavía no los conoce sigue leyendo el `team.json` como siempre (y simplemente no ve los conectores). Se lee de los repos de tus espacios y de los repos que elegiste en los ajustes de Tickets. El nombre del equipo que se muestra es el `equipo` del `team.json` del mismo repo o, si no hay, el nombre de la carpeta.
+
+Pesa como mucho 256 KB y trae hasta 10 conectores. Cada uno tiene la misma forma que un conector propio de la app, por ejemplo uno que solo lee:
+
+```json
+{
+  "formato": "sloth-conectores",
+  "versión": 1,
+  "conectores": [
+    {
+      "id": "mi-tracker",
+      "nombre": "Mi Tracker",
+      "via": "mcp",
+      "verificado": false,
+      "idRegex": "^TRK-[0-9]{1,6}$",
+      "idMayusculas": true,
+      "ejemplo": { "id": "TRK-12", "estado": "abierto", "prioridad": "alta", "proyecto": "Web" },
+      "estados": [
+        { "clave": "abierto", "nombre": "Abierto", "categoria": "pendiente" },
+        { "clave": "en_curso", "nombre": "En curso", "categoria": "en_curso" },
+        { "clave": "cerrado", "nombre": "Cerrado", "categoria": "hecho" }
+      ],
+      "faltaConector": { "clave": "sin_tracker", "mensaje": "Esta cuenta no tiene el conector de Mi Tracker en claude.ai." },
+      "herramientas": {
+        "prefijo": "mcp__claude_ai_Mi_Tracker__",
+        "lista": ["get_me", "search_issues"],
+        "detalle": [],
+        "escritura": {},
+        "negar": []
+      },
+      "pistas": {
+        "yo": { "conId": "La persona es la del id {id}.", "sinId": "La persona es la dueña de la cuenta (get_me)." },
+        "lista": "Con search_issues traé los tickets abiertos de todo el equipo, de a 100 y como máximo 250.",
+        "detalle": [],
+        "acciones": {}
+      }
+    }
+  ]
+}
+```
+
+- **Se validan igual que los de la app.** Solo vía `mcp` y nunca quedan como verificados.
+- **Las herramientas de lectura pasan por un filtro.** Es una heurística, no una garantía: el nombre tiene que parecer de lectura (`get`, `list`, `search`, `fetch`, `read`…) y ninguna de sus partes puede parecer de escritura (`create`, `update`, `delete`, `execute`, `push`, `run`…). `executeRead`, `jira_create_issue` o `bulkDelete` se rechazan.
+- Si uno no pasa, no se carga y Tickets muestra el aviso. El `team.json` no se ve afectado.
+- **Nunca se ejecuta nada del archivo.** Son solo datos: nombres de herramientas, pistas y estados.
+- **Cada persona tiene que aceptarlos.** Antes de aceptarlo, Tickets muestra qué herramientas habilita cada consulta y cada acción (las mismas que se le pasan a Claude) y todas las pistas que van al prompt. Si el archivo lo cambia, hay que volver a aceptarlo.
+- Si choca con el id de un conector incluido o de uno tuyo, no se carga. Entre dos repos con el mismo id, gana el primero por ruta.
+- Arriba del todo, las claves que empiezan con `_` o `$` se ignoran. Adentro de un conector, cualquier clave que Sloth no conoce es un error, también las que empiezan con `_`.
+
 ## Importar y actualizar sin duplicar
 
 - **La identidad de cada plantilla del equipo es su `name`.** Sloth recuerda qué plantilla tuya corresponde a cada una, en `userData/features/team-config.json`.
