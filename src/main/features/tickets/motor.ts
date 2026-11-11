@@ -17,7 +17,7 @@ import {
   type Ticket,
   type Yo
 } from '../../../shared/tickets'
-import { ID_MAX, ID_SEGURO_RE, nombreCompleto, regexDeId, type ArgValor, type ConectorDef } from './conector'
+import { ACCIONES_GH, ID_MAX, ID_SEGURO_RE, nombreCompleto, regexDeId, type ArgValor, type ConectorDef, type ConectorMcp } from './conector'
 
 const MAX_TICKETS = 250
 const MAX_CRITERIOS = 5
@@ -186,17 +186,18 @@ function sustituir(args: Record<string, ArgValor>, valor: (nombre: string) => Ar
 }
 
 const dedupe = (xs: string[]): string[] => [...new Set(xs)]
-const escrituras = (def: ConectorDef): string[] => Object.values(def.herramientas.escritura).filter((t) => t !== undefined)
+const escrituras = (def: ConectorMcp): string[] => Object.values(def.herramientas.escritura).filter((t) => t !== undefined)
 
 /** Lo que se le niega a Claude en toda consulta (nombres completos): lo negado y lo que escribe. */
-export const negadas = (def: ConectorDef): string[] =>
+export const negadas = (def: ConectorMcp): string[] =>
   dedupe([...def.herramientas.negar, ...escrituras(def)]).map((t) => nombreCompleto(def, t))
 
-export const accionesSoportadas = (def: ConectorDef): Accion[] => ACCIONES.filter((a) => def.herramientas.escritura[a] !== undefined)
+export const accionesSoportadas = (def: ConectorDef): Accion[] =>
+  def.via === 'gh' ? [...ACCIONES_GH] : ACCIONES.filter((a) => def.herramientas.escritura[a] !== undefined)
 
 /** Acciones que comparten herramienta (si falta una, faltan todas las suyas). */
 export const mismaHerramienta = (def: ConectorDef, a: Accion): Accion[] =>
-  accionesSoportadas(def).filter((k) => def.herramientas.escritura[k] === def.herramientas.escritura[a])
+  def.via === 'gh' ? [a] : accionesSoportadas(def).filter((k) => def.herramientas.escritura[k] === def.herramientas.escritura[a])
 
 /** Estados que no van al tablero. */
 export const clavesOcultas = (def: ConectorDef): string[] => def.estados.filter((e) => e.categoria === 'hecho').map((e) => e.clave)
@@ -214,15 +215,18 @@ export function idValido(def: ConectorDef, v: unknown): string | null {
   return s.length <= ID_MAX && ID_SEGURO_RE.test(s) && regexDeId(def).test(s) ? s : null
 }
 
+export const leeDetalle = (def: ConectorDef): boolean => def.via === 'gh' || def.herramientas.detalle.length > 0
+
 export function info(def: ConectorDef | undefined, idPedido: string): ConectorInfo {
-  if (!def) return { id: idPedido, nombre: idPedido, verificado: false, disponible: false, acciones: [], leeDetalle: false, ejemploId: '', estados: [] }
+  if (!def) return { id: idPedido, nombre: idPedido, verificado: false, via: 'mcp', disponible: false, acciones: [], leeDetalle: false, ejemploId: '', estados: [] }
   return {
     id: def.id,
     nombre: def.nombre,
     verificado: def.verificado,
+    via: def.via,
     disponible: true,
     acciones: accionesSoportadas(def),
-    leeDetalle: def.herramientas.detalle.length > 0,
+    leeDetalle: leeDetalle(def),
     ejemploId: def.ejemplo.id,
     estados: def.estados.map((e) => ({ ...e }))
   }
@@ -258,7 +262,7 @@ export function buildArgs(model: string, o: { allow: string[]; deny: string[]; s
  * Lee los tickets de TODO el equipo (no solo los de la cuenta) para que la app pueda separar
  * «Míos», «Del equipo» y «Sin asignar». `assigneeId` fija quién sos si ya se configuró.
  */
-export function buildPrompt(def: ConectorDef, assigneeId: string): string {
+export function buildPrompt(def: ConectorMcp, assigneeId: string): string {
   const n = def.nombre
   const { yo, lista, estados } = def.pistas
   const ej = def.ejemplo
@@ -294,10 +298,10 @@ export function buildPrompt(def: ConectorDef, assigneeId: string): string {
   ].join('\n')
 }
 
-export const buildListaArgs = (def: ConectorDef, model: string): string[] =>
+export const buildListaArgs = (def: ConectorMcp, model: string): string[] =>
   buildArgs(model, { allow: def.herramientas.lista.map((t) => nombreCompleto(def, t)), deny: negadas(def), schema: OUTPUT_SCHEMA })
 
-export function buildDetallePrompt(def: ConectorDef, id: string): string {
+export function buildDetallePrompt(def: ConectorMcp, id: string): string {
   const n = def.nombre
   const pasos = def.pistas.detalle.map(
     (p, i) => `${i + 1}. Llamá a ${p.herramienta} con ${J(sustituir(p.args, (k) => (k === 'ticket' ? id : undefined)))}.`
@@ -317,19 +321,19 @@ export function buildDetallePrompt(def: ConectorDef, id: string): string {
   ].join('\n')
 }
 
-export const buildDetalleArgs = (def: ConectorDef, model: string): string[] =>
+export const buildDetalleArgs = (def: ConectorMcp, model: string): string[] =>
   buildArgs(model, { allow: def.herramientas.detalle.map((t) => nombreCompleto(def, t)), deny: negadas(def), schema: DETAIL_SCHEMA })
 
 const NOTA_HORAS = 'En dato.minutos_total poné el total del reloj del ticket que devuelve la herramienta, en minutos enteros; si no lo trae, null.'
 
-function herramientaDe(def: ConectorDef, a: Accion): string {
+function herramientaDe(def: ConectorMcp, a: Accion): string {
   const t = def.herramientas.escritura[a]
   if (t === undefined) throw new Error(`${def.nombre} no permite la acción «${a}» desde Sloth.`)
   return t
 }
 
 /** Prompt cerrado: qué llamar, con qué ID y valores, y la forma de la respuesta. */
-export function buildAccionPrompt(def: ConectorDef, a: Accion, i: AccionInput): string {
+export function buildAccionPrompt(def: ConectorMcp, a: Accion, i: AccionInput): string {
   const tool = herramientaDe(def, a)
   const pista = def.pistas.acciones[a]
   const valores = sustituir(pista?.args ?? {}, (k) => i[k as keyof AccionInput])
@@ -346,7 +350,7 @@ export function buildAccionPrompt(def: ConectorDef, a: Accion, i: AccionInput): 
   ].join('\n')
 }
 
-export function buildAccionArgs(def: ConectorDef, model: string, a: Accion): string[] {
+export function buildAccionArgs(def: ConectorMcp, model: string, a: Accion): string[] {
   const tool = nombreCompleto(def, herramientaDe(def, a))
   return buildArgs(model, { allow: [tool], deny: negadas(def).filter((t) => t !== tool), schema: ACCION_SCHEMA })
 }
@@ -467,7 +471,7 @@ export function parseClaudeOutput(def: ConectorDef, stdout: string): ResultadoLi
 const minutosDe = (m: unknown): number | null => (typeof m === 'number' && Number.isFinite(m) ? Math.max(0, Math.round(m)) : null)
 
 /** Lee el detalle. Tira ConectorFaltaError si la cuenta no tiene el conector. */
-export function parseDetalle(def: ConectorDef, stdout: string): Detalle {
+export function parseDetalle(def: ConectorMcp, stdout: string): Detalle {
   const { data, env } = parseEnvelope(def, stdout)
   const o = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>
   const criterios = normCriterios(o.criterios, MAX_CRITERIOS_DETALLE)
@@ -479,7 +483,7 @@ export function parseDetalle(def: ConectorDef, stdout: string): Detalle {
 }
 
 /** Lee la respuesta de una escritura. Tira HerramientaFaltaError si la herramienta no existe. */
-export function parseAccion(def: ConectorDef, stdout: string, a: Accion): { minutosTotal?: number } {
+export function parseAccion(def: ConectorMcp, stdout: string, a: Accion): { minutosTotal?: number } {
   const { data, env } = parseEnvelope(def, stdout)
   const o = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>
   if (o.ok === true) {

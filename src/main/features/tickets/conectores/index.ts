@@ -1,4 +1,5 @@
 import { validarConector, type ConectorDef } from '../conector'
+import github from './github'
 import gruv from './gruv'
 
 export const CONECTOR_POR_DEFECTO = 'gruv'
@@ -18,6 +19,6 @@ function registrar(defs: readonly unknown[]): ConectorDef[] {
   return out
 }
 
-export const CONECTORES: readonly ConectorDef[] = registrar([gruv])
+export const CONECTORES: readonly ConectorDef[] = registrar([gruv, github])
 
 export const conectorPorId = (id: string): ConectorDef | undefined => CONECTORES.find((c) => c.id === id)

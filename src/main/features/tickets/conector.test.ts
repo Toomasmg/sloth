@@ -1,7 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ConectorInvalidoError, nombreCompleto, regexDeId, validarConector } from './conector'
+import { ConectorInvalidoError, nombreCompleto, regexDeId, validarConector, type ConectorMcp } from './conector'
 import { CONECTORES, conectorPorId } from './conectores'
+import github from './conectores/github'
 import gruv from './conectores/gruv'
 
 const BORRAR = Symbol('borrar')
@@ -36,11 +37,12 @@ test('Gruv valida y la copia es nueva, igual e idempotente', () => {
   assert.equal(gruv.estados.length, 8)
 })
 
-test('el registro trae Gruv validado', () => {
+test('el registro trae Gruv y GitHub validados', () => {
   assert.deepEqual(
     CONECTORES.map((c) => c.id),
-    ['gruv']
+    ['gruv', 'github']
   )
+  assert.deepEqual(conectorPorId('github'), github)
   assert.deepEqual(conectorPorId('gruv'), gruv)
   assert.equal(conectorPorId('jira'), undefined)
 })
@@ -52,7 +54,7 @@ test('regexDeId se compila una vez y una alternancia no desancla', () => {
   assert.equal(regexDeId(alt).test('TCK-1'), true)
   assert.equal(regexDeId(alt).test('TCK-1xx'), false)
   assert.equal(regexDeId(alt).test('xxB-1'), false)
-  assert.equal(nombreCompleto(def, 'ver_reloj'), 'mcp__claude_ai_Gruv__ver_reloj')
+  assert.equal(nombreCompleto(def as ConectorMcp, 'ver_reloj'), 'mcp__claude_ai_Gruv__ver_reloj')
 })
 
 const RECHAZOS: Array<[string, unknown, RegExp]> = [
@@ -69,7 +71,8 @@ const RECHAZOS: Array<[string, unknown, RegExp]> = [
   ['más de 64 KB', con('herramientas.negar', Array.from({ length: 3000 }, (_, i) => `herramienta_${i}_${'x'.repeat(20)}`)), /64 KB/],
   ['clave desconocida arriba', con('extra', 1), /conector\.extra: clave desconocida/],
   ['clave desconocida adentro', con('pistas.yo.otro', 'x'), /pistas\.yo\.otro: clave desconocida/],
-  ['vía gh', con('via', 'gh'), /vía no soportada todavía/],
+  ['vía desconocida', con('via', 'jira'), /conector.via: vía no soportada/],
+  ['vía gh con herramientas', con('via', 'gh'), /conector.herramientas: clave desconocida/],
   ['falta una clave', con('faltaConector', BORRAR), /faltaConector: falta/],
   ['id de conector', con('id', 'Gruv'), /conector\.id: tiene un formato inválido/],
   ['nombre con símbolos', con('nombre', 'Gr<uv>'), /conector\.nombre: tiene un formato inválido/],
@@ -127,4 +130,17 @@ test('la ruta del error queda en el error', () => {
     assert.ok(e instanceof ConectorInvalidoError)
     assert.equal(e.ruta, 'conector.herramientas.lista[1]')
   }
+})
+
+/** Copia de GitHub con una clave cambiada arriba. */
+const gh = (cambio: Record<string, unknown>): unknown => ({ ...structuredClone(github), ...cambio })
+
+test('GitHub valida y no lleva herramientas ni pistas', () => {
+  assert.deepEqual(validarConector(github), github)
+  rechaza(gh({ pistas: {} }), /conector\.pistas: clave desconocida/)
+})
+
+test('GitHub solo admite los estados que gh sabe mover', () => {
+  rechaza(gh({ estados: [...github.estados, { clave: 'en_curso', nombre: 'En curso', categoria: 'en_curso' }] }), /estados\[2\]\.clave: con gh/)
+  rechaza(gh({ estados: [{ clave: 'cerrado', nombre: 'Cerrado', categoria: 'pendiente' }], ejemplo: { ...github.ejemplo, estado: 'cerrado' } }), /hace falta el estado 'abierto'/)
 })

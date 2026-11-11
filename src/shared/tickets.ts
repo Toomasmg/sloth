@@ -75,10 +75,21 @@ export interface TicketsConfig {
   confirmRefresh: boolean
 }
 
+/** Cómo habla Sloth con el sistema: Claude con un conector MCP, o GitHub CLI directo. */
+export type Via = 'mcp' | 'gh'
+
+export interface ConectorResumen {
+  id: string
+  nombre: string
+  verificado: boolean
+  via: Via
+}
+
 export interface ConectorInfo {
   id: string
   nombre: string
   verificado: boolean
+  via: Via
   /** false = el conectorId guardado no existe en esta versión. */
   disponible: boolean
   acciones: Accion[]
@@ -96,6 +107,8 @@ export interface Corrida {
 
 export interface TicketsSnapshot {
   conector: ConectorInfo
+  /** Los que se pueden elegir en esta versión. */
+  conectores: ConectorResumen[]
   tickets: Ticket[]
   estados: Estado[]
   me?: Yo

@@ -54,7 +54,15 @@ export interface ConectorMcp extends ConectorBase {
   }
 }
 
-export type ConectorDef = ConectorMcp
+export interface ConectorGh extends ConectorBase {
+  via: 'gh'
+}
+
+export type ConectorDef = ConectorMcp | ConectorGh
+
+/** Lo que gh puede hacer desde Sloth. */
+export const ACCIONES_GH: readonly Accion[] = ['estado', 'tomar', 'soltar', 'comentar']
+export const ESTADOS_GH = ['abierto', 'cerrado'] as const
 
 /** Un id de ticket más largo que esto no se evalúa contra la regex (ni se guarda). */
 export const ID_MAX = 20
@@ -204,11 +212,12 @@ function idRegex(v: unknown, ruta: string): RegExp {
 
 const en = (xs: readonly string[], v: unknown): boolean => typeof v === 'string' && xs.includes(v)
 
-function validar(raw: unknown): void {
-  const R = 'conector'
-  if (!esPlano(raw)) fallar(R, 'tiene que ser un objeto')
-  if (raw.via !== 'mcp') fallar(`${R}.via`, 'vía no soportada todavía')
-  const o = objeto(raw, R, ['id', 'nombre', 'via', 'verificado', 'idRegex', 'idMayusculas', 'ejemplo', 'estados', 'faltaConector', 'herramientas', 'pistas'])
+const R = 'conector'
+const CLAVES_BASE = ['id', 'nombre', 'via', 'verificado', 'idRegex', 'idMayusculas', 'ejemplo', 'estados', 'faltaConector']
+
+/** Valida lo común a toda vía y devuelve el objeto con las claves de estado. */
+function validarBase(raw: Obj, extras: readonly string[]): { o: Obj; claves: string[] } {
+  const o = objeto(raw, R, [...CLAVES_BASE, ...extras])
   campo(o.id, `${R}.id`, 32, ID_CONECTOR_RE)
   campo(o.nombre, `${R}.nombre`, 40, NOMBRE_RE)
   booleano(o.verificado, `${R}.verificado`)
@@ -234,7 +243,19 @@ function validar(raw: unknown): void {
   const falta = objeto(o.faltaConector, `${R}.faltaConector`, ['clave', 'mensaje'])
   campo(falta.clave, `${R}.faltaConector.clave`, 40, CLAVE_FALTA_RE)
   campo(falta.mensaje, `${R}.faltaConector.mensaje`, 300)
+  return { o, claves }
+}
 
+function validarGh(raw: Obj): void {
+  const { claves } = validarBase(raw, [])
+  claves.forEach((c, i) => {
+    if (!en(ESTADOS_GH, c)) fallar(`${R}.estados[${i}].clave`, `con gh tiene que ser una de ${ESTADOS_GH.join(', ')}`)
+  })
+  if (!claves.includes('abierto')) fallar(`${R}.estados`, "con gh hace falta el estado 'abierto'")
+}
+
+function validarMcp(raw: Obj): void {
+  const { o } = validarBase(raw, ['herramientas', 'pistas'])
   const H = `${R}.herramientas`
   const h = objeto(o.herramientas, H, ['prefijo', 'lista', 'detalle', 'escritura', 'negar'])
   campo(h.prefijo, `${H}.prefijo`, 64, PREFIJO_RE)
@@ -275,6 +296,13 @@ function validar(raw: unknown): void {
   }
 }
 
+function validar(raw: unknown): void {
+  if (!esPlano(raw)) fallar(R, 'tiene que ser un objeto')
+  if (raw.via === 'mcp') validarMcp(raw)
+  else if (raw.via === 'gh') validarGh(raw)
+  else fallar(`${R}.via`, 'vía no soportada')
+}
+
 /** Valida un conector y devuelve una copia nueva. Tira ConectorInvalidoError con la ruta del problema. */
 export function validarConector(raw: unknown): ConectorDef {
   soloDatos(raw, 'conector', 0)
@@ -293,4 +321,4 @@ export function regexDeId(def: ConectorDef): RegExp {
   return re
 }
 
-export const nombreCompleto = (def: ConectorDef, corto: string): string => def.herramientas.prefijo + corto
+export const nombreCompleto = (def: ConectorMcp, corto: string): string => def.herramientas.prefijo + corto

@@ -55,8 +55,12 @@ export function entradaDeAccion(def: ConectorDef, a: Accion, t: Ticket, raw: unk
   switch (a) {
     case 'estado': {
       const estado = typeof p.estado === 'string' ? p.estado : ''
-      if (clavesOcultas(def).includes(estado) || !c.estados.some((e) => e.clave === estado))
-        throw new Error(`Ese estado no está en el flujo de ${def.nombre}.`)
+      // Con gh, cerrar es mover a un estado 'hecho': no se esconde como en el tablero.
+      const enFlujo =
+        def.via === 'gh'
+          ? def.estados.some((e) => e.clave === estado)
+          : !clavesOcultas(def).includes(estado) && c.estados.some((e) => e.clave === estado)
+      if (!enFlujo) throw new Error(`Ese estado no está en el flujo de ${def.nombre}.`)
       return t.estado === estado ? null : { ticket, estado }
     }
     case 'tomar':
