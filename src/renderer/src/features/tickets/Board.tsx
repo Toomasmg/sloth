@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
 import { SPACE_CHIP, SPACE_LABEL, spaceStatus } from '../broadcast/state'
-import { CloseIcon, SearchIcon, SpaceIcon } from '../../icons/SlothIcons'
+import { CloseIcon, SearchIcon, SettingsIcon, SpaceIcon } from '../../icons/SlothIcons'
 import type { Workspace } from '../../../../shared/types'
 import { categoriaDe } from '../../../../shared/tickets'
 import {
@@ -24,6 +24,7 @@ import {
 } from './model'
 import { Av, PrioGlyph, estadoKind, prioTone } from './parts'
 import { Detail } from './Detail'
+import { Ajustes } from './Ajustes'
 
 type Tab = 'mios' | 'equipo' | 'sin'
 const TABS: { id: Tab; name: string }[] = [
@@ -85,6 +86,7 @@ export function Board(): React.JSX.Element {
   const [prio, setPrio] = useState('todas')
   const [selId, setSelId] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [ajustes, setAjustes] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
@@ -120,11 +122,12 @@ export function Board(): React.JSX.Element {
       if (e.key !== 'Escape') return
       e.preventDefault()
       if (confirming) setConfirming(false)
+      else if (ajustes) setAjustes(false)
       else close()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [confirming])
+  }, [confirming, ajustes])
 
   useEffect(() => {
     if (toast === null) return
@@ -140,6 +143,8 @@ export function Board(): React.JSX.Element {
   const n = snap?.conector.nombre ?? 'el conector'
   const unavailable = Boolean(snap) && !snap?.conector.disponible
   const porDefecto = snap?.porDefecto
+  // Con gh no hay cuenta de Claude de por medio: se lee con la sesión de GitHub de la persona.
+  const porGh = snap?.conector.via === 'gh'
   const kindOf = (k?: string): ReturnType<typeof estadoKind> => estadoKind(categoriaDe(k, estados, snap?.conector.estados ?? []))
   const ticketTpls = tpls.filter(usesTicket)
   const ticketTpl = ticketTpls.find((x) => x.name.toLowerCase().includes(n.toLowerCase())) ?? ticketTpls[0]
@@ -218,7 +223,7 @@ export function Board(): React.JSX.Element {
   }
 
   const askRefresh = (): void => {
-    if (snap?.config.confirmRefresh) setConfirming(true)
+    if (snap?.config.confirmRefresh && !porGh) setConfirming(true)
     else void refresh()
   }
 
@@ -311,19 +316,19 @@ export function Board(): React.JSX.Element {
   if (!snap) connText = 'Cargando…'
   else if (running) {
     tone = 'busy'
-    connText = `Consultando ${n} con ${accLabel(snap.config.queryAccountId) ?? 'una cuenta'}…`
+    connText = porGh ? `Consultando ${n} con gh…` : `Consultando ${n} con ${accLabel(snap.config.queryAccountId) ?? 'una cuenta'}…`
   } else if (unavailable) {
     tone = 'bad'
     connText = `${n} no está disponible`
   } else if (snap.lastError) {
     tone = 'bad'
     connText = `Sin conexión con ${n}`
-  } else if (!anyLogged) {
+  } else if (!anyLogged && !porGh) {
     tone = 'bad'
     connText = 'Ninguna cuenta tiene sesión iniciada'
   } else if (snap.fetchedAt) {
     tone = 'ok'
-    connText = `Conectado con ${accLabel(snap.fetchedBy) ?? 'una cuenta'} · actualizado ${timeAgo(snap.fetchedAt)}`
+    connText = `Conectado con ${porGh ? 'gh' : (accLabel(snap.fetchedBy) ?? 'una cuenta')} · actualizado ${timeAgo(snap.fetchedAt)}`
   }
   const offline = Boolean(snap?.lastError) && !running && !unavailable
 
@@ -353,10 +358,21 @@ export function Board(): React.JSX.Element {
           className="f-tickets-b f-tickets-b--sm"
           onClick={askRefresh}
           disabled={running || !snap || unavailable}
-          title={`Lee los tickets de ${n} con la cuenta que la consulta (solo lectura)`}
+          title={porGh ? `Lee los issues de ${n} con gh (solo lectura)` : `Lee los tickets de ${n} con la cuenta que la consulta (solo lectura)`}
         >
           <RefreshGlyph />
           {running ? 'Actualizando…' : 'Actualizar'}
+        </button>
+        <button
+          type="button"
+          className="f-tickets-b f-tickets-b--sm"
+          onClick={() => setAjustes((v) => !v)}
+          disabled={!snap}
+          aria-label="Ajustes de tickets"
+          aria-expanded={ajustes}
+          title="Ajustes de tickets"
+        >
+          <SettingsIcon size={14} />
         </button>
       </header>
 
@@ -367,6 +383,8 @@ export function Board(): React.JSX.Element {
           </h1>
           <p className="f-tickets-lead">Tus tickets y los del equipo. Empezá uno y Sloth arma el espacio para trabajarlo.</p>
         </div>
+
+        {ajustes && snap && <Ajustes snap={snap} onClose={() => setAjustes(false)} />}
 
         {confirming && (
           <div className="f-tickets-alert f-tickets-confirm" role="alertdialog" aria-label={`Confirmar consulta a ${n}`}>
@@ -641,7 +659,7 @@ export function Board(): React.JSX.Element {
                 view={det[current.id]}
                 wbusy={wbusy[current.id]}
                 noDisp={snap.noDisponible ?? {}}
-                sinCuenta={!snap.config.queryAccountId}
+                sinCuenta={!porGh && !snap.config.queryAccountId}
                 startBusy={busy === `start:${current.id}`}
                 disabledAll={Boolean(busy)}
                 tplName={ticketTpl?.name}
