@@ -492,6 +492,12 @@ export function Board(): React.JSX.Element {
             </div>
 
             <div aria-busy={running} className="f-tickets-body">
+              {snap?.aviso && (
+                <div className="f-tickets-alert f-tickets-aviso" role="status">
+                  <span className="f-tickets-alert-text">{snap.aviso}</span>
+                </div>
+              )}
+
               {unavailable && (
                 <div className="f-tickets-alert f-tickets-offline" role="alert">
                   <span className="f-tickets-alert-text">{snap?.lastError}</span>

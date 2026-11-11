@@ -241,6 +241,13 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 30%, transparent);
   color: var(--danger-fg-strong);
 }
+/* Guardado de tickets.json: aparte del estado de conexión. */
+.f-tickets-aviso {
+  margin: 0 0 8px;
+  background: var(--warn-tint);
+  box-shadow: inset 0 0 0 1px var(--warn-ring);
+  color: var(--fg);
+}
 .f-tickets-confirm {
   background: var(--warn-tint);
   box-shadow: inset 0 0 0 1px var(--warn-ring);

@@ -102,7 +102,10 @@ export interface TicketsSnapshot {
   fetchedAt?: number
   fetchedBy?: string
   lastRun?: Corrida
+  /** Solo errores de la consulta. */
   lastError?: string
+  /** Sobre el guardado de tickets.json (no se guarda, falló o se reemplazó). No es de conexión. */
+  aviso?: string
   config: TicketsConfig
   running: boolean
   /** Acciones que esta cuenta no puede hacer, con el motivo. */
