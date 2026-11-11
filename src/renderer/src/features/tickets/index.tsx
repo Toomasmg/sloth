@@ -13,14 +13,14 @@ function TitlebarChip(): React.JSX.Element {
   return (
     <button
       type="button"
-      className="tb-chip f-gruv-chip-tb"
+      className="tb-chip f-tickets-chip-tb"
       aria-pressed={open}
       onClick={() => setBoardOpen(!open)}
       title={etiquetaTablero(snap)}
     >
       <TicketIcon size={12} />
       Tickets
-      {mine > 0 && <span className="f-gruv-chip-n">{mine}</span>}
+      {mine > 0 && <span className="f-tickets-chip-n">{mine}</span>}
     </button>
   )
 }

@@ -325,26 +325,26 @@ export function Board(): React.JSX.Element {
   const showRows = !bodyLoading && visible.length > 0
 
   return (
-    <div className="f-gruv-page" role="dialog" aria-modal="true" aria-labelledby="f-gruv-title">
-      <header className="f-gruv-bar">
-        <button ref={backRef} type="button" className="f-gruv-back" onClick={close}>
+    <div className="f-tickets-page" role="dialog" aria-modal="true" aria-labelledby="f-tickets-title">
+      <header className="f-tickets-bar">
+        <button ref={backRef} type="button" className="f-tickets-back" onClick={close}>
           <BackGlyph />
           Espacios
         </button>
-        <span className="f-gruv-sep" aria-hidden="true" />
-        <span role="status" className="f-gruv-conn" data-tone={tone}>
-          <span className="f-gruv-conn-dot" aria-hidden="true" />
+        <span className="f-tickets-sep" aria-hidden="true" />
+        <span role="status" className="f-tickets-conn" data-tone={tone}>
+          <span className="f-tickets-conn-dot" aria-hidden="true" />
           {connText}
         </span>
-        <span className="f-gruv-grow" />
+        <span className="f-tickets-grow" />
         {running ? (
-          <button type="button" className="f-gruv-b f-gruv-b--sm" onClick={() => void ui.invoke('feat:tickets:cancel')}>
+          <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => void ui.invoke('feat:tickets:cancel')}>
             <CloseIcon size={13} /> Cancelar consulta
           </button>
         ) : null}
         <button
           type="button"
-          className="f-gruv-b f-gruv-b--sm"
+          className="f-tickets-b f-tickets-b--sm"
           onClick={askRefresh}
           disabled={running || !snap || unavailable}
           title={`Lee los tickets de ${n} con la cuenta que la consulta (solo lectura)`}
@@ -354,28 +354,28 @@ export function Board(): React.JSX.Element {
         </button>
       </header>
 
-      <main className="f-gruv-main">
+      <main className="f-tickets-main">
         <div>
-          <h1 id="f-gruv-title" className="f-gruv-h1">
+          <h1 id="f-tickets-title" className="f-tickets-h1">
             {etiquetaTablero(snap)}
           </h1>
-          <p className="f-gruv-lead">Tus tickets y los del equipo. Empezá uno y Sloth arma el espacio para trabajarlo.</p>
+          <p className="f-tickets-lead">Tus tickets y los del equipo. Empezá uno y Sloth arma el espacio para trabajarlo.</p>
         </div>
 
         {confirming && (
-          <div className="f-gruv-alert f-gruv-confirm" role="alertdialog" aria-label={`Confirmar consulta a ${n}`}>
+          <div className="f-tickets-alert f-tickets-confirm" role="alertdialog" aria-label={`Confirmar consulta a ${n}`}>
             <span>
               Para leer {n} se abre Claude sin ventana con <b>{accLabel(snap?.config.queryAccountId) ?? 'una cuenta'}</b> (modelo{' '}
               {snap?.config.model}) y usa tokens de esa cuenta. Solo lee: no cambia nada en {n}.
             </span>
-            <label className="check f-gruv-inline-check">
+            <label className="check f-tickets-inline-check">
               <input type="checkbox" onChange={(e) => setConfirmRefresh(!e.target.checked)} />
               No volver a preguntar
             </label>
-            <button type="button" className="f-gruv-b f-gruv-b--sm f-gruv-b--pri" autoFocus onClick={() => void refresh()}>
+            <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" autoFocus onClick={() => void refresh()}>
               Consultar
             </button>
-            <button type="button" className="f-gruv-b f-gruv-b--sm" onClick={() => setConfirming(false)}>
+            <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => setConfirming(false)}>
               Cancelar
             </button>
           </div>
@@ -387,18 +387,18 @@ export function Board(): React.JSX.Element {
           </p>
         )}
         {info && !err && !offline && (
-          <p className="f-gruv-ok" role="status">
+          <p className="f-tickets-ok" role="status">
             {info}
           </p>
         )}
 
-        <div className="f-gruv-grid">
+        <div className="f-tickets-grid">
           {/* LISTA */}
-          <section className="f-gruv-panel f-gruv-list" aria-labelledby="f-gruv-lista-t">
-            <h2 id="f-gruv-lista-t" className="sr-only">
+          <section className="f-tickets-panel f-tickets-list" aria-labelledby="f-tickets-lista-t">
+            <h2 id="f-tickets-lista-t" className="sr-only">
               Lista de tickets
             </h2>
-            <div role="tablist" aria-label="Qué tickets ver" className="f-gruv-tabs">
+            <div role="tablist" aria-label="Qué tickets ver" className="f-tickets-tabs">
               {TABS.map((t) => {
                 const on = tab === t.id
                 return (
@@ -408,7 +408,7 @@ export function Board(): React.JSX.Element {
                     role="tab"
                     aria-selected={on}
                     tabIndex={on ? 0 : -1}
-                    className={`f-gruv-tab ${on ? 'on' : ''}`}
+                    className={`f-tickets-tab ${on ? 'on' : ''}`}
                     onClick={() => setTab(t.id)}
                     onKeyDown={(e) => {
                       if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
@@ -419,14 +419,14 @@ export function Board(): React.JSX.Element {
                     }}
                   >
                     {t.name}
-                    <span className="f-gruv-badge">{counts[t.id]}</span>
+                    <span className="f-tickets-badge">{counts[t.id]}</span>
                   </button>
                 )
               })}
             </div>
 
-            <div className="f-gruv-filters">
-              <label className="f-gruv-search">
+            <div className="f-tickets-filters">
+              <label className="f-tickets-search">
                 <SearchIcon size={14} strokeWidth={1.9} />
                 <input
                   type="search"
@@ -436,14 +436,14 @@ export function Board(): React.JSX.Element {
                   aria-label="Buscar por código o título"
                 />
               </label>
-              <div role="group" aria-label="Filtrar por estado" className="f-gruv-chips">
+              <div role="group" aria-label="Filtrar por estado" className="f-tickets-chips">
                 {estadoKeys.map((e) => {
                   const on = stSel.includes(e.clave)
                   return (
                     <button
                       key={e.clave}
                       type="button"
-                      className={`f-gruv-chipf f-gruv-st-${kindOf(e.clave)} ${on ? 'on' : ''}`}
+                      className={`f-tickets-chipf f-tickets-st-${kindOf(e.clave)} ${on ? 'on' : ''}`}
                       aria-pressed={on}
                       onClick={() => setStSel((s) => (on ? s.filter((x) => x !== e.clave) : [...s, e.clave]))}
                     >
@@ -452,8 +452,8 @@ export function Board(): React.JSX.Element {
                   )
                 })}
               </div>
-              <div className="f-gruv-filter-row">
-                <label className="f-gruv-prio-field">
+              <div className="f-tickets-filter-row">
+                <label className="f-tickets-prio-field">
                   Prioridad
                   <select value={prio} onChange={(e) => setPrio(e.target.value)}>
                     <option value="todas">Todas</option>
@@ -464,11 +464,11 @@ export function Board(): React.JSX.Element {
                     ))}
                   </select>
                 </label>
-                <span className="f-gruv-grow" />
+                <span className="f-tickets-grow" />
                 {filtersOn && (
                   <button
                     type="button"
-                    className="f-gruv-link"
+                    className="f-tickets-link"
                     onClick={() => {
                       setQ('')
                       setStSel([])
@@ -481,31 +481,31 @@ export function Board(): React.JSX.Element {
               </div>
             </div>
 
-            <div className="f-gruv-countbar">
+            <div className="f-tickets-countbar">
               <span role="status">{snap ? countLabel : ''}</span>
             </div>
 
-            <div aria-busy={running} className="f-gruv-body">
+            <div aria-busy={running} className="f-tickets-body">
               {unavailable && (
-                <div className="f-gruv-alert f-gruv-offline" role="alert">
-                  <span className="f-gruv-alert-text">{snap?.lastError}</span>
+                <div className="f-tickets-alert f-tickets-offline" role="alert">
+                  <span className="f-tickets-alert-text">{snap?.lastError}</span>
                 </div>
               )}
 
               {offline && (
-                <div className="f-gruv-alert f-gruv-offline" role="alert">
-                  <span className="f-gruv-alert-text">
+                <div className="f-tickets-alert f-tickets-offline" role="alert">
+                  <span className="f-tickets-alert-text">
                     No pudimos hablar con {n}. Mostramos lo último que cargamos.
-                    {snap?.lastError && <span className="f-gruv-alert-detail">{snap.lastError}</span>}
+                    {snap?.lastError && <span className="f-tickets-alert-detail">{snap.lastError}</span>}
                   </span>
-                  <button type="button" className="f-gruv-b f-gruv-b--xs f-gruv-b--solid-danger" onClick={() => void refresh()} disabled={running}>
+                  <button type="button" className="f-tickets-b f-tickets-b--xs f-tickets-b--solid-danger" onClick={() => void refresh()} disabled={running}>
                     Reintentar
                   </button>
                 </div>
               )}
 
               {bodyLoading && (
-                <div role="status" className="f-gruv-skel">
+                <div role="status" className="f-tickets-skel">
                   <div />
                   <div />
                   <div />
@@ -515,21 +515,21 @@ export function Board(): React.JSX.Element {
               )}
 
               {!bodyLoading && snap && !unavailable && tickets.length === 0 && (
-                <div className="f-gruv-empty">
+                <div className="f-tickets-empty">
                   {snap.lastError ? (
                     <>
-                      <span className="f-gruv-empty-title">No pudimos cargar los tickets.</span>
-                      <button type="button" className="f-gruv-b f-gruv-b--sm f-gruv-b--pri" onClick={() => void refresh()} disabled={running}>
+                      <span className="f-tickets-empty-title">No pudimos cargar los tickets.</span>
+                      <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={() => void refresh()} disabled={running}>
                         Reintentar
                       </button>
                     </>
                   ) : snap.fetchedAt ? (
-                    <span className="f-gruv-empty-title">No hay tickets activos en {n}.</span>
+                    <span className="f-tickets-empty-title">No hay tickets activos en {n}.</span>
                   ) : (
                     <>
-                      <span className="f-gruv-empty-title">Todavía no se consultó {n}.</span>
-                      <span className="f-gruv-muted">Actualizá para traer tus tickets y los del equipo.</span>
-                      <button type="button" className="f-gruv-b f-gruv-b--sm f-gruv-b--pri" onClick={askRefresh} disabled={running}>
+                      <span className="f-tickets-empty-title">Todavía no se consultó {n}.</span>
+                      <span className="f-tickets-muted">Actualizá para traer tus tickets y los del equipo.</span>
+                      <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={askRefresh} disabled={running}>
                         Actualizar
                       </button>
                     </>
@@ -538,7 +538,7 @@ export function Board(): React.JSX.Element {
               )}
 
               {showRows && (
-                <ul className="f-gruv-rows">
+                <ul className="f-tickets-rows">
                   {visible.map((t) => {
                     const ws = wsOf(t.id)
                     const sel = current?.id === t.id
@@ -548,37 +548,37 @@ export function Board(): React.JSX.Element {
                       <li key={t.id}>
                         <button
                           type="button"
-                          className={`f-gruv-row ${sel ? 'sel' : ''}`}
+                          className={`f-tickets-row ${sel ? 'sel' : ''}`}
                           aria-current={sel ? 'true' : undefined}
                           onClick={() => setSelId(t.id)}
                         >
-                          <span className="f-gruv-row-top">
-                            <span className="f-gruv-code mono">{t.id}</span>
+                          <span className="f-tickets-row-top">
+                            <span className="f-tickets-code mono">{t.id}</span>
                             {ws && st && (
-                              <span className={`chip f-gruv-space ${SPACE_CHIP[st]}`}>
+                              <span className={`chip f-tickets-space ${SPACE_CHIP[st]}`}>
                                 <SpaceIcon size={11} strokeWidth={2.2} />
-                                <span className="f-gruv-ellipsis">
+                                <span className="f-tickets-ellipsis">
                                   {ws.name} · {SPACE_LABEL[st]}
                                 </span>
                               </span>
                             )}
                           </span>
-                          <span className="f-gruv-row-title">{t.titulo}</span>
-                          <span className="f-gruv-row-meta">
-                            <span className={`f-gruv-st f-gruv-st-${kindOf(t.estado)}`}>{estadoName(t.estado)}</span>
+                          <span className="f-tickets-row-title">{t.titulo}</span>
+                          <span className="f-tickets-row-meta">
+                            <span className={`f-tickets-st f-tickets-st-${kindOf(t.estado)}`}>{estadoName(t.estado)}</span>
                             {t.prioridad && (
-                              <span className="f-gruv-prio" style={{ color: prioTone(t.prioridad) }}>
+                              <span className="f-tickets-prio" style={{ color: prioTone(t.prioridad) }}>
                                 <PrioGlyph p={t.prioridad} />
                                 {t.prioridad}
                               </span>
                             )}
                             {t.responsable ? (
-                              <span className="f-gruv-who">
+                              <span className="f-tickets-who">
                                 <Av name={t.responsable} size="sm" />
                                 {mine ? 'Vos' : t.responsable}
                               </span>
                             ) : (
-                              <span className="f-gruv-muted">Sin asignar</span>
+                              <span className="f-tickets-muted">Sin asignar</span>
                             )}
                           </span>
                         </button>
@@ -589,12 +589,12 @@ export function Board(): React.JSX.Element {
               )}
 
               {!bodyLoading && snap && tickets.length > 0 && visible.length === 0 && (
-                <div className="f-gruv-empty">
-                  <span className="f-gruv-empty-title">Ningún ticket coincide con los filtros.</span>
-                  <span className="f-gruv-muted">Probá con otra palabra o sacá algún filtro.</span>
+                <div className="f-tickets-empty">
+                  <span className="f-tickets-empty-title">Ningún ticket coincide con los filtros.</span>
+                  <span className="f-tickets-muted">Probá con otra palabra o sacá algún filtro.</span>
                   <button
                     type="button"
-                    className="f-gruv-b f-gruv-b--sm"
+                    className="f-tickets-b f-tickets-b--sm"
                     onClick={() => {
                       setQ('')
                       setStSel([])
@@ -609,9 +609,9 @@ export function Board(): React.JSX.Element {
           </section>
 
           {/* DETALLE */}
-          <section className="f-gruv-panel f-gruv-det" aria-labelledby="f-gruv-det-t">
+          <section className="f-tickets-panel f-tickets-det" aria-labelledby="f-tickets-det-t">
             {!current || !snap ? (
-              <p className="f-gruv-muted">{snap ? 'Elegí un ticket de la lista.' : 'Cargando…'}</p>
+              <p className="f-tickets-muted">{snap ? 'Elegí un ticket de la lista.' : 'Cargando…'}</p>
             ) : (
               <Detail
                 t={current}
@@ -639,7 +639,7 @@ export function Board(): React.JSX.Element {
       </main>
 
       {toast && (
-        <div className="f-gruv-toast" role="status">
+        <div className="f-tickets-toast" role="status">
           {toast}
         </div>
       )}

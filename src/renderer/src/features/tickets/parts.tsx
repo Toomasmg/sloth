@@ -15,7 +15,7 @@ export const prioTone = (p?: string): string =>
 
 const KIND = { pendiente: 'todo', en_curso: 'doing', revision: 'review', bloqueado: 'error', hecho: 'todo' } as const
 
-/** Clase de color por categoría del estado (`f-gruv-st-*`). El texto va siempre: el color solo no alcanza. */
+/** Clase de color por categoría del estado (`f-tickets-st-*`). El texto va siempre: el color solo no alcanza. */
 export const estadoKind = (cat: Categoria): (typeof KIND)[Categoria] => KIND[cat]
 
 export const initials = (name: string): string =>
@@ -46,7 +46,7 @@ export function ExternalGlyph(): React.JSX.Element {
 /** Avatar con iniciales y color estable por persona (hash del nombre). */
 export function Av({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' | 'lg' }): React.JSX.Element {
   const tint = tintFor(name)
-  const cls = size === 'md' ? 'f-gruv-av' : `f-gruv-av ${size}`
+  const cls = size === 'md' ? 'f-tickets-av' : `f-tickets-av ${size}`
   return (
     <span className={cls} style={{ background: tint.bg, color: tint.fg }} aria-hidden="true">
       {initials(name)}

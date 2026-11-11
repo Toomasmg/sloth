@@ -39,17 +39,17 @@ const fechaCorta = (f?: string): string => {
 }
 
 function CommentList({ det, loading }: { det?: Detalle; loading?: boolean }): React.JSX.Element {
-  if (!det) return <p className="f-gruv-muted">{loading ? 'Cargando comentarios…' : 'Sin comentarios cargados.'}</p>
-  if (det.comentarios.length === 0) return <p className="f-gruv-muted">Todavía no hay comentarios.</p>
+  if (!det) return <p className="f-tickets-muted">{loading ? 'Cargando comentarios…' : 'Sin comentarios cargados.'}</p>
+  if (det.comentarios.length === 0) return <p className="f-tickets-muted">Todavía no hay comentarios.</p>
   return (
-    <ul className="f-gruv-comments">
+    <ul className="f-tickets-comments">
       {det.comentarios.map((c, i) => (
-        <li key={i} className="f-gruv-comment">
+        <li key={i} className="f-tickets-comment">
           <Av name={c.autor} size="sm" />
-          <div className="f-gruv-comment-body">
-            <div className="f-gruv-comment-head">
-              <span className="f-gruv-strong">{c.autor}</span>
-              {c.fecha && <span className="f-gruv-muted">{fechaCorta(c.fecha)}</span>}
+          <div className="f-tickets-comment-body">
+            <div className="f-tickets-comment-head">
+              <span className="f-tickets-strong">{c.autor}</span>
+              {c.fecha && <span className="f-tickets-muted">{fechaCorta(c.fecha)}</span>}
             </div>
             <p>{c.cuerpo}</p>
           </div>
@@ -116,20 +116,20 @@ export function Detail(props: DetailProps): React.JSX.Element {
 
   return (
     <>
-      <div className="f-gruv-det-head">
-        <span className="f-gruv-code mono f-gruv-code-lg">{t.id}</span>
-        <h2 id="f-gruv-det-t" className="f-gruv-det-title">
+      <div className="f-tickets-det-head">
+        <span className="f-tickets-code mono f-tickets-code-lg">{t.id}</span>
+        <h2 id="f-tickets-det-t" className="f-tickets-det-title">
           {t.titulo}
         </h2>
-        <div className="f-gruv-fields">
+        <div className="f-tickets-fields">
           {can('estado') ? (
-            <div className="f-gruv-field">
-              <label htmlFor="f-gruv-estado">Estado</label>
+            <div className="f-tickets-field">
+              <label htmlFor="f-tickets-estado">Estado</label>
               <select
-                id="f-gruv-estado"
+                id="f-tickets-estado"
                 value={t.estado ?? ''}
                 disabled={Boolean(estadoWhy) || anyBusy}
-                aria-describedby="f-gruv-w-estado"
+                aria-describedby="f-tickets-w-estado"
                 onChange={(e) => void props.onWrite('estado', { estado: e.target.value }, { ticket: { estado: e.target.value } })}
               >
                 {!t.estado && <option value="">Sin estado</option>}
@@ -139,19 +139,19 @@ export function Detail(props: DetailProps): React.JSX.Element {
                   </option>
                 ))}
               </select>
-              <span id="f-gruv-w-estado" className="f-gruv-why" role={busy('estado') ? 'status' : undefined}>
+              <span id="f-tickets-w-estado" className="f-tickets-why" role={busy('estado') ? 'status' : undefined}>
                 {busy('estado') ? 'Guardando…' : estadoWhy ?? ''}
               </span>
             </div>
           ) : (
-            <div className="f-gruv-field">
-              <span className="f-gruv-lbl">Estado</span>
-              <span className="f-gruv-val">{props.estadoName(t.estado)}</span>
+            <div className="f-tickets-field">
+              <span className="f-tickets-lbl">Estado</span>
+              <span className="f-tickets-val">{props.estadoName(t.estado)}</span>
             </div>
           )}
-          <div className="f-gruv-field">
-            <span className="f-gruv-lbl">Prioridad</span>
-            <span className="f-gruv-val" style={{ color: prioTone(t.prioridad) }}>
+          <div className="f-tickets-field">
+            <span className="f-tickets-lbl">Prioridad</span>
+            <span className="f-tickets-val" style={{ color: prioTone(t.prioridad) }}>
               <PrioGlyph p={t.prioridad} size={13} />
               {t.prioridad ?? 'Sin prioridad'}
             </span>
@@ -159,32 +159,32 @@ export function Detail(props: DetailProps): React.JSX.Element {
         </div>
       </div>
 
-      <div className="f-gruv-assign">
+      <div className="f-tickets-assign">
         {resp && tint ? (
           <Av name={resp} size="lg" />
         ) : (
-          <span className="f-gruv-av lg" style={{ background: 'var(--btn-2)', color: 'var(--fg-muted)' }} aria-hidden="true">
+          <span className="f-tickets-av lg" style={{ background: 'var(--btn-2)', color: 'var(--fg-muted)' }} aria-hidden="true">
             ?
           </span>
         )}
-        <div className="f-gruv-assign-text">
-          <div className="f-gruv-muted">Asignado a</div>
-          <div className="f-gruv-strong">{resp ? (mine ? `${resp} (vos)` : resp) : 'Sin asignar'}</div>
+        <div className="f-tickets-assign-text">
+          <div className="f-tickets-muted">Asignado a</div>
+          <div className="f-tickets-strong">{resp ? (mine ? `${resp} (vos)` : resp) : 'Sin asignar'}</div>
         </div>
         {!resp && can('tomar') && (
           <>
             <button
               type="button"
-              className="f-gruv-b f-gruv-b--md f-gruv-b--pri"
+              className="f-tickets-b f-tickets-b--md f-tickets-b--pri"
               disabled={Boolean(takeWhy) || anyBusy}
-              aria-describedby="f-gruv-w-take"
+              aria-describedby="f-tickets-w-take"
               onClick={() =>
                 void props.onWrite('tomar', {}, { ticket: { responsable: me!.nombre, responsableId: me!.id } })
               }
             >
               {busy('tomar') ? 'Guardando…' : 'Tomarlo'}
             </button>
-            <span id="f-gruv-w-take" className="f-gruv-why">
+            <span id="f-tickets-w-take" className="f-tickets-why">
               {takeWhy ?? ''}
             </span>
           </>
@@ -193,60 +193,60 @@ export function Detail(props: DetailProps): React.JSX.Element {
           <>
             <button
               type="button"
-              className="f-gruv-b f-gruv-b--md"
+              className="f-tickets-b f-tickets-b--md"
               disabled={Boolean(why('soltar')) || anyBusy}
-              aria-describedby="f-gruv-w-drop"
+              aria-describedby="f-tickets-w-drop"
               onClick={() => void props.onWrite('soltar', {}, { ticket: { responsable: undefined, responsableId: undefined } })}
             >
               {busy('soltar') ? 'Guardando…' : 'Soltar'}
             </button>
-            <span id="f-gruv-w-drop" className="f-gruv-why">
+            <span id="f-tickets-w-drop" className="f-tickets-why">
               {why('soltar') ?? ''}
             </span>
           </>
         )}
-        {resp && !mine && <span className="f-gruv-owner">Lo tiene {resp}</span>}
+        {resp && !mine && <span className="f-tickets-owner">Lo tiene {resp}</span>}
       </div>
 
-      <div className="f-gruv-actions">
-        <div className="f-gruv-actions-row">
+      <div className="f-tickets-actions">
+        <div className="f-tickets-actions-row">
           {ws && st ? (
             <>
-              <span className={`chip ${SPACE_CHIP[st]} f-gruv-space-lg`}>
-                <span className="f-gruv-ellipsis">
+              <span className={`chip ${SPACE_CHIP[st]} f-tickets-space-lg`}>
+                <span className="f-tickets-ellipsis">
                   {ws.name} · {SPACE_LABEL[st]}
                 </span>
               </span>
-              <button type="button" className="f-gruv-b f-gruv-b--pri" onClick={() => props.onOpenSpace(ws)}>
+              <button type="button" className="f-tickets-b f-tickets-b--pri" onClick={() => props.onOpenSpace(ws)}>
                 Abrir espacio
               </button>
             </>
           ) : (
-            <button type="button" className="f-gruv-b f-gruv-b--pri" onClick={props.onStart} disabled={props.startBusy || props.disabledAll}>
+            <button type="button" className="f-tickets-b f-tickets-b--pri" onClick={props.onStart} disabled={props.startBusy || props.disabledAll}>
               <SpaceIcon size={14} strokeWidth={2} />
               {props.startBusy ? 'Creando…' : 'Empezar en Sloth'}
             </button>
           )}
           {t.url ? (
-            <a className="f-gruv-b" href={t.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${t.id} en ${n}`}>
+            <a className="f-tickets-b" href={t.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${t.id} en ${n}`}>
               <ExternalGlyph />
               Abrir en {n}
             </a>
           ) : (
-            <button type="button" className="f-gruv-b" disabled title={`${n} no dio el link de este ticket`}>
+            <button type="button" className="f-tickets-b" disabled title={`${n} no dio el link de este ticket`}>
               <ExternalGlyph />
               Abrir en {n}
             </button>
           )}
           {ws && wsAcc >= 0 && (
-            <span className="f-gruv-acc">
-              <span className="f-gruv-dot" style={{ background: resolveAccountColor(ws.accountId, wsAcc) }} aria-hidden="true" />
+            <span className="f-tickets-acc">
+              <span className="f-tickets-dot" style={{ background: resolveAccountColor(ws.accountId, wsAcc) }} aria-hidden="true" />
               {ui.accounts[wsAcc].label}
             </span>
           )}
         </div>
         {!(ws && st) && (
-          <p className="f-gruv-help">
+          <p className="f-tickets-help">
             {props.tplName ? `Crea un espacio con la plantilla «${props.tplName}».` : `Crea el espacio ${t.id} y arranca Claude con /ticket ${t.id}.`}
           </p>
         )}
@@ -255,37 +255,37 @@ export function Detail(props: DetailProps): React.JSX.Element {
       {view?.error && (
         <p className="form-error" role="alert">
           No pudimos leer el detalle de {t.id}: {view.error}{' '}
-          <button type="button" className="f-gruv-b f-gruv-b--xs" onClick={props.onReload}>
+          <button type="button" className="f-tickets-b f-tickets-b--xs" onClick={props.onReload}>
             Reintentar
           </button>
         </p>
       )}
 
-      <section className="f-gruv-sec" aria-labelledby="f-gruv-d-t">
-        <h3 id="f-gruv-d-t">Descripción</h3>
-        <p className="f-gruv-desc">{t.descripcion ?? `${n} no trajo la descripción de este ticket.`}</p>
+      <section className="f-tickets-sec" aria-labelledby="f-tickets-d-t">
+        <h3 id="f-tickets-d-t">Descripción</h3>
+        <p className="f-tickets-desc">{t.descripcion ?? `${n} no trajo la descripción de este ticket.`}</p>
       </section>
 
       {conector.leeDetalle && (
-        <section className="f-gruv-sec" aria-labelledby="f-gruv-c-t">
-          <div className="f-gruv-sec-head">
-            <h3 id="f-gruv-c-t">Criterios de aceptación</h3>
+        <section className="f-tickets-sec" aria-labelledby="f-tickets-c-t">
+          <div className="f-tickets-sec-head">
+            <h3 id="f-tickets-c-t">Criterios de aceptación</h3>
             {det && crit.length > 0 && (
-              <span className="f-gruv-prog-label">
+              <span className="f-tickets-prog-label">
                 {done} de {crit.length}
               </span>
             )}
           </div>
           {!det ? (
-            <p className="f-gruv-muted">{view?.loading ? 'Cargando criterios…' : 'Sin criterios cargados.'}</p>
+            <p className="f-tickets-muted">{view?.loading ? 'Cargando criterios…' : 'Sin criterios cargados.'}</p>
           ) : crit.length === 0 ? (
-            <p className="f-gruv-muted">Este ticket no tiene criterios de aceptación.</p>
+            <p className="f-tickets-muted">Este ticket no tiene criterios de aceptación.</p>
           ) : (
             <>
-              <div className="f-gruv-progress" role="progressbar" aria-label="Criterios cumplidos" aria-valuemin={0} aria-valuemax={crit.length} aria-valuenow={done}>
+              <div className="f-tickets-progress" role="progressbar" aria-label="Criterios cumplidos" aria-valuemin={0} aria-valuemax={crit.length} aria-valuenow={done}>
                 <span style={{ width: `${Math.round((done / crit.length) * 100)}%` }} />
               </div>
-              <ul className="f-gruv-crit">
+              <ul className="f-tickets-crit">
                 {crit.map((c, i) => {
                   const cWhy = c.id ? why('criterio') : `Este criterio no tiene id en ${n}: hacelo desde ${n}.`
                   return (
@@ -295,7 +295,7 @@ export function Detail(props: DetailProps): React.JSX.Element {
                           type="checkbox"
                           checked={c.hecho}
                           disabled={!can('criterio') || Boolean(cWhy) || anyBusy}
-                          aria-describedby={can('criterio') ? 'f-gruv-w-crit' : undefined}
+                          aria-describedby={can('criterio') ? 'f-tickets-w-crit' : undefined}
                           onChange={(e) => {
                             const hecho = e.target.checked
                             void props.onWrite('criterio', { criterioId: c.id, hecho }, {
@@ -312,7 +312,7 @@ export function Detail(props: DetailProps): React.JSX.Element {
             </>
           )}
           {can('criterio') && (
-            <span id="f-gruv-w-crit" className="f-gruv-why" role={busy('criterio') ? 'status' : undefined}>
+            <span id="f-tickets-w-crit" className="f-tickets-why" role={busy('criterio') ? 'status' : undefined}>
               {busy('criterio') ? 'Guardando…' : why('criterio') ?? ''}
             </span>
           )}
@@ -320,20 +320,20 @@ export function Detail(props: DetailProps): React.JSX.Element {
       )}
 
       {(conector.leeDetalle || can('comentar')) && (
-        <section className="f-gruv-sec" aria-labelledby="f-gruv-co-t">
-          <h3 id="f-gruv-co-t">Comentarios</h3>
+        <section className="f-tickets-sec" aria-labelledby="f-tickets-co-t">
+          <h3 id="f-tickets-co-t">Comentarios</h3>
           {conector.leeDetalle && <CommentList det={det} loading={view?.loading} />}
           {can('comentar') && (
             <>
-              <div className="f-gruv-inline">
+              <div className="f-tickets-inline">
                 <input
-                  className="f-gruv-input"
+                  className="f-tickets-input"
                   value={draft}
                   maxLength={2000}
                   disabled={Boolean(why('comentar')) || anyBusy}
                   placeholder="Escribí un comentario"
                   aria-label={`Comentar en ${t.id}`}
-                  aria-describedby="f-gruv-w-com"
+                  aria-describedby="f-tickets-w-com"
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => {
                     if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
@@ -342,11 +342,11 @@ export function Detail(props: DetailProps): React.JSX.Element {
                     }
                   }}
                 />
-                <button type="button" className="f-gruv-b" disabled={!draft.trim() || Boolean(why('comentar')) || anyBusy} onClick={() => void submitComment()}>
+                <button type="button" className="f-tickets-b" disabled={!draft.trim() || Boolean(why('comentar')) || anyBusy} onClick={() => void submitComment()}>
                   {busy('comentar') ? 'Guardando…' : 'Publicar'}
                 </button>
               </div>
-              <span id="f-gruv-w-com" className="f-gruv-why" role={busy('comentar') ? 'status' : undefined}>
+              <span id="f-tickets-w-com" className="f-tickets-why" role={busy('comentar') ? 'status' : undefined}>
                 {busy('comentar') ? 'Guardando…' : why('comentar') ?? ''}
               </span>
             </>
@@ -355,22 +355,22 @@ export function Detail(props: DetailProps): React.JSX.Element {
       )}
 
       {(conector.leeDetalle || can('horas')) && (
-        <section className="f-gruv-sec" aria-labelledby="f-gruv-h-t">
-          <h3 id="f-gruv-h-t">Horas cargadas</h3>
-          {conector.leeDetalle && <p className="f-gruv-strong">{det ? fmtHoras(det.minutos ?? 0) : view?.loading ? 'Cargando…' : '—'}</p>}
+        <section className="f-tickets-sec" aria-labelledby="f-tickets-h-t">
+          <h3 id="f-tickets-h-t">Horas cargadas</h3>
+          {conector.leeDetalle && <p className="f-tickets-strong">{det ? fmtHoras(det.minutos ?? 0) : view?.loading ? 'Cargando…' : '—'}</p>}
           {can('horas') && (
             <>
-              <div className="f-gruv-hours">
-                <label className="f-gruv-hours-field">
+              <div className="f-tickets-hours">
+                <label className="f-tickets-hours-field">
                   <span>Horas a sumar</span>
                   <input
-                    className="f-gruv-input narrow"
+                    className="f-tickets-input narrow"
                     inputMode="decimal"
                     placeholder="Ej.: 2 o 1,5"
                     value={horas}
                     disabled={Boolean(why('horas')) || anyBusy}
                     aria-label={`Horas a sumar en ${t.id}`}
-                    aria-describedby="f-gruv-w-hr"
+                    aria-describedby="f-tickets-w-hr"
                     aria-invalid={horasErr ? true : undefined}
                     onChange={(e) => {
                       setHoras(e.target.value)
@@ -384,7 +384,7 @@ export function Detail(props: DetailProps): React.JSX.Element {
                     }}
                   />
                 </label>
-                <button type="button" className="f-gruv-b" disabled={!horas.trim() || Boolean(why('horas')) || anyBusy} onClick={() => void submitHoras()}>
+                <button type="button" className="f-tickets-b" disabled={!horas.trim() || Boolean(why('horas')) || anyBusy} onClick={() => void submitHoras()}>
                   {busy('horas') ? 'Guardando…' : 'Sumar horas'}
                 </button>
               </div>
@@ -393,8 +393,8 @@ export function Detail(props: DetailProps): React.JSX.Element {
                   {horasErr}
                 </p>
               )}
-              <p className="f-gruv-muted f-gruv-hours-help">Más de 0 y hasta 12 horas por carga. Podés usar coma o punto.</p>
-              <span id="f-gruv-w-hr" className="f-gruv-why" role={busy('horas') ? 'status' : undefined}>
+              <p className="f-tickets-muted f-tickets-hours-help">Más de 0 y hasta 12 horas por carga. Podés usar coma o punto.</p>
+              <span id="f-tickets-w-hr" className="f-tickets-why" role={busy('horas') ? 'status' : undefined}>
                 {busy('horas') ? 'Guardando…' : why('horas') ?? ''}
               </span>
             </>
