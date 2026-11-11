@@ -106,7 +106,7 @@ const PANTALLAS: Pantalla[] = [
     nombre: 'Exportar configuración',
     abrir: (page) => desdeMenuApp(page, 'Exportar configuración…'),
     contenedor: pagina,
-    salida: volver
+    salida: (page) => pagina(page).locator('.page-back')
   },
   {
     nombre: 'Historial de sesiones',
