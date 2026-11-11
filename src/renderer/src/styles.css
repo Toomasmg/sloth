@@ -1482,7 +1482,11 @@ html[data-lite='true'] .spin {
   color: var(--fg-2);
 }
 .modal-confirm {
-  position: absolute;
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  height: fit-content;
+  z-index: 1;
   width: min(380px, calc(100vw - 32px));
   padding: var(--s-5);
 }

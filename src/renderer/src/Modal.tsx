@@ -12,6 +12,13 @@ export interface ModalProps {
   dirty?: boolean
   /** Cerrar al hacer clic en el fondo. Por defecto no: un clic suelto no debería tirar lo escrito. */
   backdropClose?: boolean
+  /** Mientras algo se está haciendo (crear, mover), Esc, fondo y X no cierran: se perdería el resultado. */
+  locked?: boolean
+  /** Esc llega primero acá; si devuelve true, lo consumió (ej.: cerrar una lista abierta) y no se cierra el diálogo. */
+  onEscape?: () => boolean
+  /** Clase del fondo y del diálogo cuando no usan el aspecto base de `.modal`. */
+  backdropClassName?: string
+  bare?: boolean
   className?: string
   headClassName?: string
   titlesClassName?: string
@@ -27,7 +34,7 @@ function focusables(root: HTMLElement | null): HTMLElement[] {
 }
 
 export function Modal(p: ModalProps): React.JSX.Element {
-  const { title, subtitle, icon, onClose, dirty, backdropClose, className, headClassName, titlesClassName, onSubmit, onKeyDown, children } = p
+  const { title, subtitle, icon, onClose, dirty, locked, onEscape, backdropClassName, bare, backdropClose, className, headClassName, titlesClassName, onSubmit, onKeyDown, children } = p
   const titleId = useId()
   const rootRef = useRef<HTMLElement | null>(null)
   const confirmRef = useRef<HTMLDivElement>(null)
@@ -36,11 +43,16 @@ export function Modal(p: ModalProps): React.JSX.Element {
   const askingRef = useRef(false)
   const dirtyRef = useRef(false)
   const closeRef = useRef(onClose)
+  const lockedRef = useRef(false)
+  const escRef = useRef(onEscape)
+  lockedRef.current = !!locked
+  escRef.current = onEscape
   askingRef.current = asking
   dirtyRef.current = !!dirty
   closeRef.current = onClose
 
   const requestClose = (): void => {
+    if (lockedRef.current) return
     if (dirtyRef.current) setAsking(true)
     else closeRef.current()
   }
@@ -66,7 +78,7 @@ export function Modal(p: ModalProps): React.JSX.Element {
         e.preventDefault()
         e.stopPropagation()
         if (askingRef.current) setAsking(false)
-        else requestRef.current()
+        else if (!escRef.current?.()) requestRef.current()
         return
       }
       if (e.key !== 'Tab') return
@@ -111,7 +123,7 @@ export function Modal(p: ModalProps): React.JSX.Element {
     </header>
   )
   const common = {
-    className: `modal ${className ?? ''}`,
+    className: `${bare ? '' : 'modal '}${className ?? ''}`,
     role: 'dialog',
     'aria-modal': true,
     'aria-labelledby': titleId,
@@ -121,9 +133,9 @@ export function Modal(p: ModalProps): React.JSX.Element {
   }
 
   return (
-    <div className="modal-backdrop" onMouseDown={backdropClose ? requestClose : undefined}>
+    <div className={backdropClassName ?? 'modal-backdrop'} onMouseDown={backdropClose ? requestClose : undefined}>
       {onSubmit ? (
-        <form {...common} ref={rootRef as React.RefObject<HTMLFormElement>} onSubmit={onSubmit}>
+        <form {...common} noValidate ref={rootRef as React.RefObject<HTMLFormElement>} onSubmit={onSubmit}>
           {head}
           {children}
         </form>
