@@ -25,7 +25,7 @@ interface Props {
   onPointerDown(e: React.PointerEvent, id: string): void
 }
 
-/** Barra de pestañas: una terminal a la vez. Flechas para moverse, clic del medio para ocultar. */
+/** Barra de pestañas: una terminal a la vez. Flechas para moverse, clic del medio o Supr para ocultar. */
 export function TabBar({ tabs, active, drag, scope, onSelect, onHide, onPointerDown }: Props): React.JSX.Element {
   const focusTab = (id: string): void => {
     requestAnimationFrame(() => scope.current?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(id)}"]`)?.focus())
@@ -68,7 +68,7 @@ export function TabBar({ tabs, active, drag, scope, onSelect, onHide, onPointerD
             tabIndex={selected ? 0 : -1}
             className={`pane-tab ${selected ? 'active' : ''} ${t.perms ? 'perm' : ''} ${t.state === 'waiting' ? 'waiting' : ''} ${drag?.id === t.id ? 'dragging' : ''} ${dropCls}`}
             style={{ '--acc': t.color } as React.CSSProperties}
-            title={`${t.title} · ${t.account} — clic del medio para ocultar`}
+            title={`${t.title} · ${t.account} — clic del medio o Supr para ocultar`}
             aria-label={`${t.title}, ${t.account}, ${stateText}${t.perms ? `, ${t.perms === 1 ? 'permiso pendiente' : `${t.perms} permisos pendientes`}` : ''}`}
             onClick={() => onSelect(t.id, true)}
             onPointerDown={(e) => onPointerDown(e, t.id)}

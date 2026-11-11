@@ -1056,7 +1056,7 @@ export function App(): React.JSX.Element {
                   {open && (
                     <div id={bodyId} className="sl-acc-body">
                       {shown.length > 0 && <ul className="sl-list">{shown.map(renderWs)}</ul>}
-                      {shown.length === 0 && <p className="sl-acc-empty">{mine.length ? 'Ningún espacio coincide.' : 'Sin espacios. Usá + para crear uno.'}</p>}
+                      {shown.length === 0 && <p className="sl-acc-empty">{mine.length ? 'Ningún espacio coincide.' : 'Sin espacios. Usá el botón + de esta cuenta para crear uno.'}</p>}
                     </div>
                   )}
                 </section>

@@ -287,11 +287,11 @@ export function Cambios({ g, st, sync, onOpenPr }: Props): React.JSX.Element {
           </button>
           <span className="g-spacer" />
           <button type="button" className="g-btn-plain" onClick={() => void doCommit(true)} disabled={busy !== ''}>
-            Confirmar y abrir PR
+            Guardar y abrir PR
           </button>
           <button type="submit" className="g-btn-solid" disabled={busy !== ''}>
             {busy === 'commit' ? <SpinGlyph /> : null}
-            Confirmar {plural(staged.length, 'archivo', 'archivos')}
+            Guardar {plural(staged.length, 'archivo', 'archivos')} (commit)
           </button>
         </div>
       </form>

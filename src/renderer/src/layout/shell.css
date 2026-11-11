@@ -176,13 +176,13 @@ button.sl-top-brand.on .sl-top-chev {
   position: absolute;
   top: 2px;
   right: 1px;
-  min-width: 15px;
-  height: 15px;
+  min-width: 16px;
+  height: 16px;
   padding: 0 4px;
   border-radius: 8px;
   background: var(--team);
   color: var(--team-on);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 700;
   display: grid;
   place-items: center;
@@ -622,6 +622,7 @@ body.is-resizing-side .panes {
 }
 .tools-toggle {
   width: 100%;
+  min-height: 24px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -956,8 +957,8 @@ body.is-resizing-side .panes {
 /* Ícono del espacio: cuadrado de 22 px con el color del espacio. */
 .pane-icon-btn {
   --ws: var(--acc);
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   flex: none;
   display: grid;
   place-items: center;
@@ -1255,7 +1256,7 @@ body.is-resizing-side .panes {
   overflow: hidden;
 }
 .sl-status kbd {
-  font-size: 10px;
+  font-size: 11px;
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
