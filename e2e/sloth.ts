@@ -73,10 +73,13 @@ export const test = base.extend<{ seed: Seed; sloth: { app: ElectronApplication;
   sloth: async ({ seed }, use) => {
     const { app, page, userData } = await launchSloth(seed)
     await use({ app, page })
-    // Cerrar sin preguntas (el aviso de la X es nativo y frenaría el cierre).
+    // Cerrar sin preguntas (el aviso de la X es nativo y frenaría el cierre). Si no cierra en 5 s, se mata.
+    const proc = app.process()
+    const closed = new Promise<void>((r) => (proc.exitCode !== null ? r() : proc.once('exit', () => r())))
     await app.evaluate(({ app: a }) => a.exit(0)).catch(() => undefined)
-    await app.close().catch(() => undefined)
-    rmSync(userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 })
+    await Promise.race([closed, new Promise((r) => setTimeout(r, 5000))])
+    if (proc.exitCode === null) proc.kill()
+    rmSync(userData, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
   }
 })
 

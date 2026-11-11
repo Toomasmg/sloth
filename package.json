@@ -14,7 +14,7 @@
     "dist": "npm run build && electron-builder --win",
     "release": "node scripts/release.mjs",
     "test:e2e": "npm run build && playwright test",
-    "test:e2e:update": "npm run build && playwright test --update-snapshots"
+    "test:e2e:update": "npm run build && playwright test --update-snapshots=all"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
