@@ -94,6 +94,8 @@ export function buildTeamArgs(model: string): string[] {
     '--disallowedTools',
     herramientasNegadas().join(','),
     '--no-session-persistence',
+    '--permission-mode',
+    'default',
     '--settings',
     JSON.stringify({ disableAllHooks: true }),
     '--json-schema',
