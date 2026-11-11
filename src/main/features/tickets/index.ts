@@ -398,9 +398,9 @@ function cuenta(def: ConectorDef): Ejecucion {
   return ejecucion(def.nombre, id)
 }
 
-const ghRun: GhRun = async (args, input) => {
+const ghRunCon = (signal?: AbortSignal): GhRun => async (args, input) => {
   try {
-    return await correr('gh', args, { input, timeoutMs: 30_000 })
+    return await correr('gh', args, { input, timeoutMs: 30_000, signal })
   } catch (e) {
     if (e instanceof GitError && e.motivo === 'falta') return { code: -1, stdout: '', stderr: '', missing: true }
     if (e instanceof GitError && e.motivo === 'tiempo') return { code: -1, stdout: '', stderr: '', timedOut: true }
@@ -429,10 +429,10 @@ async function refreshGh(def: ConectorGh): Promise<{ count: number }> {
   const inicio = Date.now()
   try {
     const repo = await repoGh()
+    if (ac.signal.aborted) throw new Error('Consulta cancelada.')
+    const ghRun = ghRunCon(ac.signal)
     const me = await ghYo(ghRun)
     const tickets = await ghLista(ghRun, def, repo)
-    // gh no se puede cortar a mitad de camino: si cancelaron, se descarta lo leído.
-    if (ac.signal.aborted) throw new Error('Consulta cancelada.')
     state.tickets = tickets
     delete state.estados
     state.me = me
@@ -565,7 +565,7 @@ async function detalle(rawId: unknown): Promise<Detalle> {
   const id = ticketId(def, rawId)
   const t = ticketEnLista(def, id)
   if (def.via === 'gh') {
-    const d = await ghDetalle(ghRun, t)
+    const d = await ghDetalle(ghRunCon(), t)
     if (state.config.conectorId === def.id) detalles.set(id, d)
     return d
   }
@@ -611,7 +611,7 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
   escribiendo.add(id)
   try {
     let minutosTotal: number | undefined
-    if (def.via === 'gh') await ghAccion(ghRun, t, a, input, state.me)
+    if (def.via === 'gh') await ghAccion(ghRunCon(), t, a, input, state.me)
     else if (c) {
       const r = await runClaude({
         exe: c.exe,
