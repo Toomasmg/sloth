@@ -9,7 +9,9 @@ import github from './conectores/github'
 import linear from './conectores/linear'
 import {
   armarRegistro,
+  claveAceptado,
   EQUIPO_MAX,
+  estaAceptado,
   IMPORT_MAX_BYTES,
   jsonCanonico,
   parsearArchivoPropios,
@@ -158,6 +160,19 @@ test('armarRegistro: el mismo conector en otra copia del repo no avisa', () => {
   const r = armarRegistro({ incluidos: [], usuario: [], equipos: [equipo('z:/wt'), equipo('z:/repo')], hash })
   assert.deepEqual(r.avisos, [])
   assert.deepEqual(r.lista[0].origen, { tipo: 'equipo', repo: 'z:/repo', equipo: 'E' })
+})
+
+test('aceptado en cualquier copia del repo vale para el conector registrado', () => {
+  const equipo = (k: string): { repo: string; repoKey: string; equipo: string; conectores: unknown[] } => ({ repo: k, repoKey: k, equipo: 'E', conectores: [propio('mio')] })
+  const r = armarRegistro({ incluidos: [], usuario: [], equipos: [equipo('z:/wt'), equipo('z:/repo')], hash }).lista[0]
+  assert.equal(r.origen.tipo === 'equipo' && r.origen.repo, 'z:/repo')
+  assert.deepEqual(r.otrosRepos, ['z:/wt'])
+  const clave = (k: string): string => k
+  assert.equal(estaAceptado(r, { [claveAceptado('z:/wt', 'mio')]: r.hash }, clave), true)
+  assert.equal(estaAceptado(r, { [claveAceptado('z:/repo', 'mio')]: r.hash }, clave), true)
+  assert.equal(estaAceptado(r, { [claveAceptado('z:/wt', 'mio')]: 'otro' }, clave), false)
+  assert.equal(estaAceptado(r, {}, clave), false)
+  assert.equal(estaAceptado({ ...r, origen: { tipo: 'usuario' } }, {}, clave), true)
 })
 
 test('parsearConectoresEquipo: devuelve la lista cruda e ignora las claves _ de arriba', () => {

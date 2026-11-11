@@ -12,6 +12,8 @@ export interface ConectorRegistrado {
   def: ConectorDef
   origen: OrigenConector
   hash: string
+  /** Del equipo: las claves (repoKey) de las otras copias del repo con el mismo conector, p. ej. worktrees. */
+  otrosRepos?: string[]
 }
 
 export interface ArchivoPropios {
@@ -98,6 +100,13 @@ export function jsonCanonico(v: unknown): string {
 }
 
 export const claveAceptado = (repoKey: string, id: string): string => `${repoKey}::${id}`
+
+/** Uno del equipo vale si se aceptó esta misma versión desde cualquiera de las copias del repo. */
+export function estaAceptado(r: ConectorRegistrado, aceptados: Readonly<Record<string, string>>, repoKey: (repo: string) => string): boolean {
+  if (r.origen.tipo !== 'equipo') return true
+  const claves = [repoKey(r.origen.repo), ...(r.otrosRepos ?? [])]
+  return claves.some((k) => aceptados[claveAceptado(k, r.def.id)] === r.hash)
+}
 
 const motivo = (e: unknown): string => (e instanceof Error ? e.message : 'inválido')
 
@@ -196,7 +205,10 @@ export function armarRegistro(o: {
       const hash = o.hash(jsonCanonico(def))
       const previo = lista.find((r) => r.def.id === def.id)
       // El mismo conector en otra copia del repo (p. ej. un worktree): no es un choque.
-      if (previo?.origen.tipo === 'equipo' && previo.hash === hash) continue
+      if (previo?.origen.tipo === 'equipo' && previo.hash === hash) {
+        previo.otrosRepos = [...(previo.otrosRepos ?? []), e.repoKey]
+        continue
+      }
       if (previo?.origen.tipo === 'incluido') avisos.push(`${del}«${def.id}» usa el id de uno incluido: no se cargó.`)
       else if (previo?.origen.tipo === 'usuario') avisos.push(`${del}«${def.id}» tiene el id de uno tuyo: no se cargó.`)
       else if (previo) avisos.push(`${del}«${def.id}» ya viene de otro repo o está repetido: no se cargó.`)
