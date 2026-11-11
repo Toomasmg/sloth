@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { conectorPorId } from './conectores'
-import { estadoVacio, migrarDeGruv, parsearArchivo, resolverEstado, sanearEstado, type Lectura } from './estado'
+import { conConector, estadoVacio, migrarDeGruv, parsearArchivo, resolverEstado, sanearEstado, type Lectura } from './estado'
 
 const AHORA = 1_700_000_000_000
 const FALTA: Lectura = { kind: 'falta' }
@@ -138,4 +138,21 @@ test('sanear dos veces da lo mismo', () => {
   assert.deepEqual(sanearEstado(una, conectorPorId), una)
   const v2 = sanearEstado(TICKETS_V2, conectorPorId)
   assert.deepEqual(sanearEstado(v2, conectorPorId), v2)
+})
+
+test('cambiar de conector limpia lo leído y conserva cuenta, modelo y repos', () => {
+  const antes = migrarDeGruv(GRUV_V1, conectorPorId, AHORA)
+  assert.ok(antes)
+  const copia = structuredClone(antes)
+  const despues = conConector(antes, 'jira')
+  assert.deepEqual(despues, {
+    version: 2,
+    tickets: [],
+    migradoDe: { archivo: 'gruv.json', en: AHORA },
+    config: { ...antes.config, conectorId: 'jira', assigneeId: '' }
+  })
+  assert.notEqual(despues.config.projectRepos, antes.config.projectRepos)
+  assert.deepEqual(antes, copia)
+  assert.equal(conConector(antes, 'gruv'), antes)
+  assert.deepEqual(sanearEstado(despues, conectorPorId), despues)
 })

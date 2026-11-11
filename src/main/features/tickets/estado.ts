@@ -120,6 +120,20 @@ export function migrarDeGruv(raw: unknown, buscar: Buscar, ahora: number): Ticke
   return armar(raw, config, buscar, { archivo: 'gruv.json', en: ahora })
 }
 
+/**
+ * El estado al pasar a otro conector: lo leído con el anterior (tickets, columnas, quién sos, la
+ * última consulta) no sirve. Se conservan la cuenta, el modelo y los repos.
+ */
+export function conConector(s: TicketsState, conectorId: string): TicketsState {
+  if (s.config.conectorId === conectorId) return s
+  return sinVacios({
+    version: 2,
+    tickets: [],
+    migradoDe: s.migradoDe,
+    config: { ...s.config, conectorId, assigneeId: '', projectRepos: { ...s.config.projectRepos } }
+  })
+}
+
 export function resolverEstado(e: { tickets: Lectura; gruv: Lectura }, buscar: Buscar, ahora: number): ResultadoCarga {
   const { tickets, gruv } = e
   let respaldar: ResultadoCarga['respaldar'] = null
