@@ -1,7 +1,8 @@
 import { app, clipboard } from 'electron'
 import { mkdir, readdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { joinPaths, pathsFromUriList, quotePath } from './paste-paths'
+import { joinPaths, quotePath } from '../shared/paste-paths'
+import { pathsFromUriList } from './paste-paths'
 
 const PASTED_DIR = (): string => join(app.getPath('temp'), 'Sloth', 'pegados')
 const KEEP_MS = 7 * 24 * 60 * 60 * 1000
