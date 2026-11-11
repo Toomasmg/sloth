@@ -32,7 +32,16 @@ export default {
       'fork_repository',
       'save_pipeline',
       'save_vulnerability',
-      'attach_scan_profile'
+      'attach_scan_profile',
+      'create_issue',
+      'update_issue',
+      'create_merge_request',
+      'update_merge_request',
+      'create_workitem_note',
+      'create_note',
+      'manage_pipeline',
+      'create_branch',
+      'delete_branch'
     ]
   },
   estados: ESTADOS_COMUNES,

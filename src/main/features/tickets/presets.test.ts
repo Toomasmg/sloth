@@ -93,3 +93,19 @@ test('Jira: la nota del estado lleva el estado en JSON y el apoyo va antes de la
   assert.ok(p.includes('UNA sola llamada de escritura sobre el ticket PROJ-1'), p)
   assert.ok(buildDetallePrompt(jira, 'PROJ-1').includes('\nAntes: El cloudId sale de getAccessibleAtlassianResources'))
 })
+
+test('los presets sin probar niegan las escrituras conocidas de su servidor', () => {
+  const conocidas: Record<string, string[]> = {
+    shortcut: ['stories-update', 'stories-create-comment', 'stories-assign-current-user', 'epics-create', 'documents-create'],
+    linear: ['create_issue', 'update_issue', 'create_project', 'create_issue_label', 'create_document'],
+    notion: ['notion-move-pages', 'notion-duplicate-page', 'notion-create-database', 'notion-update-database'],
+    monday: ['delete_item', 'move_item_to_group'],
+    asana: ['create_tasks', 'delete_task', 'create_project'],
+    'azure-devops': ['repo_create_pull_request', 'pipelines_run_pipeline', 'wiki_create_or_update_page']
+  }
+  for (const [id, tools] of Object.entries(conocidas)) {
+    const negadas = flag(buildListaArgs(conectorPorId(id) as ConectorMcp, 'haiku'), '--disallowedTools')
+    const prefijo = (conectorPorId(id) as ConectorMcp).herramientas.prefijo
+    for (const t of tools) assert.ok(negadas.includes(prefijo + t), `${id}: ${t}`)
+  }
+})

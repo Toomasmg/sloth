@@ -35,7 +35,21 @@ export default {
       'clickup_delete_comment',
       'clickup_update_list',
       'clickup_update_folder',
-      'clickup_execute_operator'
+      'clickup_execute_operator',
+      'clickup_add_tag_to_task',
+      'clickup_remove_tag_from_task',
+      'clickup_create_list',
+      'clickup_create_list_in_folder',
+      'clickup_create_folder',
+      'clickup_create_document',
+      'clickup_create_document_page',
+      'clickup_update_document_page',
+      'clickup_start_time_tracking',
+      'clickup_stop_time_tracking',
+      'clickup_add_time_entry',
+      'clickup_send_chat_message',
+      'clickup_create_reminder',
+      'clickup_update_reminder'
     ]
   },
   estados: ESTADOS_COMUNES,

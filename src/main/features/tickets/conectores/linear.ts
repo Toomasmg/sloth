@@ -15,7 +15,26 @@ export default {
     lista: ['get_user', 'list_issues'],
     detalle: ['get_issue', 'list_comments'],
     escritura: {},
-    negar: ['save_issue', 'save_comment', 'create_comment']
+    negar: [
+      'save_issue',
+      'save_comment',
+      'create_comment',
+      'create_issue',
+      'update_issue',
+      'delete_issue',
+      'update_comment',
+      'delete_comment',
+      'save_project',
+      'create_project',
+      'update_project',
+      'create_issue_label',
+      'create_document',
+      'update_document',
+      'create_attachment',
+      'delete_attachment',
+      'save_milestone',
+      'save_status_update'
+    ]
   },
   estados: ESTADOS_COMUNES,
   pistas: {

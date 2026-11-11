@@ -15,7 +15,28 @@ export default {
     lista: ['users-get-current', 'stories-search'],
     detalle: ['stories-get-by-id'],
     escritura: {},
-    negar: ['stories-create']
+    negar: [
+      'stories-create',
+      'stories-update',
+      'stories-create-comment',
+      'stories-assign-current-user',
+      'stories-unassign-current-user',
+      'stories-create-subtask',
+      'stories-add-subtask',
+      'stories-remove-subtask',
+      'stories-add-task',
+      'stories-update-task',
+      'stories-add-relation',
+      'stories-add-external-link',
+      'stories-remove-external-link',
+      'stories-set-external-links',
+      'epics-create',
+      'epics-update',
+      'iterations-create',
+      'documents-create',
+      'documents-update',
+      'objectives-create'
+    ]
   },
   estados: ESTADOS_COMUNES,
   pistas: {

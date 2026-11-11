@@ -30,7 +30,14 @@ export default {
       'notion-create-suggested-edit',
       'notion-resolve-suggested-edit',
       'notion-restore-version',
-      'notion-restore-pages'
+      'notion-restore-pages',
+      'notion-move-pages',
+      'notion-duplicate-page',
+      'notion-create-database',
+      'notion-update-database',
+      'notion-update-data-source',
+      'notion-create-view',
+      'notion-update-view'
     ]
   },
   estados: ESTADOS_COMUNES,

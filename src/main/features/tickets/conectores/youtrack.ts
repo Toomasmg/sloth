@@ -27,7 +27,11 @@ export default {
       'log_work',
       'add_attachment',
       'create_article',
-      'update_article'
+      'update_article',
+      'delete_issue',
+      'update_issue_custom_fields',
+      'add_issue_link',
+      'create_project'
     ]
   },
   estados: ESTADOS_COMUNES,

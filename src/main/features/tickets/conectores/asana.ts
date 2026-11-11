@@ -15,7 +15,25 @@ export default {
     lista: ['get_me', 'get_tasks', 'search_tasks'],
     detalle: ['get_task', 'get_task_stories'],
     escritura: { comentar: 'add_comment' },
-    negar: ['update_tasks', 'add_comment']
+    negar: [
+      'update_tasks',
+      'add_comment',
+      'create_task',
+      'create_tasks',
+      'update_task',
+      'delete_task',
+      'create_project',
+      'update_project',
+      'create_project_status',
+      'add_followers',
+      'remove_followers',
+      'set_parent_for_task',
+      'add_task_to_project',
+      'create_portfolio',
+      'update_portfolio',
+      'create_goal',
+      'update_goal'
+    ]
   },
   estados: ESTADOS_COMUNES,
   pistas: {
