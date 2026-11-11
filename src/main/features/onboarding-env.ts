@@ -5,7 +5,7 @@
  * cli.js con node, que es lo mismo sin pasar por cmd.exe.
  */
 import { execFile } from 'node:child_process'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import { delimiter, join } from 'node:path'
 
 export type CheckState = 'ok' | 'warn' | 'missing'
@@ -213,10 +213,9 @@ export async function checkEnvironment(opts: EnvOptions = {}): Promise<EnvReport
   return { items: [claude, node, git, ...gh], checkedAt: Date.now() }
 }
 
-/** Carpetas comunes del repo de Cosmos-Ai (solo las que existen y tienen .git). */
-export function repoCandidates(home: string, extra: string[] = [], isDir = (p: string): boolean => existsSync(p) && statSync(p).isDirectory()): string[] {
-  const names = ['Cosmos-Ai', 'cosmos-ai', 'Cosmos-AI']
-  const bases = ['C:\\dev\\work', join(home, 'dev', 'work'), 'C:\\dev', join(home, 'dev'), 'D:\\dev\\work', join(home, 'Documents', 'GitHub'), join(home, 'source', 'repos'), join(home, 'repos'), home]
+/** Repos sugeridos: los que ya usás y las carpetas con .git dentro de las rutas comunes (hasta 8). */
+export function repoCandidates(home: string, extra: string[] = [], isDir = (p: string): boolean => existsSync(p) && statSync(p).isDirectory(), hijos = (p: string): string[] => readdirSync(p)): string[] {
+  const bases = ['C:\dev\work', join(home, 'dev', 'work'), 'C:\dev', join(home, 'dev'), 'D:\dev\work', join(home, 'Documents', 'GitHub'), join(home, 'source', 'repos'), join(home, 'repos')]
   const out: string[] = []
   const seen = new Set<string>()
   const add = (p: string): void => {
@@ -229,7 +228,15 @@ export function repoCandidates(home: string, extra: string[] = [], isDir = (p: s
       /* sin permisos */
     }
   }
-  for (const b of bases) for (const n of names) add(join(b, n))
   for (const e of extra) add(e)
+  for (const b of bases) {
+    let nombres: string[]
+    try {
+      nombres = hijos(b)
+    } catch {
+      continue
+    }
+    for (const h of nombres) add(join(b, h))
+  }
   return out.slice(0, 8)
 }

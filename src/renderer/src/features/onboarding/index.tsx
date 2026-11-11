@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { DoneIcon, ErrorIcon, ChangesIcon, ExportIcon, AccountIcon, AddAccountIcon, HelpIcon, IdleIcon, FolderIcon, TeamIcon, EditorIcon, TicketIcon, CloseIcon, KeyboardIcon, PermissionIcon, NewSpaceIcon, UpdateIcon } from '../../icons/SlothIcons'
+import { DoneIcon, ErrorIcon, ChangesIcon, ExportIcon, AccountIcon, AddAccountIcon, HelpIcon, IdleIcon, FolderIcon, TeamIcon, EditorIcon, CloseIcon, KeyboardIcon, PermissionIcon, NewSpaceIcon, UpdateIcon } from '../../icons/SlothIcons'
 import { loginPaneId, type AccountStatus, type Workspace } from '../../../../shared/types'
 import { useUi, type Command, type FeatureUi } from '../host'
 import { LogoMark } from '../../Logo'
@@ -29,7 +29,6 @@ interface ObState {
 
 /** Pasos (la app tiene 4; el diseño los muestra en fila). */
 const STEPS = [{ title: 'Tu PC' }, { title: 'Cuenta de Claude' }, { title: 'Repo · opcional' }, { title: 'Primer espacio' }]
-const TICKET_RE = /^[A-Z][A-Z0-9]*-\d+$/
 
 /** Título y subtítulo de la tarjeta de cada paso. */
 function stepHead(i: number, repo: string): { title: string; sub: string } {
@@ -267,7 +266,6 @@ function LoginDock({ accountId, statuses, onBack }: { accountId: string; statuse
 function RepoStep({ repo, setRepo }: { repo: string; setRepo: (p: string) => void }): React.JSX.Element {
   const ui = useUi()
   const [list, setList] = useState<string[]>([])
-  const [preferred, setPreferred] = useState('')
   const [info, setInfo] = useState<{ isGit: boolean } | null>(null)
   const [team, setTeam] = useState<TeamStatus | null>(null)
   const [plan, setPlan] = useState<ImportPlan | null>(null)
@@ -277,9 +275,8 @@ function RepoStep({ repo, setRepo }: { repo: string; setRepo: (p: string) => voi
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
-    ui.invoke<{ list: string[]; preferred: string }>('feat:onboarding:suggestRepos').then((r) => {
+    ui.invoke<{ list: string[] }>('feat:onboarding:suggestRepos').then((r) => {
       setList(r.list)
-      setPreferred(r.preferred)
       if (!repo && r.list[0]) setRepo(r.list[0])
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -345,12 +342,12 @@ function RepoStep({ repo, setRepo }: { repo: string; setRepo: (p: string) => voi
         ))}
         {list.length === 0 && (
           <p className="hint">
-            No encontré <span className="mono">{preferred}</span> ni otras rutas comunes. Elegí la carpeta a mano.
+            No encontré repos en las carpetas de siempre. Elegí la carpeta a mano.
           </p>
         )}
       </div>
       <div className="input-row">
-        <input aria-label="Carpeta del repo" className="mono" value={repo} onChange={(e) => setRepo(e.target.value)} placeholder={preferred} />
+        <input aria-label="Carpeta del repo" className="mono" value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="C:uta	u-repo" />
         <button type="button" className="btn" onClick={() => void pick()}>
           <FolderIcon size={15} /> Elegir
         </button>
@@ -417,24 +414,18 @@ function RepoStep({ repo, setRepo }: { repo: string; setRepo: (p: string) => voi
 function SpaceStep({ repo, statuses, onCreated }: { repo: string; statuses: Record<string, AccountStatus>; onCreated: (ws: Workspace) => void }): React.JSX.Element {
   const ui = useUi()
   const logged = ui.accounts.filter((a) => statuses[a.id]?.loggedIn)
-  const [mode, setMode] = useState<'normal' | 'ticket'>('normal')
   const [name, setName] = useState(repo ? repoName(repo) : '')
-  const [ticket, setTicket] = useState('')
   const [accountId, setAccountId] = useState((logged[0] ?? ui.accounts[0])?.id ?? '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const tk = ticket.trim().toUpperCase()
-  const tkOk = TICKET_RE.test(tk)
-  const can = Boolean(repo && accountId && (mode === 'ticket' ? tkOk : name.trim()))
+  const can = Boolean(repo && accountId && name.trim())
 
   const create = async (): Promise<void> => {
     setBusy(true)
     setErr(null)
     try {
       const ws = await window.sloth.addWorkspace(
-        mode === 'ticket'
-          ? { name: name.trim() && name.trim() !== repoName(repo) ? name.trim() : tk, repoPath: repo, accountId, autoStartClaude: true, ticket: tk, initialPrompt: `/ticket ${tk}`, resume: true }
-          : { name: name.trim(), repoPath: repo, accountId, autoStartClaude: true, resume: true }
+        { name: name.trim(), repoPath: repo, accountId, autoStartClaude: true, resume: true }
       )
       await ui.reload()
       ui.openPane(ws.id)
@@ -449,26 +440,9 @@ function SpaceStep({ repo, statuses, onCreated }: { repo: string; statuses: Reco
   if (!ui.accounts.length) return <p className="f-onboarding-warn">Agregá una cuenta primero (paso 2) para poder crear un espacio.</p>
   return (
     <>
-      <div className="f-onboarding-seg" role="radiogroup" aria-label="Tipo de espacio">
-        <button type="button" role="radio" aria-checked={mode === 'normal'} className={mode === 'normal' ? 'on' : ''} onClick={() => setMode('normal')}>
-          <EditorIcon size={15} /> Normal
-        </button>
-        <button type="button" role="radio" aria-checked={mode === 'ticket'} className={mode === 'ticket' ? 'on' : ''} onClick={() => setMode('ticket')}>
-          <TicketIcon size={15} /> Desde ticket
-        </button>
-      </div>
-      {mode === 'ticket' && (
-        <div className="field">
-          <label htmlFor="f-ob-tk">Ticket</label>
-          <input id="f-ob-tk" className="mono" value={ticket} onChange={(e) => setTicket(e.target.value)} placeholder="TCK-1234" aria-invalid={ticket.trim() !== '' && !tkOk} />
-          <p className={ticket.trim() && !tkOk ? 'field-error' : 'field-help'}>
-            {ticket.trim() && !tkOk ? 'Tiene que ser tipo TCK-1234.' : `Arranca Claude con «/ticket ${tkOk ? tk : 'TCK-…'}».`}
-          </p>
-        </div>
-      )}
       <div className="f-onboarding-grid2">
         <div className="field">
-          <label htmlFor="f-ob-name">Nombre{mode === 'ticket' ? ' (opcional)' : ''}</label>
+          <label htmlFor="f-ob-name">Nombre</label>
           <input id="f-ob-name" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="field">
