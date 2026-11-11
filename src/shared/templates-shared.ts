@@ -18,7 +18,7 @@ export function varsIn(s: string | null | undefined): string[] {
 
 export interface VarValues {
   ticket?: string
-  /** Carpeta corta para mostrar: «Cosmos-Ai/front». */
+  /** Carpeta corta para mostrar: «mi-app/front». */
   carpeta?: string
   /** Rama que se va a usar (la del worktree o la actual del repo). */
   rama?: string
@@ -71,7 +71,7 @@ export function today(d = new Date()): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
-/** Carpeta corta para {carpeta}: los dos últimos tramos («Cosmos-Ai/front»). */
+/** Carpeta corta para {carpeta}: los dos últimos tramos («mi-app/front»). */
 export function folderLabel(p: string | null | undefined): string {
   const parts = String(p ?? '')
     .split(/[\\/]/)

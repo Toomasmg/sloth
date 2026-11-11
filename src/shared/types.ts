@@ -49,7 +49,7 @@ export interface Workspace {
   accountId: string
   autoStartClaude: boolean
   createdAt: number
-  /** Prompt con el que arranca Claude la primera vez (ej: `/ticket TCK-1234`). */
+  /** Prompt con el que arranca Claude la primera vez (ej: `/ticket PROJ-123`). */
   initialPrompt?: string
   /** Ya se usó el prompt inicial: las próximas veces se retoma la conversación. */
   initialPromptUsed?: boolean

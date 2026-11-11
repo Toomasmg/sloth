@@ -137,7 +137,7 @@ function parseTemplate(raw: unknown, i: number): TeamTemplate {
     onlyKeys(w, ['branchPattern'], `${label}: useWorktree`)
     const bp = text(w.branchPattern, 200, `${label}: branchPattern`, true)!
     checkVars(bp, `${label}: branchPattern`, BRANCH_VARS)
-    const sample = applyVars(bp, { ticket: 'TCK-1', fecha: today(), n: 1, plantilla: name })
+    const sample = applyVars(bp, { ticket: 'PROJ-1', fecha: today(), n: 1, plantilla: name })
     if (!validBranch(sample)) fail(`${label}: la rama «${sample}» no es un nombre válido para git.`)
     useWorktree = { branchPattern: bp }
   }
