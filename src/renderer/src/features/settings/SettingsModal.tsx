@@ -1,3 +1,4 @@
+import { captureOpener } from '../../return-focus'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AddAccountIcon, SearchIcon, SLOTH_ICONS } from '../../icons/SlothIcons'
 import { useUi } from '../host'
@@ -71,10 +72,7 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
   }, [onClose])
 
   useEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null
-    return () => {
-      if (opener?.isConnected) opener.focus()
-    }
+    return captureOpener()
   }, [])
 
   // Foco al entrar: el título de la sección (sin recuadro de foco, y no el buscador ni «Volver»).

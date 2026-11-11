@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEventHandler, type KeyboardEventHandler, type ReactNode } from 'react'
 import { CloseIcon } from './icons/SlothIcons'
+import { captureOpener } from './return-focus'
 import { FOCUSABLE, nextFocusIndex } from './focus-trap'
 
 export interface ModalProps {
@@ -48,15 +49,13 @@ export function Modal(p: ModalProps): React.JSX.Element {
   requestRef.current = requestClose
 
   useLayoutEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null
+    const restore = captureOpener()
     const root = rootRef.current
     if (root && !root.contains(document.activeElement)) {
       const autofocus = root.querySelector<HTMLElement>('[data-autofocus]')
       ;(autofocus ?? focusables(root).find((el) => !el.classList.contains('icon-btn')) ?? root).focus()
     }
-    return () => {
-      if (opener?.isConnected) opener.focus()
-    }
+    return restore
   }, [])
 
   useEffect(() => {

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowSquareOut, CheckCircle, DownloadSimple, Export, Plus, Sliders, Trash, UsersThree, Warning, X } from '@phosphor-icons/react'
+import { ArrowSquareOut, CheckCircle, DownloadSimple, Export, Plus, Trash, UsersThree, Warning, X } from '@phosphor-icons/react'
 import { useUi, type Command, type FeatureUi, type UiCtx } from '../host'
 import { Modal } from '../../Modal'
+import { SettingsIcon } from '../../icons/SlothIcons'
 import { useDocumentVisible } from '../../visibility'
 import {
   ACTION_LABEL,
@@ -375,7 +376,7 @@ function TeamBlock({ t }: { t: TeamStatus }): React.JSX.Element {
       )}
       {t.settingsPending && t.ajustes && (
         <div className="f-team-config-sugg">
-          <Sliders size={13} aria-hidden="true" />
+          <SettingsIcon size={13} />
           <span className="grow-min" title={`El equipo recomienda: ${settingsText(t.ajustes)}`}>
             Sugerido: {settingsText(t.ajustes)}
           </span>
