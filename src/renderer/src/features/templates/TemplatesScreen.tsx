@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useUi } from '../host'
 import { cleanError, shortPath } from '../../format'
 import { applyVars, BRANCH_VARS, TEMPLATE_COLOR_KEYS, TEMPLATE_ICON_KEYS, SUGGESTED, today, unknownVars, validBranch, varsIn, type VarValues } from '../../../../shared/templates-shared'

@@ -120,7 +120,9 @@ function MenuPopup({
       return
     }
     if (e.key === 'Tab') {
-      onClose(false)
+      // El menú vive al final del body: sin esto el foco saltaría al principio del documento.
+      e.preventDefault()
+      onClose(true)
       return
     }
     const move = keyToMove(e.key, 'vertical')

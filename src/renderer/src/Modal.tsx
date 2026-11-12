@@ -195,7 +195,7 @@ export function ModalLoading(): React.JSX.Element {
   )
 }
 
-/** La misma pregunta de descarte que hace `Modal`, para las páginas a pantalla completa (PageShell). */
+/** La misma pregunta de descarte que hace `Modal`, para las Vistas. */
 export function DiscardConfirm({ onKeep, onDiscard }: { onKeep: () => void; onDiscard: () => void }): React.JSX.Element {
   const id = useId()
   const boxRef = useRef<HTMLDivElement>(null)

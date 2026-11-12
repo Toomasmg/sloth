@@ -36,6 +36,6 @@ export const destOf = (viewId: string | null): NavDest => (viewId ? (VIEW_DEST[v
 /** Ctrl+Shift+1…5 → destino. `code` es el de la tecla (Digit1…), así no depende de lo que escribe Shift. */
 export function navDestForKey(e: { code: string; ctrlKey: boolean; shiftKey: boolean; altKey: boolean; metaKey: boolean }): NavDest | null {
   if (!e.ctrlKey || !e.shiftKey || e.altKey || e.metaKey) return null
-  const m = /^(?:Digit|Numpad)([1-5])$/.exec(e.code)
+  const m = /^Digit([1-5])$/.exec(e.code)
   return m ? NAV_MAIN[Number(m[1]) - 1] : null
 }

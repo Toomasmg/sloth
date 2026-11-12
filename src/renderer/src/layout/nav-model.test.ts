@@ -16,7 +16,8 @@ test('Ctrl+Shift+1…5 lleva a cada destino del riel, en orden', () => {
     ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'].map((c) => navDestForKey(key(c))),
     ['espacios', 'tickets', 'equipo', 'historial', 'ramas']
   )
-  assert.equal(navDestForKey(key('Numpad2')), 'tickets')
+  // Ctrl+Shift+Numpad2 con NumLock es Ctrl+Shift+↓, que la terminal tiene que recibir.
+  assert.equal(navDestForKey(key('Numpad2')), null)
 })
 
 test('no pisa Ctrl+1…4 (ir al panel) ni Ctrl+Alt+1…4 (distribución)', () => {

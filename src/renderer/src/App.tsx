@@ -93,7 +93,6 @@ import {
   PlusIcon,
   SearchIcon,
   SidebarIcon,
-  SpaceIcon,
   TrashIcon,
   UpdateIcon,
   WorktreeIcon

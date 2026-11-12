@@ -53,9 +53,10 @@ export function NavRail(): React.JSX.Element {
     const onKey = (e: KeyboardEvent): void => {
       if (isCapturingShortcut()) return
       const dest = navDestForKey(e)
-      if (!dest) return
+      // Con un diálogo abierto no se navega por detrás.
+      if (!dest || document.querySelector('.modal-backdrop')) return
       e.preventDefault()
-      e.stopPropagation()
+      e.stopImmediatePropagation()
       goTo(dest)
     }
     window.addEventListener('keydown', onKey, true)
