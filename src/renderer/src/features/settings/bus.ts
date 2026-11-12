@@ -24,3 +24,8 @@ export const takeAlVolver = (): (() => void) | null => {
   alVolver = null
   return f
 }
+
+/** Al navegar a otro destino (riel o atajo) ya no hay a dónde volver. */
+export const dropAlVolver = (): void => {
+  alVolver = null
+}

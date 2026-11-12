@@ -5,7 +5,7 @@ import { setTeamOpen } from '../features/team/model'
 import { openHistory } from '../features/history/index'
 import { openRamas } from '../features/worktrees/store'
 import { openHelp } from '../features/help/bus'
-import { openSettings } from '../features/settings/bus'
+import { dropAlVolver, openSettings } from '../features/settings/bus'
 import { destOf, type NavDest } from './nav-model'
 
 /** Destino que se ve ahora (lo marca el riel). */
@@ -18,6 +18,9 @@ export const useNavDest = (): NavDest => destOf(useSyncExternalStore(subscribeVi
 export function goTo(dest: NavDest): void {
   if (destOf(topViewId()) === dest) return
   if (!closeAllViews()) return
+  // Configuración abierta desde Tickets vuelve a Tickets al cerrarse; si se eligió otro destino, no.
+  // Se descarta antes de que React procese el cierre (los efectos corren después de este handler).
+  dropAlVolver()
   if (dest === 'tickets') setBoardOpen(true)
   else if (dest === 'equipo') setTeamOpen(true)
   else if (dest === 'historial') openHistory()
