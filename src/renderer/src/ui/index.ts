@@ -8,4 +8,4 @@ export { Badge, Tag, Chip, StatusGlyph, type ChipProps, type Tone } from './Badg
 export { EmptyState, type EmptyStateProps } from './EmptyState'
 export { toast, dismissToastById, ToastHost, InlineAlert } from './Toast'
 export { Tooltip, type TooltipProps } from './Tooltip'
-export { Menu, type MenuItem, type MenuProps, type MenuTriggerProps } from './Menu'
+export { Menu, ContextMenu, type MenuItem, type MenuProps, type MenuTriggerProps, type ContextMenuProps } from './Menu'

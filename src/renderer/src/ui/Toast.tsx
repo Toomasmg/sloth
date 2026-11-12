@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { CloseIcon, WarningIcon } from '../icons/SlothIcons'
 import { Button } from './Button'
 import { IconButton } from './IconButton'
@@ -58,9 +58,23 @@ function ToastCard({ t }: { t: ToastItem }): React.JSX.Element {
   )
 }
 
+// Si alguien monta un segundo ToastHost, dibuja solo el primero: cada aviso se ve una vez.
+let hosts: number[] = []
+let nextHost = 1
+
 export function ToastHost(): React.JSX.Element | null {
+  const [me] = useState(() => nextHost++)
+  useLayoutEffect(() => {
+    hosts = [...hosts, me]
+    emit()
+    return () => {
+      hosts = hosts.filter((h) => h !== me)
+      emit()
+    }
+  }, [me])
   const items = useSyncExternalStore(subscribe, snapshot)
-  if (!items.length) return null
+  const primary = useSyncExternalStore(subscribe, () => hosts[0] === me)
+  if (!primary || !items.length) return null
   return (
     <div className="ui-toasts">
       {items.map((t) => (

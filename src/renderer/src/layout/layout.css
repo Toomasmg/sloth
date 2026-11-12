@@ -36,14 +36,14 @@ body.is-resizing-row * {
   user-select: none !important;
 }
 
-/* ---------- Pestañas ---------- */
+/* ---------- Pestañas (una por panel abierto) ---------- */
 .pane-tabs {
   display: flex;
   align-items: stretch;
   gap: 2px;
   flex: 1 1 auto;
   min-width: 0;
-  height: 26px;
+  height: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -55,33 +55,42 @@ body.is-resizing-row * {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-2);
   flex: 0 1 auto;
-  min-width: 84px;
+  min-width: 72px;
   max-width: 220px;
-  padding: 0 10px;
+  padding: 0 var(--s-3);
   border: none;
-  border-radius: var(--r-sm);
   background: transparent;
-  color: var(--fg-muted);
-  font-size: var(--fs-sm);
+  color: var(--text-3);
+  font-size: var(--fs-12);
   cursor: pointer;
-  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+  transition: color var(--t-fast) var(--ease);
+}
+/* Las que se ven en la grilla, un poco más claras que las que esperan en pestañas. */
+.pane-tab.on-screen {
+  color: var(--text-2);
 }
 .pane-tab:hover {
-  color: var(--fg);
-  background: var(--hover);
+  color: var(--text);
 }
+/* La enfocada: subrayado de acento (forma, no solo color). */
 .pane-tab.active {
-  color: var(--fg);
-  background: var(--card);
+  color: var(--text);
+}
+.pane-tab.active::after {
+  content: '';
+  position: absolute;
+  left: var(--s-2);
+  right: var(--s-2);
+  bottom: 0;
+  height: 2px;
+  border-radius: var(--r-full);
+  background: var(--accent);
 }
 .pane-tab:focus-visible {
+  outline: 2px solid var(--focus);
   outline-offset: -2px;
-}
-.pane-tab .acc-dot {
-  width: 7px;
-  height: 7px;
 }
 .pane-tab-title {
   min-width: 0;
@@ -90,19 +99,11 @@ body.is-resizing-row * {
   text-overflow: ellipsis;
   font-weight: 600;
 }
-.pane-tab-perm {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
+.pane-tab-n {
   flex: none;
-  font-size: 11px;
+  color: var(--waiting);
+  font-size: var(--fs-11);
   font-weight: 700;
-  color: var(--warn);
-}
-/* Te necesita / permiso: lo marca el ícono ámbar (campana o escudo) y el texto más claro, sin relleno. */
-.pane-tab.waiting:not(.active),
-.pane-tab.perm:not(.active) {
-  color: var(--fg-2);
 }
 .pane-tab.dragging {
   opacity: 0.45;

@@ -2,51 +2,32 @@
    Colores y tamaños salen de los tokens de themes.css; no hay colores fijos. */
 
 /* ---------- Botón del header ---------- */
-.f-git-btn {
+.f-git-badge {
+  flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--s-1);
   height: var(--h-xs);
-  padding: 0 7px;
+  padding: 0 var(--s-2);
   border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--fg-3);
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text-2);
   font: inherit;
-  font-size: var(--fs-xs);
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-.f-git-btn:hover {
-  background: var(--hover);
-  color: var(--fg);
-}
-.f-git-btn.has {
-  color: var(--fg-2);
-}
-.f-git-btn-n {
-  min-width: 16px;
-  padding: 0 4px;
-  line-height: 16px;
-  border-radius: 999px;
-  background: var(--hover);
-  text-align: center;
-}
-.f-git-btn.has .f-git-btn-n {
-  color: var(--warn);
-  background: var(--warn-soft);
-}
-/* Las acciones del encabezado del panel son cuadradas de 28 px; este botón lleva texto y número. */
-.pane-head .pane-actions .f-git-btn {
-  width: auto;
-  height: 26px;
-  flex: none;
-  padding: 0 8px;
-  gap: 5px;
+  font-size: var(--fs-12);
+  font-weight: 500;
   white-space: nowrap;
+  cursor: pointer;
 }
-@container (max-width: 560px) {
-  .f-git-btn-label {
+.f-git-badge:hover {
+  color: var(--text);
+}
+.f-git-badge:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+@container (max-width: 520px) {
+  .f-git-badge-label {
     display: none;
   }
 }

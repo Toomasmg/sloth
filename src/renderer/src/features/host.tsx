@@ -7,6 +7,7 @@ import type {
   PermissionPrompt,
   Workspace
 } from '../../../shared/types'
+import type { PaneAction } from '../layout/pane-actions'
 
 /** Lo que cada función ve de la app desde la interfaz. */
 export interface UiCtx {
@@ -34,6 +35,11 @@ export interface UiCtx {
    */
   onBeforeClosePane(guard: PaneGuard): () => void
   notifyError(message: string): void
+  /**
+   * Acciones de un panel o espacio, ya ordenadas: las del núcleo y las que suman las funciones. Las usan
+   * el menú del espacio (clic derecho, «…» del panel, pestaña) y la paleta, así todos muestran lo mismo.
+   */
+  paneActions(paneId: string): PaneAction[]
   /** `invoke('feat:<función>:<op>', ...)` hacia main. */
   invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T>
   /** Escucha `feat:<función>:<evento>` desde main. Devuelve la función para dejar de escuchar. */
@@ -46,6 +52,8 @@ export interface NewWorkspacePreset {
   /** Cuenta preseleccionada (el «+» de cada cuenta en la barra lateral). */
   accountId?: string
 }
+
+export type { PaneAction, PaneActionGroup } from '../layout/pane-actions'
 
 /** `action`: qué intenta hacer el usuario con el panel. */
 export type PaneGuard = (paneId: string, action: 'hide' | 'restart') => boolean | Promise<boolean>
@@ -82,8 +90,13 @@ export interface FeatureUi {
   Titlebar?: React.FC
   /** Sección al final del sidebar. */
   Sidebar?: React.FC
-  /** Botones extra en el header de un panel, antes de maximizar. */
+  /**
+   * Insignias de estado en la cabecera de un panel («3 cambios»), antes de maximizar. Para acciones
+   * no: esas van en `paneActions`, que las suma al menú del espacio.
+   */
   PaneHeader?: React.FC<{ paneId: string }>
+  /** Ítems que la función suma al menú del espacio (y a sus acciones en la paleta). */
+  paneActions?(ctx: UiCtx, paneId: string): PaneAction[]
   /** Franja arriba de la terminal de un panel (debajo de la tarjeta de permiso). */
   PaneBanner?: React.FC<{ paneId: string }>
   /** Modales, paneles laterales o la paleta: se montan una sola vez. */

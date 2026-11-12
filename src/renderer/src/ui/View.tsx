@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { DiscardConfirm } from '../Modal'
 import { captureOpener } from '../return-focus'
 import { FOCUSABLE, nextFocusIndex } from '../focus-trap'
+import { pushView } from './view-stack'
 import './View.css'
 
 export interface ViewProps {
@@ -23,7 +24,7 @@ export interface ViewProps {
 }
 
 /**
- * Destino a pantalla completa debajo de la barra superior: cabecera con volver, título y acciones;
+ * Destino a la derecha del riel y debajo de la barra superior: cabecera con volver, título y acciones;
  * Esc vuelve; el foco entra al abrir y regresa a donde estaba al salir; Tab queda adentro.
  * Las terminales siguen vivas detrás.
  */
@@ -50,6 +51,11 @@ export function View({ labelId, title, onClose, actions, backLabel = 'Espacios',
     e.preventDefault()
     list[i].focus()
   }
+
+  useEffect(
+    () => pushView({ id: labelId, request: () => requestRef.current(), isDirty: () => dirtyRef.current }),
+    [labelId]
+  )
 
   useEffect(() => {
     const restore = captureOpener()

@@ -115,10 +115,6 @@
   font-weight: 500;
   border-radius: 4px;
 }
-.acc-dot {
-  width: 6px;
-  height: 6px;
-}
 
 /* Secciones colapsables al pie: discretas. */
 .f-wt-section,
@@ -159,20 +155,6 @@
   font-size: 13.5px;
   font-weight: 600;
   letter-spacing: -0.005em;
-}
-.pill {
-  background: transparent !important;
-  color: var(--fg-2) !important;
-  font-weight: 500;
-  font-size: 12px;
-  padding: 0 4px;
-}
-.pill-working svg { color: var(--info); }
-.pill-waiting svg { color: var(--warn); }
-.pill-done svg { color: var(--success); }
-.pill-exited svg { color: var(--danger); }
-.pane-actions .icon-btn {
-  opacity: 0.35;
 }
 .terminal-host {
   padding: 10px 6px 0 14px;
@@ -384,9 +366,6 @@ html[data-theme='light'] .kbd {
 html[data-theme='light'] .acc-chip {
   color: #12151c;
   background: color-mix(in srgb, var(--acc) 34%, transparent);
-}
-html[data-theme='light'] .acc-dot {
-  filter: saturate(1.8) brightness(0.72);
 }
 html[data-theme='light'] .ws.focused::before {
   background: color-mix(in srgb, var(--acc) 55%, #12151c);

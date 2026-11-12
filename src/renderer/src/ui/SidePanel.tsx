@@ -2,6 +2,14 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import { captureOpener } from '../return-focus'
 import './SidePanel.css'
 
+// Paneles laterales abiertos y su ancho: la grilla (y la Vista) se corren a la izquierda para no quedar tapadas.
+const openWidths = new Map<symbol, number>()
+function syncPush(): void {
+  const w = Math.max(0, ...openWidths.values())
+  if (w) document.documentElement.style.setProperty('--side-panel-w', `${w}px`)
+  else document.documentElement.style.removeProperty('--side-panel-w')
+}
+
 export interface SidePanelProps {
   labelId: string
   title: ReactNode
@@ -16,13 +24,23 @@ export interface SidePanelProps {
 
 /**
  * Panel a la derecha que acompaña a la terminal: no es modal (sin fondo que tape, sin trampa de
- * foco) y tiene su X visible. Esc lo cierra solo si el foco está adentro: con el foco en la
+ * foco), empuja los paneles en vez de taparlos y tiene su X visible. Esc lo cierra solo si el foco está adentro: con el foco en la
  * terminal, Esc es de Claude.
  */
 export function SidePanel({ labelId, title, onClose, actions, width = 400, className, children }: SidePanelProps): React.JSX.Element {
   const rootRef = useRef<HTMLElement>(null)
   const closeRef = useRef(onClose)
   closeRef.current = onClose
+
+  useEffect(() => {
+    const key = Symbol('side-panel')
+    openWidths.set(key, width)
+    syncPush()
+    return () => {
+      openWidths.delete(key)
+      syncPush()
+    }
+  }, [width])
 
   useEffect(() => {
     const restore = captureOpener()

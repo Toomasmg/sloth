@@ -4,6 +4,10 @@ import { SearchIcon } from '../../icons/SlothIcons'
 import { openSettings } from '../settings/bus'
 import { openReport } from '../report/bus'
 import { View } from '../../ui/View'
+import { Button } from '../../ui'
+import { useUi } from '../host'
+import { runFeatureCommand } from '../palette'
+import { openHelp } from './bus'
 import { marks, matchesAll, wordsOf } from './text'
 import './ayuda.css'
 
@@ -128,6 +132,7 @@ const SECTIONS = [
 const comboText = (s: Shortcut): string => shortcutKeys(s).map((c) => c.join('+')).join(' o ')
 
 export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Element {
+  const ui = useUi()
   const [q, setQ] = useState('')
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [active, setActive] = useState<string>(SECTIONS[0].id)
@@ -184,7 +189,33 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
     )
 
   return (
-    <View labelId="ay-view-title" title="Ayuda y atajos" onClose={onClose}>
+    <View
+      labelId="ay-view-title"
+      title="Ayuda y atajos"
+      onClose={onClose}
+      actions={
+        <>
+          <Button size="sm" variant="ghost" onClick={() => runFeatureCommand('onboarding:open', ui)}>
+            Asistente de bienvenida
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => openHelp('whatsnew')}>
+            Novedades
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => openHelp('invite')}>
+            Invitar a un compañero
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              onClose()
+              openReport()
+            }}
+          >
+            Reportar un problema
+          </Button>
+        </>
+      }
+    >
       <div className="ay-wrap">
         <header className="ay-head">
           <h1 id="ay-title">Ayuda y atajos</h1>

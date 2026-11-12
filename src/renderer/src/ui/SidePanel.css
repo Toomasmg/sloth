@@ -1,8 +1,8 @@
 .ui-side {
   position: fixed;
-  top: 48px;
+  top: var(--top-h);
   right: 0;
-  bottom: 0;
+  bottom: var(--status-h);
   z-index: var(--z-panel);
   max-width: 100vw;
   display: flex;
@@ -11,7 +11,7 @@
   color: var(--fg);
   font-family: var(--font-ui);
   font-size: var(--fs-13);
-  box-shadow: inset 1px 0 0 var(--divider-strong), var(--e-2);
+  box-shadow: inset 1px 0 0 var(--divider-strong);
   animation: ui-side-in var(--t-med) var(--ease);
 }
 @keyframes ui-side-in {

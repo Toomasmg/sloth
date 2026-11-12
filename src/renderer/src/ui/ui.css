@@ -728,6 +728,11 @@
   flex: 1;
   min-width: 0;
 }
+.ui-menu-hint {
+  color: var(--text-3);
+  font-size: var(--fs-12);
+  white-space: nowrap;
+}
 .ui-menu-kbd {
   color: var(--text-3);
   font-family: var(--font-mono);

@@ -1,7 +1,8 @@
-import { cloneElement, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactElement } from 'react'
+import { cloneElement, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactElement, type Ref } from 'react'
 import './ui.css'
 
 type ChildProps = {
+  ref?: Ref<HTMLElement>
   'aria-describedby'?: string
   onMouseEnter?: (e: React.MouseEvent) => void
   onMouseLeave?: (e: React.MouseEvent) => void
@@ -13,7 +14,7 @@ export interface TooltipProps {
   text: string
   /** Atajo que se muestra al lado, ya formateado (ej. `comboLabel('sidebar')`). */
   shortcut?: string
-  placement?: 'top' | 'bottom'
+  placement?: 'top' | 'bottom' | 'right'
   /** Un solo elemento que reciba `ref` y los eventos de mouse y foco (un botón, un enlace). */
   children: ReactElement<ChildProps>
 }
@@ -58,6 +59,10 @@ export function Tooltip({ text, shortcut, placement = 'bottom', children }: Tool
     const w = t.offsetWidth
     const h = t.offsetHeight
     const gap = 6
+    if (placement === 'right') {
+      setPos({ left: r.right + gap, top: Math.min(Math.max(4, r.top + r.height / 2 - h / 2), window.innerHeight - h - 4) })
+      return
+    }
     let top = placement === 'top' ? r.top - h - gap : r.bottom + gap
     if (top < 4) top = r.bottom + gap
     if (top + h > window.innerHeight - 4) top = r.top - h - gap
@@ -69,8 +74,12 @@ export function Tooltip({ text, shortcut, placement = 'bottom', children }: Tool
   return (
     <>
       {cloneElement(child, {
+        // El hijo puede traer su propio ref (IconButton reenvía el suyo): se respeta además del nuestro.
         ref: (el: HTMLElement | null) => {
           anchorRef.current = el
+          const own = child.props.ref
+          if (typeof own === 'function') own(el)
+          else if (own) (own as { current: HTMLElement | null }).current = el
         },
         'aria-describedby': open ? id : child.props['aria-describedby'],
         onMouseEnter: (e: React.MouseEvent) => {

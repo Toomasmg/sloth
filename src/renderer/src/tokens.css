@@ -33,6 +33,10 @@
   --pane-head-h: 36px;
   --row-min-h: 48px;
   --side-w: 264px;
+  /* Marco de la ventana: barra superior, riel de navegación y barra de estado. */
+  --top-h: 48px;
+  --rail-w: 48px;
+  --status-h: 28px;
 
   /* ---------- Radios ---------- */
   --r-sm: 4px;

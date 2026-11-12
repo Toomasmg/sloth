@@ -159,21 +159,14 @@ function Sidebar(): React.JSX.Element {
   )
 }
 
-function PaneHeader({ paneId }: { paneId: string }): React.JSX.Element | null {
-  const ctx = useUi()
-  if (isLoginPane(paneId)) return null
-  const ws = ctx.workspaces.find((w) => w.id === paneId)
-  if (!ws) return null
-  return (
-    <IconButton label={`Guardar ${ws.name} como plantilla`} icon={<TemplatesIcon size={15} />} onClick={() => void saveFromWorkspace(ctx, ws)} />
-  )
-}
-
 const ui: FeatureUi = {
   name: 'templates',
   Global,
   Sidebar,
-  PaneHeader,
+  paneActions: (ctx, paneId) => {
+    const ws = isLoginPane(paneId) ? undefined : ctx.workspaces.find((w) => w.id === paneId)
+    return ws ? [{ id: 'plantilla', label: 'Guardar como plantilla', group: 'compartir', order: 10, icon: <TemplatesIcon size={15} />, run: () => void saveFromWorkspace(ctx, ws) }] : []
+  },
   commands: (ctx) => {
     const cmds: Command[] = getTemplates().map((t) => ({
       id: `templates:create:${t.id}`,

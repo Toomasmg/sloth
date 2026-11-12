@@ -399,13 +399,6 @@ textarea {
 .ws .item-sub .tag {
   line-height: 16px;
 }
-.acc-dot {
-  width: 6px;
-  height: 6px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--acc);
-}
 .tag {
   flex: none;
   font-family: var(--font-mono);
@@ -807,108 +800,13 @@ kbd,
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.pane-id .tag {
-  align-self: center;
-}
-/* Metadatos atenuados (cuenta · ruta): ocupan solo el espacio que sobra después del título,
-   y se van escondiendo (primero la ruta, después la cuenta) en vez de cortarse a la mitad. */
-.pane-meta {
-  display: flex;
-  align-items: baseline;
-  gap: var(--s-2);
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
-  container: pane-meta / inline-size;
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
-}
-.acc-badge {
-  flex: none;
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: color-mix(in srgb, var(--acc) 80%, var(--fg));
-  white-space: nowrap;
-}
-@container pane-meta (max-width: 56px) {
-  .acc-badge {
-    display: none;
-  }
-}
 .pane-actions {
   display: flex;
   align-items: center;
   gap: 2px;
   flex: none;
 }
-.pane-actions .icon-btn {
-  width: var(--h-xs);
-  height: var(--h-xs);
-  color: var(--fg-muted);
-  opacity: 0.6;
-}
-.pane-actions .icon-btn svg {
-  width: 15px;
-  height: 15px;
-}
-/* Los botones se realzan al pasar o al enfocar el panel; nunca desaparecen (teclado). */
-.pane:hover .pane-actions .icon-btn,
-.pane.focused .pane-actions .icon-btn,
-.pane-head:focus-within .pane-actions .icon-btn {
-  opacity: 1;
-}
-.pane-actions .icon-btn:hover {
-  color: var(--fg);
-}
-@container (max-width: 460px) {
-  .pane-head .pill-detail {
-    display: none;
-  }
-}
-@container (max-width: 380px) {
-  .pane-id .tag {
-    display: none;
-  }
-}
 
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex: none;
-  height: 22px;
-  max-width: 220px;
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: var(--hover);
-  color: var(--fg-2);
-  white-space: nowrap;
-  overflow: hidden;
-}
-.pill-detail {
-  font-weight: 400;
-  opacity: 0.85;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.pill-working {
-  color: var(--info);
-  background: var(--info-soft);
-}
-.pill-waiting {
-  color: var(--warn);
-  background: var(--warn-soft);
-}
-.pill-done {
-  color: var(--success);
-  background: var(--success-soft);
-}
-.pill-exited {
-  color: var(--danger);
-  background: var(--danger-soft);
-}
 .terminal-host {
   flex: 1;
   min-height: 0;
@@ -1369,8 +1267,7 @@ html[data-lite='true'] .spin {
 }
 
 /* Los campos dentro de buscadores toman el fondo del buscador (en claro se veía un recuadro blanco adentro). */
-.pal-input,
-.sl-filter input {
+.pal-input {
   background: transparent !important;
   box-shadow: none !important;
 }
