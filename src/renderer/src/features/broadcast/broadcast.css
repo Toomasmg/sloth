@@ -9,7 +9,7 @@
   border: 0;
   border-radius: 14px;
   background: var(--raised);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 0 1px var(--divider-strong);
+  box-shadow: var(--e-3), inset 0 0 0 1px var(--divider-strong);
 }
 
 .f-broadcast-head {

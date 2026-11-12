@@ -214,7 +214,7 @@ body.is-resizing-row * {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  box-shadow: var(--shadow-float, 0 6px 18px rgba(0, 0, 0, 0.35)), inset 0 0 0 1px var(--divider);
+  box-shadow: var(--e-2), inset 0 0 0 1px var(--divider);
 }
 
 /* ---------- Indicador de dónde cae un panel ---------- */
@@ -258,7 +258,7 @@ body.is-resizing-row * {
   font-size: var(--fs-12);
   font-weight: 600;
   white-space: nowrap;
-  box-shadow: var(--shadow-float, 0 6px 18px rgba(0, 0, 0, 0.35)), inset 0 0 0 1px var(--divider);
+  box-shadow: var(--e-2), inset 0 0 0 1px var(--divider);
   transform: translateY(-50%);
 }
 .pane-drop.swap .pane-drop-label {
@@ -299,7 +299,7 @@ body.is-resizing-row * {
   font-weight: 600;
   white-space: nowrap;
   pointer-events: none;
-  box-shadow: var(--shadow-float, 0 6px 18px rgba(0, 0, 0, 0.35)), inset 0 0 0 1px var(--divider);
+  box-shadow: var(--e-2), inset 0 0 0 1px var(--divider);
   will-change: transform;
 }
 .drag-ghost[hidden] {

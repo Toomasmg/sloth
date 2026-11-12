@@ -109,7 +109,7 @@
   flex-direction: column;
   border-radius: 12px;
   background: var(--card-hover);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 0 0 1px var(--divider-strong);
+  box-shadow: var(--e-3), inset 0 0 0 1px var(--divider-strong);
   overflow: hidden;
   animation: pal-in var(--t-fast) var(--ease);
 }

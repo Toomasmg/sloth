@@ -162,7 +162,7 @@
   gap: 10px;
   padding: 10px 14px;
   background: var(--card-hover);
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 1px var(--divider-strong);
+  box-shadow: var(--e-2), inset 0 0 0 1px var(--divider-strong);
 }
 .g-toast svg {
   color: var(--success-fg);
