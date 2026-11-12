@@ -2,6 +2,8 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEventHand
 import { CloseIcon } from './icons/SlothIcons'
 import { captureOpener } from './return-focus'
 import { FOCUSABLE, nextFocusIndex } from './focus-trap'
+import { Button } from './ui/Button'
+import { IconButton } from './ui/IconButton'
 
 export interface ModalProps {
   title: ReactNode
@@ -20,6 +22,10 @@ export interface ModalProps {
   /** Clase del fondo y del diálogo cuando no usan el aspecto base de `.modal`. */
   backdropClassName?: string
   bare?: boolean
+  /** Ancho del diálogo: sm 400, md 520, lg 720. Sin `size` queda el ancho de `.modal` o el que ponga `className`. */
+  size?: 'sm' | 'md' | 'lg'
+  /** Acciones fijas al pie, siempre a la vista aunque el cuerpo scrollee. Alinea a la derecha. */
+  footer?: ReactNode
   className?: string
   headClassName?: string
   titlesClassName?: string
@@ -35,7 +41,7 @@ function focusables(root: HTMLElement | null): HTMLElement[] {
 }
 
 export function Modal(p: ModalProps): React.JSX.Element {
-  const { title, subtitle, icon, onClose, dirty, locked, onEscape, backdropClassName, bare, backdropClose, className, headClassName, titlesClassName, onSubmit, onKeyDown, children } = p
+  const { title, subtitle, icon, onClose, dirty, locked, onEscape, backdropClassName, bare, size, footer, backdropClose, className, headClassName, titlesClassName, onSubmit, onKeyDown, children } = p
   const titleId = useId()
   const rootRef = useRef<HTMLElement | null>(null)
   const confirmRef = useRef<HTMLDivElement>(null)
@@ -68,7 +74,7 @@ export function Modal(p: ModalProps): React.JSX.Element {
     const root = rootRef.current
     if (root && !root.contains(document.activeElement)) {
       const autofocus = root.querySelector<HTMLElement>('[data-autofocus]')
-      ;(autofocus ?? focusables(root).find((el) => !el.classList.contains('icon-btn')) ?? root).focus()
+      ;(autofocus ?? focusables(root).find((el) => !el.classList.contains('icon-btn') && !el.classList.contains('ui-icon-btn')) ?? root).focus()
     }
     return () => {
       // Sin esto, la trampa de foco (que todavía está viva) le devolvería el foco al diálogo que se está yendo.
@@ -124,13 +130,12 @@ export function Modal(p: ModalProps): React.JSX.Element {
         <h2 id={titleId}>{title}</h2>
         {subtitle && <p>{subtitle}</p>}
       </div>
-      <button type="button" className="icon-btn" onClick={requestClose} aria-label="Cerrar">
-        <CloseIcon size={16} />
-      </button>
+      <IconButton label="Cerrar" icon={<CloseIcon size={16} />} onClick={requestClose} />
     </header>
   )
+  const foot = footer ? <footer className="modal-footer">{footer}</footer> : null
   const common = {
-    className: `${bare ? '' : 'modal '}${className ?? ''}`,
+    className: `${bare ? '' : `modal ${size ? `modal--${size} ` : ''}`}${className ?? ''}`,
     role: 'dialog',
     'aria-modal': true,
     'aria-labelledby': titleId,
@@ -145,11 +150,13 @@ export function Modal(p: ModalProps): React.JSX.Element {
         <form {...common} noValidate ref={rootRef as React.RefObject<HTMLFormElement>} onSubmit={onSubmit}>
           {head}
           {children}
+          {foot}
         </form>
       ) : (
         <div {...common} ref={rootRef as React.RefObject<HTMLDivElement>}>
           {head}
           {children}
+          {foot}
         </div>
       )}
       {asking && (
@@ -166,12 +173,12 @@ export function Modal(p: ModalProps): React.JSX.Element {
             ¿Descartar lo que escribiste?
           </h2>
           <div className="modal-actions">
-            <button type="button" className="btn ghost" onClick={() => closeRef.current()}>
+            <Button variant="ghost" onClick={() => closeRef.current()}>
               Descartar
-            </button>
-            <button type="button" className="btn primary" ref={keepRef} onClick={() => setAsking(false)}>
+            </Button>
+            <Button variant="primary" ref={keepRef} onClick={() => setAsking(false)}>
               Seguir editando
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -225,12 +232,12 @@ export function DiscardConfirm({ onKeep, onDiscard }: { onKeep: () => void; onDi
           ¿Descartar lo que escribiste?
         </h2>
         <div className="modal-actions">
-          <button type="button" className="btn ghost" onClick={onDiscard}>
+          <Button variant="ghost" onClick={onDiscard}>
             Descartar
-          </button>
-          <button type="button" className="btn primary" ref={keepRef} onClick={onKeep}>
+          </Button>
+          <Button variant="primary" ref={keepRef} onClick={onKeep}>
             Seguir editando
-          </button>
+          </Button>
         </div>
       </div>
     </div>
