@@ -139,9 +139,9 @@
   min-height: var(--h-sm);
   padding: 2px var(--s-1) 2px var(--s-3); /* 2px: ajuste óptico para el botón de adentro */
   border-radius: var(--r-full);
-  background: var(--success-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 28%, transparent);
-  color: var(--fg-2);
+  background: var(--done-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--done) 28%, transparent);
+  color: var(--text-2);
   font-size: var(--fs-12);
   max-width: 100%;
 }
@@ -587,13 +587,13 @@ body.is-resizing-side .panes {
 }
 .sl-usage dt {
   font-size: var(--fs-11);
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .sl-usage dd {
   margin: 0;
   font-family: var(--font-mono);
   font-size: var(--fs-11);
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-set-acc-menu {
   display: flex;
@@ -603,7 +603,7 @@ body.is-resizing-side .panes {
   padding: 10px var(--s-3);
   border-radius: var(--r-lg);
   background: var(--card-hover);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .f-set-acc-menu .btn.danger {
   align-self: flex-start;
@@ -716,7 +716,7 @@ body.is-resizing-side .panes {
   font-weight: 600;
   cursor: pointer;
   padding: 0 var(--s-1);
-  border-radius: var(--r-xs);
+  border-radius: var(--r-sm);
 }
 .sl-maxnote button:hover {
   text-decoration: underline;
@@ -854,7 +854,7 @@ body.is-resizing-side .panes {
   width: 7px;
   height: 7px;
   border-radius: var(--r-full);
-  background: var(--success);
+  background: var(--done);
 }
 .sl-status-keys {
   margin-left: auto;

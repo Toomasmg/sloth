@@ -159,7 +159,7 @@ export function Detail(props: DetailProps): React.JSX.Element {
         {resp && tint ? (
           <Av name={resp} size="lg" />
         ) : (
-          <span className="f-tickets-av lg" style={{ background: 'var(--btn-2)', color: 'var(--fg-muted)' }} aria-hidden="true">
+          <span className="f-tickets-av lg" style={{ background: 'var(--btn-2)', color: 'var(--text-3)' }} aria-hidden="true">
             ?
           </span>
         )}

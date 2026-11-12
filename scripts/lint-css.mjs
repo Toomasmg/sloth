@@ -2,7 +2,7 @@
 // (fuera de tokens.css). Solo mira lo nuevo respecto de origin/staging: un archivo nuevo entero, y en un
 // archivo tocado las líneas con infracción que no estaban antes (mover una línea de un archivo a otro no cuenta).
 // Para dejar pasar un caso justificado: /* lint-css-ok: motivo */ en la misma línea.
-// Uso: node scripts/lint-css.mjs [--base=<ref>]   (también LINT_CSS_BASE; por defecto origin/staging)
+// Uso: node scripts/lint-css.mjs [--base=<ref>] [--todo: cuenta todo el CSS sin mirar la base]   (también LINT_CSS_BASE; por defecto origin/staging)
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
@@ -60,6 +60,16 @@ function infracciones(ruta, texto) {
     }
   })
   return out
+}
+
+if (process.argv.includes('--todo')) {
+  const todos = git('ls-files', '--cached', '--others', '--exclude-standard', '--', '*.css').split('\n').filter(Boolean)
+  const todas = todos.flatMap((ruta) => infracciones(ruta, readFileSync(ruta, 'utf8')))
+  const porRegla = {}
+  for (const v of todas) porRegla[v.regla.id] = (porRegla[v.regla.id] ?? 0) + 1
+  for (const v of todas) process.stderr.write(`${v.ruta}:${v.linea}  ${v.regla.msg}\n`)
+  process.stdout.write(`lint:css --todo: ${todas.length} infracciones en todo el CSS ${JSON.stringify(porRegla)}\n`)
+  process.exit(todas.length ? 1 : 0)
 }
 
 let base

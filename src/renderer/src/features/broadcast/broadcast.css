@@ -8,8 +8,8 @@
   box-sizing: border-box;
   border: 0;
   border-radius: 14px;
-  background: var(--card);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 0 1px var(--line-strong);
+  background: var(--raised);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 0 1px var(--divider-strong);
 }
 
 .f-broadcast-head {
@@ -39,7 +39,7 @@
 }
 .f-broadcast-titles p {
   margin: 4px 0 0;
-  color: var(--fg-2);
+  color: var(--text-2);
   line-height: 1.5;
 }
 .f-broadcast-head .icon-btn {
@@ -50,10 +50,10 @@
   margin: 0;
   padding: 10px 12px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--success) 8%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 30%, transparent);
-  color: var(--fg-2);
-  font-size: var(--fs-sm);
+  background: color-mix(in srgb, var(--done) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--done) 30%, transparent);
+  color: var(--text-2);
+  font-size: var(--fs-12);
   line-height: 1.5;
 }
 
@@ -72,13 +72,13 @@
 }
 .f-broadcast-dest-head h3 {
   margin: 0 0 0 4px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   font-weight: 600;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-broadcast-count {
-  font-size: var(--fs-sm);
-  color: var(--fg);
+  font-size: var(--fs-12);
+  color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 .f-broadcast-shorts {
@@ -95,7 +95,7 @@
   flex-direction: column;
   border-radius: var(--r-lg);
   background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
 }
 .f-broadcast-group-head {
@@ -103,10 +103,10 @@
   align-items: center;
   gap: 8px;
   padding: 9px 14px;
-  box-shadow: inset 0 -1px 0 var(--line);
-  font-size: var(--fs-sm);
+  box-shadow: inset 0 -1px 0 var(--divider);
+  font-size: var(--fs-12);
   font-weight: 600;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 /* Avatar de la cuenta: inicial sobre el tinte del color de la cuenta (color y fondo los pone el componente). */
 .f-broadcast-dot {
@@ -125,7 +125,7 @@
   height: 26px;
   border-radius: 8px;
   background: var(--btn-2);
-  color: var(--fg-2);
+  color: var(--text-2);
   display: grid;
   place-items: center;
 }
@@ -138,7 +138,7 @@
 .f-broadcast-group-count {
   margin-left: auto;
   font-weight: 400;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 
 .f-broadcast-list {
@@ -147,7 +147,7 @@
   padding: 0;
 }
 .f-broadcast-list li + li {
-  box-shadow: inset 0 1px 0 var(--line);
+  box-shadow: inset 0 1px 0 var(--divider);
 }
 .f-broadcast-row {
   display: flex;
@@ -190,16 +190,16 @@
   overflow-wrap: anywhere;
 }
 .f-broadcast-hidden {
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
+  font-size: var(--fs-11);
+  color: var(--text-3);
 }
 .f-broadcast-path {
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
+  font-size: var(--fs-11);
+  color: var(--text-3);
   overflow-wrap: anywhere;
 }
 .f-broadcast-hint {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   color: var(--warn-fg);
 }
 .f-broadcast-row .chip,
@@ -208,7 +208,7 @@
   height: 22px;
   padding: 0 8px;
   gap: 5px;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-11);
 }
 .f-broadcast-row .chip > svg,
 .f-broadcast-progress-row .chip > svg {
@@ -223,15 +223,15 @@
   gap: 10px 12px;
   padding: 12px 14px;
   border-radius: var(--r-lg);
-  background: color-mix(in srgb, var(--warn) 10%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 40%, transparent);
+  background: color-mix(in srgb, var(--waiting) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--waiting) 40%, transparent);
 }
 .f-broadcast-warn-ico {
   flex: none;
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: color-mix(in srgb, var(--warn) 18%, transparent);
+  background: color-mix(in srgb, var(--waiting) 18%, transparent);
   color: var(--warn-fg);
   display: grid;
   place-items: center;
@@ -253,21 +253,21 @@
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: var(--warn);
+  accent-color: var(--waiting);
 }
 .f-broadcast-confirm {
   margin: 0;
-  color: var(--fg);
-  font-size: var(--fs-sm);
+  color: var(--text);
+  font-size: var(--fs-12);
   line-height: 1.5;
 }
 
 /* ---------- Mensaje ---------- */
 .f-broadcast-msg > label {
   margin: 0 0 0 4px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   font-weight: 600;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-broadcast-text {
   box-sizing: border-box;
@@ -277,18 +277,18 @@
   border: 0;
   border-radius: var(--r-md, 10px);
   background: var(--input-bg);
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
   line-height: 1.55;
   resize: vertical;
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .f-broadcast-text::placeholder {
   color: var(--placeholder);
 }
 .f-broadcast-text:focus {
   outline: none;
-  box-shadow: inset 0 0 0 1px var(--ring), 0 0 0 3px var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
 }
 .f-broadcast-text[aria-invalid='true'] {
   box-shadow: inset 0 0 0 1px var(--danger);
@@ -300,14 +300,14 @@
   gap: 6px;
 }
 .f-broadcast-tools-label {
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  color: var(--text-3);
   margin-right: 2px;
 }
 .f-broadcast-counter {
   margin-left: auto;
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
 .chip-btn {
@@ -316,15 +316,15 @@
   border: 0;
   border-radius: 13px;
   background: var(--btn-2);
-  color: var(--fg-2);
+  color: var(--text-2);
   font: inherit;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   cursor: pointer;
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .chip-btn:hover {
   background: var(--hover);
-  color: var(--fg);
+  color: var(--text);
 }
 .chip-btn.var {
   border-radius: 7px;
@@ -336,7 +336,7 @@
 }
 .chip-btn:focus-visible,
 .f-broadcast-row:focus-within {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -348,7 +348,7 @@
   background: transparent;
   color: var(--info);
   font: inherit;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   cursor: pointer;
 }
 .f-broadcast-toggle:hover {
@@ -361,7 +361,7 @@
   padding: 4px 12px;
   border-radius: 10px;
   background: var(--input-bg);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .f-broadcast-preview-row {
   display: flex;
@@ -370,12 +370,12 @@
   padding: 9px 0;
 }
 .f-broadcast-preview-row + .f-broadcast-preview-row {
-  box-shadow: inset 0 1px 0 var(--line);
+  box-shadow: inset 0 1px 0 var(--divider);
 }
 .f-broadcast-preview-body {
   font-size: 12.5px;
   line-height: 1.5;
-  color: var(--fg);
+  color: var(--text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -406,13 +406,13 @@
   flex-direction: column;
   gap: 8px;
   padding-top: var(--s-3);
-  box-shadow: inset 0 1px 0 var(--line);
+  box-shadow: inset 0 1px 0 var(--divider);
 }
 .f-broadcast-hist h3 {
   margin: 0 0 0 4px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   font-weight: 600;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-broadcast-hist ul {
   list-style: none;
@@ -420,13 +420,13 @@
   padding: 0;
   border-radius: var(--r-lg);
   background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
 }
 .f-broadcast-hist .btn.sm {
   height: 28px;
   padding: 0 11px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
 }
 .f-broadcast-hist li {
   display: flex;
@@ -435,13 +435,13 @@
   padding: 10px 14px;
 }
 .f-broadcast-hist li + li {
-  box-shadow: inset 0 1px 0 var(--line);
+  box-shadow: inset 0 1px 0 var(--divider);
 }
 .f-broadcast-time {
   flex: none;
   width: 44px;
   font-size: 11px;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-broadcast-hist-main {
   flex: 1;
@@ -452,12 +452,12 @@
 }
 .f-broadcast-hist-text {
   font-size: 12.5px;
-  color: var(--fg);
+  color: var(--text);
   overflow-wrap: anywhere;
 }
 .f-broadcast-hist-meta {
   font-size: 11px;
-  color: var(--fg-muted);
+  color: var(--text-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -475,15 +475,15 @@
   gap: 10px;
   padding: 16px;
   border-radius: var(--r-lg);
-  background: color-mix(in srgb, var(--success) 8%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 30%, transparent);
+  background: color-mix(in srgb, var(--done) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--done) 30%, transparent);
 }
 .f-broadcast-result-ic {
   width: 30px;
   height: 30px;
   flex: none;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--success) 18%, transparent);
+  background: color-mix(in srgb, var(--done) 18%, transparent);
   color: var(--success-fg);
   display: grid;
   place-items: center;
@@ -503,7 +503,7 @@
 .f-broadcast-progress-list {
   border-radius: var(--r-lg);
   background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
 }
 .f-broadcast-progress-row {
@@ -513,7 +513,7 @@
   padding: 11px 14px;
 }
 .f-broadcast-progress-row + .f-broadcast-progress-row {
-  box-shadow: inset 0 1px 0 var(--line);
+  box-shadow: inset 0 1px 0 var(--divider);
 }
 .f-broadcast-progress-row .f-broadcast-main {
   flex: 1;
@@ -524,7 +524,7 @@
   position: fixed;
   right: 18px;
   bottom: 18px;
-  z-index: 20;
+  z-index: var(--z-panel);
   pointer-events: none;
 }
 .f-broadcast-toast {
@@ -533,9 +533,9 @@
   padding: 10px 14px;
   border-radius: 10px;
   background: var(--toast-bg);
-  color: var(--fg);
-  box-shadow: var(--shadow-md);
-  font-size: var(--fs-sm);
+  color: var(--text);
+  box-shadow: var(--e-2);
+  font-size: var(--fs-12);
   overflow-wrap: anywhere;
 }
 

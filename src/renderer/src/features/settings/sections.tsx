@@ -449,7 +449,7 @@ export function AppearanceSection(): React.JSX.Element {
             const on = s.accent === a
             return (
               <button key={a} type="button" role="radio" aria-checked={on} className={`f-set-accent ${on ? 'on' : ''}`} onClick={() => save({ accent: a })}>
-                <span className="f-set-accent-dot" style={{ background: ACCENT_HEX[a].hex, boxShadow: on ? `0 0 0 2px var(--card), 0 0 0 4px ${ACCENT_HEX[a].hex}` : undefined }} aria-hidden="true" />
+                <span className="f-set-accent-dot" style={{ background: ACCENT_HEX[a].hex, boxShadow: on ? `0 0 0 2px var(--raised), 0 0 0 4px ${ACCENT_HEX[a].hex}` : undefined }} aria-hidden="true" />
                 {ACCENT_HEX[a].name}
               </button>
             )
@@ -871,8 +871,8 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
   }
   // Tokens del tema (oscuro y claro): cada par fondo/texto cumple contraste sobre la tarjeta.
   const toneColor = {
-    ok: ['var(--success-soft)', 'var(--ok-fg)'],
-    warn: ['var(--warn-soft)', 'var(--warn-fg)'],
+    ok: ['var(--done-soft)', 'var(--ok-fg)'],
+    warn: ['var(--waiting-soft)', 'var(--warn-fg)'],
     err: ['var(--danger-soft)', 'var(--danger-fg)'],
     info: ['var(--info-soft)', 'var(--info)']
   }[tone]
@@ -1072,7 +1072,7 @@ export function UpdatesSection(): React.JSX.Element {
   return (
     <>
       <div className="f-set-card f-set-status">
-        <span className="f-set-status-ico lg" style={{ background: 'var(--success-soft)', color: 'var(--ok-fg)' }} aria-hidden="true">
+        <span className="f-set-status-ico lg" style={{ background: 'var(--done-soft)', color: 'var(--ok-fg)' }} aria-hidden="true">
           <UpdateIcon size={18} />
         </span>
         <div className="grow">

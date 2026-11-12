@@ -22,7 +22,7 @@
 }
 .ay-head p {
   margin: 0;
-  color: var(--fg-2);
+  color: var(--text-2);
   line-height: 1.5;
 }
 
@@ -37,7 +37,7 @@
   border: 0;
   border-radius: 8px;
   font: inherit;
-  font-size: var(--fs-md);
+  font-size: var(--fs-13);
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
@@ -52,27 +52,27 @@
 }
 .ay-btn-secondary {
   background: var(--btn-2);
-  color: var(--fg);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .ay-btn-sm {
   height: 28px;
   padding: 0 10px;
   border-radius: 7px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
 }
 .ay-btn-copy {
   height: 26px;
   padding: 0 10px;
   border-radius: 7px;
   background: transparent;
-  color: var(--fg-2);
-  font-size: var(--fs-sm);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--text-2);
+  font-size: var(--fs-12);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .ay-btn-copy:hover {
   background: var(--surface-hover);
-  color: var(--fg);
+  color: var(--text);
   filter: none;
 }
 
@@ -89,12 +89,12 @@
   box-sizing: border-box;
   padding: 0 8px 0 14px;
   border-radius: 10px;
-  background: var(--card);
-  color: var(--fg-muted);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  background: var(--raised);
+  color: var(--text-3);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .ay-search:focus-within {
-  box-shadow: inset 0 0 0 1px var(--ring), 0 0 0 3px var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px var(--accent-soft);
 }
 .ay-search input {
   flex: 1;
@@ -102,7 +102,7 @@
   height: 40px;
   border: 0;
   background: transparent;
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
   font-size: 14px;
   outline: none;
@@ -113,8 +113,8 @@
 .ay-count {
   margin: 0 4px;
   min-height: 16px;
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
+  font-size: var(--fs-12);
+  color: var(--text-2);
 }
 
 .ay-empty {
@@ -124,16 +124,16 @@
   gap: 8px;
   padding: 28px 20px;
   border-radius: 12px;
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--divider);
   text-align: center;
 }
 .ay-empty-title {
   font-weight: 600;
 }
 .ay-empty-text {
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  color: var(--text-3);
   line-height: 1.5;
 }
 .ay-empty-actions {
@@ -170,7 +170,7 @@
   border: 0;
   border-radius: var(--r-md);
   background: transparent;
-  color: var(--fg-2);
+  color: var(--text-2);
   font: inherit;
   font-weight: 500;
   text-align: left;
@@ -182,7 +182,7 @@
 }
 .ay-nav-item[aria-current] {
   background: var(--accent-soft);
-  color: var(--fg);
+  color: var(--text);
   font-weight: 600;
 }
 
@@ -220,8 +220,8 @@
 /* Contenedor de listas (atajos y preguntas): tarjeta con borde interno. */
 .ay-card-box {
   border-radius: 12px;
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
 }
 
@@ -234,8 +234,8 @@
 }
 .ay-card {
   border-radius: 12px;
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
 }
 .ay-card-btn,
@@ -247,7 +247,7 @@
   padding: 14px 16px;
   border: 0;
   background: transparent;
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -277,8 +277,8 @@
   font-weight: 600;
 }
 .ay-card-sum {
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
+  font-size: var(--fs-12);
+  color: var(--text-2);
   line-height: 1.5;
 }
 .ay-steps {
@@ -287,14 +287,14 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  color: var(--fg-2);
+  color: var(--text-2);
   line-height: 1.5;
 }
 
 .ay-chev {
   flex: none;
   margin-top: 4px;
-  color: var(--fg-muted);
+  color: var(--text-3);
   transform: rotate(0deg);
   transition: transform var(--t-fast) var(--ease);
 }
@@ -304,13 +304,13 @@
 
 /* Atajos */
 .ay-group + .ay-group {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--divider);
 }
 .ay-group-name {
   padding: 12px 16px 6px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   font-weight: 600;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .ay-key-row {
   display: flex;
@@ -320,7 +320,7 @@
   padding: 10px 16px;
 }
 .ay-key-row + .ay-key-row {
-  box-shadow: inset 0 1px 0 var(--line);
+  box-shadow: inset 0 1px 0 var(--divider);
 }
 .ay-key-what {
   flex: 1 1 200px;
@@ -339,20 +339,20 @@
   padding: 2px 7px;
   border-radius: 5px;
   background: var(--btn-2);
-  color: var(--fg);
+  color: var(--text);
   box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.45);
   white-space: nowrap;
 }
 .ay-plus,
 .ay-or {
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  color: var(--text-3);
   padding: 0 2px;
 }
 .ay-note {
   margin: 0 4px;
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  color: var(--text-3);
   line-height: 1.5;
 }
 .ay-mark {
@@ -363,7 +363,7 @@
 
 /* Preguntas frecuentes */
 .ay-faq + .ay-faq {
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--divider);
 }
 .ay-faq-q {
   flex: 1;
@@ -372,7 +372,7 @@
 }
 .ay-faq-a {
   padding: 0 16px 16px;
-  color: var(--fg-2);
+  color: var(--text-2);
   line-height: 1.6;
 }
 
@@ -383,8 +383,8 @@
   align-items: center;
   gap: 14px;
   border-radius: 12px;
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--divider);
   padding: 16px;
 }
 .ay-more-text {
@@ -398,8 +398,8 @@
   font-weight: 600;
 }
 .ay-more-hint {
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
+  font-size: var(--fs-12);
+  color: var(--text-2);
   line-height: 1.5;
 }
 .ay-more-actions {
@@ -412,7 +412,7 @@
   position: fixed;
   right: 18px;
   bottom: 18px;
-  z-index: 20;
+  z-index: var(--z-toast);
   max-width: calc(100% - 36px);
   display: flex;
   align-items: center;
@@ -420,8 +420,8 @@
   padding: 10px 14px;
   border-radius: 10px;
   background: var(--toast-bg);
-  color: var(--fg);
-  box-shadow: var(--shadow-md), inset 0 0 0 1px var(--line-strong);
+  color: var(--text);
+  box-shadow: var(--e-2), inset 0 0 0 1px var(--divider-strong);
 }
 .ay-toast > svg {
   flex: none;

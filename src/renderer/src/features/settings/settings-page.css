@@ -2,7 +2,7 @@
    Usa los tokens de styles.css / themes.css (oscuro, claro, acento y densidad). */
 
 .f-settings-gear {
-  color: var(--fg-2);
+  color: var(--text-2);
   position: relative;
 }
 
@@ -14,8 +14,8 @@
   display: flex;
   flex-wrap: wrap;
   background: var(--bg);
-  color: var(--fg);
-  font-size: var(--fs-md);
+  color: var(--text);
+  font-size: var(--fs-13);
   overflow: hidden;
 }
 
@@ -30,7 +30,7 @@
   gap: 12px;
   padding: 14px 10px;
   background: var(--surface);
-  box-shadow: inset -1px 0 0 var(--line);
+  box-shadow: inset -1px 0 0 var(--divider);
 }
 
 .f-set-main {
@@ -57,15 +57,15 @@
   padding: 0 10px;
   border-radius: 8px;
   background: var(--input-bg);
-  color: var(--fg-muted);
-  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text-3);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .f-set-search input {
   flex: 1;
   min-width: 0;
   border: 0;
   background: transparent;
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
   box-shadow: none !important;
 }
@@ -77,11 +77,11 @@
 }
 .f-set-results-h {
   padding: 4px 8px;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-11);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-set-result {
   display: flex;
@@ -92,7 +92,7 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -129,7 +129,7 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -162,7 +162,7 @@
   border-radius: 9px;
   background: #f0b45a;
   color: #1c1406;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-11);
   font-weight: 700;
   display: grid;
   place-items: center;
@@ -195,7 +195,7 @@
 }
 .f-set-head p {
   margin: 6px 0 0;
-  color: var(--fg-2);
+  color: var(--text-2);
   line-height: 1.5;
 }
 
@@ -215,12 +215,12 @@
   margin: 0 0 0 4px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-set-card {
   border-radius: 12px;
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
 }
 .f-set-card > .f-set-row + .f-set-row,
@@ -229,13 +229,13 @@
 .f-set-group .f-set-card > .f-set-toggle + .f-set-toggle,
 .f-set-group .f-set-card > .f-set-toggle + .f-set-row,
 .f-set-group .f-set-card > .f-set-row + .f-set-row {
-  box-shadow: inset 0 1px 0 var(--line);
+  box-shadow: inset 0 1px 0 var(--divider);
 }
 .f-set-card .f-set-acc + .f-set-acc {
-  box-shadow: inset 0 1px 0 var(--line);
+  box-shadow: inset 0 1px 0 var(--divider);
 }
 .f-set-group > .f-set-card {
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .f-set-row,
 .f-set-toggle {
@@ -248,7 +248,7 @@
   padding: 13px 16px;
   border: 0;
   background: transparent;
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
   text-align: left;
 }
@@ -274,15 +274,15 @@ button.f-set-toggle:disabled {
   gap: 2px;
 }
 .f-set-row-title {
-  color: var(--fg);
+  color: var(--text);
 }
 .f-set-row-title.grow,
 .grow {
   flex: 1;
 }
 .f-set-hint {
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  color: var(--text-3);
   line-height: 1.45;
 }
 .f-set-row-ctl {
@@ -302,7 +302,7 @@ button.f-set-toggle:disabled {
   background: transparent;
   color: var(--accent);
   font: inherit;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   font-weight: 500;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -315,27 +315,27 @@ button.f-set-toggle:disabled {
 }
 .f-set-note {
   margin: 0 4px;
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  color: var(--text-3);
   line-height: 1.5;
 }
 .f-set-note.warn {
   margin: 0;
   padding: 0 16px 4px;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-set-preview {
   margin: 0 16px 16px;
   padding: 12px 14px;
   border-radius: 10px;
   background: var(--input-bg);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
   line-height: 1.5;
 }
 .f-set-ok {
   margin: 0 4px;
   color: var(--ok-fg);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
 }
 .f-set-plan {
   flex: 0 0 120px;
@@ -343,7 +343,7 @@ button.f-set-toggle:disabled {
 .f-set-plan-input {
   width: 120px;
   height: 28px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
 }
 
 /* Interruptor */
@@ -398,7 +398,7 @@ button.f-set-toggle:disabled {
   padding: 2px;
   border-radius: 8px;
   background: var(--input-bg);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .f-set-seg button {
   height: 26px;
@@ -406,9 +406,9 @@ button.f-set-toggle:disabled {
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: var(--fg-2);
+  color: var(--text-2);
   font: inherit;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   font-weight: 500;
   cursor: pointer;
 }
@@ -419,7 +419,6 @@ button.f-set-toggle:disabled {
 }
 
 /* Controles de formulario */
-.f-set-select,
 .f-set-input {
   height: 32px;
   min-width: 0;
@@ -427,32 +426,22 @@ button.f-set-toggle:disabled {
   border: 0;
   border-radius: 8px;
   background: var(--input-bg);
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .f-set-input.mono,
 .f-set-key {
   font-family: var(--font-mono);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
 }
-.f-set-select {
-  min-width: 180px;
-  appearance: none;
-  padding-right: 28px;
-  background-image: linear-gradient(45deg, transparent 50%, #8b909c 50%), linear-gradient(135deg, #8b909c 50%, transparent 50%);
-  background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%;
-  background-size: 5px 5px;
-  background-repeat: no-repeat;
-}
-.f-set-page .f-set-input:focus,
-.f-set-page .f-set-select:focus {
+.f-set-page .f-set-input:focus {
   outline: none;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent), 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 .f-set-label {
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
+  font-size: var(--fs-12);
+  color: var(--text-2);
 }
 .f-set-form-row {
   display: flex;
@@ -505,10 +494,6 @@ button.f-set-toggle:disabled {
 .f-set-actions .grow {
   min-width: 200px;
 }
-.f-set-toolbar {
-  display: flex;
-  justify-content: flex-end;
-}
 .f-set-slider {
   display: flex;
   align-items: center;
@@ -538,7 +523,7 @@ button.f-set-toggle:disabled {
   flex: none;
   text-align: right;
   font-family: var(--font-mono);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   color: #c9cdd6;
 }
 
@@ -547,7 +532,7 @@ button.f-set-toggle:disabled {
   position: fixed;
   right: 18px;
   bottom: 18px;
-  z-index: 70;
+  z-index: var(--z-toast);
   max-width: calc(100% - 36px);
   display: flex;
   align-items: center;
@@ -555,12 +540,12 @@ button.f-set-toggle:disabled {
   padding: 10px 14px;
   border-radius: 10px;
   background: var(--toast-bg);
-  color: var(--fg);
-  box-shadow: var(--shadow-md), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  color: var(--text);
+  box-shadow: var(--e-2), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 .f-set-toast.err {
   color: var(--danger-fg-strong);
-  box-shadow: var(--shadow-md), inset 0 0 0 1px var(--toast-border);
+  box-shadow: var(--e-2), inset 0 0 0 1px var(--toast-border);
 }
 .f-set-toast-ok {
   color: var(--ok-fg);
@@ -590,8 +575,8 @@ button.f-set-toggle:disabled {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
+  font-size: var(--fs-12);
+  color: var(--text-2);
 }
 .f-set-state.ok {
   color: var(--ok-fg);
@@ -620,7 +605,7 @@ button.f-set-toggle:disabled {
   border-radius: 50%;
   background: transparent;
   cursor: pointer;
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .f-set-sw span {
   display: block;
@@ -629,10 +614,10 @@ button.f-set-toggle:disabled {
   border-radius: 50%;
 }
 .f-set-sw.on {
-  box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px var(--fg-2);
+  box-shadow: 0 0 0 2px var(--raised), 0 0 0 3.5px var(--text-2);
 }
 .f-set-form .f-set-hint {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
 }
 
 /* ---------- Apariencia ---------- */
@@ -645,15 +630,15 @@ button.f-set-toggle:disabled {
   padding: 10px;
   border: 0;
   border-radius: 12px;
-  background: var(--card);
-  color: var(--fg);
+  background: var(--raised);
+  color: var(--text);
   font: inherit;
   text-align: left;
   display: flex;
   flex-direction: column;
   gap: 10px;
   cursor: pointer;
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .f-set-theme.on {
   box-shadow: inset 0 0 0 2px var(--accent);
@@ -698,7 +683,7 @@ button.f-set-toggle:disabled {
   border: 0;
   border-radius: 17px;
   background: transparent;
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
   cursor: pointer;
 }
@@ -716,7 +701,7 @@ button.f-set-toggle:disabled {
   margin: 0;
   padding: 14px 16px;
   border-radius: 12px;
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
   white-space: pre;
   overflow: hidden;
 }
@@ -742,26 +727,26 @@ button.f-set-toggle:disabled {
   border: 0;
   border-radius: 8px;
   background: var(--input-bg);
-  color: var(--fg);
+  color: var(--text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
   cursor: pointer;
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .f-set-key:disabled {
   cursor: default;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-set-key.capturing {
   background: var(--accent-soft);
-  color: var(--fg);
+  color: var(--text);
   font-family: inherit;
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 .f-set-key kbd {
-  font-size: var(--fs-xs);
+  font-size: var(--fs-11);
 }
 
 /* ---------- Equipo y chat / Actualizaciones ---------- */
@@ -776,7 +761,7 @@ button.f-set-toggle:disabled {
   font-weight: 600;
 }
 .f-set-status .f-set-hint {
-  color: var(--fg-2);
+  color: var(--text-2);
   margin-top: 2px;
 }
 .f-set-status-ico.lg {
@@ -814,7 +799,7 @@ button.f-set-toggle:disabled {
   text-align: center;
 }
 .f-set-about > .f-set-hint {
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-set-about > .f-set-actions {
   margin-top: 8px;
@@ -855,7 +840,7 @@ button.f-set-toggle:disabled {
   align-items: center;
   gap: 8px;
   margin-right: auto;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
 }
 .f-set-toast-x {
   min-width: 24px;

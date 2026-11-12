@@ -6,7 +6,7 @@
   gap: 6px;
 }
 .f-chat-chip svg {
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-chat-badge {
   display: inline-grid;
@@ -34,21 +34,21 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  color: var(--fg);
+  color: var(--text);
 }
 .f-chat-head {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 12px 12px 10px 14px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--divider);
   min-height: 52px;
 }
 .f-chat-title {
   margin: 0;
   flex: 1;
   min-width: 0;
-  font-size: var(--fs-md);
+  font-size: var(--fs-13);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -59,7 +59,7 @@
   gap: 6px;
   flex-wrap: wrap;
   padding: 6px 14px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--divider);
 }
 .f-chat-body {
   flex: 1;
@@ -79,18 +79,14 @@
 }
 .f-chat-block p {
   margin: 0;
-  color: var(--fg-2);
+  color: var(--text-2);
   line-height: 1.5;
 }
 .f-chat-err {
   color: var(--danger-fg, var(--danger));
   margin: 0;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   line-height: 1.4;
-}
-.f-chat-ok {
-  color: var(--success);
-  margin: 0;
 }
 
 /* ---------- Listas ---------- */
@@ -101,11 +97,11 @@
 }
 .f-chat-section h4 {
   margin: 0;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-11);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-chat-rows {
   list-style: none;
@@ -124,7 +120,7 @@
   border: 0;
   border-radius: var(--r-md, 8px);
   background: transparent;
-  color: var(--fg);
+  color: var(--text);
   text-align: left;
   cursor: pointer;
   font: inherit;
@@ -156,21 +152,21 @@
   justify-content: space-between;
   gap: 8px;
   padding: 10px 14px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--divider);
 }
 .f-chat-conn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
+  font-size: var(--fs-11);
+  color: var(--text-3);
 }
 .f-chat-conn.live svg {
-  color: var(--success);
+  color: var(--done);
 }
 .f-chat-conn.connecting svg,
 .f-chat-conn.retrying svg {
-  color: var(--warn);
+  color: var(--waiting);
 }
 .f-chat-conn.off svg {
   color: var(--danger);
@@ -181,12 +177,12 @@
   flex: none;
   border-radius: 50%;
   object-fit: cover;
-  background: var(--card);
+  background: var(--raised);
 }
 .f-chat-av-init {
   display: inline-grid;
   place-items: center;
-  color: var(--fg-2);
+  color: var(--text-2);
   font-weight: 600;
   user-select: none;
 }
@@ -222,8 +218,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--fg-muted);
-  font-size: var(--fs-xs);
+  color: var(--text-3);
+  font-size: var(--fs-11);
   margin: 4px 0 -4px;
 }
 .f-chat-day::before,
@@ -231,7 +227,7 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: var(--line-2);
+  background: var(--divider-strong);
 }
 .f-chat-msg {
   display: flex;
@@ -252,14 +248,14 @@
 }
 .f-chat-msg-head strong {
   font-weight: 600;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
 }
 .f-chat-msg.mine .f-chat-msg-head strong {
   color: var(--accent);
 }
 .f-chat-msg-head time {
-  color: var(--fg-muted);
-  font-size: var(--fs-xs);
+  color: var(--text-3);
+  font-size: var(--fs-11);
   font-variant-numeric: tabular-nums;
 }
 .f-chat-text {
@@ -267,10 +263,10 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   line-height: 1.45;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-chat-msg.failed .f-chat-text {
-  color: var(--fg-muted);
+  color: var(--text-3);
   text-decoration: line-through;
   text-decoration-color: var(--danger);
 }
@@ -283,8 +279,8 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
+  font-size: var(--fs-11);
+  color: var(--text-3);
 }
 .f-chat-state.err {
   color: var(--danger-fg, var(--danger));
@@ -303,7 +299,7 @@
   cursor: pointer;
 }
 .f-chat-errline {
-  font-size: var(--fs-xs);
+  font-size: var(--fs-11);
 }
 .f-chat-spin {
   animation: f-chat-spin 1s linear infinite;
@@ -320,7 +316,7 @@
   flex-direction: column;
   gap: 6px;
   padding: 10px 14px 12px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--divider);
   background: var(--bg);
 }
 .f-chat-composer textarea {
@@ -329,17 +325,17 @@
   min-height: 44px;
   max-height: 220px;
   padding: 9px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--divider);
   border-radius: var(--r-md, 8px);
-  background: var(--card);
-  color: var(--fg);
+  background: var(--raised);
+  color: var(--text);
   font: inherit;
   line-height: 1.4;
   box-sizing: border-box;
 }
 .f-chat-composer textarea:focus {
   outline: none;
-  border-color: var(--ring);
+  border-color: var(--accent);
   box-shadow: var(--brand-glow);
 }
 .f-chat-composer-foot {
@@ -349,8 +345,8 @@
   gap: 8px;
 }
 .f-chat-count {
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
+  font-size: var(--fs-11);
+  color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
 .f-chat-count.over {
@@ -359,41 +355,6 @@
 }
 
 /* ---------- Configuración ---------- */
-.f-chat-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.f-chat-cfg-title {
-  margin: 0;
-  font-size: var(--fs-md);
-  font-weight: 600;
-}
-.f-chat-cfg-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.f-chat-cfg-actions,
-.f-chat-session {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.f-chat-offer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: var(--r-md, 8px);
-  background: var(--info-soft, var(--card));
-}
-.f-chat-offer p {
-  margin: 0;
-  font-size: var(--fs-sm);
-}
 
 @media (prefers-reduced-motion: reduce) {
   .f-chat-spin {

@@ -47,14 +47,14 @@
 }
 .f-templates-busy {
   margin-left: 6px;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-11);
   color: var(--accent);
 }
 .f-templates-meta {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: var(--fg-3);
+  color: var(--text-3);
   min-width: 0;
 }
 .f-templates-meta.mono {
@@ -86,7 +86,7 @@
 /* ---------- Pantalla de plantillas ---------- */
 .modal-backdrop:has(> .tp-screen) {
   padding: 16px;
-  z-index: 60;
+  z-index: var(--z-palette);
 }
 .modal.tp-screen {
   position: relative;
@@ -101,8 +101,8 @@
   border: 0;
   border-radius: 14px;
   background: var(--bg);
-  color: var(--fg);
-  box-shadow: var(--shadow-lg);
+  color: var(--text);
+  box-shadow: var(--e-3);
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -117,7 +117,7 @@
 .tp-titles p {
   margin: 0;
   font-size: 12px;
-  color: var(--fg-3);
+  color: var(--text-3);
 }
 .tp-head {
   display: flex;
@@ -130,7 +130,7 @@
   box-sizing: border-box;
   flex: none;
   background: var(--surface);
-  box-shadow: inset 0 -1px 0 var(--line);
+  box-shadow: inset 0 -1px 0 var(--divider);
 }
 .tp-head h2 {
   margin: 0;
@@ -154,7 +154,7 @@
   padding: 14px 10px;
   overflow-y: auto;
   background: var(--surface);
-  box-shadow: inset -1px 0 0 var(--line);
+  box-shadow: inset -1px 0 0 var(--divider);
 }
 .tp-new-btn {
   width: 100%;
@@ -168,7 +168,7 @@
   gap: 10px;
   padding: 14px;
   border-radius: 12px;
-  background: var(--card);
+  background: var(--raised);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .tp-new-title {
@@ -188,7 +188,7 @@
   margin: 8px 0 2px 8px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .tp-row {
   display: flex;
@@ -199,7 +199,7 @@
   border: 0;
   border-radius: 9px;
   background: transparent;
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -241,7 +241,7 @@
 }
 .tp-row-desc {
   font-size: 12px;
-  color: var(--fg-3);
+  color: var(--text-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -249,7 +249,7 @@
 .tp-unsaved {
   flex: none;
   font-size: 11px;
-  color: var(--warn);
+  color: var(--waiting);
 }
 .tp-badge {
   flex: none;
@@ -261,7 +261,7 @@
   color: var(--accent);
 }
 .tp-badge.ok {
-  background: var(--success-soft);
+  background: var(--done-soft);
   color: var(--success-fg);
 }
 .tp-badge.team {
@@ -270,12 +270,12 @@
 }
 .tp-badge.mine {
   background: var(--seg-on);
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .tp-foot {
   margin: auto 6px 0;
   font-size: 12px;
-  color: var(--fg-3);
+  color: var(--text-3);
   line-height: 1.5;
 }
 .tp-main {
@@ -290,17 +290,17 @@
   gap: 10px;
   padding: 60px 16px;
   text-align: center;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .tp-none-title {
   font-weight: 600;
   font-size: 15px;
-  color: var(--fg);
+  color: var(--text);
 }
 .tp-none-sub {
   max-width: 380px;
   font-size: 12px;
-  color: var(--fg-3);
+  color: var(--text-3);
   line-height: 1.5;
 }
 .tp-detail {
@@ -355,8 +355,8 @@
   gap: 10px;
   padding: 10px 14px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--warn) 12%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 35%, transparent);
+  background: color-mix(in srgb, var(--waiting) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--waiting) 35%, transparent);
   color: var(--warn-fg);
 }
 .tp-dirty strong {
@@ -366,11 +366,11 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--warn);
+  background: var(--waiting);
 }
 .tp-dirty span:last-child {
   font-size: 12px;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .tp-actions {
   display: flex;
@@ -381,7 +381,7 @@
   height: 32px;
 }
 .tp-actions .btn.tp-def[aria-pressed='true'] {
-  background: var(--success-soft);
+  background: var(--done-soft);
   color: var(--success-fg);
 }
 .tp-card {
@@ -390,8 +390,8 @@
   gap: 14px;
   padding: 16px;
   border-radius: 12px;
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .tp-readonly {
   gap: 14px;
@@ -403,7 +403,7 @@
 }
 .tp-kv > span:first-child {
   font-size: 12px;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .tp-kv .pre {
   white-space: pre-wrap;
@@ -413,7 +413,7 @@
 .tp-hint {
   margin: 0;
   font-size: 12px;
-  color: var(--fg-3);
+  color: var(--text-3);
   line-height: 1.5;
 }
 .tp-editor {
@@ -425,7 +425,7 @@
 .tp-editor .field > label {
   font-size: 12px;
   font-weight: 400;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .tp-editor .field > input,
 .tp-editor .field > select {
@@ -433,7 +433,7 @@
   padding: 0 10px;
   border-radius: 8px;
   background: var(--input-bg);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .tp-editor .field > input[aria-invalid='true'],
 .tp-editor .field > select[aria-invalid='true'] {
@@ -446,7 +446,7 @@
 }
 .tp-field-group > span {
   font-size: 12px;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .tp-icons {
   display: flex;
@@ -469,13 +469,13 @@
   border: 0;
   border-radius: 10px;
   background: var(--input-bg);
-  color: var(--fg-2);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--text-2);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
   cursor: pointer;
 }
 .tp-icon-pick.on {
   background: var(--accent-soft);
-  color: var(--fg);
+  color: var(--text);
   box-shadow: inset 0 0 0 1.5px var(--accent);
 }
 .tp-color-pick {
@@ -488,7 +488,7 @@
   cursor: pointer;
 }
 .tp-color-pick.on {
-  box-shadow: 0 0 0 2px var(--card), 0 0 0 4px currentColor;
+  box-shadow: 0 0 0 2px var(--raised), 0 0 0 4px currentColor;
 }
 .tp-wt {
   display: flex;
@@ -501,11 +501,11 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: var(--fs-md);
+  font-size: var(--fs-13);
 }
 .tp-wt-text small {
   font-size: 12px;
-  color: var(--fg-3);
+  color: var(--text-3);
 }
 .switch-btn {
   position: relative;
@@ -544,7 +544,7 @@
 .tp-chips-lbl {
   margin-right: 4px;
   font-size: 12px;
-  color: var(--fg-3);
+  color: var(--text-3);
 }
 .tp-preview {
   display: flex;
@@ -555,13 +555,13 @@
   margin: 0 0 0 4px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .tp-preview-box {
   padding: 14px 16px;
   border-radius: 12px;
   background: var(--input-bg);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   line-height: 1.7;
@@ -574,7 +574,7 @@
   font-weight: 600;
 }
 .tp-muted {
-  color: var(--fg-3);
+  color: var(--text-3);
 }
 .tp-save-bar {
   display: flex;
@@ -665,7 +665,7 @@
   .tp-list {
     flex: 0 0 auto;
     max-height: 40%;
-    box-shadow: inset 0 -1px 0 var(--line);
+    box-shadow: inset 0 -1px 0 var(--divider);
   }
 }
 

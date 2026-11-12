@@ -144,11 +144,11 @@ function cleanable(r: RowView): boolean {
 }
 
 const TONE: Record<Tone, { bg: string; fg: string }> = {
-  ok: { bg: 'var(--success-soft)', fg: 'var(--ok-fg)' },
+  ok: { bg: 'var(--done-soft)', fg: 'var(--ok-fg)' },
   info: { bg: 'var(--info-soft)', fg: 'var(--info)' },
-  warn: { bg: 'var(--warn-soft)', fg: 'var(--warn-fg)' },
+  warn: { bg: 'var(--waiting-soft)', fg: 'var(--warn-fg)' },
   err: { bg: 'var(--danger-soft)', fg: 'var(--danger-fg)' },
-  neutral: { bg: 'var(--surface-2)', fg: 'var(--fg-2)' }
+  neutral: { bg: 'var(--surface-2)', fg: 'var(--text-2)' }
 }
 
 // ---------- Panel ----------

@@ -20,7 +20,7 @@
   height: 32px;
   padding: 0 var(--s-1);
   border-radius: var(--r-md);
-  background: var(--card);
+  background: var(--raised);
 }
 .ws-rename,
 .pane-title-input {
@@ -28,7 +28,7 @@
   flex: 1 1 auto;
   font: inherit;
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
   background: var(--surface);
   border: 1px solid var(--accent);
   border-radius: var(--r-sm);
@@ -48,13 +48,13 @@
 /* Popover de íconos. */
 .icon-picker {
   position: fixed;
-  z-index: 60;
+  z-index: var(--z-palette);
   width: 248px;
   padding: 8px;
   background: var(--surface);
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--divider-strong);
   border-radius: var(--r-md);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--e-2);
 }
 .icon-picker-grid {
   display: grid;
@@ -71,7 +71,7 @@
   line-height: 1;
   background: transparent;
   border: 0;
-  border-radius: var(--r-xs);
+  border-radius: var(--r-sm);
   cursor: pointer;
 }
 .icon-picker-grid button:hover {
@@ -94,7 +94,7 @@
 .folder-drop {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: var(--z-palette);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -105,11 +105,11 @@
   padding: 18px 26px;
   font-weight: 600;
   font-size: 15px;
-  color: var(--fg);
+  color: var(--text);
   background: var(--surface);
   border: 2px dashed var(--accent);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--e-2);
 }
 
 @media (prefers-reduced-motion: reduce) {

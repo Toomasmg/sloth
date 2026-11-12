@@ -5,7 +5,7 @@
   background: rgba(4, 5, 8, 0.66);
 }
 html[data-theme='light'] .f-move-backdrop {
-  background: var(--backdrop);
+  background: var(--scrim);
 }
 
 .modal.f-move-modal {
@@ -17,9 +17,9 @@ html[data-theme='light'] .f-move-backdrop {
   padding: 22px;
   border: 0;
   border-radius: 14px;
-  background: var(--card);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 0 1px var(--line-strong);
-  color: var(--fg);
+  background: var(--raised);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 0 1px var(--divider-strong);
+  color: var(--text);
   font-size: 13px;
 }
 
@@ -42,28 +42,28 @@ html[data-theme='light'] .f-move-backdrop {
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: var(--fg);
+  color: var(--text);
 }
 .f-move-titles p {
   margin: 6px 0 0;
   font-size: 13px;
-  color: var(--fg-2);
+  color: var(--text-2);
   line-height: 1.5;
 }
 
 .f-move-muted {
   font-size: 12px;
-  color: var(--fg-muted);
+  color: var(--text-3);
   line-height: 1.5;
 }
 .f-move-hint {
   margin: 0;
   font-size: 12px;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-move-label {
   font-size: 12px;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 
 /* Espacio de origen */
@@ -74,7 +74,7 @@ html[data-theme='light'] .f-move-backdrop {
   padding: 12px 14px;
   border-radius: 12px;
   background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .f-move-space-icon {
   width: 36px;
@@ -100,19 +100,19 @@ html[data-theme='light'] .f-move-backdrop {
   margin-top: 2px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  color: var(--fg-2);
+  color: var(--text-2);
   overflow-wrap: anywhere;
 }
 .f-move-space-acc {
   flex: none;
   text-align: right;
   font-size: 12px;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-move-space-acc strong {
   display: block;
   margin-top: 2px;
-  color: var(--fg);
+  color: var(--text);
   font-weight: 600;
 }
 
@@ -125,14 +125,14 @@ html[data-theme='light'] .f-move-backdrop {
   margin: 0 0 0 4px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 
 /* Cuentas destino (radiogroup) */
 .f-move-list {
   border-radius: 12px;
   background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
 }
 .f-move-row {
@@ -141,7 +141,7 @@ html[data-theme='light'] .f-move-backdrop {
   gap: 8px;
 }
 .f-move-row.sep {
-  box-shadow: inset 0 -1px 0 var(--line);
+  box-shadow: inset 0 -1px 0 var(--divider);
 }
 .f-move-opt {
   position: relative;
@@ -152,7 +152,7 @@ html[data-theme='light'] .f-move-backdrop {
   gap: 12px;
   padding: 12px 14px;
   cursor: pointer;
-  color: var(--fg);
+  color: var(--text);
   transition: background 0.12s, box-shadow 0.12s;
 }
 .f-move-opt.off {
@@ -201,7 +201,7 @@ html[data-theme='light'] .f-move-backdrop {
 }
 .f-move-opt-sub {
   font-size: 12px;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-move-opt-sub.warn {
   color: var(--warn-fg);
@@ -212,7 +212,7 @@ html[data-theme='light'] .f-move-backdrop {
   padding: 3px 8px;
   border-radius: 9px;
   background: var(--btn-2);
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-move-mark {
   flex: none;
@@ -260,10 +260,10 @@ html[data-theme='light'] .f-move-backdrop {
   padding: 12px 14px;
   border-radius: 12px;
   background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .f-move-body {
-  color: var(--fg);
+  color: var(--text);
   line-height: 1.55;
 }
 .f-move-keep {
@@ -286,7 +286,7 @@ html[data-theme='light'] .f-move-backdrop {
 }
 .f-move-keep-title {
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
 }
 .f-move-field {
   display: flex;
@@ -300,11 +300,11 @@ html[data-theme='light'] .f-move-backdrop {
   border: 0;
   border-radius: 8px;
   background: var(--input-bg);
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
   line-height: 1.5;
   resize: vertical;
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .f-move-text:focus {
   outline: none;
@@ -325,7 +325,7 @@ html[data-theme='light'] .f-move-backdrop {
   line-height: 1.4;
 }
 .f-move-banner.warn {
-  background: var(--warn-soft);
+  background: var(--waiting-soft);
   box-shadow: inset 0 0 0 1px var(--warn-ring);
   color: var(--warn-fg);
 }
@@ -334,7 +334,7 @@ html[data-theme='light'] .f-move-backdrop {
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: color-mix(in srgb, var(--warn) 18%, transparent);
+  background: color-mix(in srgb, var(--waiting) 18%, transparent);
   color: var(--warn-fg);
   display: grid;
   place-items: center;
@@ -367,10 +367,10 @@ html[data-theme='light'] .f-move-backdrop {
   border: 0;
   border-radius: 8px;
   background: var(--btn-2);
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
   font-weight: 500;
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
   cursor: pointer;
   transition: filter 0.12s;
 }
@@ -378,7 +378,7 @@ html[data-theme='light'] .f-move-backdrop {
   filter: brightness(1.12);
 }
 .f-move-btn:disabled {
-  color: var(--fg-2);
+  color: var(--text-2);
   cursor: default;
 }
 .f-move-btn:focus-visible,
@@ -395,9 +395,9 @@ html[data-theme='light'] .f-move-backdrop {
   gap: 10px;
   padding: 12px 14px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--success) 8%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 30%, transparent);
-  color: var(--fg);
+  background: color-mix(in srgb, var(--done) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--done) 30%, transparent);
+  color: var(--text);
 }
 .f-move-ok-ico {
   flex: none;
@@ -433,7 +433,7 @@ html[data-theme='light'] .f-move-backdrop {
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--fg-2);
+  color: var(--text-2);
   font: inherit;
   cursor: pointer;
 }
@@ -451,7 +451,7 @@ html[data-theme='light'] .f-move-backdrop {
 }
 .f-move-go.blocked {
   background: var(--seg-on);
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-move-go:hover:not(:disabled) {
   filter: brightness(1.12);
@@ -489,7 +489,7 @@ html[data-theme='light'] .f-move-backdrop {
 }
 .f-move-run-text .f-move-muted {
   margin-top: 2px;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 
 /* Estado «listo» */
@@ -504,8 +504,8 @@ html[data-theme='light'] .f-move-backdrop {
   gap: 8px;
   padding: 16px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--success) 8%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 30%, transparent);
+  background: color-mix(in srgb, var(--done) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--done) 30%, transparent);
 }
 .f-move-done-head {
   display: flex;
@@ -517,7 +517,7 @@ html[data-theme='light'] .f-move-backdrop {
   height: 30px;
   flex: none;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--success) 18%, transparent);
+  background: color-mix(in srgb, var(--done) 18%, transparent);
   color: var(--success-fg);
   display: grid;
   place-items: center;
@@ -528,12 +528,12 @@ html[data-theme='light'] .f-move-backdrop {
 }
 .f-move-done-p {
   margin: 0;
-  color: var(--fg);
+  color: var(--text);
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
 .f-move-donebox .f-move-muted.f-move-done-p {
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 
 @media (max-width: 560px) {

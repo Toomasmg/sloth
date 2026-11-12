@@ -4,9 +4,9 @@
 :root {
   /* Los tokens (colores, escala, radios, capas) viven en tokens.css. */
   font-family: var(--font-ui);
-  font-size: var(--fs-md);
+  font-size: var(--fs-13);
   line-height: 1.45;
-  color: var(--fg);
+  color: var(--text);
   background: var(--bg);
   color-scheme: dark;
   -webkit-font-smoothing: antialiased;
@@ -77,7 +77,7 @@ textarea {
   align-items: center;
   gap: 6px;
   height: var(--h-xs);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-11);
   font-weight: 600;
   padding: 0 10px;
   border: 0;
@@ -90,7 +90,7 @@ textarea {
 /* ---------- Sidebar ---------- */
 .sidebar {
   background: var(--surface);
-  border-right: 1px solid var(--line);
+  border-right: 1px solid var(--divider);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -110,7 +110,7 @@ textarea {
 }
 .wordmark-name span,
 .empty h1 span {
-  background: var(--brand-text, var(--accent));
+  background: var(--accent, var(--accent));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -118,13 +118,13 @@ textarea {
 .wordmark-tag {
   font-family: var(--font-mono);
   font-size: 10.5px;
-  color: var(--fg-muted);
+  color: var(--text-3);
   letter-spacing: 0.02em;
 }
 
 .section {
   padding: var(--s-4) var(--s-3) var(--s-3);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--divider);
 }
 .section.grow {
   flex: 1 0 auto;
@@ -145,11 +145,11 @@ textarea {
   min-height: 20px;
   margin: 0 0 var(--s-2);
   padding-left: var(--s-1);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-11);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .section-row .section-title {
   margin-bottom: 0;
@@ -162,14 +162,14 @@ textarea {
   min-width: 18px;
   text-align: center;
   background: var(--hover);
-  color: var(--fg-2);
+  color: var(--text-2);
   border-radius: 999px;
   padding: 0 5px;
   letter-spacing: 0;
 }
 .hint {
-  color: var(--fg-muted);
-  font-size: var(--fs-sm);
+  color: var(--text-3);
+  font-size: var(--fs-12);
   margin: 0 var(--s-1) var(--s-2);
 }
 .list {
@@ -186,7 +186,7 @@ textarea {
   gap: 6px;
   min-width: 0;
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -196,19 +196,19 @@ textarea {
   align-items: center;
   gap: 6px;
   min-width: 0;
-  color: var(--fg-muted);
-  font-size: var(--fs-sm);
+  color: var(--text-3);
+  font-size: var(--fs-12);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .item-sub.warn {
-  color: var(--warn);
+  color: var(--waiting);
 }
 
 /* Cuenta: tarjeta por elevación (sin borde ni barra lateral); la identidad la da el avatar. */
 .account {
-  background: var(--card);
+  background: var(--raised);
   border-radius: var(--r-md);
   padding: var(--s-3);
   display: flex;
@@ -226,7 +226,7 @@ textarea {
   place-items: center;
   border-radius: var(--r-sm);
   font-weight: 700;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   color: var(--acc);
   background: color-mix(in srgb, var(--acc) 14%, transparent);
 }
@@ -236,14 +236,14 @@ textarea {
   grid-template-columns: repeat(3, 1fr);
   margin: 0;
   padding: var(--s-2) 0 0;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--divider);
 }
 .usage div {
   display: flex;
   flex-direction: column;
   gap: 1px;
   padding: 0 var(--s-2);
-  border-left: 1px solid var(--line);
+  border-left: 1px solid var(--divider);
 }
 .usage div:first-child {
   padding-left: 0;
@@ -252,17 +252,17 @@ textarea {
 .usage dt {
   font-size: 10.5px;
   font-weight: 600;
-  color: var(--fg-muted);
+  color: var(--text-3);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 .usage dd {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: var(--fs-md);
+  font-size: var(--fs-13);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--fg);
+  color: var(--text);
 }
 
 /* Switch accesible (checkbox real con role=switch): texto a la izquierda, control a la derecha. */
@@ -272,8 +272,8 @@ textarea {
   justify-content: space-between;
   gap: var(--s-2);
   min-height: 20px;
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
+  font-size: var(--fs-12);
+  color: var(--text-2);
   cursor: pointer;
   position: relative;
 }
@@ -284,7 +284,7 @@ textarea {
   white-space: nowrap;
 }
 .switch-text .mono {
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .switch input {
   position: absolute;
@@ -306,7 +306,7 @@ textarea {
   flex: none;
   border-radius: 10px;
   background: var(--muted);
-  box-shadow: inset 0 0 0 1px var(--border-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
   position: relative;
   transition: background var(--t-fast) var(--ease), box-shadow var(--t-fast);
 }
@@ -318,12 +318,12 @@ textarea {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--fg-2);
+  background: var(--text-2);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
   transition: transform var(--t-fast) var(--ease), background var(--t-fast);
 }
 .switch:hover .switch-track {
-  box-shadow: inset 0 0 0 1px var(--fg-muted);
+  box-shadow: inset 0 0 0 1px var(--text-3);
 }
 .switch input:checked + .switch-track {
   background: var(--accent);
@@ -334,7 +334,7 @@ textarea {
   background: #ffffff;
 }
 .switch input:focus-visible + .switch-track {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -373,7 +373,7 @@ textarea {
 }
 .ws.focused,
 .ws.focused:hover {
-  background: var(--card);
+  background: var(--raised);
 }
 /* Indicador del panel enfocado: rayita en el color de la cuenta. */
 .ws.focused::before {
@@ -405,9 +405,9 @@ textarea {
   font-size: 10.5px;
   font-weight: 600;
   line-height: 18px;
-  color: var(--warn);
-  background: var(--warn-soft);
-  border-radius: var(--r-xs);
+  color: var(--waiting);
+  background: var(--waiting-soft);
+  border-radius: var(--r-sm);
   padding: 0 5px;
   white-space: nowrap;
 }
@@ -419,16 +419,16 @@ textarea {
 .ic-none,
 .ic-idle,
 .ic-sleeping {
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .ic-working {
   color: var(--info);
 }
 .ic-waiting {
-  color: var(--warn);
+  color: var(--waiting);
 }
 .ic-done {
-  color: var(--success);
+  color: var(--done);
 }
 .ic-exited {
   color: var(--danger);
@@ -470,11 +470,11 @@ textarea {
   height: var(--h-md);
   padding: 0 14px;
   border: 0;
-  border-radius: var(--radius);
+  border-radius: var(--r-md);
   background: var(--surface-hover);
-  box-shadow: inset 0 0 0 1px var(--line);
-  color: var(--fg);
-  font-size: var(--fs-md);
+  box-shadow: inset 0 0 0 1px var(--divider);
+  color: var(--text);
+  font-size: var(--fs-13);
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
@@ -489,12 +489,7 @@ textarea {
 .btn.sm {
   height: var(--h-sm);
   padding: 0 10px;
-  font-size: var(--fs-sm);
-}
-.btn.icon-only {
-  width: var(--h-md);
-  padding: 0;
-  flex: none;
+  font-size: var(--fs-12);
 }
 .btn.primary {
   background: var(--accent);
@@ -512,11 +507,11 @@ textarea {
 .btn.ghost {
   background: transparent;
   box-shadow: none;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .btn.ghost:hover:not(:disabled) {
   background: var(--hover);
-  color: var(--fg);
+  color: var(--text);
 }
 .btn.danger {
   color: var(--danger-fg);
@@ -541,13 +536,13 @@ textarea {
   border: none;
   border-radius: 7px;
   background: transparent;
-  color: var(--fg-muted);
+  color: var(--text-3);
   cursor: pointer;
   transition: background var(--t-fast) var(--ease), color var(--t-fast), opacity var(--t-fast);
 }
 .icon-btn:hover {
   background: var(--surface-hover);
-  color: var(--fg);
+  color: var(--text);
 }
 .icon-btn:active {
   background: var(--muted);
@@ -563,19 +558,19 @@ select,
 textarea {
   width: 100%;
   height: var(--h-md);
-  background: var(--card);
+  background: var(--raised);
   border: 0;
-  box-shadow: inset 0 0 0 1px var(--line-strong);
-  border-radius: var(--radius);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
+  border-radius: var(--r-md);
   padding: 0 10px;
-  color: var(--fg);
+  color: var(--text);
   outline: none;
   transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
 input:hover,
 select:hover,
 textarea:hover {
-  box-shadow: inset 0 0 0 1px var(--fg-muted);
+  box-shadow: inset 0 0 0 1px var(--text-3);
 }
 input::placeholder,
 textarea::placeholder {
@@ -584,7 +579,7 @@ textarea::placeholder {
 input:focus,
 select:focus,
 textarea:focus {
-  box-shadow: inset 0 0 0 1px var(--line-strong), var(--brand-glow);
+  box-shadow: inset 0 0 0 1px var(--divider-strong), var(--brand-glow);
 }
 input[aria-invalid='true'] {
   border-color: var(--danger);
@@ -600,29 +595,29 @@ textarea:disabled {
   display: inline-flex;
   padding: 2px;
   gap: 1px;
-  border-radius: var(--radius);
+  border-radius: var(--r-md);
   background: var(--card-hover);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .seg > button {
   height: 26px;
   padding: 0 12px;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-md);
   background: transparent;
-  color: var(--fg-2);
+  color: var(--text-2);
   font: inherit;
-  font-size: var(--fs-md);
+  font-size: var(--fs-13);
   cursor: pointer;
   transition: background var(--t-fast) var(--ease), color var(--t-fast);
 }
 .seg > button:hover:not([aria-pressed='true']):not(.on) {
-  color: var(--fg);
+  color: var(--text);
 }
 .seg > button[aria-pressed='true'],
 .seg > button.on {
   background: var(--seg-on);
-  color: var(--fg);
+  color: var(--text);
   font-weight: 500;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
@@ -636,8 +631,8 @@ textarea:disabled {
   padding: 0 10px 0 8px;
   border-radius: 13px;
   background: rgba(255, 255, 255, 0.06);
-  color: var(--fg-2);
-  font-size: var(--fs-md);
+  color: var(--text-2);
+  font-size: var(--fs-13);
   font-weight: 500;
   white-space: nowrap;
 }
@@ -668,28 +663,17 @@ textarea:disabled {
 }
 .chip-idle {
   background: rgba(255, 255, 255, 0.06);
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 
 /* ---------- Grupo de filas estilo macOS: tarjeta radio 12, filas separadas por línea interna ---------- */
 .group {
   display: flex;
   flex-direction: column;
-  background: var(--card);
-  border-radius: var(--radius-lg);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised);
+  border-radius: var(--r-lg);
+  box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
-}
-.group-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 40px;
-  padding: 8px 14px;
-  color: var(--fg);
-}
-.group-row + .group-row {
-  border-top: 1px solid var(--line);
 }
 
 /* ---------- Teclas (atajos) ---------- */
@@ -702,17 +686,11 @@ kbd,
   padding: 0 5px;
   border-radius: 5px;
   background: var(--btn-2);
-  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px var(--line-strong);
-  color: var(--fg-2);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.4), inset 0 0 0 1px var(--divider-strong);
+  color: var(--text-2);
   font-family: var(--font-mono);
   font-size: 11px;
   line-height: 1;
-}
-
-.inline-form {
-  display: flex;
-  gap: 6px;
-  margin-top: var(--s-2);
 }
 
 /* ---------- Paneles ---------- */
@@ -747,7 +725,7 @@ kbd,
   background: var(--term-bg);
   border-radius: var(--r-md);
   /* Contorno de 1px como sombra interior: separa del fondo sin "caja dentro de caja". */
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
   transition: box-shadow var(--t-med) var(--ease);
 }
@@ -770,7 +748,7 @@ kbd,
 }
 .pane.pane-waiting::after,
 .pane.pane-perm::after {
-  background: var(--warn);
+  background: var(--waiting);
 }
 .pane-head {
   display: flex;
@@ -780,7 +758,7 @@ kbd,
   flex: none;
   padding: 0 6px 0 12px;
   background: var(--surface);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--divider);
   min-width: 0;
 }
 .pane-id {
@@ -795,7 +773,7 @@ kbd,
   flex: 0 1 auto;
   min-width: 3ch;
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -832,18 +810,18 @@ kbd,
   text-align: center;
 }
 .sleeping-ico {
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .sleeping-title {
   margin: 0;
-  font-size: var(--fs-lg);
+  font-size: var(--fs-15);
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
 }
 .sleeping-lead {
   max-width: 340px;
   margin: 0 0 var(--s-2);
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 
 /* ---------- Vacío ---------- */
@@ -854,19 +832,14 @@ kbd,
   width: min(640px, 100%);
   padding: var(--s-5);
   text-align: center;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .empty h1 {
   margin: var(--s-4) 0 var(--s-2);
   font-size: 28px;
   line-height: 1.1;
   letter-spacing: -0.02em;
-  color: var(--fg);
-}
-.empty-lead {
-  margin: 0 0 var(--s-6);
-  font-size: var(--fs-lg);
-  color: var(--fg-2);
+  color: var(--text);
 }
 .steps {
   list-style: none;
@@ -884,20 +857,20 @@ kbd,
   background: var(--surface);
   border-radius: var(--r-lg);
   padding: var(--s-4);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .steps li.done {
   box-shadow: inset 0 0 0 1px rgba(138, 180, 255, 0.4);
 }
 .steps strong {
   display: block;
-  color: var(--fg);
-  font-size: var(--fs-md);
+  color: var(--text);
+  font-size: var(--fs-13);
   font-weight: 600;
 }
 .steps p {
   margin: var(--s-1) 0 0;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   line-height: 1.5;
 }
 .step-n {
@@ -908,33 +881,24 @@ kbd,
   place-items: center;
   border-radius: 50%;
   font-family: var(--font-mono);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-11);
   font-weight: 700;
-  background: var(--card);
-  color: var(--fg-2);
+  background: var(--raised);
+  color: var(--text-2);
 }
 .steps li.done .step-n {
-  background: var(--brand-grad);
+  background: var(--accent);
   color: var(--on-accent);
-}
-.empty-logo {
-  display: inline-grid;
-  place-items: center;
-  width: 112px;
-  height: 112px;
-  border-radius: 28px;
-  background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--line);
 }
 
 /* ---------- Modal ---------- */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: var(--backdrop);
+  background: var(--scrim);
   display: grid;
   place-items: center;
-  z-index: 10;
+  z-index: var(--z-sticky);
   animation: fade var(--t-fast) var(--ease);
 }
 .modal {
@@ -942,13 +906,13 @@ kbd,
   max-height: calc(100vh - 48px);
   overflow-y: auto;
   background: var(--surface);
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--divider-strong);
   border-radius: var(--r-lg);
   padding: 0 var(--s-5) var(--s-5);
   display: flex;
   flex-direction: column;
   gap: var(--s-4);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--e-3);
   animation: rise var(--t-med) var(--ease);
 }
 .modal-head {
@@ -959,12 +923,12 @@ kbd,
   flex: none;
   margin: 0 calc(var(--s-5) * -1) var(--s-1);
   padding: 0 var(--s-3) 0 var(--s-5);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--divider);
 }
 .modal-head h2 {
   flex: 1;
   margin: 0;
-  font-size: var(--fs-lg);
+  font-size: var(--fs-15);
   font-weight: 600;
 }
 .field {
@@ -973,15 +937,15 @@ kbd,
   gap: 6px;
 }
 .field > label {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   font-weight: 600;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .field-help,
 .field-error {
   margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  color: var(--text-3);
 }
 .field-error,
 .form-error {
@@ -1005,7 +969,7 @@ kbd,
   align-items: flex-start;
   gap: 10px;
   cursor: pointer;
-  color: var(--fg);
+  color: var(--text);
 }
 .check input {
   width: 16px;
@@ -1013,14 +977,14 @@ kbd,
   min-height: 0;
   margin: 2px 0 0;
   padding: 0;
-  accent-color: var(--brand-2);
+  accent-color: var(--accent);
   flex: none;
 }
 .check small {
   display: block;
   margin-top: 2px;
-  color: var(--fg-muted);
-  font-size: var(--fs-sm);
+  color: var(--text-3);
+  font-size: var(--fs-12);
 }
 .modal-actions {
   display: flex;
@@ -1028,7 +992,7 @@ kbd,
   gap: var(--s-2);
   margin: var(--s-1) calc(var(--s-5) * -1) 0;
   padding: var(--s-4) var(--s-5) 0;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--divider);
 }
 
 /* ---------- Toast ---------- */
@@ -1042,13 +1006,13 @@ kbd,
   gap: var(--s-3);
   background: var(--toast-bg);
   border: 1px solid var(--toast-border);
-  color: var(--fg);
-  font-size: var(--fs-md);
+  color: var(--text);
+  font-size: var(--fs-13);
   line-height: 1.5;
   padding: var(--s-3) var(--s-2) var(--s-3) var(--s-4);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  z-index: 20;
+  border-radius: var(--r-lg);
+  box-shadow: var(--e-2);
+  z-index: var(--z-panel);
   animation: rise var(--t-med) var(--ease);
 }
 .toast > svg {
@@ -1124,100 +1088,14 @@ kbd,
   width: auto;
   height: var(--h-sm);
   padding: 0 9px;
-  font-size: var(--fs-sm);
-}
-.perm-error {
-  margin: 0;
-  padding: 6px 10px;
-  border-radius: var(--r-sm);
-  background: var(--danger-soft);
-  color: var(--danger-fg);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
 }
 
 /* ---------- Estado de las terminales (daemon) ---------- */
 .daemon {
   position: relative;
 }
-.tb-daemon {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px var(--line-2);
-  color: var(--fg-muted);
-  font: inherit;
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--t-fast) var(--ease), color var(--t-fast);
-}
-.tb-daemon:hover,
-.tb-daemon[aria-expanded='true'] {
-  color: var(--fg-2);
-  background: var(--hover);
-}
-.tb-daemon:not(.simple) svg:first-child {
-  color: var(--brand-1);
-}
-.tb-daemon.simple svg:first-child {
-  color: var(--warn);
-}
-.daemon-pop {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  width: 288px;
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-3);
-  padding: var(--s-4);
-  background: var(--surface);
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-md);
-  user-select: text;
-  animation: fade var(--t-fast) var(--ease);
-}
-.daemon-lead {
-  margin: 0;
-  color: var(--fg-2);
-  font-size: var(--fs-sm);
-  line-height: 1.5;
-}
-.daemon-reason {
-  margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--warn);
-}
 /* Datos como lista clave/valor con separadores finos, sin cajitas. */
-.daemon-info {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  margin: 0;
-  border-top: 1px solid var(--line);
-}
-.daemon-info div {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: var(--s-2) 0;
-  border-bottom: 1px solid var(--line);
-}
-.daemon-info dt {
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--fg-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.daemon-info dd {
-  margin: 0;
-  font-size: var(--fs-md);
-  font-weight: 600;
-  color: var(--fg);
-}
-.daemon-off {
-  justify-content: center;
-}
 
 /* Sin animaciones infinitas con la ventana oculta. */
 .doc-hidden .spin,
@@ -1278,30 +1156,30 @@ html[data-lite='true'] .spin {
 }
 .modal-titles h2 {
   margin: 0;
-  font-size: var(--fs-lg);
+  font-size: var(--fs-15);
   font-weight: 600;
 }
 .modal-titles p {
   margin: 4px 0 0;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .modal-confirm {
   position: fixed;
   inset: 0;
   margin: auto;
   height: fit-content;
-  z-index: 1;
+  z-index: var(--z-pane);
   width: min(380px, calc(100vw - 32px));
   padding: var(--s-5);
 }
 .modal-confirm-title {
   margin: 0;
-  font-size: var(--fs-lg);
+  font-size: var(--fs-15);
   font-weight: 600;
 }
 
 .modal-loading {
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 
 .confirm-dialog {
@@ -1309,6 +1187,6 @@ html[data-lite='true'] .spin {
 }
 .confirm-body {
   margin: 0;
-  color: var(--fg-2);
+  color: var(--text-2);
   line-height: 1.5;
 }

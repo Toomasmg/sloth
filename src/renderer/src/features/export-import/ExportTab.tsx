@@ -4,7 +4,7 @@ import { errText, fmtKb, type Overview, type Preview, type Selection } from './t
 import { Ico, P } from './ico'
 
 const MIN_PW = 8
-const LINE = 'inset 0 -1px 0 var(--line)'
+const LINE = 'inset 0 -1px 0 var(--divider)'
 
 const dayStamp = (): string => new Date().toISOString().slice(0, 10)
 
@@ -136,7 +136,7 @@ export function ExportTab({ ui }: { ui: UiCtx }): React.JSX.Element {
             {ov.espacios.map((e) => (
               <label key={e.id} className="f-ei-row sub">
                 <input type="checkbox" checked={sel.espacios.includes(e.id)} onChange={() => toggleSpace(e.id)} />
-                <span className="f-ei-dot" style={{ background: e.color ?? 'var(--fg-muted)' }} aria-hidden="true" />
+                <span className="f-ei-dot" style={{ background: e.color ?? 'var(--text-3)' }} aria-hidden="true" />
                 <span className="f-ei-name">{e.nombre}</span>
                 <span className="f-ei-chip">{e.cuenta}</span>
                 <span className="f-ei-path mono">{e.ruta}</span>

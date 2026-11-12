@@ -14,7 +14,7 @@
   border: 0;
   border-radius: var(--r-sm);
   background: transparent;
-  color: var(--fg-muted);
+  color: var(--text-3);
   cursor: pointer;
   text-align: left;
 }
@@ -62,7 +62,7 @@
 }
 .f-wt-sub {
   margin: 6px 0 0;
-  color: var(--fg-2);
+  color: var(--text-2);
   line-height: 1.5;
 }
 .f-wt-head-actions {
@@ -83,8 +83,8 @@
   gap: 4px;
   padding: 14px 16px;
   border-radius: 12px;
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .f-wt-tile-n {
   font-size: 22px;
@@ -93,7 +93,7 @@
 }
 .f-wt-tile-l {
   font-size: 12px;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 
 .f-wt-filters {
@@ -112,15 +112,15 @@
   padding: 0 10px;
   border-radius: 8px;
   background: var(--input-bg);
-  color: var(--fg-muted);
-  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text-3);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .f-wt-search input {
   flex: 1;
   min-width: 0;
   border: 0;
   background: transparent;
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
   box-shadow: none;
 }
@@ -133,9 +133,9 @@
   border: 0;
   border-radius: 8px;
   background: var(--input-bg);
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .f-wt-pill {
   height: 32px;
@@ -143,12 +143,12 @@
   border: 0;
   border-radius: 16px;
   background: var(--btn-2);
-  color: var(--fg-2);
+  color: var(--text-2);
   font: inherit;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .f-wt-pill.on {
   background: var(--info-soft);
@@ -162,7 +162,7 @@
 .f-wt-result {
   margin-left: 4px;
   font-size: 12px;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 
 .f-wt-empty,
@@ -170,21 +170,21 @@
   margin: 0;
   padding: 28px 16px;
   text-align: center;
-  color: var(--fg-2);
+  color: var(--text-2);
   border-radius: 12px;
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .f-wt-empty-group {
   margin: 0;
   padding: 16px;
   font-size: 12px;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-wt-foot {
   margin: 0;
   font-size: 12px;
-  color: var(--fg-muted);
+  color: var(--text-3);
   line-height: 1.5;
 }
 
@@ -194,8 +194,8 @@
   display: flex;
   flex-direction: column;
   border-radius: 12px;
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
 }
 .f-wt-group-head {
@@ -204,7 +204,7 @@
   align-items: center;
   gap: 8px 10px;
   padding: 12px 16px;
-  box-shadow: inset 0 -1px 0 var(--line);
+  box-shadow: inset 0 -1px 0 var(--divider);
 }
 .f-wt-group-head h2 {
   margin: 0;
@@ -219,12 +219,12 @@
   height: 26px;
   flex: none;
   border-radius: 7px;
-  background: var(--success-soft);
+  background: var(--done-soft);
   color: var(--success-fg);
 }
 .f-wt-group-count {
   font-size: 12px;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-wt-pad {
   padding: 12px 16px;
@@ -241,7 +241,7 @@
   min-width: 0;
 }
 .f-wt-row.sep {
-  box-shadow: inset 0 -1px 0 var(--line);
+  box-shadow: inset 0 -1px 0 var(--divider);
 }
 /* Encabezados de columna: mismo grid que las filas. */
 .f-wt-cols {
@@ -250,8 +250,8 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--fg-muted);
-  box-shadow: inset 0 -1px 0 var(--line);
+  color: var(--text-3);
+  box-shadow: inset 0 -1px 0 var(--divider);
 }
 .f-wt-cols-end {
   text-align: right;
@@ -279,7 +279,7 @@
   padding: 1px 7px;
   border-radius: 9px;
   background: var(--btn-2);
-  color: var(--fg-2);
+  color: var(--text-2);
   white-space: nowrap;
 }
 .f-wt-folder {
@@ -287,7 +287,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-wt-space {
   display: flex;
@@ -303,10 +303,10 @@
 }
 .f-wt-space-acc {
   font-size: 11px;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-wt-muted {
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-wt-chips {
   display: flex;
@@ -328,13 +328,13 @@
   flex-direction: column;
   gap: 2px;
   font-size: 12px;
-  color: var(--fg-2);
+  color: var(--text-2);
   white-space: nowrap;
 }
 /* Tamaño en disco de la carpeta, debajo de «último uso». */
 .f-wt-size {
   font-size: 11.5px;
-  color: var(--fg-muted);
+  color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
 .f-wt-actions {
@@ -354,7 +354,7 @@
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: var(--fg-2);
+  color: var(--text-2);
   font: inherit;
   font-size: 12px;
   white-space: nowrap;
@@ -375,17 +375,17 @@
 }
 .f-wt-btn.solid {
   background: var(--btn-2);
-  color: var(--fg);
+  color: var(--text);
 }
 .f-wt-btn.solid:hover:not(:disabled) {
   filter: brightness(1.12);
   background: var(--btn-2);
 }
 .f-wt-btn.ring {
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .f-wt-btn.plain {
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-wt-btn.primary {
   background: var(--accent);
@@ -429,7 +429,7 @@
   padding: 12px 14px;
   border-radius: 10px;
   background: var(--surface-2);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .f-wt-confirm.danger {
   box-shadow: inset 0 0 0 1px var(--toast-border);
@@ -467,10 +467,10 @@
   border: 0;
   border-radius: 8px;
   background: var(--input-bg);
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
   font-size: 12.5px;
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .f-wt-input::placeholder {
   color: var(--placeholder);
@@ -488,7 +488,7 @@
   position: fixed;
   right: 18px;
   bottom: 18px;
-  z-index: 30;
+  z-index: var(--z-toast);
   max-width: calc(100vw - 36px);
   display: flex;
   align-items: center;
@@ -496,8 +496,8 @@
   padding: 10px 14px;
   border-radius: 10px;
   background: var(--toast-bg);
-  color: var(--fg);
-  box-shadow: var(--shadow-lg);
+  color: var(--text);
+  box-shadow: var(--e-3);
 }
 
 /* ---------- Diálogos ---------- */
@@ -525,7 +525,7 @@
 .f-wt-lead {
   margin: 0;
   font-size: 13px;
-  color: var(--fg-2);
+  color: var(--text-2);
   line-height: 1.5;
 }
 .f-wt-field {
@@ -533,16 +533,16 @@
   flex-direction: column;
   gap: 5px;
   font-size: 12px;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-wt-folder-box {
   padding: 8px 10px;
   border-radius: 8px;
   background: var(--input-bg);
-  color: var(--fg-2);
+  color: var(--text-2);
   font-size: 12px;
   overflow-wrap: anywhere;
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .f-wt-check {
   display: flex;
@@ -560,7 +560,7 @@
 .f-wt-grow {
   flex: 1 1 200px;
   font-size: 12px;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 
 .f-wt-list {
@@ -568,7 +568,7 @@
   flex-direction: column;
   border-radius: 10px;
   background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
 }
 .f-wt-pick {
@@ -582,7 +582,7 @@
   background: var(--hover);
 }
 .f-wt-pick.sep {
-  box-shadow: inset 0 -1px 0 var(--line);
+  box-shadow: inset 0 -1px 0 var(--divider);
 }
 .f-wt-pick input {
   accent-color: var(--accent);
@@ -603,14 +603,14 @@
   margin-left: auto;
   padding-top: 1px;
   font-size: 12px;
-  color: var(--fg-2);
+  color: var(--text-2);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .f-wt-reason {
   font-family: inherit;
   font-size: 12px;
-  color: var(--fg-muted);
+  color: var(--text-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -96,52 +96,16 @@
   --info-soft: rgba(138, 180, 255, 0.14);
 
   /* ---------- Elevación y capa oscura de los modales ---------- */
-  --e-0: none;
   --e-1: 0 1px 2px rgba(0, 0, 0, 0.35);
   --e-2: 0 16px 40px rgba(0, 0, 0, 0.45);
   --e-3: 0 24px 64px rgba(0, 0, 0, 0.5);
   --scrim: rgba(8, 9, 12, 0.66);
-
-  /* ---------- Alias de los nombres de antes (obsoletos: se van en la fase 7) ---------- */
-  --fg: var(--text);
-  --fg-2: var(--text-2);
-  --fg-3: var(--text-3);
-  --fg-muted: var(--text-3);
-  --card: var(--raised);
-  --border: var(--divider);
-  --line: var(--divider);
-  --border-strong: var(--divider-strong);
-  --line-strong: var(--divider-strong);
-  --line-2: var(--divider-strong);
-  --warn: var(--waiting);
-  --warn-soft: var(--waiting-soft);
-  --success: var(--done);
-  --success-soft: var(--done-soft);
-  --ok: var(--done);
-  --ring: var(--accent);
   --acc: var(--accent);
-  --brand-1: var(--accent);
-  --brand-2: var(--accent);
-  --brand-grad: var(--accent);
-  --brand-text: var(--accent);
   --brand-glow: 0 0 0 3px rgba(138, 180, 255, 0.28);
-  --check-border: var(--control-border);
-  --r-xs: var(--r-sm);
-  --radius-sm: var(--r-md);
-  --radius: var(--r-md);
-  --radius-lg: var(--r-lg);
-  --fs-xs: var(--fs-11);
-  --fs-sm: var(--fs-12);
-  --fs-md: var(--fs-13);
-  --fs-lg: var(--fs-15);
-  --fs-xl: var(--fs-18);
-  --backdrop: var(--scrim);
-  --shadow-md: var(--e-2);
-  --shadow-lg: var(--e-3);
-  --press: var(--muted);
   --hover: var(--surface-hover);
+  --press: var(--muted);
 
-  /* ---------- Superficies y controles heredados (aún los usan estilos viejos) ---------- */
+  /* ---------- Superficies y controles de componentes ---------- */
   --surface-2: #111319;
   --card-hover: #1b1f29;
   --surface-hover: #222734;
@@ -153,10 +117,7 @@
   --diff-add: rgba(95, 212, 166, 0.1);
   --diff-del: rgba(255, 122, 122, 0.1);
   --selection: rgba(138, 180, 255, 0.3);
-  --mark: rgba(240, 180, 90, 0.28);
-  --info-fg: var(--info);
   --warn-fg: #f5c77e;
-  --warn-strong-fg: #ffd699;
   --warn-ring: rgba(240, 180, 90, 0.4);
   --warn-tint: rgba(240, 180, 90, 0.06);
   --warn-line: rgba(240, 180, 90, 0.22);
@@ -169,15 +130,10 @@
   --backdrop-soft: rgba(10, 11, 15, 0.6);
   --toast-bg: #1f2330;
   --toast-border: rgba(255, 122, 122, 0.35);
-  --card-acc: #14171f;
   --panes-bg: var(--sunken);
   --pane-bg: #0f1117;
   --search-bg: #171a22;
-  --newbtn-bg: #191c25;
   --seg-on: #3a4152;
-  --fg-label: #c9cdd6;
-  --chip-bg: #20242e;
-  --confirm-bg: #1a1d26;
   --perm-bg: #1a1d26;
 
   /* Terminal: settings/store.ts arma el tema de xterm leyendo estos. */
@@ -186,10 +142,6 @@
   --term-cursor: #8ab4ff;
   --term-selection: rgba(138, 180, 255, 0.3);
   /* Logo (Logo.tsx). */
-  --logo-1: #8ab4ff;
-  --logo-2: #5b86c9;
-  --logo-core-fill: #1b1f29;
-  --logo-prompt: #8ab4ff;
 }
 
 /* ---------- Densidad «cómoda»: más aire y controles más altos ---------- */
@@ -260,9 +212,7 @@ html[data-theme='light'] {
   --diff-add: rgba(26, 127, 87, 0.12);
   --diff-del: rgba(198, 40, 40, 0.1);
   --selection: rgba(40, 98, 208, 0.22);
-  --mark: rgba(163, 90, 0, 0.22);
   --warn-fg: #8a4a00;
-  --warn-strong-fg: #8a5a00;
   --warn-ring: rgba(163, 90, 0, 0.4);
   --warn-tint: #fbf7ef;
   --warn-line: rgba(163, 90, 0, 0.16);
@@ -274,25 +224,16 @@ html[data-theme='light'] {
   --backdrop-soft: rgba(18, 22, 32, 0.22);
   --toast-bg: #fdf0f0;
   --toast-border: rgba(198, 40, 40, 0.25);
-  --card-acc: #ffffff;
   --panes-bg: #e6e6e2;
   --pane-bg: #ffffff;
   --search-bg: #ebebe7;
-  --newbtn-bg: #ffffff;
   --seg-on: #ffffff;
-  --fg-label: #3d4250;
-  --chip-bg: #ebebe7;
-  --confirm-bg: #fdf7ec;
   --perm-bg: #fdf7ec;
 
   --term-bg: #ffffff;
   --term-fg: #1f2430;
   --term-cursor: #2862d0;
   --term-selection: rgba(40, 98, 208, 0.2);
-  --logo-1: #2862d0;
-  --logo-2: #2459b8;
-  --logo-core-fill: #12151c;
-  --logo-prompt: #2862d0;
 
   color-scheme: light;
 }

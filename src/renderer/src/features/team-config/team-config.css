@@ -1,12 +1,12 @@
 /* Función «team-config»: sección «Equipo» compacta y sus diálogos. */
 .f-team-config .section-title svg {
-  color: var(--brand-2);
+  color: var(--accent);
 }
 .f-team-config-name {
   text-transform: none;
   letter-spacing: 0;
   font-weight: 500;
-  color: var(--fg-2);
+  color: var(--text-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -40,7 +40,7 @@
   background: var(--info-soft);
   color: var(--info);
   font: inherit;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -58,7 +58,7 @@
 }
 .f-team-config-chip:focus-visible,
 .f-team-config-link:focus-visible {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 .f-team-config-chip-row .icon-btn,
@@ -68,12 +68,12 @@
   flex: none;
 }
 .f-team-config-sugg {
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
+  font-size: var(--fs-12);
+  color: var(--text-2);
 }
 .f-team-config-sugg > svg {
   flex: none;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-team-config-sugg .grow-min {
   overflow: hidden;
@@ -98,24 +98,24 @@
   border: 0;
   border-radius: var(--r-sm);
   background: var(--hover);
-  color: var(--fg-2);
+  color: var(--text-2);
   font: inherit;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-11);
   cursor: pointer;
 }
 .f-team-config-link:hover {
   background: var(--press);
-  color: var(--fg);
+  color: var(--text);
 }
 .f-team-config-link svg {
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-team-config-invalid {
   display: flex;
   gap: 6px;
   margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--warn);
+  font-size: var(--fs-12);
+  color: var(--waiting);
   line-height: 1.4;
 }
 .f-team-config-invalid svg {
@@ -128,7 +128,7 @@
   width: min(620px, calc(100vw - 32px));
 }
 .f-team-config-icon {
-  color: var(--brand-1);
+  color: var(--accent);
 }
 .f-team-config-plan {
   list-style: none;
@@ -144,7 +144,7 @@
   gap: var(--s-2);
   padding: 6px var(--s-2);
   border-radius: var(--r-sm);
-  background: var(--card);
+  background: var(--raised);
 }
 .f-team-config-plan li > svg {
   flex: none;
@@ -152,10 +152,10 @@
   color: var(--info);
 }
 .f-team-config-plan li.is-same > svg {
-  color: var(--success);
+  color: var(--done);
 }
 .f-team-config-plan li.is-error > svg {
-  color: var(--warn);
+  color: var(--waiting);
 }
 .f-team-config-plan .item-sub {
   display: block;
@@ -163,8 +163,8 @@
 }
 .f-team-config-act {
   flex: none;
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
+  font-size: var(--fs-11);
+  color: var(--text-3);
   margin-top: 2px;
 }
 .f-team-config-plan li:not(.is-same):not(.is-error) .f-team-config-act {
@@ -175,8 +175,8 @@
   align-items: center;
   gap: 6px;
   margin: 0;
-  color: var(--success);
-  font-size: var(--fs-sm);
+  color: var(--done);
+  font-size: var(--fs-12);
   flex-wrap: wrap;
 }
 .f-team-config-pre-wrap {
@@ -189,16 +189,16 @@
   padding: var(--s-3);
   border-radius: var(--r-md);
   background: var(--term-bg);
-  font-size: var(--fs-xs);
+  font-size: var(--fs-11);
   line-height: 1.55;
-  color: var(--fg-2);
+  color: var(--text-2);
   white-space: pre;
 }
 .f-team-config-pre:focus-visible {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--accent);
 }
 .f-team-config-warn {
-  color: var(--warn);
+  color: var(--waiting);
   vertical-align: -2px;
 }
 .f-team-config-fs {
@@ -212,9 +212,9 @@
 .f-team-config-fs legend {
   padding: 0;
   margin-bottom: 6px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   font-weight: 600;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-team-config-link-row {
   display: grid;
