@@ -1,7 +1,6 @@
-import { captureOpener } from '../../return-focus'
-import { FOCUSABLE, nextFocusIndex } from '../../focus-trap'
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { ArrowsClockwise, CheckCircle, CircleNotch, Key, Plus, SignIn, SignOut, WarningCircle, X } from '@phosphor-icons/react'
+import { SidePanel } from '../../ui/SidePanel'
+import { useEffect, useState, type KeyboardEvent } from 'react'
+import { ArrowsClockwise, CheckCircle, CircleNotch, Key, Plus, SignIn, SignOut, WarningCircle } from '@phosphor-icons/react'
 import type { ChatConnection, ChatSnapshot, ChatTeam, ChatThread } from '../../../../shared/chat'
 import { convKey } from '../../../../shared/chat'
 import { useUi, type UiCtx } from '../host'
@@ -36,15 +35,7 @@ export function ChatDrawer(): React.JSX.Element {
   const d = useDrawer()
   const snap = useChatSnapshot()
   const [modal, setModal] = useState<Modal>(null)
-  const ref = useRef<HTMLDivElement>(null)
   const key = d.conv ? convKey(d.conv) : 'list'
-
-  // Foco: entra al diálogo y, al cerrar, vuelve a donde estaba (el botón Chat).
-  useLayoutEffect(() => {
-    const restore = captureOpener()
-    ref.current?.focus()
-    return restore
-  }, [])
 
   // Qué mira el usuario (para no leídos y avisos en main). Al cerrar: open false.
   useEffect(() => {
@@ -57,37 +48,18 @@ export function ChatDrawer(): React.JSX.Element {
   const thread = d.conv?.kind === 'dm' ? threadOf(snap, d.conv.id) : undefined
   const close = (): void => setModal(null)
 
+  // Con un modal abierto, Esc cierra el modal; si no, lo cierra el SidePanel.
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
-    if (e.key === 'Tab' && !e.defaultPrevented && ref.current) {
-      const list = [...ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.getClientRects().length > 0)
-      const i = nextFocusIndex(list.length, list.indexOf(document.activeElement as HTMLElement), e.shiftKey)
-      if (i >= 0) {
-        e.preventDefault()
-        list[i].focus()
-      }
-      return
-    }
-    if (e.key !== 'Escape' || e.defaultPrevented) return
-    e.stopPropagation()
-    // Con un modal abierto, Escape cierra el modal; si no, cierra el drawer.
-    if (modal) setModal(null)
-    else closeChat()
+    if (e.key !== 'Escape' || e.defaultPrevented || !modal) return
+    e.preventDefault()
+    setModal(null)
   }
 
   const showConv = !!d.conv && (!!team || !!thread)
 
   return (
-    <>
-      <div className="f-chat-scrim" onMouseDown={closeChat} aria-hidden="true" />
-      <div
-        ref={ref}
-        className="f-chat-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Chat del equipo"
-        tabIndex={-1}
-        onKeyDown={onKeyDown}
-      >
+    <SidePanel labelId="f-chat-title" title="Chat del equipo" onClose={closeChat} width={420}>
+      <div className="f-chat-drawer" onKeyDown={onKeyDown}>
         {showConv && d.conv ? (
           <Conversation
             key={convKey(d.conv)}
@@ -98,7 +70,6 @@ export function ChatDrawer(): React.JSX.Element {
             role={team?.role}
             meId={snap?.auth.status === 'signedIn' ? snap.auth.me.id : undefined}
             onBack={() => showChatList()}
-            onClose={closeChat}
             onModal={(k) => setModal(k)}
           />
         ) : (
@@ -140,7 +111,7 @@ export function ChatDrawer(): React.JSX.Element {
           />
         )}
       </div>
-    </>
+    </SidePanel>
   )
 }
 
@@ -170,13 +141,6 @@ function ConnIcon({ c }: { c: ChatConnection }): React.JSX.Element {
 function ListView({ snap, onModal, ui }: { snap: ChatSnapshot | null; onModal(k: Modal): void; ui: UiCtx }): React.JSX.Element {
   return (
     <>
-      <header className="f-chat-head">
-        <h3 className="f-chat-title">Chat del equipo</h3>
-        <button type="button" className="icon-btn" onClick={closeChat} aria-label="Cerrar chat">
-          <X size={16} aria-hidden="true" />
-        </button>
-      </header>
-
       <div className="f-chat-body">
         {!snap && <p className="hint">Cargando…</p>}
         {snap && <ListBody snap={snap} onModal={onModal} ui={ui} />}

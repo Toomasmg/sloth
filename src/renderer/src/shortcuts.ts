@@ -27,6 +27,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: [['Ctrl', 'Shift', 'B']], what: 'Enviar a varios espacios', group: 'General', id: 'broadcast' },
   { keys: [['Ctrl', 'N']], what: 'Nuevo espacio', group: 'General', id: 'new' },
   { keys: [['Ctrl', 'B']], what: 'Mostrar u ocultar la barra lateral', group: 'General', id: 'sidebar' },
+  { keys: [['Ctrl', 'Shift', '1–5']], what: 'Ir a Espacios (1), Tickets (2), Equipo (3), Historial (4) o Ramas aparte (5)', group: 'General' },
   { keys: [['Ctrl', 'Shift', 'M']], what: 'Abrir el chat del equipo', group: 'Chat', id: 'chat' },
   { keys: [['Esc']], what: 'Cerrar ventanas y paletas', group: 'General' },
   { keys: [['F2']], what: 'Renombrar el panel activo (o el espacio enfocado en la lista)', group: 'Paneles', id: 'rename' },
@@ -137,6 +138,16 @@ export function comboFromEvent(e: KeyboardEvent): string | null {
 
 const norm = (s: string): string => canonicalCombo(s) ?? s
 
+/** «Ctrl Shift 1–5» son cinco combinaciones: así un atajo propio no puede pisar ninguna. */
+function expandRange(keys: string[]): string[][] {
+  const last = keys[keys.length - 1] ?? ''
+  const m = /^(\d)–(\d)$/.exec(last)
+  if (!m) return [keys]
+  const out: string[][] = []
+  for (let d = Number(m[1]); d <= Number(m[2]); d++) out.push([...keys.slice(0, -1), String(d)])
+  return out
+}
+
 /**
  * Qué otra cosa usa ya esta combinación: otra acción configurable o un atajo fijo de la app.
  * Devuelve el nombre para mostrar, o null si está libre.
@@ -149,7 +160,7 @@ export function findConflict(id: ShortcutId, combo: string, custom: Partial<Reco
   }
   for (const s of SHORTCUTS) {
     if (s.id) continue
-    for (const k of s.keys) if (norm(k.join(' ')) === target) return s.what
+    for (const k of s.keys) for (const c of expandRange(k)) if (norm(c.join(' ')) === target) return s.what
   }
   return null
 }

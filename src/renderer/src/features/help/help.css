@@ -3,7 +3,7 @@
 /* Novedades */
 .f-help-entry + .f-help-entry {
   padding-top: var(--s-3);
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--divider);
 }
 .f-help-entry header {
   display: flex;
@@ -13,7 +13,7 @@
 }
 .f-help-entry h3 {
   margin: 0;
-  font-size: var(--fs-md);
+  font-size: var(--fs-13);
   font-weight: 600;
 }
 .f-help-entry ul {
@@ -22,8 +22,8 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
+  font-size: var(--fs-12);
+  color: var(--text-2);
 }
 
 /* Invitar */
@@ -32,12 +32,12 @@
   min-height: 150px;
   resize: vertical;
   padding: var(--s-3);
-  background: var(--card);
-  border: 1px solid var(--line-2);
+  background: var(--raised);
+  border: 1px solid var(--divider-strong);
   border-radius: var(--r-sm);
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   line-height: 1.5;
 }
 .f-help-copied {
@@ -45,6 +45,6 @@
   align-items: center;
   gap: 6px;
   margin-right: auto;
-  font-size: var(--fs-sm);
-  color: var(--success);
+  font-size: var(--fs-12);
+  color: var(--done);
 }

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
-import { EyeIcon, HideIcon, PencilIcon, TerminalIcon } from '../../icons/SlothIcons'
-import { PaneMenu, type PaneMenuItem } from '../../layout/PaneMenu'
+import { EyeIcon, HideIcon, MoreIcon, PencilIcon, TerminalIcon } from '../../icons/SlothIcons'
+import { IconButton, Menu, type MenuItem } from '../../ui'
 import { dayLabel, durLabel, fmtTime, plainSummary, plural, spaceColor, STATUS_LABEL } from './model'
 import type { DetailItem, OpenResult, PrefsReply, SessionInfo, SessionRow } from './types'
 
@@ -118,7 +118,7 @@ export function SessionDetail({
     }
   }
 
-  const menuItems: PaneMenuItem[] = [
+  const menuItems: MenuItem[] = [
     isHidden
       ? { id: 'show', label: 'Volver a mostrar', icon: <EyeIcon size={15} />, onSelect: () => void setHidden(false) }
       : {
@@ -194,7 +194,11 @@ export function SessionDetail({
         <button type="button" className="btn ghost hd-del" onClick={() => setAskDel(true)} disabled={deleting}>
           Borrar
         </button>
-        <PaneMenu label="Más acciones de la conversación" items={menuItems} />
+        <Menu
+          aria-label="Acciones de la conversación"
+          items={menuItems}
+          trigger={(p) => <IconButton {...p} label="Más acciones de la conversación" icon={<MoreIcon size={16} />} />}
+        />
       </div>
 
       {askDel && (

@@ -16,11 +16,11 @@
 .ws-edit {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: var(--row-min-h);
-  padding: 6px 10px;
+  gap: var(--s-2);
+  height: 32px;
+  padding: 0 var(--s-1);
   border-radius: var(--r-md);
-  background: var(--card);
+  background: var(--raised);
 }
 .ws-rename,
 .pane-title-input {
@@ -28,7 +28,7 @@
   flex: 1 1 auto;
   font: inherit;
   font-weight: 600;
-  color: var(--fg);
+  color: var(--text);
   background: var(--surface);
   border: 1px solid var(--accent);
   border-radius: var(--r-sm);
@@ -45,67 +45,16 @@
   outline-offset: 1px;
 }
 
-/* Botón de ícono en el header del panel: muestra el ícono o un Smiley tenue. */
-.pane-icon-btn {
-  align-self: center;
-  flex: none;
-  width: 24px;
-  height: 24px;
-  font-size: 13px;
-  color: var(--fg-muted);
-}
-.pane-icon-btn span {
-  line-height: 1;
-}
-
-/* Menú chico del espacio en el sidebar (clic derecho). */
-.ws-menu {
-  position: fixed;
-  z-index: 60;
-  min-width: 180px;
-  padding: 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  background: var(--surface);
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-md);
-}
-.ws-menu button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 10px;
-  text-align: left;
-  font: inherit;
-  font-size: 13px;
-  color: var(--fg);
-  background: transparent;
-  border: 0;
-  border-radius: var(--r-xs);
-  cursor: pointer;
-}
-.ws-menu button:hover,
-.ws-menu button:focus-visible {
-  background: var(--hover);
-  outline: none;
-}
-.ws-menu button:focus-visible {
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
-
 /* Popover de íconos. */
 .icon-picker {
   position: fixed;
-  z-index: 60;
+  z-index: var(--z-palette);
   width: 248px;
   padding: 8px;
   background: var(--surface);
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--divider-strong);
   border-radius: var(--r-md);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--e-2);
 }
 .icon-picker-grid {
   display: grid;
@@ -122,7 +71,7 @@
   line-height: 1;
   background: transparent;
   border: 0;
-  border-radius: var(--r-xs);
+  border-radius: var(--r-sm);
   cursor: pointer;
 }
 .icon-picker-grid button:hover {
@@ -145,7 +94,7 @@
 .folder-drop {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: var(--z-palette);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -156,15 +105,14 @@
   padding: 18px 26px;
   font-weight: 600;
   font-size: 15px;
-  color: var(--fg);
+  color: var(--text);
   background: var(--surface);
   border: 2px dashed var(--accent);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--e-2);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ws-menu,
   .icon-picker,
   .folder-drop {
     transition: none;

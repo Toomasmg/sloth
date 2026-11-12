@@ -11,7 +11,7 @@ const PRIO_PATH = {
 export const prioPath = (p?: string): string => PRIO_PATH[(Math.min(prioRank(p), 3) as keyof typeof PRIO_PATH)]
 /** Color del texto de prioridad, como en el artboard: urgente coral, alta ámbar, media gris claro, baja gris. */
 export const prioTone = (p?: string): string =>
-  prioRank(p) === 0 ? 'var(--danger-fg)' : prioRank(p) === 1 ? 'var(--warn-fg)' : prioRank(p) === 2 ? 'var(--g-c9)' : 'var(--fg-2)'
+  prioRank(p) === 0 ? 'var(--danger-fg)' : prioRank(p) === 1 ? 'var(--warn-fg)' : prioRank(p) === 2 ? 'var(--g-c9)' : 'var(--text-2)'
 
 const KIND = { pendiente: 'todo', en_curso: 'doing', revision: 'review', bloqueado: 'error', hecho: 'todo' } as const
 

@@ -9,10 +9,10 @@
   box-sizing: border-box;
   padding: 3px 4px 3px 10px;
   border-radius: 15px;
-  background: var(--success-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 28%, transparent);
-  color: var(--fg-2);
-  font-size: var(--fs-sm);
+  background: var(--done-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--done) 28%, transparent);
+  color: var(--text-2);
+  font-size: var(--fs-12);
 }
 .f-updater-banner > svg {
   flex: none;
@@ -20,7 +20,7 @@
 }
 .f-updater-banner-text {
   min-width: 0;
-  color: var(--fg);
+  color: var(--text);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -30,16 +30,16 @@
   height: 24px;
   padding: 0 9px;
   border-radius: 12px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   font-weight: 600;
 }
 .f-updater-banner .btn.ghost {
   font-weight: 400;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 
 .f-updater-backdrop {
-  z-index: 60;
+  z-index: var(--z-palette);
 }
 .f-updater-dialog {
   position: relative;
@@ -51,8 +51,8 @@
   box-sizing: border-box;
   padding: 22px;
   border-radius: 14px;
-  background: var(--card);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), inset 0 0 0 1px var(--line-strong);
+  background: var(--raised);
+  box-shadow: var(--e-3), inset 0 0 0 1px var(--divider-strong);
   overflow: hidden;
 }
 .f-updater-dialog:focus {
@@ -62,7 +62,7 @@
 .f-updater-dialog .f-updater-actions .btn {
   height: 34px;
   padding: 0 14px;
-  font-size: var(--fs-md);
+  font-size: var(--fs-13);
 }
 .f-updater-dialog .f-updater-actions .btn.primary {
   padding: 0 16px;
@@ -91,12 +91,12 @@
   letter-spacing: -0.01em;
 }
 .f-updater-dialog.is-err .f-updater-titles h2 {
-  font-size: var(--fs-xl);
+  font-size: var(--fs-18);
 }
 .f-updater-titles p {
   margin: 4px 0 0;
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
+  font-size: var(--fs-12);
+  color: var(--text-2);
   line-height: 1.5;
 }
 .f-updater-logo {
@@ -118,8 +118,8 @@
   border-radius: 50%;
 }
 .f-updater-ico.ok {
-  background: var(--success-soft);
-  color: var(--success);
+  background: var(--done-soft);
+  color: var(--done);
 }
 .f-updater-ico.danger {
   background: var(--danger-soft);
@@ -130,8 +130,8 @@
   padding: 12px 14px;
   border-radius: 12px;
   background: var(--surface);
-  box-shadow: inset 0 0 0 1px var(--line);
-  color: var(--fg-2);
+  box-shadow: inset 0 0 0 1px var(--divider);
+  color: var(--text-2);
   line-height: 1.55;
 }
 .f-updater-notes {
@@ -152,7 +152,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   font-weight: 600;
 }
 .f-updater-gdot {
@@ -176,7 +176,7 @@
   align-items: flex-start;
   gap: 10px;
   line-height: 1.5;
-  color: var(--fg);
+  color: var(--text);
 }
 .f-updater-bullet {
   width: 5px;
@@ -187,7 +187,7 @@
 }
 .f-updater-muted {
   margin: 0;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-updater-progress {
   display: flex;
@@ -197,7 +197,7 @@
 .f-updater-track {
   height: 8px;
   border-radius: 4px;
-  background: var(--line-2);
+  background: var(--divider-strong);
   overflow: hidden;
 }
 .f-updater-track > div {
@@ -211,8 +211,8 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 6px 12px;
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
+  font-size: var(--fs-12);
+  color: var(--text-2);
 }
 
 /* Aviso «Se instala al cerrar Sloth» (abajo a la derecha, como en el artboard). */
@@ -220,7 +220,7 @@
   position: fixed;
   right: 18px;
   bottom: 42px;
-  z-index: 40;
+  z-index: var(--z-toast);
   max-width: calc(100% - 36px);
   display: flex;
   align-items: center;
@@ -228,8 +228,8 @@
   padding: 10px 14px;
   border-radius: 10px;
   background: var(--toast-bg);
-  color: var(--fg);
-  box-shadow: var(--shadow-md), inset 0 0 0 1px var(--line-strong);
+  color: var(--text);
+  box-shadow: var(--e-2), inset 0 0 0 1px var(--divider-strong);
 }
 .f-updater-toast > svg {
   flex: none;
@@ -259,7 +259,7 @@
   gap: var(--s-3);
 }
 .f-updater-name {
-  font-size: var(--fs-lg);
+  font-size: var(--fs-15);
   font-weight: 700;
   margin-bottom: 2px;
 }
@@ -270,9 +270,9 @@
   margin: 0;
   padding: var(--s-2) var(--s-3);
   border-radius: var(--r-sm);
-  background: var(--card);
-  color: var(--fg-2);
-  font-size: var(--fs-sm);
+  background: var(--raised);
+  color: var(--text-2);
+  font-size: var(--fs-12);
 }
 .f-updater-status > svg {
   flex: none;
@@ -284,8 +284,8 @@
 }
 .f-updater-status.ready,
 .f-updater-status.ok {
-  background: var(--success-soft);
-  color: var(--success);
+  background: var(--done-soft);
+  color: var(--done);
 }
 .f-updater-status.error {
   background: var(--danger-soft);
@@ -293,8 +293,8 @@
 }
 .f-updater-note {
   margin: calc(var(--s-2) * -1) 0 0;
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  color: var(--text-3);
 }
 .f-updater-modal .switch-text {
   white-space: normal;

@@ -4,7 +4,7 @@ import type { FeatureUi } from '../host'
 import { useUi } from '../host'
 import { bindingOf, matchShortcut, isCapturingShortcut } from '../../shortcuts'
 import { UpdateDot } from '../updater'
-import { onOpenSettings, openSettings, type SettingsTab } from './bus'
+import { onOpenSettings, openSettings, takeAlVolver, type SettingsTab } from './bus'
 import { getSettings } from './store'
 const SettingsModal = lazy(() => import('./SettingsModal').then((m) => ({ default: m.SettingsModal })))
 import './settings-page.css'
@@ -78,6 +78,7 @@ function Global(): React.JSX.Element {
       const el = prevFocus.current
       prevFocus.current = null
       if (el?.isConnected) el.focus()
+      takeAlVolver()?.()
     }
   }, [tab])
 

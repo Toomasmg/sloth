@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { Workspace } from '../../../../shared/types'
-import { api } from '../../api'
 import { cleanError, shortPath, STATE_LABEL } from '../../format'
-import { ChangesIcon, ChatIcon, CloseIcon, EditorIcon, FolderIcon, MaximizeIcon, MoveAccountIcon, PaletteIcon, PencilIcon, SearchIcon, SettingsIcon, SpaceIcon, TrashIcon, TicketIcon, UpdateIcon } from '../../icons/SlothIcons'
+import { ChatIcon, FolderIcon, MaximizeIcon, PaletteIcon, SearchIcon, SettingsIcon, SpaceIcon, TicketIcon, UpdateIcon } from '../../icons/SlothIcons'
 
 /** Ícono de cada grupo para los comandos que no traen uno propio: todo ítem tiene cuadrado con ícono. */
 const GROUP_ICON: Record<string, ReactNode> = {
@@ -16,7 +15,7 @@ const GROUP_ICON: Record<string, ReactNode> = {
 const DEFAULT_ICON: ReactNode = <PaletteIcon size={15} />
 const groupIcon = (group: string): ReactNode => GROUP_ICON[group] ?? DEFAULT_ICON
 import { bindingOf, isCapturingShortcut, matchShortcut } from '../../shortcuts'
-import { getSettings, resolveAccountColor, useSettings } from '../settings/store'
+import { resolveAccountColor, useSettings } from '../settings/store'
 import { FEATURE_UIS } from '../registry'
 import { useUi, type Command, type FeatureUi, type UiCtx } from '../host'
 import { fuzzyFilter, splitHighlight, type FuzzyMatch } from './fuzzy'
@@ -28,11 +27,6 @@ import './palette.css'
  * se despliega debajo. Los comandos son los que ya registra cada función (FEATURE_UIS), más los
  * comandos de cada espacio (Tab sobre un resultado).
  */
-
-/** Evento para que App abra el renombrado de un espacio (el panel ya está abierto). */
-export const PALETTE_RENAME_EVENT = 'sloth:palette-rename'
-/** Evento para que App pida quitar un espacio (con confirmación, como el botón de la barra lateral). */
-export const PALETTE_REMOVE_EVENT = 'sloth:palette-remove'
 
 /** Abre el buscador y le pone el foco. */
 let focusField: (() => void) | null = null
@@ -160,7 +154,10 @@ function spaceItem(ctx: UiCtx, ws: Workspace, colorOf: (accountId: string) => st
   }
 }
 
-/** Acciones de un espacio (Tab sobre un resultado de espacio). */
+/**
+ * Acciones de un espacio (Tab sobre un resultado de espacio): abrir, abrir maximizado y después las
+ * mismas del menú del espacio (clic derecho o «…»), en el mismo orden.
+ */
 function spaceActions(ctx: UiCtx, ws: Workspace): Item[] {
   const id = ws.id
   const base = { section: 'acciones' as const, group: ws.name }
@@ -176,69 +173,11 @@ function spaceActions(ctx: UiCtx, ws: Workspace): Item[] {
         ctx.openPane(id)
         ctx.setMaximized(id)
       }
-    },
-    {
-      ...base,
-      id: 'x-git',
-      title: 'Ver cambios',
-      subtitle: 'Git del espacio',
-      icon: <ChangesIcon size={15} />,
-      run: () => {
-        ctx.openPane(id)
-        runFeatureCommand('git:changes', { ...ctx, focused: id })
-      }
-    },
-    {
-      ...base,
-      id: 'x-code',
-      title: `Abrir en ${getSettings().settings.editor === 'Bloc de notas' ? 'carpeta' : getSettings().settings.editor}`,
-      subtitle: ws.cwd,
-      icon: <EditorIcon size={15} />,
-      run: () => {
-        api.revealWorkspace(id, 'vscode').catch((e) => ctx.notifyError(cleanError(e)))
-      }
-    },
-    {
-      ...base,
-      id: 'x-ren',
-      title: 'Renombrar',
-      subtitle: 'Escribís el nombre nuevo en el panel',
-      shortcut: 'F2',
-      icon: <PencilIcon size={15} />,
-      run: () => {
-        ctx.openPane(id)
-        window.dispatchEvent(new CustomEvent(PALETTE_RENAME_EVENT, { detail: id }))
-      }
     }
   ]
-  if (ctx.accounts.length >= 2)
-    items.push({
-      ...base,
-      id: 'x-mover',
-      title: 'Mover a otra cuenta',
-      subtitle: 'La terminal se reinicia con la otra cuenta',
-      icon: <MoveAccountIcon size={15} />,
-      run: () => runFeatureCommand('move-account.focused', { ...ctx, focused: id })
-    })
-  items.push(
-    {
-      ...base,
-      id: 'x-ocultar',
-      title: 'Ocultar panel',
-      subtitle: 'La terminal sigue corriendo',
-      icon: <CloseIcon size={15} />,
-      run: () => ctx.closePane(id)
-    },
-    {
-      ...base,
-      id: 'x-quitar',
-      title: 'Quitar espacio',
-      subtitle: 'Se cierra su terminal',
-      icon: <TrashIcon size={15} />,
-      danger: true,
-      run: () => window.dispatchEvent(new CustomEvent(PALETTE_REMOVE_EVENT, { detail: id }))
-    }
-  )
+  for (const a of ctx.paneActions(id)) {
+    items.push({ ...base, id: `x-${a.id}`, title: a.label, subtitle: a.hint, shortcut: a.shortcut, icon: a.icon ?? <SpaceIcon size={15} />, danger: a.danger, run: a.run })
+  }
   return items
 }
 

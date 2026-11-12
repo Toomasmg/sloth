@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useUi } from '../host'
 import { cleanError, shortPath } from '../../format'
 import { applyVars, BRANCH_VARS, TEMPLATE_COLOR_KEYS, TEMPLATE_ICON_KEYS, SUGGESTED, today, unknownVars, validBranch, varsIn, type VarValues } from '../../../../shared/templates-shared'
@@ -6,6 +6,7 @@ import { colorHex, iconPath, TEMPLATE_COLORS, TEMPLATE_ICONS, VAR_CHIPS } from '
 import { loadTemplates, openDialog, setPreselect, useTemplates, type TemplateDto } from './store'
 import { Modal } from '../../Modal'
 import { SearchIcon } from '../../icons/SlothIcons'
+import { Button, Chip, EmptyState, Input, Select, Textarea, toast as showToast } from '../../ui'
 
 /** Campos que se editan en el formulario (lo que el usuario puede cambiar de una plantilla propia). */
 interface Fields {
@@ -97,9 +98,7 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
   const [newFrom, setNewFrom] = useState('')
   const [newErr, setNewErr] = useState('')
   const [share, setShare] = useState<ShareState | null>(null)
-  const [toast, setToast] = useState('')
   const [err, setErr] = useState('')
-  const toastTimer = useRef<number | undefined>(undefined)
   const promptRef = useRef<HTMLTextAreaElement | null>(null)
 
   const cur = list.find((t) => t.id === sel) ?? list[0] ?? null
@@ -117,12 +116,8 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
     else onClose()
   }
 
-  useEffect(() => () => window.clearTimeout(toastTimer.current), [])
-
   const flash = (msg: string): void => {
-    setToast(msg)
-    window.clearTimeout(toastTimer.current)
-    toastTimer.current = window.setTimeout(() => setToast(''), 2400)
+    showToast({ tone: 'info', message: msg, duration: 2400 })
   }
 
   const select = (id: string): void => {
@@ -405,47 +400,36 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
     >
       <div className="tp-body">
         <aside className="tp-list" aria-label="Lista de plantillas">
-          <label className="tp-search">
-            <SearchIcon size={14} />
-            <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar plantilla" aria-label="Buscar plantilla" />
-          </label>
+          <Input prefix={<SearchIcon size={14} />} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar plantilla" aria-label="Buscar plantilla" />
 
-          <button type="button" className="btn primary tp-new-btn" aria-expanded={creating} onClick={() => setCreating((v) => !v)}>
+          <Button variant="primary" className="tp-new-btn" aria-expanded={creating} onClick={() => setCreating((v) => !v)}>
             <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
               <path d="M12 5v14M5 12h14" />
             </svg>
             Nueva plantilla
-          </button>
+          </Button>
 
           {creating && (
             <form className="tp-new" onSubmit={(e) => void createNew(e)} noValidate>
               <div className="tp-new-title">Nueva plantilla</div>
               <div className="field">
                 <label htmlFor="tp-new-name">Nombre</label>
-                <input
-                  id="tp-new-name"
-                  autoFocus
-                  value={newName}
-                  maxLength={80}
-                  onChange={(e) => {
+                <Input id="tp-new-name" autoFocus value={newName} maxLength={80} onChange={(e) => {
                     setNewName(e.target.value)
                     setNewErr('')
-                  }}
-                  placeholder="Ej.: Hotfix de staging"
-                  aria-invalid={Boolean(newErr)}
-                  aria-describedby={newErr ? 'tp-new-err' : undefined}
+                  }} placeholder="Ej.: Hotfix de staging" aria-invalid={Boolean(newErr)} aria-describedby={newErr ? 'tp-new-err' : undefined}
                 />
               </div>
               <div className="field">
                 <label htmlFor="tp-new-from">Empezar desde</label>
-                <select id="tp-new-from" value={newFrom} onChange={(e) => setNewFrom(e.target.value)}>
+                <Select id="tp-new-from" value={newFrom} onChange={(e) => setNewFrom(e.target.value)}>
                   <option value="">Vacía</option>
                   {list.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
               {newErr && (
                 <p className="tp-err" id="tp-new-err" role="alert">
@@ -453,12 +437,12 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
                 </p>
               )}
               <div className="tp-new-actions">
-                <button type="button" className="btn ghost sm" onClick={() => setCreating(false)}>
+                <Button variant="ghost" size="sm" onClick={() => setCreating(false)}>
                   Cancelar
-                </button>
-                <button type="submit" className="btn primary sm">
+                </Button>
+                <Button variant="primary" size="sm" type="submit">
                   Crear
-                </button>
+                </Button>
               </div>
             </form>
           )}
@@ -476,11 +460,11 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
             </section>
           )}
           {q0 && visible.length === 0 && (
-            <p className="tp-empty" role="status">
-              Ninguna plantilla coincide con «{q.trim()}».
-            </p>
+            <div role="status">
+              <EmptyState size="sm" as="p" title={`Ninguna plantilla coincide con «${q.trim()}».`} />
+            </div>
           )}
-          {list.length === 0 && <p className="tp-empty">Todavía no hay plantillas. Creá una con «Nueva plantilla».</p>}
+          {list.length === 0 && <EmptyState size="sm" as="p" title="Todavía no hay plantillas. Creá una con «Nueva plantilla»." />}
           <p className="tp-foot">Las plantillas del equipo no se editan ni se borran. Duplicalas para tener tu versión.</p>
         </aside>
 
@@ -518,26 +502,22 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
               )}
 
               <div className="tp-actions">
-                <button type="button" className="btn primary" onClick={useNow}>
+                <Button variant="primary" onClick={useNow}>
                   Usar esta plantilla
-                </button>
-                <button type="button" className="btn tp-def" aria-pressed={defaultId === cur.id} onClick={() => void toggleDefault()}>
+                </Button>
+                <Button className="tp-def" aria-pressed={defaultId === cur.id} onClick={() => void toggleDefault()}>
                   {defaultId === cur.id ? 'Es la predeterminada' : 'Fijar como predeterminada'}
-                </button>
-                <button type="button" className="btn" onClick={() => void dup()}>
+                </Button>
+                <Button onClick={() => void dup()}>
                   Duplicar
-                </button>
+                </Button>
                 {isMine && (
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => {
+                  <Button onClick={() => {
                       setShare(share ? null : { repo: cur.repoPath ?? '', equipo: '', notice: '', preview: null })
-                    }}
-                    aria-expanded={Boolean(share)}
+                    }} aria-expanded={Boolean(share)}
                   >
                     Compartir con el equipo
-                  </button>
+                  </Button>
                 )}
               </div>
 
@@ -574,14 +554,7 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
                 >
                   <div className="field">
                     <label htmlFor="tp-name">Nombre</label>
-                    <input
-                      id="tp-name"
-                      value={ed.name}
-                      maxLength={80}
-                      onChange={(e) => setField('name', e.target.value)}
-                      placeholder="Ej.: Ticket del tablero"
-                      aria-invalid={Boolean(nameErr)}
-                      aria-describedby={nameErr ? 'tp-name-err' : undefined}
+                    <Input id="tp-name" value={ed.name} maxLength={80} onChange={(e) => setField('name', e.target.value)} placeholder="Ej.: Ticket del tablero" aria-invalid={Boolean(nameErr)} aria-describedby={nameErr ? 'tp-name-err' : undefined}
                     />
                     {nameErr && (
                       <p className="field-error" id="tp-name-err">
@@ -592,7 +565,7 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
 
                   <div className="field">
                     <label htmlFor="tp-desc">Descripción</label>
-                    <input id="tp-desc" value={ed.description} maxLength={140} onChange={(e) => setField('description', e.target.value)} placeholder="Una línea para reconocerla en la lista" />
+                    <Input id="tp-desc" value={ed.description} maxLength={140} onChange={(e) => setField('description', e.target.value)} placeholder="Una línea para reconocerla en la lista" />
                   </div>
 
                   <div className="tp-field-group">
@@ -644,14 +617,14 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
 
                   <div className="field">
                     <label htmlFor="tp-acc">Cuenta sugerida</label>
-                    <select id="tp-acc" value={ed.accountId} onChange={(e) => setField('accountId', e.target.value)}>
+                    <Select id="tp-acc" value={ed.accountId} onChange={(e) => setField('accountId', e.target.value)}>
                       <option value={SUGGESTED}>Sugerida (con sesión y menos uso en 5 h)</option>
                       {ctx.accounts.map((a) => (
                         <option key={a.id} value={a.id}>
                           {a.label}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
 
                   <div className="tp-wt">
@@ -674,15 +647,7 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
                   {ed.wt && (
                     <div className="field indent">
                       <label htmlFor="tp-br">Patrón de rama</label>
-                      <input
-                        id="tp-br"
-                        className="mono"
-                        spellCheck={false}
-                        value={ed.br}
-                        onChange={(e) => setField('br', e.target.value)}
-                        placeholder="fix/{ticket}"
-                        aria-invalid={Boolean(brErr)}
-                        aria-describedby="tp-br-hint"
+                      <Input id="tp-br" mono spellCheck={false} value={ed.br} onChange={(e) => setField('br', e.target.value)} placeholder="fix/{ticket}" aria-invalid={Boolean(brErr)} aria-describedby="tp-br-hint"
                       />
                       {brErr && (
                         <p className="field-error" role="alert">
@@ -697,22 +662,14 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
 
                   <div className="field">
                     <label htmlFor="tp-prompt">Primer mensaje para Claude</label>
-                    <textarea
-                      id="tp-prompt"
-                      ref={promptRef}
-                      rows={5}
-                      className="mono"
-                      value={ed.prompt}
-                      onChange={(e) => setField('prompt', e.target.value)}
-                      placeholder="Ej.: Leé el ticket {ticket} y resumí qué pide."
-                      aria-describedby="tp-prompt-hint"
+                    <Textarea id="tp-prompt" ref={promptRef} rows={5} value={ed.prompt} onChange={(e) => setField('prompt', e.target.value)} placeholder="Ej.: Leé el ticket {ticket} y resumí qué pide." aria-describedby="tp-prompt-hint"
                     />
                     <div className="tp-chips" role="group" aria-label="Insertar variable">
                       <span className="tp-chips-lbl">Insertar:</span>
                       {VAR_CHIPS.map((v) => (
-                        <button key={v} type="button" className="tp-chip mono" onClick={() => insertVar(v)} aria-label={`Insertar ${v} en el cursor`}>
+                        <Chip key={v} onClick={() => insertVar(v)} aria-label={`Insertar ${v} en el cursor`}>
                           {v}
-                        </button>
+                        </Chip>
                       ))}
                     </div>
                     <p className="field-help" id="tp-prompt-hint">
@@ -744,12 +701,12 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
                     <span className="tp-save-hint" role="status">
                       {tried && (nameErr || brErr) ? 'Revisá los campos marcados.' : err}
                     </span>
-                    <button type="button" className="btn ghost" onClick={discard} disabled={!dirty}>
+                    <Button variant="ghost" onClick={discard} disabled={!dirty}>
                       Descartar cambios
-                    </button>
-                    <button type="submit" className="btn primary" disabled={saving}>
+                    </Button>
+                    <Button variant="primary" type="submit" disabled={saving}>
                       {saving ? 'Guardando…' : 'Guardar'}
-                    </button>
+                    </Button>
                   </div>
                 </form>
               )}
@@ -767,15 +724,15 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
                   <div className="field">
                     <label htmlFor="tp-share-repo">Carpeta del repo</label>
                     <div className="input-row">
-                      <input id="tp-share-repo" className="mono" value={share.repo} onChange={(e) => setShare({ ...share, repo: e.target.value, preview: null })} placeholder="C:\repos\…" />
-                      <button type="button" className="btn" onClick={() => void pickRepo()}>
+                      <Input id="tp-share-repo" mono value={share.repo} onChange={(e) => setShare({ ...share, repo: e.target.value, preview: null })} placeholder="C:\repos\…" />
+                      <Button onClick={() => void pickRepo()}>
                         Elegir…
-                      </button>
+                      </Button>
                     </div>
                   </div>
                   <div className="field">
                     <label htmlFor="tp-share-team">Nombre del equipo</label>
-                    <input id="tp-share-team" value={share.equipo} maxLength={60} onChange={(e) => setShare({ ...share, equipo: e.target.value, preview: null })} placeholder="Ej.: Mi equipo" />
+                    <Input id="tp-share-team" value={share.equipo} maxLength={60} onChange={(e) => setShare({ ...share, equipo: e.target.value, preview: null })} placeholder="Ej.: Mi equipo" />
                   </div>
                   {share.notice && (
                     <p className="tp-err" role="alert">
@@ -800,17 +757,17 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
                     </>
                   )}
                   <div className="tp-share-actions">
-                    <button type="button" className="btn ghost" onClick={() => setShare(null)}>
+                    <Button variant="ghost" onClick={() => setShare(null)}>
                       Cerrar
-                    </button>
+                    </Button>
                     {!share.preview ? (
-                      <button type="button" className="btn" onClick={() => void shareCheck()}>
+                      <Button onClick={() => void shareCheck()}>
                         Ver qué se comparte
-                      </button>
+                      </Button>
                     ) : (
-                      <button type="button" className="btn primary" disabled={share.preview.count === 0} onClick={() => void shareWrite()}>
+                      <Button variant="primary" disabled={share.preview.count === 0} onClick={() => void shareWrite()}>
                         Guardar en el repo
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </section>
@@ -821,12 +778,12 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
                   {confirmDel ? (
                     <div className="tp-confirm" role="alertdialog" aria-labelledby="tp-del-t">
                       <span id="tp-del-t">¿Borrar «{cur.name}»? No se puede deshacer.</span>
-                      <button type="button" className="btn ghost sm" onClick={() => setConfirmDel(false)}>
+                      <Button variant="ghost" size="sm" onClick={() => setConfirmDel(false)}>
                         Cancelar
-                      </button>
-                      <button type="button" className="btn danger sm" onClick={() => void remove()}>
+                      </Button>
+                      <Button variant="danger" size="sm" onClick={() => void remove()}>
                         Sí, borrar
-                      </button>
+                      </Button>
                     </div>
                   ) : (
                     <button type="button" className="tp-del-link" onClick={() => setConfirmDel(true)}>
@@ -840,11 +797,6 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
         </main>
       </div>
 
-      {toast && (
-        <div className="tp-toast" role="status">
-          {toast}
-        </div>
-      )}
     </Modal>
   )
 }

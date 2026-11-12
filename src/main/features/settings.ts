@@ -37,7 +37,7 @@ function read(): SlothSettings {
 
 /** Colores de la barra de título que dibuja Windows (los botones de ventana), por tema. */
 const CHROME = {
-  // Igual a --bg del estilo A (theme-a.css) y del claro (themes.css).
+  // Igual a --bg del estilo A (tokens.css) y del claro (tokens.css).
   dark: { bg: '#111318', symbol: '#8b93a3' },
   light: { bg: '#f1f2f5', symbol: '#5c6474' }
 }

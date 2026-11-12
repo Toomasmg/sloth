@@ -1,25 +1,5 @@
 /* Función «export-import»: página «Exportar e importar» (dos pestañas). Medidas y colores según el artboard «Exportar». */
 
-/* ---- Cáscara (PageShell con clase f-ei-page): cabecera de 48 px, título apagado, «‹ Configuración». ---- */
-.f-ei-page .page-head {
-  padding: 0 14px;
-}
-.f-ei-page .page-name {
-  font-weight: 400;
-  color: var(--fg-2);
-}
-.f-ei-page .page-back {
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px 0 6px;
-  color: var(--fg-2);
-}
-.f-ei-page .page-back svg {
-  flex: none;
-}
-
 .f-ei-wrap {
   max-width: 760px;
   margin: 0 auto;
@@ -36,7 +16,7 @@
 }
 .f-ei-head p {
   margin: 6px 0 0;
-  color: var(--fg-2);
+  color: var(--text-2);
   line-height: 1.5;
 }
 
@@ -49,7 +29,7 @@
   padding: 3px;
   border-radius: 10px;
   background: var(--card-hover);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .f-ei-tabs > button {
   height: 30px;
@@ -57,13 +37,13 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--fg-2);
+  color: var(--text-2);
   font: inherit;
   font-weight: 500;
   cursor: pointer;
 }
 .f-ei-tabs > button:hover {
-  color: var(--fg);
+  color: var(--text);
 }
 .f-ei-tabs > button.on {
   background: #3a4152;
@@ -71,7 +51,7 @@
 }
 html[data-theme='light'] .f-ei-tabs > button.on {
   background: #ffffff;
-  color: var(--fg);
+  color: var(--text);
   box-shadow: 0 1px 2px rgba(16, 22, 34, 0.12);
 }
 
@@ -82,7 +62,7 @@ html[data-theme='light'] .f-ei-tabs > button.on {
   border: 0;
   border-radius: 8px;
   font: inherit;
-  font-size: var(--fs-md);
+  font-size: var(--fs-13);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -104,31 +84,31 @@ html[data-theme='light'] .f-ei-tabs > button.on {
 }
 .f-ei-btn.secondary {
   background: var(--btn-2);
-  color: var(--fg);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .f-ei-btn.ghost {
   padding: 0 14px;
   background: transparent;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-ei-btn.warn {
   padding: 0 10px;
-  background: var(--warn-soft);
+  background: var(--waiting-soft);
   color: var(--warn-fg);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   font-weight: 600;
 }
 .f-ei-btn.sm {
   height: 30px;
   padding: 0 14px;
-  font-size: var(--fs-md);
+  font-size: var(--fs-13);
 }
 .f-ei-btn.warn.sm {
   height: 28px;
   padding: 0 10px;
   border-radius: 7px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
 }
 
 .f-ei-tab {
@@ -144,9 +124,9 @@ html[data-theme='light'] .f-ei-tabs > button.on {
   gap: 12px;
   padding: 14px 16px;
   border-radius: 12px;
-  background: var(--warn-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 40%, transparent);
-  color: var(--fg);
+  background: var(--waiting-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--waiting) 40%, transparent);
+  color: var(--text);
   font-weight: 500;
   line-height: 1.5;
 }
@@ -157,7 +137,7 @@ html[data-theme='light'] .f-ei-tabs > button.on {
   display: grid;
   place-items: center;
   border-radius: 9px;
-  background: color-mix(in srgb, var(--warn) 18%, transparent);
+  background: color-mix(in srgb, var(--waiting) 18%, transparent);
   color: var(--warn-fg);
 }
 
@@ -168,15 +148,15 @@ html[data-theme='light'] .f-ei-tabs > button.on {
 }
 .f-ei-h {
   margin: 0 0 0 4px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   font-weight: 600;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 
 .f-ei-card {
   border-radius: 12px;
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
 }
 
@@ -209,7 +189,7 @@ html[data-theme='light'] .f-ei-tabs > button.on {
   height: 15px;
 }
 .f-ei-row.muted {
-  color: var(--fg-muted);
+  color: var(--text-3);
   cursor: default;
 }
 .f-ei-row.muted:hover {
@@ -242,13 +222,13 @@ html[data-theme='light'] .f-ei-tabs > button.on {
 .f-ei-desc {
   display: block;
   margin-top: 2px;
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  color: var(--text-3);
   line-height: 1.5;
 }
 .f-ei-size {
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
+  font-size: var(--fs-12);
+  color: var(--text-2);
   white-space: nowrap;
   text-align: right;
 }
@@ -263,13 +243,13 @@ html[data-theme='light'] .f-ei-tabs > button.on {
   padding: 1px 7px;
   border-radius: 9px;
   background: var(--btn-2);
-  color: var(--fg-2);
+  color: var(--text-2);
   white-space: nowrap;
 }
 .f-ei-path {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--fg-muted);
+  color: var(--text-3);
   overflow-wrap: anywhere;
 }
 
@@ -286,8 +266,8 @@ html[data-theme='light'] .f-ei-tabs > button.on {
   gap: 5px;
 }
 .f-ei-pwfield > span:first-child {
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
+  font-size: var(--fs-12);
+  color: var(--text-2);
 }
 .f-ei-pwfield input {
   height: 32px;
@@ -295,19 +275,19 @@ html[data-theme='light'] .f-ei-tabs > button.on {
   border: 0;
   border-radius: 8px;
   background: var(--input-bg);
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 html[data-theme='light'] .f-ei-pwfield input {
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .f-ei-pwfield input[aria-invalid='true'] {
   box-shadow: inset 0 0 0 1px var(--danger);
 }
 .f-ei-fieldmsg {
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  color: var(--text-3);
 }
 .f-ei-fieldmsg.bad {
   color: var(--danger-fg);
@@ -317,8 +297,8 @@ html[data-theme='light'] .f-ei-pwfield input {
 }
 .f-ei-hint {
   margin-left: auto;
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  color: var(--text-3);
   font-weight: 400;
 }
 
@@ -338,7 +318,7 @@ html[data-theme='light'] .f-ei-pwfield input {
 }
 .f-ei-preview > summary > svg {
   flex: none;
-  color: var(--fg-muted);
+  color: var(--text-3);
   transition: transform var(--t-fast) var(--ease);
 }
 .f-ei-preview[open] > summary > svg {
@@ -348,11 +328,11 @@ html[data-theme='light'] .f-ei-pwfield input {
   margin: 0;
   padding: 14px 16px;
   background: var(--input-bg);
-  box-shadow: inset 0 1px 0 var(--line);
+  box-shadow: inset 0 1px 0 var(--divider);
   font-family: var(--font-mono);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   line-height: 1.6;
-  color: var(--fg-2);
+  color: var(--text-2);
   white-space: pre;
   overflow: auto;
   max-height: 320px;
@@ -374,13 +354,13 @@ html[data-theme='light'] .f-ei-pwfield input {
 }
 .f-ei-err {
   margin: 0;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   color: var(--danger-fg);
 }
 .f-ei-errors {
   margin: 0;
   padding-left: 18px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   color: var(--danger-fg);
   display: flex;
   flex-direction: column;
@@ -392,7 +372,7 @@ html[data-theme='light'] .f-ei-pwfield input {
   position: fixed;
   right: 18px;
   bottom: 18px;
-  z-index: 40;
+  z-index: var(--z-toast);
   max-width: calc(100% - 36px);
   display: flex;
   flex-wrap: wrap;
@@ -401,8 +381,8 @@ html[data-theme='light'] .f-ei-pwfield input {
   padding: 10px 14px;
   border-radius: 10px;
   background: var(--toast-bg);
-  color: var(--fg);
-  box-shadow: var(--shadow-md), inset 0 0 0 1px var(--line-strong);
+  color: var(--text);
+  box-shadow: var(--e-2), inset 0 0 0 1px var(--divider-strong);
 }
 .f-ei-toast > svg {
   flex: none;
@@ -414,14 +394,14 @@ html[data-theme='light'] .f-ei-pwfield input {
 }
 
 .f-ei-muted {
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  color: var(--text-3);
   line-height: 1.5;
 }
 .f-ei-help {
   margin: 0;
   padding: 20px;
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 
 /* ---- Importar: zona para soltar el archivo ---- */
@@ -432,7 +412,7 @@ html[data-theme='light'] .f-ei-pwfield input {
   gap: 10px;
   padding: 32px 20px;
   border-radius: 14px;
-  border: 1.5px dashed var(--line-strong);
+  border: 1.5px dashed var(--divider-strong);
   background: var(--surface-2);
   text-align: center;
 }
@@ -468,8 +448,8 @@ html[data-theme='light'] .f-ei-pwfield input {
   gap: 5px;
 }
 .f-ei-pwform .field > span {
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
+  font-size: var(--fs-12);
+  color: var(--text-2);
 }
 .f-ei-pwform input {
   height: 32px;
@@ -477,12 +457,12 @@ html[data-theme='light'] .f-ei-pwfield input {
   border: 0;
   border-radius: 8px;
   background: var(--input-bg);
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 html[data-theme='light'] .f-ei-pwform input {
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .f-ei-pwform input[aria-invalid='true'] {
   box-shadow: inset 0 0 0 1px var(--danger);
@@ -499,8 +479,8 @@ html[data-theme='light'] .f-ei-pwform input {
   gap: 12px 14px;
   padding: 14px 16px;
   border-radius: 12px;
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .f-ei-file-ico {
   width: 38px;
@@ -521,8 +501,8 @@ html[data-theme='light'] .f-ei-pwform input {
   display: block;
   padding: 12px 14px;
   border-radius: 10px;
-  background: var(--warn-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 40%, transparent);
+  background: var(--waiting-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--waiting) 40%, transparent);
   color: var(--warn-fg);
   line-height: 1.5;
 }
@@ -540,7 +520,7 @@ html[data-theme='light'] .f-ei-pwform input {
   padding-left: 18px;
 }
 .f-ei-warnText {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   color: var(--warn-fg);
 }
 .f-ei-okbox {
@@ -549,8 +529,8 @@ html[data-theme='light'] .f-ei-pwform input {
   gap: 10px;
   padding: 12px 14px;
   border-radius: 10px;
-  background: var(--success-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 30%, transparent);
+  background: var(--done-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--done) 30%, transparent);
   color: var(--success-fg);
   line-height: 1.5;
 }
@@ -561,7 +541,7 @@ html[data-theme='light'] .f-ei-pwform input {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   color: var(--success-fg);
 }
 
@@ -571,7 +551,7 @@ html[data-theme='light'] .f-ei-pwform input {
   flex-direction: column;
   gap: 6px;
   padding: 11px 16px 11px 44px;
-  box-shadow: inset 0 -1px 0 var(--line);
+  box-shadow: inset 0 -1px 0 var(--divider);
 }
 .f-ei-sub.muted {
   opacity: 0.6;
@@ -594,7 +574,7 @@ html[data-theme='light'] .f-ei-pwform input {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
 }
 .f-ei-fix {
   display: flex;
@@ -602,14 +582,14 @@ html[data-theme='light'] .f-ei-pwform input {
   align-items: center;
   gap: 8px;
   padding-left: 19px;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
 }
 .f-ei-conflict {
   gap: 8px 10px;
 }
 .f-ei-conflict > span {
   flex: 1 1 220px;
-  color: var(--fg-2);
+  color: var(--text-2);
   line-height: 1.5;
 }
 .f-ei-conflict select {
@@ -618,12 +598,12 @@ html[data-theme='light'] .f-ei-pwform input {
   border: 0;
   border-radius: 8px;
   background: var(--input-bg);
-  color: var(--fg);
+  color: var(--text);
   font: inherit;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 html[data-theme='light'] .f-ei-conflict select {
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 
 /* Chips de cada espacio */
@@ -639,7 +619,7 @@ html[data-theme='light'] .f-ei-conflict select {
   white-space: nowrap;
 }
 .f-ei-badge.ok {
-  background: var(--success-soft);
+  background: var(--done-soft);
   color: var(--success-fg);
 }
 .f-ei-badge.info {
@@ -647,12 +627,12 @@ html[data-theme='light'] .f-ei-conflict select {
   color: var(--info);
 }
 .f-ei-badge.warn {
-  background: var(--warn-soft);
+  background: var(--waiting-soft);
   color: var(--warn-fg);
 }
 .f-ei-badge.muted {
   background: var(--btn-2);
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 
 /* ---- Listo ---- */
@@ -662,8 +642,8 @@ html[data-theme='light'] .f-ei-conflict select {
   gap: 12px;
   padding: 22px;
   border-radius: 14px;
-  background: var(--card);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 35%, transparent);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--done) 35%, transparent);
 }
 .f-ei-done-head {
   display: flex;
@@ -681,7 +661,7 @@ html[data-theme='light'] .f-ei-conflict select {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: var(--success-soft);
+  background: var(--done-soft);
   color: var(--success-fg);
 }
 .f-ei-done-title {
@@ -690,7 +670,7 @@ html[data-theme='light'] .f-ei-conflict select {
 }
 .f-ei-done-msg {
   margin-top: 4px;
-  color: var(--fg-2);
+  color: var(--text-2);
   line-height: 1.5;
 }
 .f-ei-done-note {

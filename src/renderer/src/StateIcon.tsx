@@ -1,7 +1,6 @@
 import { CircleIcon, DoneIcon, MinusCircleIcon, WaitingIcon, WorkingIcon } from './icons/SlothIcons'
 import { MoonIcon } from '@phosphor-icons/react'
 import type { AgentState } from '../../shared/types'
-import { STATE_LABEL } from './format'
 
 /** Estado con ícono + color (nunca solo color). Los íconos son los del diseño (SlothIcons). */
 export function StateIcon({ state, size = 14 }: { state?: AgentState; size?: number }): React.JSX.Element {
@@ -21,14 +20,4 @@ export function StateIcon({ state, size = 14 }: { state?: AgentState; size?: num
     default:
       return <CircleIcon size={size} className="ic ic-none" />
   }
-}
-
-export function StatePill({ state, detail }: { state: AgentState; detail?: string }): React.JSX.Element {
-  return (
-    <span className={`pill pill-${state}`} title={detail} role="status">
-      <StateIcon state={state} size={12} />
-      {STATE_LABEL[state]}
-      {state === 'working' && detail ? <span className="pill-detail">· {detail}</span> : null}
-    </span>
-  )
 }

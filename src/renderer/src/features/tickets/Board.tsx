@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUi } from '../host'
+import { View } from '../../ui/View'
 import { cleanError } from '../../format'
 import { SPACE_CHIP, SPACE_LABEL, spaceStatus } from '../broadcast/state'
-import { CloseIcon, SearchIcon, SettingsIcon, SpaceIcon } from '../../icons/SlothIcons'
+import { CloseIcon, SearchIcon, SettingsIcon, SpaceIcon, TicketIcon } from '../../icons/SlothIcons'
+import { Button, EmptyState } from '../../ui'
+import { openSettings } from '../settings/bus'
 import type { Workspace } from '../../../../shared/types'
 import { categoriaDe, SIN_CONECTOR } from '../../../../shared/tickets'
 import { espacioDelTicket } from '../../../../shared/templates-shared'
@@ -25,7 +28,6 @@ import {
 } from './model'
 import { Av, PrioGlyph, estadoKind, prioTone } from './parts'
 import { Detail } from './Detail'
-import { Ajustes } from './Ajustes'
 
 type Tab = 'mios' | 'equipo' | 'sin'
 const TABS: { id: Tab; name: string }[] = [
@@ -62,14 +64,6 @@ const byIdDesc = (a: Ticket, b: Ticket): number => {
   return nb - na
 }
 
-function BackGlyph(): React.JSX.Element {
-  return (
-    <svg width={14} height={14} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M15 5l-7 7 7 7" />
-    </svg>
-  )
-}
-
 function RefreshGlyph(): React.JSX.Element {
   return (
     <svg width={14} height={14} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
@@ -87,7 +81,6 @@ export function Board(): React.JSX.Element {
   const [prio, setPrio] = useState('todas')
   const [selId, setSelId] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
-  const [ajustes, setAjustes] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
@@ -102,16 +95,12 @@ export function Board(): React.JSX.Element {
   const [detTick, setDetTick] = useState(0)
   /** Candado sincrónico: evita dos escrituras en el mismo ticket aunque se clickee rápido. */
   const lock = useRef(new Set<string>())
-  const backRef = useRef<HTMLButtonElement>(null)
 
   const close = (): void => setBoardOpen(false)
-
-  // Foco al abrir y vuelta a lo que tenía el foco al cerrar.
-  useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null
-    backRef.current?.focus()
-    return () => prev?.focus?.()
-  }, [])
+  const elegirConector = (): void => {
+    close()
+    openSettings('tickets', () => setBoardOpen(true))
+  }
 
   useEffect(() => {
     void ui.invoke<TemplateLite[]>('feat:templates:list').then((l) => setTpls(Array.isArray(l) ? l : []), () => setTpls([]))
@@ -123,12 +112,11 @@ export function Board(): React.JSX.Element {
       if (e.key !== 'Escape') return
       e.preventDefault()
       if (confirming) setConfirming(false)
-      else if (ajustes) setAjustes(false)
       else close()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [confirming, ajustes])
+  }, [confirming])
 
   useEffect(() => {
     if (toast === null) return
@@ -337,48 +325,93 @@ export function Board(): React.JSX.Element {
   const bodyLoading = !snap || (running && tickets.length === 0)
   const showRows = !bodyLoading && visible.length > 0
 
-  return (
-    <div className="f-tickets-page" role="dialog" aria-modal="true" aria-labelledby="f-tickets-title">
-      <header className="f-tickets-bar">
-        <button ref={backRef} type="button" className="f-tickets-back" onClick={close}>
-          <BackGlyph />
-          Espacios
-        </button>
-        <span className="f-tickets-sep" aria-hidden="true" />
-        <span role="status" className="f-tickets-conn" data-tone={tone}>
-          <span className="f-tickets-conn-dot" aria-hidden="true" />
-          {connText}
-        </span>
-        <span className="f-tickets-grow" />
-        {running ? (
-          <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => void ui.invoke('feat:tickets:cancel')}>
-            <CloseIcon size={13} /> Cancelar consulta
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className="f-tickets-b f-tickets-b--sm"
-          onClick={askRefresh}
-          disabled={running || !snap || unavailable || sinConector}
-          title={porGh ? `Lee los issues de ${n} con gh (solo lectura)` : `Lee los tickets de ${n} con la cuenta que la consulta (solo lectura)`}
-        >
-          <RefreshGlyph />
-          {running ? 'Actualizando…' : 'Actualizar'}
-        </button>
-        <button
-          type="button"
-          className="f-tickets-b f-tickets-b--sm"
-          onClick={() => setAjustes((v) => !v)}
-          disabled={!snap}
-          aria-label="Ajustes de tickets"
-          aria-expanded={ajustes}
-          aria-controls="f-tickets-ajustes"
-          title="Ajustes de tickets"
-        >
-          <SettingsIcon size={14} />
-        </button>
-      </header>
+  // Sin tickets que mostrar: la vista es solo un estado vacío con una acción (sin pestañas ni filtros en 0).
+  const vacio = !bodyLoading && Boolean(snap) && tickets.length === 0
+  const vacioNode = !snap ? null : sinConector ? (
+    <EmptyState
+      size="lg"
+      icon={<TicketIcon size={28} />}
+      title="Conectá tus tickets"
+      description="Traé los tickets de Jira, GitHub, Linear u otro sistema y empezá a trabajarlos desde un espacio. Sloth funciona igual sin tickets."
+      action={
+        <Button variant="primary" onClick={elegirConector}>
+          Elegir conector
+        </Button>
+      }
+    />
+  ) : unavailable ? (
+    <EmptyState
+      size="lg"
+      icon={<TicketIcon size={28} />}
+      title={`${n} no está disponible`}
+      description={snap.lastError ?? 'Elegí otro conector para traer tus tickets.'}
+      action={
+        <Button variant="primary" onClick={elegirConector}>
+          Elegir conector
+        </Button>
+      }
+    />
+  ) : snap.lastError ? (
+    <EmptyState
+      size="lg"
+      icon={<TicketIcon size={28} />}
+      title="No pudimos cargar los tickets"
+      description={snap.lastError}
+      action={
+        <Button variant="primary" onClick={() => void refresh()} disabled={running}>
+          Reintentar
+        </Button>
+      }
+    />
+  ) : snap.fetchedAt ? (
+    <EmptyState size="lg" icon={<TicketIcon size={28} />} title={`No hay tickets activos en ${n}`} description="Cuando haya alguno asignado o del equipo, aparece acá." action={<Button onClick={askRefresh} disabled={running}>Actualizar</Button>} />
+  ) : (
+    <EmptyState
+      size="lg"
+      icon={<TicketIcon size={28} />}
+      title={`Todavía no se consultó ${n}`}
+      description="Actualizá para traer tus tickets y los del equipo."
+      action={
+        <Button variant="primary" onClick={askRefresh} disabled={running}>
+          Actualizar
+        </Button>
+      }
+    />
+  )
 
+  return (
+    <View
+      labelId="f-tickets-view-title"
+      title="Tickets"
+      onClose={close}
+      className="f-tickets-page"
+      actions={
+        <>
+          <span role="status" className="f-tickets-conn" data-tone={tone}>
+            <span className="f-tickets-conn-dot" aria-hidden="true" />
+            {connText}
+          </span>
+          {running ? (
+            <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => void ui.invoke('feat:tickets:cancel')}>
+              <CloseIcon size={13} /> Cancelar consulta
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="f-tickets-b f-tickets-b--sm"
+            onClick={askRefresh}
+            disabled={running || !snap || unavailable || sinConector}
+            title={porGh ? `Lee los issues de ${n} con gh (solo lectura)` : `Lee los tickets de ${n} con la cuenta que la consulta (solo lectura)`}
+          >
+            <RefreshGlyph />
+            {running ? 'Actualizando…' : 'Actualizar'}
+          </button>
+          <Button size="sm" onClick={elegirConector} disabled={!snap} icon={<SettingsIcon size={14} />} title="Conector, cuenta y carpeta de los tickets">
+            Conector
+          </Button>
+        </>
+      }
+    >
       <main className="f-tickets-main">
         <div>
           <h1 id="f-tickets-title" className="f-tickets-h1">
@@ -386,12 +419,6 @@ export function Board(): React.JSX.Element {
           </h1>
           <p className="f-tickets-lead">Tus tickets y los del equipo. Empezá uno y Sloth arma el espacio para trabajarlo.</p>
         </div>
-
-        {snap && (
-          <div id="f-tickets-ajustes" hidden={!ajustes}>
-            <Ajustes snap={snap} onClose={() => setAjustes(false)} />
-          </div>
-        )}
 
         {confirming && (
           <div className="f-tickets-alert f-tickets-confirm" role="alertdialog" aria-label={`Confirmar consulta a ${n}`}>
@@ -423,267 +450,249 @@ export function Board(): React.JSX.Element {
           </p>
         )}
 
-        <div className="f-tickets-grid">
-          {/* LISTA */}
-          <section className="f-tickets-panel f-tickets-list" aria-labelledby="f-tickets-lista-t">
-            <h2 id="f-tickets-lista-t" className="sr-only">
-              Lista de tickets
-            </h2>
-            <div role="tablist" aria-label="Qué tickets ver" className="f-tickets-tabs">
-              {TABS.map((t) => {
-                const on = tab === t.id
-                return (
-                  <button
-                    key={t.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={on}
-                    tabIndex={on ? 0 : -1}
-                    className={`f-tickets-tab ${on ? 'on' : ''}`}
-                    onClick={() => setTab(t.id)}
-                    onKeyDown={(e) => {
-                      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
-                      e.preventDefault()
-                      const i = TABS.findIndex((x) => x.id === tab)
-                      const j = (i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length
-                      setTab(TABS[j].id)
-                    }}
-                  >
-                    {t.name}
-                    <span className="f-tickets-badge">{counts[t.id]}</span>
-                  </button>
-                )
-              })}
-            </div>
-
-            <div className="f-tickets-filters">
-              <label className="f-tickets-search">
-                <SearchIcon size={14} strokeWidth={1.9} />
-                <input
-                  type="search"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Buscar por código o título"
-                  aria-label="Buscar por código o título"
-                />
-              </label>
-              <div role="group" aria-label="Filtrar por estado" className="f-tickets-chips">
-                {estadoKeys.map((e) => {
-                  const on = stSel.includes(e.clave)
+        {vacio ? (
+          <div className="f-tickets-vacio">
+            {snap?.aviso && (
+              <div className="f-tickets-alert f-tickets-aviso" role="status">
+                <span className="f-tickets-alert-text">{snap.aviso}</span>
+              </div>
+            )}
+            {vacioNode}
+          </div>
+        ) : (
+          <div className="f-tickets-grid">
+            {/* LISTA */}
+            <section className="f-tickets-panel f-tickets-list" aria-labelledby="f-tickets-lista-t">
+              <h2 id="f-tickets-lista-t" className="sr-only">
+                Lista de tickets
+              </h2>
+              <div role="tablist" aria-label="Qué tickets ver" className="f-tickets-tabs">
+                {TABS.map((t) => {
+                  const on = tab === t.id
                   return (
                     <button
-                      key={e.clave}
+                      key={t.id}
                       type="button"
-                      className={`f-tickets-chipf f-tickets-st-${kindOf(e.clave)} ${on ? 'on' : ''}`}
-                      aria-pressed={on}
-                      onClick={() => setStSel((s) => (on ? s.filter((x) => x !== e.clave) : [...s, e.clave]))}
+                      role="tab"
+                      aria-selected={on}
+                      tabIndex={on ? 0 : -1}
+                      className={`f-tickets-tab ${on ? 'on' : ''}`}
+                      onClick={() => setTab(t.id)}
+                      onKeyDown={(e) => {
+                        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+                        e.preventDefault()
+                        const i = TABS.findIndex((x) => x.id === tab)
+                        const j = (i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length
+                        setTab(TABS[j].id)
+                      }}
                     >
-                      {e.nombre}
+                      {t.name}
+                      <span className="f-tickets-badge">{counts[t.id]}</span>
                     </button>
                   )
                 })}
               </div>
-              <div className="f-tickets-filter-row">
-                <label className="f-tickets-prio-field">
-                  Prioridad
-                  <select value={prio} onChange={(e) => setPrio(e.target.value)}>
-                    <option value="todas">Todas</option>
-                    {prioOpts.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
+
+              <div className="f-tickets-filters">
+                <label className="f-tickets-search">
+                  <SearchIcon size={14} strokeWidth={1.9} />
+                  <input
+                    type="search"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    placeholder="Buscar por código o título"
+                    aria-label="Buscar por código o título"
+                  />
                 </label>
-                <span className="f-tickets-grow" />
-                {filtersOn && (
-                  <button
-                    type="button"
-                    className="f-tickets-link"
-                    onClick={() => {
-                      setQ('')
-                      setStSel([])
-                      setPrio('todas')
-                    }}
-                  >
-                    Limpiar filtros
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="f-tickets-countbar">
-              <span role="status">{snap ? countLabel : ''}</span>
-            </div>
-
-            <div aria-busy={running} className="f-tickets-body">
-              {snap?.aviso && (
-                <div className="f-tickets-alert f-tickets-aviso" role="status">
-                  <span className="f-tickets-alert-text">{snap.aviso}</span>
-                </div>
-              )}
-
-              {unavailable && (
-                <div className="f-tickets-alert f-tickets-offline" role="alert">
-                  <span className="f-tickets-alert-text">{snap?.lastError}</span>
-                  <button type="button" className="f-tickets-b f-tickets-b--xs f-tickets-b--solid-danger" onClick={() => setAjustes(true)}>
-                    Elegir conector
-                  </button>
-                </div>
-              )}
-
-              {offline && (
-                <div className="f-tickets-alert f-tickets-offline" role="alert">
-                  <span className="f-tickets-alert-text">
-                    No pudimos hablar con {n}. Mostramos lo último que cargamos.
-                    {snap?.lastError && <span className="f-tickets-alert-detail">{snap.lastError}</span>}
-                  </span>
-                  <button type="button" className="f-tickets-b f-tickets-b--xs f-tickets-b--solid-danger" onClick={() => void refresh()} disabled={running}>
-                    Reintentar
-                  </button>
-                </div>
-              )}
-
-              {bodyLoading && (
-                <div role="status" className="f-tickets-skel">
-                  <div />
-                  <div />
-                  <div />
-                  <div />
-                  <span>{snap ? `Cargando tickets de ${n}…` : 'Cargando tickets…'}</span>
-                </div>
-              )}
-
-              {!bodyLoading && snap && !unavailable && tickets.length === 0 && (
-                <div className="f-tickets-empty">
-                  {sinConector ? (
-                    <>
-                      <span className="f-tickets-empty-title">Todavía no elegiste de dónde traer tickets.</span>
-                      <span className="f-tickets-muted">Sloth funciona igual sin tickets. Si tu equipo usa Jira, GitHub, Linear u otro sistema, elegilo en los ajustes.</span>
-                      <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={() => setAjustes(true)}>
-                        Elegir conector
-                      </button>
-                    </>
-                  ) : snap.lastError ? (
-                    <>
-                      <span className="f-tickets-empty-title">No pudimos cargar los tickets.</span>
-                      <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={() => void refresh()} disabled={running}>
-                        Reintentar
-                      </button>
-                    </>
-                  ) : snap.fetchedAt ? (
-                    <span className="f-tickets-empty-title">No hay tickets activos en {n}.</span>
-                  ) : (
-                    <>
-                      <span className="f-tickets-empty-title">Todavía no se consultó {n}.</span>
-                      <span className="f-tickets-muted">Actualizá para traer tus tickets y los del equipo.</span>
-                      <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={askRefresh} disabled={running}>
-                        Actualizar
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {showRows && (
-                <ul className="f-tickets-rows">
-                  {visible.map((t) => {
-                    const ws = wsOf(t)
-                    const sel = current?.id === t.id
-                    const mine = isMineT(t)
-                    const st = ws ? spaceStatus(ws.id, ui.agents, ui.permissions) : null
+                <div role="group" aria-label="Filtrar por estado" className="f-tickets-chips">
+                  {estadoKeys.map((e) => {
+                    const on = stSel.includes(e.clave)
                     return (
-                      <li key={t.id}>
-                        <button
-                          type="button"
-                          className={`f-tickets-row ${sel ? 'sel' : ''}`}
-                          aria-current={sel ? 'true' : undefined}
-                          onClick={() => setSelId(t.id)}
-                        >
-                          <span className="f-tickets-row-top">
-                            <span className="f-tickets-code mono">{t.id}</span>
-                            {ws && st && (
-                              <span className={`chip f-tickets-space ${SPACE_CHIP[st]}`}>
-                                <SpaceIcon size={11} strokeWidth={2.2} />
-                                <span className="f-tickets-ellipsis">
-                                  {ws.name} · {SPACE_LABEL[st]}
-                                </span>
-                              </span>
-                            )}
-                          </span>
-                          <span className="f-tickets-row-title">{t.titulo}</span>
-                          <span className="f-tickets-row-meta">
-                            <span className={`f-tickets-st f-tickets-st-${kindOf(t.estado)}`}>{estadoName(t.estado)}</span>
-                            {t.prioridad && (
-                              <span className="f-tickets-prio" style={{ color: prioTone(t.prioridad) }}>
-                                <PrioGlyph p={t.prioridad} />
-                                {t.prioridad}
-                              </span>
-                            )}
-                            {t.responsable ? (
-                              <span className="f-tickets-who">
-                                <Av name={t.responsable} size="sm" />
-                                {mine ? 'Vos' : t.responsable}
-                              </span>
-                            ) : (
-                              <span className="f-tickets-muted">Sin asignar</span>
-                            )}
-                          </span>
-                        </button>
-                      </li>
+                      <button
+                        key={e.clave}
+                        type="button"
+                        className={`f-tickets-chipf f-tickets-st-${kindOf(e.clave)} ${on ? 'on' : ''}`}
+                        aria-pressed={on}
+                        onClick={() => setStSel((s) => (on ? s.filter((x) => x !== e.clave) : [...s, e.clave]))}
+                      >
+                        {e.nombre}
+                      </button>
                     )
                   })}
-                </ul>
-              )}
-
-              {!bodyLoading && snap && tickets.length > 0 && visible.length === 0 && (
-                <div className="f-tickets-empty">
-                  <span className="f-tickets-empty-title">Ningún ticket coincide con los filtros.</span>
-                  <span className="f-tickets-muted">Probá con otra palabra o sacá algún filtro.</span>
-                  <button
-                    type="button"
-                    className="f-tickets-b f-tickets-b--sm"
-                    onClick={() => {
-                      setQ('')
-                      setStSel([])
-                      setPrio('todas')
-                    }}
-                  >
-                    Limpiar filtros
-                  </button>
                 </div>
-              )}
-            </div>
-          </section>
+                <div className="f-tickets-filter-row">
+                  <label className="f-tickets-prio-field">
+                    Prioridad
+                    <select value={prio} onChange={(e) => setPrio(e.target.value)}>
+                      <option value="todas">Todas</option>
+                      {prioOpts.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <span className="f-tickets-grow" />
+                  {filtersOn && (
+                    <button
+                      type="button"
+                      className="f-tickets-link"
+                      onClick={() => {
+                        setQ('')
+                        setStSel([])
+                        setPrio('todas')
+                      }}
+                    >
+                      Limpiar filtros
+                    </button>
+                  )}
+                </div>
+              </div>
 
-          {/* DETALLE */}
-          <section className="f-tickets-panel f-tickets-det" aria-labelledby="f-tickets-det-t">
-            {!current || !snap ? (
-              <p className="f-tickets-muted">{snap ? 'Elegí un ticket de la lista.' : 'Cargando…'}</p>
-            ) : (
-              <Detail
-                t={current}
-                ws={wsOf(current)}
-                mine={isMineT(current)}
-                me={me}
-                estados={estados}
-                conector={snap.conector}
-                estadoName={estadoName}
-                view={det[current.id]}
-                wbusy={wbusy[current.id]}
-                noDisp={snap.noDisponible ?? {}}
-                sinCuenta={!porGh && !snap.config.queryAccountId}
-                startBusy={busy === `start:${current.id}`}
-                disabledAll={Boolean(busy)}
-                tplName={ticketTpl?.name}
-                onStart={() => void start(current)}
-                onOpenSpace={openSpace}
-                onWrite={(a, payload, opt) => write(current.id, a, payload, opt)}
-                onReload={() => setDetTick((n) => n + 1)}
-              />
-            )}
-          </section>
-        </div>
+              <div className="f-tickets-countbar">
+                <span role="status">{snap ? countLabel : ''}</span>
+              </div>
+
+              <div aria-busy={running} className="f-tickets-body">
+                {snap?.aviso && (
+                  <div className="f-tickets-alert f-tickets-aviso" role="status">
+                    <span className="f-tickets-alert-text">{snap.aviso}</span>
+                  </div>
+                )}
+
+                {unavailable && (
+                  <div className="f-tickets-alert f-tickets-offline" role="alert">
+                    <span className="f-tickets-alert-text">{snap?.lastError}</span>
+                    <button type="button" className="f-tickets-b f-tickets-b--xs f-tickets-b--solid-danger" onClick={elegirConector}>
+                      Elegir conector
+                    </button>
+                  </div>
+                )}
+
+                {offline && (
+                  <div className="f-tickets-alert f-tickets-offline" role="alert">
+                    <span className="f-tickets-alert-text">
+                      No pudimos hablar con {n}. Mostramos lo último que cargamos.
+                      {snap?.lastError && <span className="f-tickets-alert-detail">{snap.lastError}</span>}
+                    </span>
+                    <button type="button" className="f-tickets-b f-tickets-b--xs f-tickets-b--solid-danger" onClick={() => void refresh()} disabled={running}>
+                      Reintentar
+                    </button>
+                  </div>
+                )}
+
+                {bodyLoading && (
+                  <div role="status" className="f-tickets-skel">
+                    <div />
+                    <div />
+                    <div />
+                    <div />
+                    <span>{snap ? `Cargando tickets de ${n}…` : 'Cargando tickets…'}</span>
+                  </div>
+                )}
+
+                {showRows && (
+                  <ul className="f-tickets-rows">
+                    {visible.map((t) => {
+                      const ws = wsOf(t)
+                      const sel = current?.id === t.id
+                      const mine = isMineT(t)
+                      const st = ws ? spaceStatus(ws.id, ui.agents, ui.permissions) : null
+                      return (
+                        <li key={t.id}>
+                          <button
+                            type="button"
+                            className={`f-tickets-row ${sel ? 'sel' : ''}`}
+                            aria-current={sel ? 'true' : undefined}
+                            onClick={() => setSelId(t.id)}
+                          >
+                            <span className="f-tickets-row-top">
+                              <span className="f-tickets-code mono">{t.id}</span>
+                              {ws && st && (
+                                <span className={`chip f-tickets-space ${SPACE_CHIP[st]}`}>
+                                  <SpaceIcon size={11} strokeWidth={2.2} />
+                                  <span className="f-tickets-ellipsis">
+                                    {ws.name} · {SPACE_LABEL[st]}
+                                  </span>
+                                </span>
+                              )}
+                            </span>
+                            <span className="f-tickets-row-title">{t.titulo}</span>
+                            <span className="f-tickets-row-meta">
+                              <span className={`f-tickets-st f-tickets-st-${kindOf(t.estado)}`}>{estadoName(t.estado)}</span>
+                              {t.prioridad && (
+                                <span className="f-tickets-prio" style={{ color: prioTone(t.prioridad) }}>
+                                  <PrioGlyph p={t.prioridad} />
+                                  {t.prioridad}
+                                </span>
+                              )}
+                              {t.responsable ? (
+                                <span className="f-tickets-who">
+                                  <Av name={t.responsable} size="sm" />
+                                  {mine ? 'Vos' : t.responsable}
+                                </span>
+                              ) : (
+                                <span className="f-tickets-muted">Sin asignar</span>
+                              )}
+                            </span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+
+                {!bodyLoading && snap && tickets.length > 0 && visible.length === 0 && (
+                  <EmptyState
+                    size="sm"
+                    as="h3"
+                    title="Ningún ticket coincide"
+                    description="Probá con otra palabra o sacá algún filtro."
+                    action={
+                      <Button
+                        onClick={() => {
+                          setQ('')
+                          setStSel([])
+                          setPrio('todas')
+                        }}
+                      >
+                        Limpiar filtros
+                      </Button>
+                    }
+                  />
+                )}
+              </div>
+            </section>
+
+            {/* DETALLE */}
+            <section className="f-tickets-panel f-tickets-det" aria-labelledby="f-tickets-det-t">
+              {!current || !snap ? (
+                <p className="f-tickets-muted">{snap ? 'Elegí un ticket de la lista.' : 'Cargando…'}</p>
+              ) : (
+                <Detail
+                  t={current}
+                  ws={wsOf(current)}
+                  mine={isMineT(current)}
+                  me={me}
+                  estados={estados}
+                  conector={snap.conector}
+                  estadoName={estadoName}
+                  view={det[current.id]}
+                  wbusy={wbusy[current.id]}
+                  noDisp={snap.noDisponible ?? {}}
+                  sinCuenta={!porGh && !snap.config.queryAccountId}
+                  startBusy={busy === `start:${current.id}`}
+                  disabledAll={Boolean(busy)}
+                  tplName={ticketTpl?.name}
+                  onStart={() => void start(current)}
+                  onOpenSpace={openSpace}
+                  onWrite={(a, payload, opt) => write(current.id, a, payload, opt)}
+                  onReload={() => setDetTick((n) => n + 1)}
+                />
+              )}
+            </section>
+          </div>
+        )}
       </main>
 
       {toast && (
@@ -691,6 +700,6 @@ export function Board(): React.JSX.Element {
           {toast}
         </div>
       )}
-    </div>
+    </View>
   )
 }

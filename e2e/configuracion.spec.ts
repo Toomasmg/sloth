@@ -1,8 +1,7 @@
 import { test, expect } from './sloth'
 
 test('General muestra «Preguntar antes de cerrar» y «Dormir espacios inactivos»', async ({ sloth: { page } }) => {
-  await page.getByRole('button', { name: 'Menú de Sloth' }).click()
-  await page.getByRole('menuitem', { name: /^Configuración/ }).click()
+  await page.getByRole('navigation', { name: 'Navegación' }).getByRole('button', { name: 'Configuración' }).click()
   await page.getByRole('button', { name: /^General/ }).first().click()
 
   await expect(page.getByText('Preguntar antes de cerrar Sloth')).toBeVisible()

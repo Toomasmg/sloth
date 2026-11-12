@@ -1,0 +1,73 @@
+.ui-side {
+  position: fixed;
+  top: var(--top-h);
+  right: 0;
+  bottom: var(--status-h);
+  z-index: var(--z-panel);
+  max-width: 100vw;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-13);
+  box-shadow: inset 1px 0 0 var(--divider-strong);
+  animation: ui-side-in var(--t-med) var(--ease);
+}
+@keyframes ui-side-in {
+  from {
+    transform: translateX(var(--s-5));
+    opacity: 0;
+  }
+}
+
+.ui-side-head {
+  flex: none;
+  min-height: calc(var(--h-lg) + var(--s-2));
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3) var(--s-2) var(--s-4);
+  box-shadow: inset 0 -1px 0 var(--divider);
+}
+.ui-side-title {
+  margin: 0;
+  font-size: var(--fs-15);
+  font-weight: 600;
+  line-height: var(--lh-title);
+}
+.ui-side-grow {
+  flex: 1;
+}
+.ui-side-x {
+  width: var(--h-md);
+  height: var(--h-md);
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.ui-side-x:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.ui-side-x:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.ui-side-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-side {
+    animation: none;
+  }
+}

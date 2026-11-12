@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { CloseIcon, PlusIcon, WarningIcon } from '../../icons/SlothIcons'
-import { PageShell } from '../help/PageShell'
+import { View } from '../../ui/View'
 import './report.css'
 
 /** Mismos límites que main (report-core.ts). */
@@ -181,7 +181,7 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
 
   if (sent) {
     return (
-      <PageShell labelId="rp-title" title="Reportar un problema" onClose={onClose}>
+      <View labelId="rp-view-title" title="Reportar un problema" onClose={onClose}>
         <div className="rp-wrap">
           <section role="status" aria-labelledby="rp-title" className="rp-thanks">
             <span className="rp-thanks-ico" aria-hidden="true">
@@ -216,14 +216,14 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
             </div>
           </section>
         </div>
-      </PageShell>
+      </View>
     )
   }
 
   const dirty = title.trim() !== '' || what.trim() !== '' || expect.trim() !== '' || steps.some((x) => x.text.trim() !== '') || shotData !== null
 
   return (
-    <PageShell labelId="rp-title" title="Reportar un problema" onClose={onClose} dirty={dirty}>
+    <View labelId="rp-view-title" title="Reportar un problema" onClose={onClose} dirty={dirty}>
       <div className="rp-wrap">
         <header className="rp-head">
           <h1 id="rp-title">Reportar un problema</h1>
@@ -415,7 +415,7 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
           </div>
         </form>
       </div>
-    </PageShell>
+    </View>
   )
 }
 
