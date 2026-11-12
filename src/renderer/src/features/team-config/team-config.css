@@ -36,7 +36,7 @@
   height: var(--h-xs);
   padding: 0 var(--s-2);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--info-soft);
   color: var(--info);
   font: inherit;
@@ -49,11 +49,11 @@
   transition: background var(--t-fast) var(--ease);
 }
 .f-team-config-chip:hover {
-  background: rgba(103, 216, 239, 0.2);
+  background: var(--info-soft);
 }
 .f-team-config-chip .count {
   margin-left: auto;
-  background: rgba(103, 216, 239, 0.18);
+  background: var(--info-soft);
   color: var(--info);
 }
 .f-team-config-chip:focus-visible,

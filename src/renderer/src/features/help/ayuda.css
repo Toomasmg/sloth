@@ -16,7 +16,7 @@
 }
 .ay-head h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--fs-24);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -35,7 +35,7 @@
   height: 34px;
   padding: 0 14px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   font: inherit;
   font-size: var(--fs-13);
   text-decoration: none;
@@ -58,13 +58,13 @@
 .ay-btn-sm {
   height: 28px;
   padding: 0 10px;
-  border-radius: 7px;
+  border-radius: var(--r-md);
   font-size: var(--fs-12);
 }
 .ay-btn-copy {
   height: 26px;
   padding: 0 10px;
-  border-radius: 7px;
+  border-radius: var(--r-md);
   background: transparent;
   color: var(--text-2);
   font-size: var(--fs-12);
@@ -88,7 +88,7 @@
   height: 42px;
   box-sizing: border-box;
   padding: 0 8px 0 14px;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: var(--raised);
   color: var(--text-3);
   box-shadow: inset 0 0 0 1px var(--divider-strong);
@@ -104,7 +104,7 @@
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--fs-13);
   outline: none;
 }
 .ay-search input::placeholder {
@@ -123,7 +123,7 @@
   align-items: center;
   gap: 8px;
   padding: 28px 20px;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--divider);
   text-align: center;
@@ -201,7 +201,7 @@
 }
 .ay-sec h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--fs-15);
   font-weight: 600;
 }
 .ay-sec-head {
@@ -219,7 +219,7 @@
 
 /* Contenedor de listas (atajos y preguntas): tarjeta con borde interno. */
 .ay-card-box {
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
@@ -233,7 +233,7 @@
   align-items: start;
 }
 .ay-card {
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
@@ -334,13 +334,13 @@
 }
 .ay-keys kbd {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--fs-11);
   line-height: 1.6;
   padding: 2px 7px;
-  border-radius: 5px;
+  border-radius: var(--r-sm);
   background: var(--btn-2);
   color: var(--text);
-  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 -1px 0 var(--sunken);
   white-space: nowrap;
 }
 .ay-plus,
@@ -358,7 +358,7 @@
 .ay-mark {
   background: var(--accent-soft);
   color: inherit;
-  border-radius: 3px;
+  border-radius: var(--r-sm);
 }
 
 /* Preguntas frecuentes */
@@ -382,7 +382,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 14px;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--divider);
   padding: 16px;
@@ -418,7 +418,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: var(--toast-bg);
   color: var(--text);
   box-shadow: var(--e-2), inset 0 0 0 1px var(--divider-strong);

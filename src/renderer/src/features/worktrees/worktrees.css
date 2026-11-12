@@ -56,7 +56,7 @@
 }
 .f-wt-head-text h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--fs-24);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -82,17 +82,17 @@
   flex-direction: column;
   gap: 4px;
   padding: 14px 16px;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--divider);
 }
 .f-wt-tile-n {
-  font-size: 22px;
+  font-size: var(--fs-24);
   font-weight: 700;
   letter-spacing: -0.01em;
 }
 .f-wt-tile-l {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-2);
 }
 
@@ -110,7 +110,7 @@
   gap: 8px;
   height: 32px;
   padding: 0 10px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--input-bg);
   color: var(--text-3);
   box-shadow: inset 0 0 0 1px var(--divider);
@@ -131,7 +131,7 @@
   height: 32px;
   padding: 0 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--input-bg);
   color: var(--text);
   font: inherit;
@@ -141,11 +141,11 @@
   height: 32px;
   padding: 0 12px;
   border: 0;
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   background: var(--btn-2);
   color: var(--text-2);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 500;
   cursor: pointer;
   box-shadow: inset 0 0 0 1px var(--divider-strong);
@@ -161,7 +161,7 @@
 }
 .f-wt-result {
   margin-left: 4px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-3);
 }
 
@@ -171,19 +171,19 @@
   padding: 28px 16px;
   text-align: center;
   color: var(--text-2);
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--divider);
 }
 .f-wt-empty-group {
   margin: 0;
   padding: 16px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-3);
 }
 .f-wt-foot {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-3);
   line-height: 1.5;
 }
@@ -193,7 +193,7 @@
 .f-wt-group {
   display: flex;
   flex-direction: column;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
@@ -208,7 +208,7 @@
 }
 .f-wt-group-head h2 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--fs-13);
   font-weight: 600;
   font-family: 'JetBrains Mono', monospace;
 }
@@ -218,12 +218,12 @@
   width: 26px;
   height: 26px;
   flex: none;
-  border-radius: 7px;
+  border-radius: var(--r-md);
   background: var(--done-soft);
   color: var(--success-fg);
 }
 .f-wt-group-count {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-2);
 }
 .f-wt-pad {
@@ -246,7 +246,7 @@
 /* Encabezados de columna: mismo grid que las filas. */
 .f-wt-cols {
   padding: 8px 16px;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -271,13 +271,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
-  font-size: 12.5px;
+  font-size: var(--fs-12);
   font-weight: 500;
 }
 .f-wt-tag {
-  font-size: 11px;
+  font-size: var(--fs-11);
   padding: 1px 7px;
-  border-radius: 9px;
+  border-radius: var(--r-lg);
   background: var(--btn-2);
   color: var(--text-2);
   white-space: nowrap;
@@ -286,14 +286,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-2);
 }
 .f-wt-space {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 12.5px;
+  font-size: var(--fs-12);
   min-width: 0;
 }
 .f-wt-space-name {
@@ -302,7 +302,7 @@
   white-space: nowrap;
 }
 .f-wt-space-acc {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: var(--text-3);
 }
 .f-wt-muted {
@@ -318,8 +318,8 @@
   align-items: center;
   height: 20px;
   padding: 0 8px;
-  border-radius: 10px;
-  font-size: 11px;
+  border-radius: var(--r-lg);
+  font-size: var(--fs-11);
   font-weight: 500;
   white-space: nowrap;
 }
@@ -327,13 +327,13 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-2);
   white-space: nowrap;
 }
 /* Tamaño en disco de la carpeta, debajo de «último uso». */
 .f-wt-size {
-  font-size: 11.5px;
+  font-size: var(--fs-11);
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
@@ -352,11 +352,11 @@
   height: 28px;
   padding: 0 9px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--r-md);
   background: transparent;
   color: var(--text-2);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-12);
   white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
@@ -408,8 +408,8 @@
 .f-wt-btn.lg {
   height: 32px;
   padding: 0 12px;
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: var(--r-md);
+  font-size: var(--fs-13);
 }
 .f-wt-btn.lg.primary {
   padding: 0 14px;
@@ -427,7 +427,7 @@
   flex-direction: column;
   gap: 10px;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
@@ -455,8 +455,8 @@
 }
 .f-wt-confirm .f-wt-btn.lg {
   height: 30px;
-  font-size: 12px;
-  border-radius: 8px;
+  font-size: var(--fs-12);
+  border-radius: var(--r-md);
 }
 
 .f-wt-input {
@@ -465,11 +465,11 @@
   max-width: 420px;
   padding: 0 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--input-bg);
   color: var(--text);
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--fs-12);
   box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .f-wt-input::placeholder {
@@ -480,7 +480,7 @@
 }
 .f-wt-err {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--danger-fg);
 }
 
@@ -494,7 +494,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: var(--toast-bg);
   color: var(--text);
   box-shadow: var(--e-3);
@@ -508,7 +508,7 @@
   overflow-y: auto;
   box-sizing: border-box;
   padding: 0 20px 20px;
-  border-radius: 14px;
+  border-radius: var(--r-lg);
 }
 .modal.f-wt-dialog .modal-head {
   margin: 0 -20px var(--s-1);
@@ -524,7 +524,7 @@
 }
 .f-wt-lead {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: var(--text-2);
   line-height: 1.5;
 }
@@ -532,15 +532,15 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-2);
 }
 .f-wt-folder-box {
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--input-bg);
   color: var(--text-2);
-  font-size: 12px;
+  font-size: var(--fs-12);
   overflow-wrap: anywhere;
   box-shadow: inset 0 0 0 1px var(--divider);
 }
@@ -559,14 +559,14 @@
 }
 .f-wt-grow {
   flex: 1 1 200px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-3);
 }
 
 .f-wt-list {
   display: flex;
   flex-direction: column;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
@@ -602,14 +602,14 @@
   flex: none;
   margin-left: auto;
   padding-top: 1px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-2);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .f-wt-reason {
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-3);
   overflow: hidden;
   text-overflow: ellipsis;
