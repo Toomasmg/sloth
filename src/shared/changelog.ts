@@ -9,6 +9,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.9',
+    date: '2026-11-12',
+    title: 'Sloth renovado',
+    items: [
+      'Diseño nuevo de punta a punta: letras, espacios y colores parejos, con buen contraste en tema claro y oscuro.',
+      'Riel de navegación a la izquierda con Tickets, Equipo, Historial, Ramas y Chat. Llegás a cada uno con Ctrl+Shift+1 a 5, aunque estés en la terminal.',
+      'Un solo menú por espacio: el de «…», el del clic derecho y el de la pestaña son el mismo.',
+      'Tickets, Historial, Equipo, Ayuda y Configuración se abren como pantallas con «‹ volver» siempre a la vista. Chat y Git se abren al costado sin tapar los paneles.',
+      'Nuevo espacio más simple, y la primera vez que abrís Sloth te recibe «Empecemos» en la pantalla principal.',
+      'La vinculación de Equipo se guarda por conector y «Copiado» solo aparece si de verdad se copió.',
+      'Al cerrar Sloth con terminales abiertas, se cierran de a una y en orden.'
+    ]
+  },
+  {
     version: '0.6.8',
     date: '2026-11-11',
     title: 'Sloth para cualquier equipo',

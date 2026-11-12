@@ -1,7 +1,7 @@
 {
   "name": "sloth",
   "productName": "Sloth",
-  "version": "0.6.8",
+  "version": "0.6.9",
   "description": "Sloth: varias cuentas de Claude Code, cada una en su PowerShell y su repo. Liviano a propósito.",
   "private": true,
   "main": "./out/main/index.js",
