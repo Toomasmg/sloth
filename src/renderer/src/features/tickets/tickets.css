@@ -1121,3 +1121,11 @@
   flex-direction: column;
   gap: 6px;
 }
+
+.f-tickets-vacio {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--s-4);
+}

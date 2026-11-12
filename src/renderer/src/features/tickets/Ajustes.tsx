@@ -20,7 +20,7 @@ function grupos(cs: readonly ConectorResumen[]): { etiqueta: string; conectores:
 }
 
 /** De qué sistema salen los tickets y, según la vía, con qué cuenta de Claude o qué repo de GitHub. */
-export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void }): React.JSX.Element {
+export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => void }): React.JSX.Element {
   const ui = useUi()
   const [err, setErr] = useState<string | null>(null)
   // Cambiar de conector borra la lista: si hay tickets, se confirma antes.
@@ -149,9 +149,11 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
         )}
 
         <span className="f-tickets-grow" />
-        <Button size="sm" onClick={onClose} aria-label="Cerrar ajustes de tickets">
-          <CloseIcon size={13} />
-        </Button>
+        {onClose && (
+          <Button size="sm" onClick={onClose} aria-label="Cerrar ajustes de tickets">
+            <CloseIcon size={13} />
+          </Button>
+        )}
       </div>
 
       <details className="f-tickets-propios" onToggle={(e) => e.currentTarget.open && setPropiosVistos(true)}>

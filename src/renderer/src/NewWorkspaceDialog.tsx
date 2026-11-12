@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Account, AccountStatus, AccountUsage, NewWorkspaceInput, Workspace } from '../../shared/types'
 import { api } from './api'
 import { Modal } from './Modal'
+import { Button, Chip, Input, Select, Tabs, Textarea, tabPanelProps } from './ui'
+import { FolderIcon, TemplatesIcon, TicketIcon } from './icons/SlothIcons'
 import { cleanError, emptyTotals, totalTok } from './format'
 import type { NewWorkspacePreset } from './features/host'
 import { useUi } from './features/host'
@@ -40,6 +42,8 @@ interface RecentData {
   counts: Record<string, number>
 }
 
+type Origin = 'carpeta' | 'ticket' | 'plantilla'
+
 type FieldKey = 'carpeta' | 'nombre' | 'ticket' | 'rama' | 'msg' | 'dup'
 
 const lastSegment = (p: string): string => p.split(/[\\/]/).filter(Boolean).pop() ?? ''
@@ -58,7 +62,6 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
   const ctx = useUi()
   const tk = useSnapshot()
   const { accounts, statuses, usage, mode, onClose } = props
-  const ticketMode = mode === 'ticket'
   const tplState = useTemplates()
 
   // Sugerida: con sesión y la que menos usó en las últimas 5 h.
@@ -70,11 +73,13 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
   }, [accounts, statuses, usage])
 
   // Plantilla inicial: la que pidió la barra o la predeterminada. Se lee una vez.
+  const [origin, setOrigin] = useState<Origin>(() => (mode === 'ticket' ? 'ticket' : peekPreselect() || tplState.defaultId ? 'plantilla' : 'carpeta'))
   const [tplId, setTplId] = useState<string>(() => peekPreselect() ?? tplState.defaultId ?? '')
   useEffect(() => {
     takePreselect()
   }, [])
-  const tpl: TemplateDto | undefined = tplState.list.find((t) => t.id === tplId)
+  const ticketMode = origin === 'ticket'
+  const tpl: TemplateDto | undefined = origin === 'plantilla' ? tplState.list.find((t) => t.id === tplId) : undefined
   const tplTicket = Boolean(tpl && usesTicket(tpl))
 
   const [ticket, setTicket] = useState('')
@@ -88,7 +93,6 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
   const [branchRaw, setBranchRaw] = useState('')
   const [base, setBase] = useState('')
   const [msgEdit, setMsgEdit] = useState<string | null>(null)
-  const [pickerOpen, setPickerOpen] = useState(false)
   const [dupAck, setDupAck] = useState(false)
   const [tried, setTried] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -267,13 +271,11 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
     if (!p) return
     setCarpeta(p)
     setDupAck(false)
-    setPickerOpen(false)
   }
 
   const chooseFolder = (p: string): void => {
     setCarpeta(p)
     setDupAck(false)
-    setPickerOpen(false)
   }
 
   const pickTemplate = (t: TemplateDto | undefined): void => {
@@ -306,7 +308,6 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
   const counts = recent?.counts ?? {}
   const canCreate = accounts.length > 0
 
-  // Muestra de color: letra inicial sobre el tono del color (como en el diseño).
   const colorSwatch = (k: (typeof TEMPLATE_COLOR_KEYS)[number], on: boolean): React.JSX.Element => {
     const hex = TEMPLATE_COLORS[k].hex
     return (
@@ -332,402 +333,341 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
     ticket.trim() !== '' ||
     (msgEdit ?? '').trim() !== ''
 
-  const previewBranch = wtOn ? branchResolved || 'rama nueva' : cur ? (cur.isGit ? (cur.branch ?? 'sin rama') : 'sin Git') : 'sin carpeta'
-  const previewName = name.trim() || 'Sin nombre'
-  const previewIni = (name.trim().charAt(0) || '?').toUpperCase()
   const acc = accounts.find((a) => a.id === accountId)
-  const accStatus = acc ? statuses[acc.id] : undefined
+  const accNoSession = Boolean(acc && statuses[acc.id] && !statuses[acc.id].loggedIn)
+
+  const changeOrigin = (o: Origin): void => {
+    if (o === origin) return
+    setOrigin(o)
+    setTried(false)
+    if (o === 'plantilla') {
+      if (!tplState.list.some((t) => t.id === tplId) && tplState.list[0]) pickTemplate(tplState.list[0])
+    } else setMsgEdit(null)
+  }
+
+  const gitHint = !carpetaTrim
+    ? 'Escribí la ruta, elegí una reciente o soltá una carpeta en la ventana.'
+    : cur && !cur.exists
+      ? 'No encontramos esa carpeta en esta PC.'
+      : cur?.isGit
+        ? `Repo git · rama ${cur.branch ?? 'sin rama (HEAD suelto)'}`
+        : cur
+          ? 'No es un repositorio Git.'
+          : 'Revisando la carpeta…'
+
+  const ticketField = (
+    <div className="nw-field">
+      <label htmlFor="nw-ticket">
+        Ticket <span className="nw-req" aria-hidden="true">*</span>
+      </label>
+      <Input
+        id="nw-ticket"
+        mono
+        autoFocus={ticketMode}
+        value={ticket}
+        onChange={(e) => setTicket(e.target.value)}
+        placeholder={tk?.conector.ejemploId || 'PROJ-123'}
+        error={showErr('ticket')}
+      />
+      <span className="nw-hint">
+        {ticketMode ? (tk?.conector.comandoTicket ? 'Claude arranca con /ticket: tu skill se encarga del worktree, el PR y las horas.' : 'El id del ticket va en el nombre del espacio.') : 'Reemplaza {ticket} en el nombre, la rama y el primer mensaje.'}{' '}
+        <button type="button" className="nw-link" onClick={openTickets}>
+          {tk?.conector.disponible ? `Elegir de ${tk.conector.nombre}` : 'Elegir de la lista'}
+        </button>
+      </span>
+    </div>
+  )
+
+  const footer = (
+    <>
+      <span className="nw-summary">
+        {canCreate ? (
+          <>
+            Se crea en <strong>{acc?.label ?? 'tu cuenta'}</strong> y se abre en un panel.
+          </>
+        ) : (
+          'Agregá una cuenta de Claude para poder crear espacios.'
+        )}
+      </span>
+      <Button variant="ghost" onClick={onClose} disabled={busy}>
+        Cancelar
+      </Button>
+      <Button variant="primary" type="submit" loading={busy} kbd="Ctrl+Enter">
+        {busy ? 'Creando…' : 'Crear espacio'}
+      </Button>
+    </>
+  )
 
   return (
     <Modal
-      bare
-      backdropClassName="nw-backdrop"
-      className="nw-sheet"
-      headClassName="nw-head"
-      titlesClassName="nw-titles"
+      size="lg"
+      className="nw-modal"
       title={ticketMode ? 'Espacio desde ticket' : 'Nuevo espacio'}
-      subtitle={ticketMode ? (tk?.conector.comandoTicket ? 'Arranca Claude con /ticket. Tu skill se encarga del worktree, el PR y las horas.' : 'Crea un espacio con el id del ticket en el nombre.') : 'Una carpeta, una cuenta de Claude y su propia terminal.'}
+      subtitle="Una carpeta, una cuenta de Claude y su propia terminal."
       dirty={dirty}
       locked={busy}
       onClose={onClose}
-      onEscape={() => {
-        if (!pickerOpen) return false
-        setPickerOpen(false)
-        return true
+      footer={footer}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault()
+          void submit()
+        }
       }}
       onSubmit={(e) => {
         e.preventDefault()
         void submit()
       }}
     >
-        <div className="nw-body">
-          <div className="nw-main">
-            {ticketMode && (
-              <div className="nw-field">
-                <label htmlFor="nw-ticket">Ticket</label>
-                <input
-                  id="nw-ticket"
-                  className="nw-input mono"
-                  autoFocus
-                  value={ticket}
-                  onChange={(e) => setTicket(e.target.value)}
-                  placeholder={tk?.conector.ejemploId || 'PROJ-123'}
-                  aria-invalid={invalidOf('ticket')}
-                  aria-describedby={showErr('ticket') ? 'nw-ticket-err' : undefined}
-                />
-                {showErr('ticket') && (
-                  <span id="nw-ticket-err" className="nw-err" role="alert">
-                    {showErr('ticket')}
-                  </span>
-                )}
-              </div>
-            )}
+      <div className="nw-body">
+        <Tabs
+          aria-label="Origen del espacio"
+          idBase="nw-origin"
+          value={origin}
+          onChange={changeOrigin}
+          tabs={[
+            { id: 'carpeta', label: <span className="nw-tab"><FolderIcon size={14} /> Carpeta</span> },
+            { id: 'ticket', label: <span className="nw-tab"><TicketIcon size={14} /> Ticket</span> },
+            { id: 'plantilla', label: <span className="nw-tab"><TemplatesIcon size={14} /> Plantilla</span> }
+          ]}
+        />
 
-            {/* Carpeta */}
+        <div className="nw-panel" {...tabPanelProps('nw-origin', origin)}>
+          {origin === 'ticket' && ticketField}
+
+          {origin === 'plantilla' && (
             <div className="nw-field">
-              <label htmlFor="nw-carpeta">Carpeta del proyecto</label>
-              <div className="nw-row">
-                <input
-                  id="nw-carpeta"
-                  className="nw-input mono"
-                  type="text"
-                  autoComplete="off"
-                  spellCheck={false}
-                  autoFocus={!ticketMode}
-                  value={carpeta}
-                  onChange={(e) => {
-                    setCarpeta(e.target.value)
-                    setDupAck(false)
-                  }}
-                  placeholder="Ruta de la carpeta"
-                  aria-invalid={invalidOf('carpeta')}
-                  aria-describedby="nw-carpeta-hint"
-                />
-                <button
-                  type="button"
-                  className="nw-btn"
-                  onClick={() => (folderRows.length ? setPickerOpen((v) => !v) : void pick())}
-                  aria-expanded={folderRows.length ? pickerOpen : undefined}
-                  aria-controls={folderRows.length ? 'nw-recent' : undefined}
-                >
-                  Elegir…
-                </button>
-              </div>
-              {showErr('carpeta') && (
-                <span className="nw-err" role="alert">
-                  {showErr('carpeta')}
-                </span>
-              )}
-              <span id="nw-carpeta-hint" className="nw-hint">
-                {!carpetaTrim
-                  ? 'Escribí la ruta o elegí una carpeta.'
-                  : cur && !cur.exists
-                    ? 'No encontramos esa carpeta en esta PC.'
-                    : cur?.isGit
-                      ? (
-                          <>
-                            Repositorio de Git, rama <span className="mono strong">{cur.branch ?? 'sin rama (HEAD suelto)'}</span>
-                          </>
-                        )
-                      : cur
-                        ? 'No es un repositorio Git.'
-                        : 'Revisando la carpeta…'}
+              <span id="nw-tpl-lbl" className="nw-lbl">
+                Plantilla
               </span>
-
-              {pickerOpen && folderRows.length > 0 && (
-                <div id="nw-recent" className="nw-recent" role="group" aria-label="Carpetas recientes">
-                  {folderRows.map((f) => (
-                    <button key={f.path} type="button" className="nw-recent-row" onClick={() => chooseFolder(f.path)}>
-                      <span className="nw-recent-name">{f.name}</span>
-                      <span className="nw-recent-path mono">{f.path}</span>
-                      <span className={`nw-recent-git${f.isGit ? ' ok' : ''}`}>{f.isGit ? `Git · ${f.branch ?? 'sin rama'}` : 'Sin Git'}</span>
-                      {f.spaces.length > 0 && <span className="nw-recent-dup">Ya tiene espacio</span>}
-                    </button>
+              {tplState.list.length === 0 ? (
+                <span className="nw-hint">
+                  Todavía no tenés plantillas.{' '}
+                  <button type="button" className="nw-link" onClick={openTemplates}>
+                    Crear una
+                  </button>
+                </span>
+              ) : (
+                <div role="group" aria-labelledby="nw-tpl-lbl" className="nw-chips">
+                  {tplState.list.map((t) => (
+                    <Chip key={t.id} selected={tpl?.id === t.id} onClick={() => pickTemplate(t)}>
+                      {t.name}
+                    </Chip>
                   ))}
-                  <button type="button" className="nw-recent-row nw-recent-other" onClick={() => void pick()}>
-                    <span className="nw-recent-name">Otra carpeta…</span>
-                  </button>
                 </div>
               )}
-            </div>
-
-            {/* Espacio existente en la carpeta */}
-            {hasDup && !dupAck && (
-              <div className="nw-dup" role="group" aria-label="Espacio existente en esta carpeta">
-                <span>
-                  Ya tenés un espacio en esta carpeta: <strong>{dupSpaces[0].name}</strong> ({dupSpaces[0].accountLabel}). ¿Abrir ese o crear otro?
-                </span>
-                <div className="nw-dup-actions">
-                  <button
-                    type="button"
-                    className="nw-btn"
-                    onClick={() => {
-                      ctx.openPane(dupSpaces[0].id)
-                      onClose()
-                    }}
-                  >
-                    Abrir ese
+              {tpl?.description && <span className="nw-hint">{tpl.description}</span>}
+              {tplState.list.length > 0 && (
+                <span className="nw-hint">
+                  <button type="button" className="nw-link" onClick={openTemplates}>
+                    Administrar plantillas
                   </button>
-                  <button id="nw-dup-otro" type="button" className="nw-btn warn" onClick={() => setDupAck(true)}>
-                    Crear otro
-                  </button>
-                </div>
-                {showErr('dup') && (
-                  <span className="nw-err" role="alert">
-                    {showErr('dup')}
-                  </span>
-                )}
-              </div>
-            )}
-            {hasDup && dupAck && <span className="nw-warn-line">Vas a crear otro espacio en esta carpeta.</span>}
-
-            {!ticketMode && (
-              <div className="nw-field">
-                <label htmlFor="nw-nombre">Nombre</label>
-                <input
-                  id="nw-nombre"
-                  className="nw-input"
-                  type="text"
-                  autoComplete="off"
-                  value={name}
-                  onChange={(e) => {
-                    setNameRaw(e.target.value)
-                    setNameTouched(true)
-                  }}
-                  placeholder="Ej.: front"
-                  aria-invalid={invalidOf('nombre')}
-                  aria-describedby="nw-nombre-hint"
-                />
-                <span id="nw-nombre-hint" className="nw-hint">
-                  Se completa con el nombre de la carpeta. Lo podés cambiar.
                 </span>
-                {showErr('nombre') && (
-                  <span className="nw-err" role="alert">
-                    {showErr('nombre')}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {ticketMode && (
-              <div className="nw-field">
-                <label htmlFor="nw-nombre">Nombre (opcional)</label>
-                <input id="nw-nombre" className="nw-input" value={name} onChange={(e) => { setNameRaw(e.target.value); setNameTouched(true) }} placeholder={ticketId || 'PROJ-123'} />
-              </div>
-            )}
-
-            {/* Cuenta */}
-            <div className="nw-field">
-              <span id="nw-acc-lbl" className="nw-lbl">
-                Cuenta de Claude
-              </span>
-              <div role="radiogroup" aria-labelledby="nw-acc-lbl" className="nw-accs">
-                {accounts.map((a, i) => {
-                  const on = a.id === accountId
-                  const n = recent ? (counts[a.id] ?? 0) : null
-                  return (
-                    <button key={a.id} type="button" role="radio" aria-checked={on} className={`nw-acc${on ? ' on' : ''}`} onClick={() => setAccountId(a.id)}>
-                      <span className={`nw-acc-ini${i % 2 ? ' alt' : ''}`} aria-hidden="true">
-                        {a.label.charAt(0).toUpperCase()}
-                      </span>
-                      <span className="nw-acc-text">
-                        <span className="nw-acc-name">{a.label}</span>
-                        <span className="nw-acc-sub">{n === null ? '…' : n === 1 ? '1 espacio abierto' : `${n} espacios abiertos`}</span>
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-              {accounts.length === 0 && <span className="nw-err">Agregá una cuenta de Claude antes de crear un espacio.</span>}
+              )}
             </div>
+          )}
+          {origin === 'plantilla' && tplTicket && ticketField}
 
-            {!ticketMode && (
-              <>
-                {/* Plantilla */}
-                <div className="nw-field">
-                  <span id="nw-tpl-lbl" className="nw-lbl">
-                    Plantilla <span className="nw-opt">· opcional</span>
-                  </span>
-                  <div role="group" aria-labelledby="nw-tpl-lbl" className="nw-chips">
-                    <button type="button" className="nw-chip" aria-pressed={!tpl} onClick={() => pickTemplate(undefined)}>
-                      Ninguna
-                    </button>
-                    {tplState.list.map((t) => (
-                      <button key={t.id} type="button" className="nw-chip" aria-pressed={tpl?.id === t.id} onClick={() => pickTemplate(t)}>
-                        {t.name}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="nw-links">
-                    <button type="button" className="nw-link" onClick={openTemplates}>
-                      Administrar plantillas…
-                    </button>
-                    <button type="button" className="nw-link" onClick={openTickets}>
-                      {tk?.conector.disponible ? `Desde un ticket de ${tk.conector.nombre}…` : 'Desde un ticket…'}
-                    </button>
-                  </div>
-                  {tpl?.description && <span className="nw-hint">{tpl.description}</span>}
-                </div>
-
-                <div className="nw-field">
-                  <label htmlFor="nw-msg">Primer mensaje para Claude (editable)</label>
-                  <textarea
-                    id="nw-msg"
-                    className="nw-input nw-textarea"
-                    rows={3}
-                    value={msg}
-                    onChange={(e) => setMsgEdit(e.target.value)}
-                    placeholder="Ej.: revisá los tests que fallan"
-                    aria-invalid={invalidOf('msg')}
-                    aria-describedby="nw-msg-hint"
-                  />
-                  <span id="nw-msg-hint" className="nw-hint">
-                    Se manda solo la primera vez que se abre el espacio.
-                  </span>
-                  {showErr('msg') && (
-                    <span className="nw-err" role="alert">
-                      {showErr('msg')}
-                    </span>
-                  )}
-                </div>
-
-                {tplTicket && (
-                  <div className="nw-field">
-                    <label htmlFor="nw-ticket">Ticket</label>
-                    <input
-                      id="nw-ticket"
-                      className="nw-input mono"
-                      value={ticket}
-                      onChange={(e) => setTicket(e.target.value)}
-                      placeholder={tk?.conector.ejemploId || 'PROJ-123'}
-                      aria-invalid={invalidOf('ticket')}
-                      aria-describedby="nw-ticket-hint"
-                    />
-                    <span id="nw-ticket-hint" className={showErr('ticket') ? 'nw-err' : 'nw-hint'} role={showErr('ticket') ? 'alert' : undefined}>
-                      {showErr('ticket') || 'Reemplaza {ticket} en el nombre, la rama y el primer mensaje.'}
-                    </span>
-                  </div>
-                )}
-
-                {/* Color */}
-                <div className="nw-field">
-                  <span id="nw-col-lbl" className="nw-lbl">
-                    Color del ícono
-                  </span>
-                  <div role="radiogroup" aria-labelledby="nw-col-lbl" className="nw-colors">
-                    {TEMPLATE_COLOR_KEYS.map((k, i) => colorSwatch(k, colorIdx === i))}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {ticketMode && (
-              <div className="nw-field">
-                <span className="nw-lbl">Color del ícono</span>
-                <div role="radiogroup" aria-label="Color del ícono" className="nw-colors">
-                  {TEMPLATE_COLOR_KEYS.map((k) => colorSwatch(k, colorKey === k))}
-                </div>
+          <div className="nw-field">
+            <label htmlFor="nw-carpeta">
+              Carpeta del proyecto <span className="nw-req" aria-hidden="true">*</span>
+            </label>
+            <div className="nw-row">
+              <Input
+                id="nw-carpeta"
+                mono
+                className="nw-grow"
+                autoComplete="off"
+                spellCheck={false}
+                autoFocus={origin === 'carpeta'}
+                value={carpeta}
+                onChange={(e) => {
+                  setCarpeta(e.target.value)
+                  setDupAck(false)
+                }}
+                placeholder="Ruta de la carpeta"
+                error={showErr('carpeta')}
+                aria-describedby="nw-carpeta-hint"
+              />
+              <Button onClick={() => void pick()}>Elegir…</Button>
+            </div>
+            {folderRows.length > 0 && (
+              <div className="nw-recents" role="group" aria-label="Carpetas recientes">
+                <span className="nw-hint">Recientes:</span>
+                {folderRows.slice(0, 5).map((f) => (
+                  <Chip key={f.path} selected={carpetaTrim === f.path} onClick={() => chooseFolder(f.path)}>
+                    {f.name}
+                  </Chip>
+                ))}
               </div>
-            )}
-
-            {/* Opciones avanzadas */}
-            {!ticketMode && (
-              <details className="nw-adv" open>
-                <summary>Opciones avanzadas</summary>
-                <div className="nw-adv-body">
-                  <div className="nw-wt">
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={wtOn}
-                      aria-labelledby="nw-wt-lbl"
-                      className={`nw-switch${wtOn ? ' on' : ''}`}
-                      onClick={() => setWtOn((v) => !v)}
-                    >
-                      <span aria-hidden="true" />
-                    </button>
-                    <span className="nw-wt-text">
-                      <span id="nw-wt-lbl">Trabajar en una rama aparte</span>
-                      <small>Crea una copia de trabajo (worktree) para no pisar tus cambios.</small>
-                    </span>
-                  </div>
-                  {wtOn && (
-                    <div className="nw-wt-fields">
-                      <div className="nw-field grow">
-                        <label htmlFor="nw-rama">Rama nueva</label>
-                        <input
-                          id="nw-rama"
-                          className="nw-input mono"
-                          spellCheck={false}
-                          autoComplete="off"
-                          value={branchRaw}
-                          onChange={(e) => setBranchRaw(e.target.value)}
-                          placeholder="feat/mi-cambio"
-                          aria-invalid={invalidOf('rama')}
-                          aria-describedby="nw-rama-hint"
-                        />
-                        <span id="nw-rama-hint" className={showErr('rama') ? 'nw-err' : 'nw-hint'} role={showErr('rama') ? 'alert' : undefined}>
-                          {showErr('rama') || (branchResolved && branchResolved !== branchRaw.trim() ? `Se va a crear: ${branchResolved}` : 'Sin espacios: usá guiones o barras.')}
-                        </span>
-                      </div>
-                      <div className="nw-field grow">
-                        <label htmlFor="nw-base">Desde</label>
-                        <select id="nw-base" className="nw-input mono" value={base} onChange={(e) => setBase(e.target.value)} disabled={!hasGit}>
-                          {!branches?.list.length && <option value={base}>{base || 'Elegí una carpeta Git'}</option>}
-                          {(branches?.list ?? []).map((b) => (
-                            <option key={b} value={b}>
-                              {b}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </details>
-            )}
-
-            {err && (
-              <p className="nw-form-err" role="alert">
-                {err}
-              </p>
             )}
           </div>
 
-          <aside className="nw-preview" aria-label="Vista previa del espacio">
-            <span className="nw-lbl">Así se va a ver en la barra lateral</span>
-            <div className="nw-pv-box">
-              <div className="nw-pv-acc">
-                <span className="nw-pv-acc-ini" aria-hidden="true">
-                  {(acc?.label ?? '?').charAt(0).toUpperCase()}
-                </span>
-                <span className="nw-pv-acc-name">{acc?.label ?? 'Sin cuenta'}</span>
-                <span className="nw-pv-acc-sub">{accStatus?.email ?? (accStatus?.loggedIn ? 'con sesión' : 'sin sesión')}</span>
+          {hasDup && !dupAck && (
+            <div className="nw-dup" role="group" aria-label="Espacio existente en esta carpeta">
+              <span>
+                Ya tenés un espacio en esta carpeta: <strong>{dupSpaces[0].name}</strong> ({dupSpaces[0].accountLabel}). ¿Abrir ese o crear otro?
+              </span>
+              <div className="nw-dup-actions">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    ctx.openPane(dupSpaces[0].id)
+                    onClose()
+                  }}
+                >
+                  Abrir ese
+                </Button>
+                <Button id="nw-dup-otro" size="sm" onClick={() => setDupAck(true)}>
+                  Crear otro
+                </Button>
               </div>
-              <div className="nw-pv-row">
-                <span className="nw-pv-tile" style={{ background: `${sw}2e`, color: sw }} aria-hidden="true">
-                  {previewIni}
+              {showErr('dup') && (
+                <span className="nw-err" role="alert">
+                  {showErr('dup')}
                 </span>
-                <span className="nw-pv-text">
-                  <span className="nw-pv-name">{previewName}</span>
-                  <span className="nw-pv-branch mono">{previewBranch}</span>
+              )}
+            </div>
+          )}
+          {hasDup && dupAck && <span className="nw-warn-line">Vas a crear otro espacio en esta carpeta.</span>}
+
+          <div className="nw-pair">
+            <div className="nw-field">
+              <label htmlFor="nw-nombre">{ticketMode ? 'Nombre (opcional)' : 'Nombre'}</label>
+              <Input
+                id="nw-nombre"
+                autoComplete="off"
+                value={name}
+                onChange={(e) => {
+                  setNameRaw(e.target.value)
+                  setNameTouched(true)
+                }}
+                placeholder={ticketMode ? ticketId || 'PROJ-123' : 'Ej.: front'}
+                error={showErr('nombre')}
+              />
+              <span className="nw-hint">{ticketMode ? 'Si lo dejás vacío, usa el id del ticket.' : 'Sale de la carpeta; lo podés cambiar.'}</span>
+            </div>
+            {!ticketMode ? (
+              <div className="nw-field">
+                <label htmlFor="nw-rama-modo">Rama</label>
+                <Select
+                  id="nw-rama-modo"
+                  value={wtOn ? 'nueva' : 'actual'}
+                  onChange={(e) => setWtOn(e.target.value === 'nueva')}
+                  options={[
+                    { value: 'actual', label: cur?.isGit ? `Rama actual · ${cur.branch ?? 'sin rama'}` : 'Rama actual' },
+                    { value: 'nueva', label: 'Rama aparte nueva (worktree)' }
+                  ]}
+                />
+                <span id="nw-carpeta-hint" className={`nw-hint${cur?.isGit ? ' ok' : ''}`}>
+                  {gitHint}
                 </span>
-                <span className="nw-pv-new">Nuevo</span>
+              </div>
+            ) : (
+              <span id="nw-carpeta-hint" className="nw-hint nw-hint--alone">
+                {gitHint}
+              </span>
+            )}
+          </div>
+
+          {!ticketMode && wtOn && (
+            <div className="nw-pair">
+              <div className="nw-field">
+                <label htmlFor="nw-rama">Rama nueva</label>
+                <Input
+                  id="nw-rama"
+                  mono
+                  spellCheck={false}
+                  autoComplete="off"
+                  value={branchRaw}
+                  onChange={(e) => setBranchRaw(e.target.value)}
+                  placeholder="feat/mi-cambio"
+                  error={showErr('rama')}
+                />
+                <span className="nw-hint">{branchResolved && branchResolved !== branchRaw.trim() ? `Se va a crear: ${branchResolved}` : 'Sin espacios: usá guiones o barras.'}</span>
+              </div>
+              <div className="nw-field">
+                <label htmlFor="nw-base">Desde</label>
+                <Select id="nw-base" value={base} onChange={(e) => setBase(e.target.value)} disabled={!hasGit}>
+                  {!branches?.list.length && <option value={base}>{base || 'Elegí una carpeta Git'}</option>}
+                  {(branches?.list ?? []).map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </Select>
               </div>
             </div>
-          </aside>
-        </div>
+          )}
 
-        <footer className="nw-foot">
-          <span className="nw-keys">Enter crea · Esc cierra</span>
-          <span className="nw-grow" />
-          <button type="button" className="nw-btn" onClick={onClose}>
-            Cancelar
-          </button>
-          <button type="submit" className="nw-btn primary" aria-busy={busy} disabled={busy}>
-            {busy ? 'Creando…' : 'Crear espacio'}
-          </button>
-        </footer>
+          <div className="nw-field">
+            <span id="nw-acc-lbl" className="nw-lbl">
+              Cuenta de Claude
+            </span>
+            <div role="radiogroup" aria-labelledby="nw-acc-lbl" className="nw-accs">
+              {accounts.map((a, i) => {
+                const on = a.id === accountId
+                const n = recent ? (counts[a.id] ?? 0) : null
+                const st = statuses[a.id]
+                return (
+                  <button key={a.id} type="button" role="radio" aria-checked={on} className={`nw-acc${on ? ' on' : ''}`} onClick={() => setAccountId(a.id)}>
+                    <span className={`nw-acc-ini${i % 2 ? ' alt' : ''}`} aria-hidden="true">
+                      {a.label.charAt(0).toUpperCase()}
+                    </span>
+                    <span className="nw-acc-text">
+                      <span className="nw-acc-name">{a.label}</span>
+                      <span className="nw-acc-sub">{n === null ? '…' : n === 1 ? '1 espacio abierto' : `${n} espacios abiertos`}</span>
+                      {st && !st.loggedIn && <span className="nw-acc-warn">Sin sesión: vas a iniciarla en la terminal</span>}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+            {accounts.length === 0 && <span className="nw-err">Agregá una cuenta de Claude antes de crear un espacio.</span>}
+            {accNoSession && <span className="nw-hint">Al abrir el espacio, Claude te pide iniciar sesión en esa terminal.</span>}
+          </div>
+
+          {!ticketMode && (
+            <div className="nw-field">
+              <label htmlFor="nw-msg">
+                Primer mensaje para Claude <span className="nw-opt">· opcional</span>
+              </label>
+              <Textarea
+                id="nw-msg"
+                rows={3}
+                value={msg}
+                onChange={(e) => setMsgEdit(e.target.value)}
+                placeholder="Ej.: revisá los tests que fallan"
+                error={showErr('msg')}
+                aria-describedby="nw-msg-hint"
+              />
+              <span id="nw-msg-hint" className="nw-hint">
+                Se manda solo la primera vez que se abre el espacio.
+              </span>
+            </div>
+          )}
+
+          <details className="nw-adv">
+            <summary>
+              <span className="nw-adv-title">Más opciones</span> <span className="nw-hint">color del ícono</span>
+            </summary>
+            <div className="nw-adv-body">
+              <span id="nw-col-lbl" className="nw-lbl">
+                Color del ícono
+              </span>
+              <div role="radiogroup" aria-labelledby="nw-col-lbl" className="nw-colors">
+                {TEMPLATE_COLOR_KEYS.map((k) => colorSwatch(k, colorKey === k))}
+              </div>
+            </div>
+          </details>
+
+          {err && (
+            <p className="nw-form-err" role="alert">
+              {err}
+            </p>
+          )}
+        </div>
+      </div>
     </Modal>
   )
 }

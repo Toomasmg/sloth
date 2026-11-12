@@ -6,7 +6,7 @@ import type { SectionId, SettingsTab } from './bus'
 import { NAV, navOf, normalizeTab, searchSettings } from './search'
 import { updateSettings, type SettingsPatch } from './store'
 import { SaveContext, errText, type SaveFn } from './ui'
-import { AboutSection, AccountsSection, AppearanceSection, BackupSection, GeneralSection, NotificationsSection, ShortcutsSection, TeamSection, TerminalSection, UpdatesSection } from './sections'
+import { AboutSection, AccountsSection, AppearanceSection, BackupSection, GeneralSection, NotificationsSection, ShortcutsSection, TeamSection, TemplatesSection, TerminalSection, TicketsSection, UpdatesSection } from './sections'
 
 interface Toast {
   text: string
@@ -123,6 +123,8 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
                 {sec === 'terminal' && <TerminalSection />}
                 {sec === 'atajos' && <ShortcutsSection />}
                 {sec === 'notif' && <NotificationsSection onClose={onClose} />}
+                {sec === 'plantillas' && <TemplatesSection />}
+                {sec === 'tickets' && <TicketsSection onClose={onClose} />}
                 {sec === 'equipo' && <TeamSection onClose={onClose} />}
                 {sec === 'updates' && <UpdatesSection />}
                 {sec === 'backup' && <BackupSection onClose={onClose} />}

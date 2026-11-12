@@ -18,7 +18,7 @@ const paleta = (titulo: string): Abrir => async (page) => {
 
 /** Cada pantalla, abierta desde su lugar canónico: el riel, la paleta o su atajo. */
 const PANTALLAS: { nombre: string; abrir: Abrir; lista: string; captura: string }[] = [
-  { nombre: 'Tickets', abrir: riel('Tickets'), lista: 'Todavía no elegiste de dónde traer tickets.', captura: 'tickets.png' },
+  { nombre: 'Tickets', abrir: riel('Tickets'), lista: 'Conectá tus tickets', captura: 'tickets.png' },
   { nombre: 'Historial de sesiones', abrir: riel('Historial'), lista: 'Todavía no hay sesiones guardadas', captura: 'historial.png' },
   { nombre: 'Plantillas', abrir: paleta('Nueva plantilla'), lista: 'Todavía no hay plantillas.', captura: 'plantillas.png' },
   { nombre: 'Ramas aparte', abrir: riel('Ramas aparte'), lista: 'Ningún espacio apunta a un repo git.', captura: 'ramas.png' },
