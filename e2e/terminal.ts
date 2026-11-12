@@ -49,3 +49,28 @@ export async function shellReady(page: Page): Promise<void> {
   }
   throw new Error('La PowerShell de la terminal no respondió en 45 s')
 }
+
+type Recorder = { sent: { at: number; data: string }[]; keyAt: number }
+type XtermLive = HTMLElement & {
+  __xterm?: { onData(cb: (d: string) => void): unknown; selectAll(): void; hasSelection(): boolean }
+}
+
+/**
+ * Desde ahora anota lo que la terminal le manda a la shell (con su hora) y la hora de la próxima tecla.
+ * Así se mide lo que tarda Sloth, sin contar lo que tarda la shell en mostrarlo.
+ */
+export const recordInput = (page: Page): Promise<void> =>
+  page.locator('.terminal-host').first().evaluate((el) => {
+    const rec: Recorder = { sent: [], keyAt: 0 }
+    ;(window as unknown as { __rec: Recorder }).__rec = rec
+    window.addEventListener('keydown', () => (rec.keyAt = performance.now()), { capture: true, once: true })
+    ;(el as XtermLive).__xterm?.onData((data) => rec.sent.push({ at: performance.now(), data }))
+  })
+
+export const recorded = (page: Page): Promise<Recorder> => page.evaluate(() => (window as unknown as { __rec: Recorder }).__rec)
+
+export const selectAll = (page: Page): Promise<void> =>
+  page.locator('.terminal-host').first().evaluate((el) => (el as XtermLive).__xterm?.selectAll())
+
+export const hasSelection = (page: Page): Promise<boolean> =>
+  page.locator('.terminal-host').first().evaluate((el) => (el as XtermLive).__xterm?.hasSelection() ?? false)

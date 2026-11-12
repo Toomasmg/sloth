@@ -129,8 +129,18 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
     const pasteClipboard = (): void => {
       void api.clipboardRead().then((t) => t && term.paste(t))
     }
-    // Ctrl+V y Ctrl+Shift+V pegan; Ctrl+Shift+C copia; Ctrl+C sigue siendo interrumpir. En la pantalla
-    // alternativa (vim, nano) Ctrl+V solo llega como ^V: allá es bloque visual o «literal siguiente».
+    // Copia la selección y la limpia; si falla, la selección queda a la vista.
+    const copySelection = (): void => {
+      const sel = term.getSelection()
+      if (!sel) return
+      api
+        .clipboardWrite(sel)
+        .then(() => term.clearSelection())
+        .catch(() => undefined)
+    }
+    // Ctrl+V y Ctrl+Shift+V pegan. Ctrl+C copia si hay algo seleccionado y si no interrumpe (^C), como
+    // Windows Terminal; Ctrl+Shift+C siempre copia. En la pantalla alternativa (vim, nano) Ctrl+V solo
+    // llega como ^V: allá es bloque visual o «literal siguiente».
     term.attachCustomKeyEventHandler((ev) => {
       if (ev.type !== 'keydown' || !ev.ctrlKey || ev.altKey || ev.metaKey) return true
       if (ev.code === 'KeyV' && (ev.shiftKey || inNormalBuffer())) {
@@ -139,9 +149,9 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
         pasteClipboard()
         return false
       }
-      if (ev.shiftKey && ev.code === 'KeyC') {
-        const sel = term.getSelection()
-        if (sel) void api.clipboardWrite(sel).catch(() => undefined) // si falla, la selección queda a la vista
+      if (ev.code === 'KeyC' && (ev.shiftKey || term.hasSelection())) {
+        ev.preventDefault()
+        copySelection()
         return false
       }
       return true
@@ -182,13 +192,8 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
     // Clic derecho: copia si hay selección, si no pega (como Windows Terminal).
     const onContext = (ev: MouseEvent): void => {
       ev.preventDefault()
-      const sel = term.getSelection()
-      if (sel) {
-        api
-          .clipboardWrite(sel)
-          .then(() => term.clearSelection())
-          .catch(() => undefined) // si falla, la selección queda a la vista
-      } else pasteClipboard()
+      if (term.hasSelection()) copySelection()
+      else pasteClipboard()
     }
     el.addEventListener('contextmenu', onContext)
 
