@@ -41,6 +41,11 @@
   user-select: none;
   transition: background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 }
+.ui-btn--xs {
+  height: var(--h-xs);
+  padding: 0 var(--s-2);
+  font-size: var(--fs-12);
+}
 .ui-btn--sm {
   height: var(--h-sm);
   padding: 0 var(--s-2);
@@ -197,7 +202,8 @@
 
 /* ---------- Input, Select, Textarea ---------- */
 .ui-field {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
   flex-direction: column;
   gap: var(--s-1);
   min-width: 0;
@@ -241,20 +247,27 @@
 .ui-input {
   flex: 1;
   min-width: 0;
+  width: auto;
   height: 100%;
   padding: 0;
   border: 0;
+  border-radius: 0;
   background: transparent;
   color: inherit;
   font: inherit;
   font-size: var(--fs-13);
   outline: none;
+}
+.ui-input,
+.ui-input:hover,
+.ui-input:focus {
   box-shadow: none;
 }
 .ui-input::placeholder {
   color: var(--placeholder);
 }
 .ui-textarea {
+  height: auto;
   padding: var(--s-2);
   resize: vertical;
   min-height: calc(var(--h-lg) * 2);

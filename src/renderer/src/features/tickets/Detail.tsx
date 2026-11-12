@@ -6,6 +6,7 @@ import { SpaceIcon } from '../../icons/SlothIcons'
 import type { Workspace } from '../../../../shared/types'
 import { fmtHoras, tintFor, type Accion, type ConectorInfo, type Detalle, type DetView, type Estado, type EstadoBase, type Ticket, type WriteOpt } from './model'
 import { Av, ExternalGlyph, PrioGlyph, prioTone } from './parts'
+import { Button, Select } from '../../ui'
 
 /** Lo que no se puede hacer desde la app: se dice en voz clara al lado del control. */
 const sinCuentaMsg = (nombre: string): string => `Actualizá ${nombre} primero para elegir la cuenta que lo conecta.`
@@ -125,12 +126,7 @@ export function Detail(props: DetailProps): React.JSX.Element {
           {can('estado') ? (
             <div className="f-tickets-field">
               <label htmlFor="f-tickets-estado">Estado</label>
-              <select
-                id="f-tickets-estado"
-                value={t.estado ?? ''}
-                disabled={Boolean(estadoWhy) || anyBusy}
-                aria-describedby="f-tickets-w-estado"
-                onChange={(e) => void props.onWrite('estado', { estado: e.target.value }, { ticket: { estado: e.target.value } })}
+              <Select id="f-tickets-estado" value={t.estado ?? ''} disabled={Boolean(estadoWhy) || anyBusy} aria-describedby="f-tickets-w-estado" onChange={(e) => void props.onWrite('estado', { estado: e.target.value }, { ticket: { estado: e.target.value } })}
               >
                 {!t.estado && <option value="">Sin estado</option>}
                 {selectOpts.map((e) => (
@@ -138,7 +134,7 @@ export function Detail(props: DetailProps): React.JSX.Element {
                     {e.nombre}
                   </option>
                 ))}
-              </select>
+              </Select>
               <span id="f-tickets-w-estado" className="f-tickets-why" role={busy('estado') ? 'status' : undefined}>
                 {busy('estado') ? 'Guardando…' : estadoWhy ?? ''}
               </span>
@@ -173,17 +169,12 @@ export function Detail(props: DetailProps): React.JSX.Element {
         </div>
         {!resp && can('tomar') && (
           <>
-            <button
-              type="button"
-              className="f-tickets-b f-tickets-b--md f-tickets-b--pri"
-              disabled={Boolean(takeWhy) || anyBusy}
-              aria-describedby="f-tickets-w-take"
-              onClick={() =>
+            <Button variant="primary" disabled={Boolean(takeWhy) || anyBusy} aria-describedby="f-tickets-w-take" onClick={() =>
                 void props.onWrite('tomar', {}, { ticket: { responsable: me!.nombre, responsableId: me!.id } })
               }
             >
               {busy('tomar') ? 'Guardando…' : 'Tomarlo'}
-            </button>
+            </Button>
             <span id="f-tickets-w-take" className="f-tickets-why">
               {takeWhy ?? ''}
             </span>
@@ -191,15 +182,10 @@ export function Detail(props: DetailProps): React.JSX.Element {
         )}
         {mine && can('soltar') && (
           <>
-            <button
-              type="button"
-              className="f-tickets-b f-tickets-b--md"
-              disabled={Boolean(why('soltar')) || anyBusy}
-              aria-describedby="f-tickets-w-drop"
-              onClick={() => void props.onWrite('soltar', {}, { ticket: { responsable: undefined, responsableId: undefined } })}
+            <Button disabled={Boolean(why('soltar')) || anyBusy} aria-describedby="f-tickets-w-drop" onClick={() => void props.onWrite('soltar', {}, { ticket: { responsable: undefined, responsableId: undefined } })}
             >
               {busy('soltar') ? 'Guardando…' : 'Soltar'}
-            </button>
+            </Button>
             <span id="f-tickets-w-drop" className="f-tickets-why">
               {why('soltar') ?? ''}
             </span>
@@ -217,15 +203,15 @@ export function Detail(props: DetailProps): React.JSX.Element {
                   {ws.name} · {SPACE_LABEL[st]}
                 </span>
               </span>
-              <button type="button" className="f-tickets-b f-tickets-b--pri" onClick={() => props.onOpenSpace(ws)}>
+              <Button variant="primary" onClick={() => props.onOpenSpace(ws)}>
                 Abrir espacio
-              </button>
+              </Button>
             </>
           ) : (
-            <button type="button" className="f-tickets-b f-tickets-b--pri" onClick={props.onStart} disabled={props.startBusy || props.disabledAll}>
+            <Button variant="primary" onClick={props.onStart} disabled={props.startBusy || props.disabledAll}>
               <SpaceIcon size={14} strokeWidth={2} />
               {props.startBusy ? 'Creando…' : 'Empezar en Sloth'}
-            </button>
+            </Button>
           )}
           {t.url ? (
             <a className="f-tickets-b" href={t.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${t.id} en ${n}`}>
@@ -233,10 +219,10 @@ export function Detail(props: DetailProps): React.JSX.Element {
               Abrir en {n}
             </a>
           ) : (
-            <button type="button" className="f-tickets-b" disabled title={`${n} no dio el link de este ticket`}>
+            <Button disabled title={`${n} no dio el link de este ticket`}>
               <ExternalGlyph />
               Abrir en {n}
-            </button>
+            </Button>
           )}
           {ws && wsAcc >= 0 && (
             <span className="f-tickets-acc">
@@ -255,9 +241,9 @@ export function Detail(props: DetailProps): React.JSX.Element {
       {view?.error && (
         <p className="form-error" role="alert">
           No pudimos leer el detalle de {t.id}: {view.error}{' '}
-          <button type="button" className="f-tickets-b f-tickets-b--xs" onClick={props.onReload}>
+          <Button size="xs" onClick={props.onReload}>
             Reintentar
-          </button>
+          </Button>
         </p>
       )}
 
@@ -342,9 +328,9 @@ export function Detail(props: DetailProps): React.JSX.Element {
                     }
                   }}
                 />
-                <button type="button" className="f-tickets-b" disabled={!draft.trim() || Boolean(why('comentar')) || anyBusy} onClick={() => void submitComment()}>
+                <Button disabled={!draft.trim() || Boolean(why('comentar')) || anyBusy} onClick={() => void submitComment()}>
                   {busy('comentar') ? 'Guardando…' : 'Publicar'}
-                </button>
+                </Button>
               </div>
               <span id="f-tickets-w-com" className="f-tickets-why" role={busy('comentar') ? 'status' : undefined}>
                 {busy('comentar') ? 'Guardando…' : why('comentar') ?? ''}
@@ -384,9 +370,9 @@ export function Detail(props: DetailProps): React.JSX.Element {
                     }}
                   />
                 </label>
-                <button type="button" className="f-tickets-b" disabled={!horas.trim() || Boolean(why('horas')) || anyBusy} onClick={() => void submitHoras()}>
+                <Button disabled={!horas.trim() || Boolean(why('horas')) || anyBusy} onClick={() => void submitHoras()}>
                   {busy('horas') ? 'Guardando…' : 'Sumar horas'}
-                </button>
+                </Button>
               </div>
               {horasErr && (
                 <p className="form-error" role="alert">

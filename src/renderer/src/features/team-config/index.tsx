@@ -21,6 +21,7 @@ import {
   type TeamStatus
 } from './store'
 import './team-config.css'
+import { Button, IconButton, Input, Select } from '../../ui'
 
 // ---------- Importar ----------
 
@@ -91,14 +92,14 @@ function ImportDialog({ repoPath, onClose }: { repoPath: string; onClose: () => 
       )}
       {err && <p className="form-error f-team-config-pre-wrap" role="alert">{err}</p>}
       <div className="modal-actions">
-        <button type="button" className="btn ghost" onClick={onClose}>
+        <Button variant="ghost" onClick={onClose}>
           {done ? 'Cerrar' : 'Cancelar'}
-        </button>
+        </Button>
         {!done && (
-          <button type="button" className="btn primary" disabled={!plan || busy || todo === 0} onClick={() => void run()}>
+          <Button variant="primary" disabled={!plan || busy || todo === 0} onClick={() => void run()}>
             <DownloadSimple size={14} aria-hidden="true" />
             {busy ? 'Importando…' : todo ? `Importar ${todo} plantilla${todo > 1 ? 's' : ''}` : 'Todo al día'}
-          </button>
+          </Button>
         )}
       </div>
     </Modal>
@@ -223,9 +224,9 @@ function ExportDialog({ initialRepo, onClose }: { initialRepo?: string; onClose:
             Commitealo cuando quieras: <span className="mono">git add .sloth/team.json</span>. Tus compañeros lo ven al abrir un espacio en ese repo.
           </p>
           <div className="modal-actions">
-            <button type="button" className="btn primary" onClick={onClose}>
+            <Button variant="primary" onClick={onClose}>
               Listo
-            </button>
+            </Button>
           </div>
         </>
       ) : preview ? (
@@ -245,12 +246,12 @@ function ExportDialog({ initialRepo, onClose }: { initialRepo?: string; onClose:
           )}
           {err && <p className="form-error" role="alert">{err}</p>}
           <div className="modal-actions">
-            <button type="button" className="btn ghost" onClick={() => setPreview(null)}>
+            <Button variant="ghost" onClick={() => setPreview(null)}>
               Volver
-            </button>
-            <button type="button" className="btn primary" disabled={busy} onClick={() => void doWrite()}>
+            </Button>
+            <Button variant="primary" disabled={busy} onClick={() => void doWrite()}>
               {preview.exists ? 'Reemplazar team.json' : 'Guardar team.json'}
-            </button>
+            </Button>
           </div>
         </>
       ) : (
@@ -258,20 +259,20 @@ function ExportDialog({ initialRepo, onClose }: { initialRepo?: string; onClose:
           <div className="field">
             <label htmlFor="f-tc-repo">Repo del equipo</label>
             {repos.length ? (
-              <select id="f-tc-repo" value={repo} onChange={(e) => setRepo(e.target.value)}>
+              <Select id="f-tc-repo" value={repo} onChange={(e) => setRepo(e.target.value)}>
                 {repos.map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>
                 ))}
-              </select>
+              </Select>
             ) : (
               <p className="hint">Creá un espacio en el repo del equipo primero.</p>
             )}
           </div>
           <div className="field">
             <label htmlFor="f-tc-name">Nombre del equipo</label>
-            <input id="f-tc-name" value={equipo} maxLength={60} onChange={(e) => (setEquipo(e.target.value), setPreview(null))} />
+            <Input id="f-tc-name" value={equipo} maxLength={60} onChange={(e) => (setEquipo(e.target.value), setPreview(null))} />
           </div>
           <fieldset className="f-team-config-fs">
             <legend>Plantillas de este repo</legend>
@@ -298,17 +299,15 @@ function ExportDialog({ initialRepo, onClose }: { initialRepo?: string; onClose:
             <legend>Links útiles</legend>
             {links.map((l, i) => (
               <div key={i} className="f-team-config-link-row">
-                <input aria-label={`Nombre del link ${i + 1}`} value={l.nombre} maxLength={40} placeholder="Nombre" onChange={(e) => setLink(i, { nombre: e.target.value })} />
-                <input aria-label={`URL del link ${i + 1}`} className="mono" value={l.url} placeholder="https://…" onChange={(e) => setLink(i, { url: e.target.value })} />
-                <button type="button" className="icon-btn danger" aria-label={`Quitar link ${l.nombre || i + 1}`} onClick={() => (setLinks((ls) => ls.filter((_, j) => j !== i)), setPreview(null))}>
-                  <Trash size={13} aria-hidden="true" />
-                </button>
+                <Input aria-label={`Nombre del link ${i + 1}`} value={l.nombre} maxLength={40} placeholder="Nombre" onChange={(e) => setLink(i, { nombre: e.target.value })} />
+                <Input aria-label={`URL del link ${i + 1}`} mono value={l.url} placeholder="https://…" onChange={(e) => setLink(i, { url: e.target.value })} />
+                <IconButton label={`Quitar link ${l.nombre || i + 1}`} icon={<Trash size={13} aria-hidden="true" />} variant="danger" onClick={() => (setLinks((ls) => ls.filter((_, j) => j !== i)), setPreview(null))} />
               </div>
             ))}
             {links.length < 12 && (
-              <button type="button" className="btn sm ghost f-team-config-add" onClick={() => setLinks((ls) => [...ls, { nombre: '', url: '' }])}>
+              <Button variant="ghost" size="sm" className="f-team-config-add" onClick={() => setLinks((ls) => [...ls, { nombre: '', url: '' }])}>
                 <Plus size={12} weight="bold" aria-hidden="true" /> Link
-              </button>
+              </Button>
             )}
             <p className="field-help">Solo https. Los vacíos no se guardan.</p>
           </fieldset>
@@ -321,12 +320,12 @@ function ExportDialog({ initialRepo, onClose }: { initialRepo?: string; onClose:
           </label>
           {err && <p className="form-error" role="alert">{err}</p>}
           <div className="modal-actions">
-            <button type="button" className="btn ghost" onClick={onClose}>
+            <Button variant="ghost" onClick={onClose}>
               Cancelar
-            </button>
-            <button type="button" className="btn primary" disabled={!repo || !equipo.trim() || busy} onClick={() => void doPreview()}>
+            </Button>
+            <Button variant="primary" disabled={!repo || !equipo.trim() || busy} onClick={() => void doPreview()}>
               Ver contenido
-            </button>
+            </Button>
           </div>
         </>
       )}
@@ -369,9 +368,7 @@ function TeamBlock({ t }: { t: TeamStatus }): React.JSX.Element {
             Hay plantillas nuevas del equipo
             <span className="count">{t.pending}</span>
           </button>
-          <button type="button" className="icon-btn" disabled={busy} aria-label="Ahora no (avisar en el próximo cambio)" title="Ahora no" onClick={() => void act(async () => setTeams(await ctx.invoke('feat:team-config:dismiss', t.repoPath)))}>
-            <X size={12} aria-hidden="true" />
-          </button>
+          <IconButton label="Ahora no (avisar en el próximo cambio)" icon={<X size={12} aria-hidden="true" />} disabled={busy} onClick={() => void act(async () => setTeams(await ctx.invoke('feat:team-config:dismiss', t.repoPath)))} />
         </div>
       )}
       {t.settingsPending && t.ajustes && (
@@ -380,12 +377,10 @@ function TeamBlock({ t }: { t: TeamStatus }): React.JSX.Element {
           <span className="grow-min" title={`El equipo recomienda: ${settingsText(t.ajustes)}`}>
             Sugerido: {settingsText(t.ajustes)}
           </span>
-          <button type="button" className="btn sm ghost" disabled={busy} onClick={() => void act(() => applyTeamSettings(ctx, t.repoPath, t.ajustes!))}>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={() => void act(() => applyTeamSettings(ctx, t.repoPath, t.ajustes!))}>
             Aplicar
-          </button>
-          <button type="button" className="icon-btn" disabled={busy} aria-label="No aplicar los ajustes sugeridos" title="No, gracias" onClick={() => void act(async () => setTeams(await ctx.invoke('feat:team-config:settingsDone', t.repoPath)))}>
-            <X size={12} aria-hidden="true" />
-          </button>
+          </Button>
+          <IconButton label="No aplicar los ajustes sugeridos" icon={<X size={12} aria-hidden="true" />} disabled={busy} onClick={() => void act(async () => setTeams(await ctx.invoke('feat:team-config:settingsDone', t.repoPath)))} />
         </div>
       )}
       {t.links.length > 0 && (
@@ -413,9 +408,7 @@ function Sidebar(): React.JSX.Element | null {
           <UsersThree size={13} aria-hidden="true" /> Equipo
           {names.length > 0 && <span className="f-team-config-name">{names.join(' · ')}</span>}
         </h2>
-        <button className="icon-btn" onClick={() => openTeamDialog({ kind: 'export', repoPath: teams[0]?.repoPath })} aria-label="Exportar mi configuración como la del equipo" title="Exportar como configuración del equipo">
-          <Export size={14} aria-hidden="true" />
-        </button>
+        <IconButton label="Exportar mi configuración como la del equipo" icon={<Export size={14} aria-hidden="true" />} onClick={() => openTeamDialog({ kind: 'export', repoPath: teams[0]?.repoPath })} />
       </div>
       {teams.map((t) => (
         <TeamBlock key={t.repoPath} t={t} />

@@ -16,8 +16,9 @@ import { setPhase } from '../updater/phase'
 import { useUpdateDot } from '../updater/useUpdateStatus'
 import { SoundTest } from '../sound/SoundTest'
 import { resolveAccountColor, pickProjectsDir, projectsDirOf, updateSettings, useSettings } from './store'
-import { errText, Group, Row, Seg, Slider, ToggleRow, useSave, SectionHint } from './ui'
 import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, EDITORS, LINE_HEIGHT, PLAN_SUGGESTIONS, SCROLLBACK, SHELLS, SLEEP_MINUTES, TERM_FONTS, TERM_FONT, UI_FONT, UPDATE_CHANNELS, type AccentChoice, type CursorShape, type Density, type EditorChoice, type ShellChoice, type ShortcutId, type SleepMinutes, type SoundName, type TermFont, type ThemeChoice, type UpdateChannel } from '../../../../main/features/settings-model'
+import { errText, Group, Row, Slider, ToggleRow, useSave, SectionHint } from './ui'
+import { Button, IconButton, Input, Segmented, Select } from '../../ui'
 
 /* ---------- General ---------- */
 
@@ -70,18 +71,14 @@ export function GeneralSection(): React.JSX.Element {
           hint="Cierra el Claude de un espacio sin uso para liberar memoria. Al volver, retoma la misma conversación. Nunca duerme uno que está trabajando, esperando un permiso o con texto sin enviar."
           htmlFor="f-set-sleep"
         >
-          <select
-            id="f-set-sleep"
-            className="f-set-select"
-            value={s.sleepAfterMin}
-            onChange={(e) => save({ sleepAfterMin: Number(e.target.value) as SleepMinutes })}
+          <Select id="f-set-sleep" value={s.sleepAfterMin} onChange={(e) => save({ sleepAfterMin: Number(e.target.value) as SleepMinutes })}
           >
             {SLEEP_MINUTES.map((m) => (
               <option key={m} value={m}>
                 {m === 0 ? 'Nunca' : m < 60 ? `Tras ${m} minutos` : `Tras ${m / 60} ${m === 60 ? 'hora' : 'horas'}`}
               </option>
             ))}
-          </select>
+          </Select>
         </Row>
         <ToggleRow
           title="Abrir Sloth al iniciar Windows"
@@ -106,18 +103,18 @@ export function GeneralSection(): React.JSX.Element {
       </Group>
       <Group id="g-ed" title="Carpetas y editor">
         <Row title={<>Editor para «Abrir en editor»</>} hint="Se usa desde el menú de cada espacio." htmlFor="f-set-editor">
-          <select id="f-set-editor" className="f-set-select" value={s.editor} onChange={(e) => save({ editor: e.target.value as EditorChoice })}>
+          <Select id="f-set-editor" value={s.editor} onChange={(e) => save({ editor: e.target.value as EditorChoice })}>
             {EDITORS.map((o) => (
               <option key={o} value={o}>
                 {o}
               </option>
             ))}
-          </select>
+          </Select>
         </Row>
         <Row title="Carpeta de proyectos" hint={<span className="mono">{projectsDirOf(p)}</span>}>
-          <button type="button" className="btn sm" onClick={() => save(() => pickProjectsDir())}>
+          <Button size="sm" onClick={() => save(() => pickProjectsDir())}>
             Cambiar…
-          </button>
+          </Button>
         </Row>
       </Group>
     </>
@@ -183,17 +180,17 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
           <div className="f-set-form-row">
             <label className="f-set-stack grow2">
               <span className="f-set-label">Nombre para reconocerla</span>
-              <input className="f-set-input" value={name} placeholder="Ej.: Trabajo de Ana" onChange={(e) => setName(e.target.value)} aria-invalid={nameErr} />
+              <Input value={name} placeholder="Ej.: Trabajo de Ana" onChange={(e) => setName(e.target.value)} aria-invalid={nameErr} />
             </label>
             <label className="f-set-stack grow1">
               <span className="f-set-label">Plan</span>
-              <select className="f-set-select" value={plan} onChange={(e) => setPlan(e.target.value)}>
+              <Select value={plan} onChange={(e) => setPlan(e.target.value)}>
                 {PLAN_SUGGESTIONS.map((x) => (
                   <option key={x} value={x}>
                     {x}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           </div>
           {nameErr && (
@@ -203,12 +200,12 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
           )}
           <div className="f-set-actions">
             <span className="f-set-hint grow">Después vas a iniciar sesión en el navegador. Sloth no guarda contraseñas.</span>
-            <button type="button" className="btn ghost sm" onClick={() => setAdding(false)}>
+            <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>
               Cancelar
-            </button>
-            <button type="submit" className="btn primary sm">
+            </Button>
+            <Button variant="primary" size="sm" type="submit">
               Agregar
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -265,50 +262,41 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
                 <div className="f-set-row-ctl">
                   {busy ? (
                     <>
-                      <button type="button" className="btn sm" onClick={() => setConfirm(null)}>
+                      <Button size="sm" onClick={() => setConfirm(null)}>
                         Cancelar
-                      </button>
-                      <button type="button" className="btn sm danger" onClick={() => remove(a.id)}>
+                      </Button>
+                      <Button variant="danger" size="sm" onClick={() => remove(a.id)}>
                         Sí, quitar
-                      </button>
+                      </Button>
                     </>
                   ) : (
                     <>
                       {logged ? (
-                        <button
-                          type="button"
-                          className="btn sm"
-                          aria-label={`Abrir terminal de ${a.label}`}
-                          onClick={() => {
+                        <Button size="sm" aria-label={`Abrir terminal de ${a.label}`} onClick={() => {
                             onClose()
                             ui.openPane(loginPaneId(a.id))
                           }}
                         >
                           Terminal
-                        </button>
+                        </Button>
                       ) : (
-                        <button
-                          type="button"
-                          className="btn primary sm"
-                          onClick={() => {
+                        <Button variant="primary" size="sm" onClick={() => {
                             onClose()
                             ui.openPane(loginPaneId(a.id))
                           }}
                         >
                           Iniciar sesión
-                        </button>
+                        </Button>
                       )}
-                      <button
-                        type="button"
-                        className="btn ghost sm icon-only"
+                      <IconButton
+                        variant="ghost"
+                        size="sm"
                         aria-haspopup="menu"
                         aria-expanded={menu === a.id}
-                        aria-label={`Más acciones de ${a.label}`}
-                        title="Más"
+                        label={`Más acciones de ${a.label}`}
+                        icon={<MoreIcon size={15} aria-hidden="true" />}
                         onClick={() => setMenu(menu === a.id ? null : a.id)}
-                      >
-                        <MoreIcon size={15} aria-hidden="true" />
-                      </button>
+                      />
                     </>
                   )}
                 </div>
@@ -322,17 +310,13 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
                     <input type="checkbox" role="switch" checked={a.shareSetup !== false} onChange={() => toggleShare(a)} />
                     <span className="switch-track" aria-hidden="true" />
                   </label>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="btn sm danger"
-                    onClick={() => {
+                  <Button variant="danger" size="sm" role="menuitem" onClick={() => {
                       setMenu(null)
                       setConfirm(a.id)
                     }}
                   >
                     Quitar cuenta
-                  </button>
+                  </Button>
                 </div>
               )}
               <AccountSwatches acc={a} index={i} custom={custom} onPick={(hex) => save({ accountColors: { [a.id]: hex } })} onAuto={() => save({ accountColors: { [a.id]: null } })} />
@@ -470,11 +454,11 @@ export function AppearanceSection(): React.JSX.Element {
 
       <Group id="g-de" title="Densidad y tamaño">
         <Row title="Densidad de las listas">
-          <Seg<Density>
-            label="Densidad"
+          <Segmented<Density>
+            aria-label="Densidad"
             value={s.density}
             options={DENSITIES.map((d) => ({ value: d, label: d === 'cómoda' ? 'Cómoda' : 'Compacta' })).reverse()}
-            onPick={(density) => save({ density })}
+            onChange={(density) => save({ density })}
           />
         </Row>
         <Row title={<label htmlFor="f-set-uifont">Tamaño del texto de la interfaz</label>}>
@@ -545,13 +529,13 @@ export function TerminalSection(): React.JSX.Element {
       )}
       <Group id="g-term" label="Texto y cursor">
         <Row title={<label htmlFor="f-set-tfont">Fuente</label>}>
-          <select id="f-set-tfont" className="f-set-select" value={t.fontFamily} onChange={(e) => save({ terminal: { fontFamily: e.target.value as TermFont } })}>
+          <Select id="f-set-tfont" value={t.fontFamily} onChange={(e) => save({ terminal: { fontFamily: e.target.value as TermFont } })}>
             {TERM_FONTS.map((f) => (
               <option key={f} value={f}>
                 {f}
               </option>
             ))}
-          </select>
+          </Select>
         </Row>
         <Row title={<label htmlFor="f-set-tsize">Tamaño de letra</label>}>
           <Slider id="f-set-tsize" label="Tamaño de letra de la terminal" value={t.fontSize} min={TERM_FONT.min} max={TERM_FONT.max} format={(v) => `${v} px`} onChange={(fontSize) => save({ terminal: { fontSize } })} />
@@ -569,7 +553,7 @@ export function TerminalSection(): React.JSX.Element {
           />
         </Row>
         <Row title="Cursor">
-          <Seg<CursorShape> label="Forma del cursor" value={t.cursorStyle} options={CURSOR_ORDER.map((c) => ({ value: c, label: CURSOR_LABEL[c] }))} onPick={(cursorStyle) => save({ terminal: { cursorStyle } })} />
+          <Segmented<CursorShape> aria-label="Forma del cursor" value={t.cursorStyle} options={CURSOR_ORDER.map((c) => ({ value: c, label: CURSOR_LABEL[c] }))} onChange={(cursorStyle) => save({ terminal: { cursorStyle } })} />
         </Row>
         <ToggleRow title="Cursor que parpadea" checked={t.cursorBlink} onChange={(cursorBlink) => save({ terminal: { cursorBlink } })} />
         <Row title={<label htmlFor="f-set-tscroll">Historial</label>} hint="Líneas que se guardan para subir con la rueda. Más líneas, más memoria.">
@@ -585,13 +569,13 @@ export function TerminalSection(): React.JSX.Element {
           />
         </Row>
         <Row title={<label htmlFor="f-set-shell">Shell</label>} hint="Se aplica a los espacios nuevos.">
-          <select id="f-set-shell" className="f-set-select" value={t.shell} onChange={(e) => save({ terminal: { shell: e.target.value as ShellChoice } })}>
+          <Select id="f-set-shell" value={t.shell} onChange={(e) => save({ terminal: { shell: e.target.value as ShellChoice } })}>
             {SHELLS.map((x) => (
               <option key={x} value={x}>
                 {x}
               </option>
             ))}
-          </select>
+          </Select>
         </Row>
       </Group>
     </>
@@ -687,9 +671,9 @@ export function ShortcutsSection(): React.JSX.Element {
                   {label}
                 </button>
                 {changed && (
-                  <button type="button" className="btn ghost sm" onClick={() => save({ shortcuts: { [a.id]: null } })}>
+                  <Button variant="ghost" size="sm" onClick={() => save({ shortcuts: { [a.id]: null } })}>
                     Restaurar
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -736,11 +720,7 @@ export function NotificationsSection({ onClose }: { onClose(): void }): React.JS
       </p>
       <Group id="g-so" title="Sonido">
         <Row title={<label htmlFor="f-set-sound">Sonido de aviso</label>} hint="Suena aunque la ventana esté en segundo plano.">
-          <select
-            id="f-set-sound"
-            className="f-set-select"
-            value={selected}
-            onChange={(e) => {
+          <Select id="f-set-sound" value={selected} onChange={(e) => {
               const v = e.target.value
               save(v === 'Sin sonido' ? { sounds: false } : { sounds: true, soundName: v as SoundName })
             }}
@@ -750,7 +730,7 @@ export function NotificationsSection({ onClose }: { onClose(): void }): React.JS
                 {o.label}
               </option>
             ))}
-          </select>
+          </Select>
           <SoundTest name={s.soundName} disabled={!s.sounds} />
         </Row>
       </Group>
@@ -910,9 +890,9 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
           <div className="f-set-row-title">{title}</div>
           <div className="f-set-hint">{sub}</div>
         </div>
-        <button type="button" className="btn sm" disabled={testing} aria-busy={testing} onClick={runTest}>
+        <Button size="sm" disabled={testing} aria-busy={testing} onClick={runTest}>
           {testing ? 'Probando…' : 'Probar conexión'}
-        </button>
+        </Button>
       </div>
       {testRes && (
         <p className={testRes.ok ? 'f-set-ok' : 'form-error'} role={testRes.ok ? 'status' : 'alert'}>
@@ -925,16 +905,16 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
           <p>
             El repo <strong title={repoName}>{repoName}</strong> propone usar el chat en <strong>{new URL(offered.supabaseUrl).host}</strong>. ¿Usarlo?
           </p>
-          <button type="button" className="btn primary sm" disabled={busy} onClick={() => void act(() => ui.invoke('feat:chat:acceptTeamConfig', offered.repo), 'Usando la configuración del repo.')}>
+          <Button variant="primary" size="sm" disabled={busy} onClick={() => void act(() => ui.invoke('feat:chat:acceptTeamConfig', offered.repo), 'Usando la configuración del repo.')}>
             Usar
-          </button>
+          </Button>
         </div>
       )}
 
       <form className="f-set-card f-set-form" onSubmit={saveCfg} noValidate>
         <label className="f-set-stack">
           <span className="f-set-hint">URL del proyecto de Supabase</span>
-          <input className="f-set-input mono" type="url" value={url} placeholder="https://xxxx.supabase.co" autoComplete="off" spellCheck={false} aria-invalid={tried && !url.trim()} onChange={(e) => setUrl(e.target.value)} />
+          <Input mono type="url" value={url} placeholder="https://xxxx.supabase.co" autoComplete="off" spellCheck={false} aria-invalid={tried && !url.trim()} onChange={(e) => setUrl(e.target.value)} />
         </label>
         <label className="f-set-stack">
           <span className="f-set-hint">Clave publicable (la que empieza con sb_publishable)</span>
@@ -949,40 +929,36 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
               aria-invalid={tried && !key.trim() && !cfg?.active}
               onChange={(e) => setKey(e.target.value)}
             />
-            <button type="button" className="btn sm" aria-pressed={showKey} onClick={() => setShowKey((v) => !v)}>
+            <Button size="sm" aria-pressed={showKey} onClick={() => setShowKey((v) => !v)}>
               {showKey ? 'Ocultar' : 'Mostrar'}
-            </button>
+            </Button>
           </span>
         </label>
         <p className="f-set-note warn">Nunca pegues acá la clave service_role: Sloth la rechaza porque daría acceso total a la base.</p>
         <div className="f-set-actions">
           {cfg?.active?.source === 'settings' && !confirmDel && (
-            <button type="button" className="btn ghost sm" disabled={busy} onClick={() => setConfirmDel(true)}>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => setConfirmDel(true)}>
               Borrar configuración
-            </button>
+            </Button>
           )}
           {confirmDel && (
             <span className="f-set-confirm" role="alertdialog" aria-labelledby="f-set-del-t">
               <span id="f-set-del-t">¿Borrar la configuración del chat? Hay que volver a cargar la URL y la clave.</span>
-              <button type="button" className="btn ghost sm" data-autofocus onClick={() => setConfirmDel(false)}>
+              <Button variant="ghost" size="sm" data-autofocus onClick={() => setConfirmDel(false)}>
                 Cancelar
-              </button>
-              <button
-                type="button"
-                className="btn danger sm"
-                disabled={busy}
-                onClick={() => {
+              </Button>
+              <Button variant="danger" size="sm" disabled={busy} onClick={() => {
                   setConfirmDel(false)
                   void act(() => ui.invoke('feat:chat:setConfig', null), 'Configuración borrada.')
                 }}
               >
                 Sí, borrar
-              </button>
+              </Button>
             </span>
           )}
-          <button type="submit" className="btn primary sm" disabled={busy}>
+          <Button variant="primary" size="sm" type="submit" disabled={busy}>
             Guardar
-          </button>
+          </Button>
         </div>
       </form>
 
@@ -993,18 +969,18 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
         </div>
         <div className="f-set-row-ctl">
           {signingIn && (
-            <button type="button" className="btn ghost sm" onClick={() => gh('feat:chat:cancelSignIn')}>
+            <Button variant="ghost" size="sm" onClick={() => gh('feat:chat:cancelSignIn')}>
               Cancelar
-            </button>
+            </Button>
           )}
           {signedIn ? (
-            <button type="button" className="btn sm" disabled={busy} onClick={() => gh('feat:chat:signOut', 'Sesión de GitHub cerrada.')}>
+            <Button size="sm" disabled={busy} onClick={() => gh('feat:chat:signOut', 'Sesión de GitHub cerrada.')}>
               Cerrar sesión
-            </button>
+            </Button>
           ) : (
-            <button type="button" className="btn primary sm" disabled={busy || signingIn || auth?.status === 'unconfigured'} onClick={() => gh('feat:chat:signIn')}>
+            <Button variant="primary" size="sm" disabled={busy || signingIn || auth?.status === 'unconfigured'} onClick={() => gh('feat:chat:signIn')}>
               Conectar con GitHub
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -1099,13 +1075,13 @@ export function UpdatesSection(): React.JSX.Element {
           <div className="f-set-hint">Versión instalada: {st?.current ?? '…'}</div>
         </div>
         {st?.state === 'ready' ? (
-          <button type="button" className="btn primary sm" onClick={() => void ui.invoke('feat:updater:install')}>
+          <Button variant="primary" size="sm" onClick={() => void ui.invoke('feat:updater:install')}>
             Reiniciar e instalar
-          </button>
+          </Button>
         ) : (
-          <button type="button" className="btn primary sm" disabled={busy || busyNow || st?.enabled === false} onClick={check}>
+          <Button variant="primary" size="sm" disabled={busy || busyNow || st?.enabled === false} onClick={check}>
             Buscar ahora
-          </button>
+          </Button>
         )}
       </div>
       {msg && (
@@ -1119,9 +1095,9 @@ export function UpdatesSection(): React.JSX.Element {
             <div className="f-set-row-title">Dejaste para después la versión {st.version}</div>
             <div className="f-set-hint">No te vuelve a avisar hasta mañana. Podés verla cuando quieras.</div>
           </div>
-          <button type="button" className="btn sm" onClick={() => setPhase('notes')}>
+          <Button size="sm" onClick={() => setPhase('notes')}>
             Ver novedades
-          </button>
+          </Button>
         </div>
       )}
       <Group id="g-canal" label="Canal de actualizaciones">
@@ -1196,9 +1172,9 @@ export function AboutSection({ onClose }: { onClose(): void }): React.JSX.Elemen
           <a className="btn sm" href="https://github.com/Toomasmg/sloth" target="_blank" rel="noreferrer">
             Repositorio
           </a>
-          <button type="button" className="btn sm" onClick={go(() => openReport())}>
+          <Button size="sm" onClick={go(() => openReport())}>
             Reportar un problema
-          </button>
+          </Button>
         </div>
       </div>
       <Group id="g-mas" title="Más">

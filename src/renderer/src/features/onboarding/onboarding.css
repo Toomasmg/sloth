@@ -35,7 +35,7 @@
   --danger: #ff7a7a;
   --danger-fg: #ff9a9a;
   --danger-soft: rgba(255, 122, 122, 0.12);
-  --placeholder: #6f7587;
+  --placeholder: #80869a; /* lint-css-ok: mismo valor que el tema oscuro de tokens.css (esta paleta es siempre oscura) */
   color-scheme: dark;
 }
 

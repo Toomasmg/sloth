@@ -5,6 +5,8 @@ import { CloseIcon } from '../../icons/SlothIcons'
 import { SIN_CONECTOR, type ConectorPropioVista, type ConectorResumen } from '../../../../shared/tickets'
 import { setSnapshot, type Snapshot } from './model'
 import { aceptarYUsar, AvisoHerramientas, deDondeViene, etiquetaOrigen, Propios } from './Propios'
+import { Button, Select } from '../../ui'
+
 
 function grupos(cs: readonly ConectorResumen[]): { etiqueta: string; conectores: ConectorResumen[] }[] {
   const out: { etiqueta: string; conectores: ConectorResumen[] }[] = []
@@ -83,15 +85,15 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
           <p>
             El equipo cambió el conector «{snap.conectores.find((c) => c.id === snap.pendienteAceptar)?.nombre ?? snap.pendienteAceptar}»: revisalo y aceptalo de nuevo.
           </p>
-          <button type="button" className="btn" onClick={() => pedirAceptar(snap.pendienteAceptar as string)}>
+          <Button onClick={() => pedirAceptar(snap.pendienteAceptar as string)}>
             Revisar y aceptar
-          </button>
+          </Button>
         </div>
       )}
       <div className="f-tickets-ajustes-fila">
         <label className="field f-tickets-ajustes-campo">
           <span>Conector</span>
-          <select value={pendiente ?? snap.config.conectorId} onChange={(e) => elegirConector(e.target.value)} disabled={snap.running}>
+          <Select value={pendiente ?? snap.config.conectorId} onChange={(e) => elegirConector(e.target.value)} disabled={snap.running}>
             <option value={SIN_CONECTOR}>Ninguno</option>
             {grupos(snap.conectores).map((g) => (
               <optgroup key={g.etiqueta} label={g.etiqueta}>
@@ -103,14 +105,14 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
                 ))}
               </optgroup>
             ))}
-          </select>
+          </Select>
         </label>
 
         {via === 'mcp' ? (
           <>
             <label className="field f-tickets-ajustes-campo">
               <span>Cuenta para consultar</span>
-              <select value={snap.config.queryAccountId ?? ''} onChange={(e) => set({ queryAccountId: e.target.value })}>
+              <Select value={snap.config.queryAccountId ?? ''} onChange={(e) => set({ queryAccountId: e.target.value })}>
                 <option value="">La de menos uso</option>
                 {ui.accounts.map((a) => (
                   <option key={a.id} value={a.id} disabled={!ui.statuses[a.id]?.loggedIn}>
@@ -118,15 +120,15 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
                     {ui.statuses[a.id]?.loggedIn ? '' : ' (sin sesión)'}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
             <label className="field f-tickets-ajustes-campo">
               <span>Modelo</span>
-              <select value={snap.config.model} onChange={(e) => set({ model: e.target.value })}>
+              <Select value={snap.config.model} onChange={(e) => set({ model: e.target.value })}>
                 <option value="haiku">Haiku (barato)</option>
                 <option value="sonnet">Sonnet</option>
                 <option value="opus">Opus</option>
-              </select>
+              </Select>
             </label>
           </>
         ) : (
@@ -134,22 +136,22 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
             <span>Carpeta del repo</span>
             <div className="f-tickets-ajustes-ruta">
               <code title={snap.config.defaultRepo ?? snap.lastRepo}>{snap.config.defaultRepo ?? snap.lastRepo ?? 'Sin elegir'}</code>
-              <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => void elegirCarpeta()}>
+              <Button size="sm" onClick={() => void elegirCarpeta()}>
                 Elegir carpeta…
-              </button>
+              </Button>
               {snap.config.defaultRepo && (
-                <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => set({ defaultRepo: '' })} title="Usar la carpeta del último espacio">
+                <Button size="sm" onClick={() => set({ defaultRepo: '' })} title="Usar la carpeta del último espacio">
                   Usar la del último espacio
-                </button>
+                </Button>
               )}
             </div>
           </div>
         )}
 
         <span className="f-tickets-grow" />
-        <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={onClose} aria-label="Cerrar ajustes de tickets">
+        <Button size="sm" onClick={onClose} aria-label="Cerrar ajustes de tickets">
           <CloseIcon size={13} />
-        </button>
+        </Button>
       </div>
 
       <details className="f-tickets-propios" onToggle={(e) => e.currentTarget.open && setPropiosVistos(true)}>
@@ -177,12 +179,12 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose: () => void
       {pendiente !== null && (
         <div className="f-tickets-alert f-tickets-confirm" role="alertdialog" aria-label="Confirmar cambio de conector">
           <span className="f-tickets-alert-text">Cambiar de conector borra la lista actual. ¿Seguimos?</span>
-          <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={confirmar}>
+          <Button variant="primary" size="sm" onClick={confirmar}>
             Cambiar
-          </button>
-          <button type="button" className="f-tickets-b f-tickets-b--sm" autoFocus onClick={() => setPendiente(null)}>
+          </Button>
+          <Button size="sm" autoFocus onClick={() => setPendiente(null)}>
             Cancelar
-          </button>
+          </Button>
         </div>
       )}
 

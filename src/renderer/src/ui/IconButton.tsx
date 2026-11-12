@@ -28,7 +28,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
         type={type}
         className={cls}
         aria-label={label}
-        aria-pressed={pressed}
+        {...(pressed !== undefined && { 'aria-pressed': pressed })}
         aria-busy={loading || undefined}
         aria-disabled={loading || undefined}
         onClick={loading ? undefined : onClick}

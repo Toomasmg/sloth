@@ -33,15 +33,16 @@ export interface ChipProps {
   /** Con esto el chip se puede sacar: muestra una X con su propio botón. */
   onRemove?: () => void
   removeLabel?: string
+  'aria-label'?: string
   count?: number
   icon?: ReactNode
   disabled?: boolean
 }
 
-export function Chip({ children, selected, onClick, onRemove, removeLabel = 'Quitar', count, icon, disabled }: ChipProps): React.JSX.Element {
+export function Chip({ children, selected, onClick, onRemove, removeLabel = 'Quitar', count, icon, disabled, ...rest }: ChipProps): React.JSX.Element {
   return (
     <span className={`ui-chip${selected ? ' is-on' : ''}${disabled ? ' is-disabled' : ''}`}>
-      <button type="button" className="ui-chip-main" aria-pressed={onClick ? !!selected : undefined} disabled={disabled} onClick={onClick}>
+      <button type="button" className="ui-chip-main" aria-label={rest['aria-label']} aria-pressed={selected === undefined ? undefined : selected} disabled={disabled} onClick={onClick}>
         {icon}
         {children}
         {count != null && <span className="ui-chip-count">{count}</span>}

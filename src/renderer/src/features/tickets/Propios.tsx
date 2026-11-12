@@ -7,6 +7,7 @@ import { vistaHerramientas } from '../../../../main/features/tickets/propios'
 import { ACCION_ETIQUETA, deDef, seEditaSinPerder, type Borrador } from './borrador'
 import { Asistente } from './Asistente'
 import { setSnapshot, type Snapshot } from './model'
+import { Button, Input } from '../../ui'
 
 type Lista = { lista: ConectorPropioVista[]; avisos: string[] }
 type Abierto = { inicial?: Borrador; idAnterior?: string }
@@ -116,12 +117,12 @@ export function Propios({ snap }: { snap: Snapshot }): React.JSX.Element {
   return (
     <div className="f-tickets-propios-cuerpo">
       <div className="f-tickets-asis-acciones">
-        <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => setAbierto({})}>
+        <Button size="sm" onClick={() => setAbierto({})}>
           Nuevo conector…
-        </button>
-        <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={importar}>
+        </Button>
+        <Button size="sm" onClick={importar}>
           Importar…
-        </button>
+        </Button>
       </div>
 
       {datos.lista.length === 0 ? (
@@ -139,28 +140,28 @@ export function Propios({ snap }: { snap: Snapshot }): React.JSX.Element {
                 </span>
                 <span className="f-tickets-grow" />
                 {mio ? (
-                  <button type="button" className="f-tickets-b f-tickets-b--xs" onClick={() => editar(c.id)}>
+                  <Button size="xs" onClick={() => editar(c.id)}>
                     Editar
-                  </button>
+                  </Button>
                 ) : (
                   <>
                     {!c.aceptado && (
-                      <button type="button" className="f-tickets-b f-tickets-b--xs f-tickets-b--pri" onClick={() => setRevisar(c)}>
+                      <Button variant="primary" size="xs" onClick={() => setRevisar(c)}>
                         Revisar y aceptar
-                      </button>
+                      </Button>
                     )}
-                    <button type="button" className="f-tickets-b f-tickets-b--xs" onClick={() => copiar(c)}>
+                    <Button size="xs" onClick={() => copiar(c)}>
                       Copiar como mío
-                    </button>
+                    </Button>
                   </>
                 )}
-                <button type="button" className="f-tickets-b f-tickets-b--xs" onClick={() => exportar(c.id)}>
+                <Button size="xs" onClick={() => exportar(c.id)}>
                   Exportar
-                </button>
+                </Button>
                 {mio && (
-                  <button type="button" className="f-tickets-b f-tickets-b--xs" onClick={() => setBorrar(c.id)} aria-label={`Borrar ${c.nombre}`}>
+                  <Button size="xs" onClick={() => setBorrar(c.id)} aria-label={`Borrar ${c.nombre}`}>
                     Borrar
-                  </button>
+                  </Button>
                 )}
               </li>
             )
@@ -171,12 +172,12 @@ export function Propios({ snap }: { snap: Snapshot }): React.JSX.Element {
       {aBorrar && (
         <div className="f-tickets-alert f-tickets-confirm" role="alertdialog" aria-label={`Confirmar borrar ${aBorrar.nombre}`}>
           <span className="f-tickets-alert-text">¿Borrar {aBorrar.nombre}? Si es el que usás, Tickets queda sin conector.</span>
-          <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--solid-danger" onClick={() => confirmarBorrar(aBorrar.id)}>
+          <Button variant="danger" size="sm" onClick={() => confirmarBorrar(aBorrar.id)}>
             Borrar
-          </button>
-          <button type="button" className="f-tickets-b f-tickets-b--sm" autoFocus onClick={() => setBorrar(null)}>
+          </Button>
+          <Button size="sm" autoFocus onClick={() => setBorrar(null)}>
             Cancelar
-          </button>
+          </Button>
         </div>
       )}
 
@@ -240,7 +241,7 @@ function GuardarComoMio({
     >
       <label className="field">
         <span>{etiqueta}</span>
-        <input value={id} maxLength={32} spellCheck={false} aria-invalid={!idOk} onChange={(e) => setId(e.target.value.trim())} />
+        <Input value={id} maxLength={32} spellCheck={false} aria-invalid={!idOk} onChange={(e) => setId(e.target.value.trim())} />
       </label>
     </AvisoHerramientas>
   )
@@ -346,12 +347,12 @@ export function AvisoHerramientas({
       </details>
       {children}
       <div className="f-tickets-asis-acciones">
-        <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={onAceptar} disabled={!listo}>
+        <Button variant="primary" size="sm" onClick={onAceptar} disabled={!listo}>
           {aceptar}
-        </button>
-        <button type="button" className="f-tickets-b f-tickets-b--sm" autoFocus onClick={onCancelar}>
+        </Button>
+        <Button size="sm" autoFocus onClick={onCancelar}>
           Cancelar
-        </button>
+        </Button>
       </div>
     </div>
   )
