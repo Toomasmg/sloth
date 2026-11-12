@@ -14,7 +14,7 @@ import {
   type PlanSpace
 } from './types'
 
-const LINE = 'inset 0 -1px 0 var(--line)'
+const LINE = 'inset 0 -1px 0 var(--divider)'
 
 const plural = (k: number, uno: string, varios: string): string => `${k} ${k === 1 ? uno : varios}`
 
@@ -415,7 +415,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
                   return (
                     <div key={s.index} className={`f-ei-sub${dim ? ' muted' : ''}`}>
                       <div className="f-ei-sub-head">
-                        <span className="f-ei-dot" style={{ background: s.color ?? 'var(--fg-muted)' }} aria-hidden="true" />
+                        <span className="f-ei-dot" style={{ background: s.color ?? 'var(--text-3)' }} aria-hidden="true" />
                         <span className="f-ei-name">{s.nombre}</span>
                         <span className="f-ei-chip">{s.cuenta}</span>
                         <span className={`f-ei-badge ${badge.tone}`}>{badge.label}</span>

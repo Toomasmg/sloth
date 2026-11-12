@@ -31,22 +31,16 @@ const PANTALLAS: Pantalla[] = [
     dialogo: /.+/,
     salida: 'Volver a los espacios'
   },
-  {
-    nombre: 'Plantillas',
-    abrir: async (page) => {
-      const b = page.getByRole('button', { name: 'Plantillas', exact: true })
-      await b.click()
-      return b
-    },
-    dialogo: 'Plantillas de espacio',
-    salida: 'Cerrar'
-  },
+  { nombre: 'Plantillas', abrir: (p) => porPaleta(p, 'Nueva plantilla'), dialogo: 'Plantillas de espacio', salida: 'Cerrar' },
+  { nombre: 'Acerca de Sloth (actualizaciones)', abrir: (p) => porPaleta(p, 'Buscar actualizaciones'), dialogo: 'Acerca de Sloth', salida: 'Cerrar' },
+  { nombre: 'Reportar un problema', abrir: (p) => porPaleta(p, 'Reportar un problema'), dialogo: 'Reportar un problema', salida: 'Volver a los espacios' },
+  { nombre: 'Exportar configuración', abrir: (p) => porPaleta(p, 'Exportar configuración'), dialogo: /Exportar/, salida: 'Volver a Configuración' },
   { nombre: 'Decisiones', abrir: (p) => porPaleta(p, 'Decisiones de permisos'), dialogo: 'Decisiones', salida: 'Cerrar' },
   { nombre: 'Pedidos de permiso', abrir: (p) => porPaleta(p, 'Revisar pedidos de permiso'), dialogo: 'Pedidos de permiso', salida: 'Cerrar' },
   { nombre: 'Ayuda', abrir: (p) => porPaleta(p, 'Ayuda y atajos'), dialogo: /Ayuda/, salida: 'Volver a los espacios' },
   { nombre: 'Novedades', abrir: (p) => porPaleta(p, 'Novedades'), dialogo: 'Novedades', salida: 'Cerrar' },
   { nombre: 'Invitar', abrir: (p) => porPaleta(p, 'Invitar a un compañero'), dialogo: 'Invitar a un compañero', salida: 'Cerrar' },
-  { nombre: 'Asistente de bienvenida', abrir: (p) => porPaleta(p, 'Asistente de bienvenida'), dialogo: /Revisá tu PC|Bienvenido/, salida: /^Cerrar el asistente/ },
+  { nombre: 'Primeros pasos', abrir: (p) => porPaleta(p, 'Primeros pasos'), dialogo: 'Primeros pasos', salida: 'Volver a los espacios' },
   { nombre: 'Exportar equipo', abrir: (p) => porPaleta(p, 'Exportar mi configuración como configuración del equipo'), dialogo: 'Exportar como configuración del equipo', salida: 'Cerrar' },
   {
     nombre: 'Chat',

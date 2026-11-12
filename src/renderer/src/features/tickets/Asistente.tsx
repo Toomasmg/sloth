@@ -6,6 +6,7 @@ import type { Descubiertas } from '../../../../main/features/tickets/descubrir'
 import { borradorNuevo, conHerramientas, slugId, validarBorrador, type Borrador } from './borrador'
 import { PasoFormato, PasoHerramientas } from './AsistentePasos'
 import { setSnapshot, type Snapshot } from './model'
+import { Button, Input, Select, Textarea } from '../../ui'
 
 export type Paso = 1 | 2 | 3 | 4
 export type Cambiar = (f: (b: Borrador) => Borrador) => void
@@ -110,33 +111,33 @@ export function Asistente({
       {descartando && (
         <div className="f-tickets-alert f-tickets-confirm" role="alertdialog" aria-label="Descartar el conector">
           <span className="f-tickets-alert-text">¿Descartar el conector a medio armar?</span>
-          <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={onCancelar}>
+          <Button variant="primary" size="sm" onClick={onCancelar}>
             Descartar
-          </button>
-          <button type="button" className="f-tickets-b f-tickets-b--sm" ref={seguir} onClick={() => setDescartando(false)}>
+          </Button>
+          <Button size="sm" ref={seguir} onClick={() => setDescartando(false)}>
             Seguir editando
-          </button>
+          </Button>
         </div>
       )}
 
       <div className="f-tickets-asis-pie">
-        <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => (huella === huellaInicial.current ? onCancelar() : setDescartando(true))}>
+        <Button size="sm" onClick={() => (huella === huellaInicial.current ? onCancelar() : setDescartando(true))}>
           Cancelar
-        </button>
+        </Button>
         <span className="f-tickets-grow" />
         {paso > 1 && (
-          <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => setPaso((p) => (p - 1) as Paso)}>
+          <Button size="sm" onClick={() => setPaso((p) => (p - 1) as Paso)}>
             Atrás
-          </button>
+          </Button>
         )}
         {paso < 4 ? (
-          <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={siguiente} disabled={!b || (paso === 1 && (!nombre.trim() || !PREFIJO_RE.test(prefijo) || otroPrefijo))}>
+          <Button variant="primary" size="sm" onClick={siguiente} disabled={!b || (paso === 1 && (!nombre.trim() || !PREFIJO_RE.test(prefijo) || otroPrefijo))}>
             Siguiente
-          </button>
+          </Button>
         ) : (
-          <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" onClick={guardar} disabled={!revision?.ok || guardando}>
+          <Button variant="primary" size="sm" onClick={guardar} disabled={!revision?.ok || guardando}>
             {guardando ? 'Guardando…' : 'Guardar'}
-          </button>
+          </Button>
         )}
       </div>
     </section>
@@ -185,18 +186,11 @@ function PasoServidor({
     <div className="f-tickets-asis-cuerpo">
       <label className="field">
         <span>Nombre</span>
-        <input value={nombre} maxLength={40} onChange={(e) => setNombre(e.target.value)} placeholder="Trello" />
+        <Input value={nombre} maxLength={40} onChange={(e) => setNombre(e.target.value)} placeholder="Trello" />
       </label>
       <label className="field">
         <span>Prefijo de las herramientas</span>
-        <input
-          value={prefijo}
-          maxLength={64}
-          spellCheck={false}
-          onChange={(e) => setPrefijo(e.target.value.trim())}
-          placeholder="mcp__claude_ai_Trello__"
-          aria-invalid={prefijoMal}
-          aria-describedby="f-tickets-asis-prefijo"
+        <Input value={prefijo} maxLength={64} spellCheck={false} onChange={(e) => setPrefijo(e.target.value.trim())} placeholder="mcp__claude_ai_Trello__" aria-invalid={prefijoMal} aria-describedby="f-tickets-asis-prefijo"
         />
         <span id="f-tickets-asis-prefijo" className={prefijoMal ? 'field-error' : 'field-help'}>
           Tiene que empezar con mcp__ y terminar con __
@@ -204,23 +198,23 @@ function PasoServidor({
       </label>
       <label className="field">
         <span>Cuenta para buscar</span>
-        <select value={cuenta} onChange={(e) => setCuenta(e.target.value)}>
+        <Select value={cuenta} onChange={(e) => setCuenta(e.target.value)}>
           <option value="">La que usás para consultar</option>
           {conSesion.map((a) => (
             <option key={a.id} value={a.id}>
               {a.label}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
       <p className="f-tickets-ajustes-nota">
         Cada búsqueda gasta uso de esa cuenta (unos centavos de dólar, según el modelo y cuántas herramientas tenga): Claude recibe la definición de todas.
         {editando ? ' Si buscás de nuevo, se conservan los roles de las herramientas que siguen.' : ''}
       </p>
       <div className="f-tickets-asis-acciones">
-        <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={buscar} disabled={buscando || !nombre.trim() || !PREFIJO_RE.test(prefijo)}>
+        <Button size="sm" onClick={buscar} disabled={buscando || !nombre.trim() || !PREFIJO_RE.test(prefijo)}>
           {buscando ? 'Preguntándole a Claude (no usa ninguna herramienta)…' : 'Buscar herramientas'}
-        </button>
+        </Button>
         {res && res.herramientas.length > 0 && (
           <span className="f-tickets-ajustes-nota" role="status">
             {res.herramientas.length} herramientas encontradas.{res.fuente === 'claude' ? ' Lista armada por Claude: revisala.' : ''}
@@ -248,31 +242,26 @@ function PasoPistas({ b, cambiar }: { b: Borrador; cambiar: Cambiar }): React.JS
     <div className="f-tickets-asis-cuerpo">
       <label className="field">
         <span>Cómo traer la lista</span>
-        <textarea
-          rows={3}
-          maxLength={1000}
-          value={b.pistas.lista}
-          onChange={(e) => pista('lista', e.target.value)}
-          placeholder="Con search_cards traé las tarjetas abiertas del tablero, sin filtrar por asignado, como máximo 250. El id es el idShort."
+        <Textarea rows={3} maxLength={1000} value={b.pistas.lista} onChange={(e) => pista('lista', e.target.value)} placeholder="Con search_cards traé las tarjetas abiertas del tablero, sin filtrar por asignado, como máximo 250. El id es el idShort."
         />
       </label>
       <label className="field">
         <span>Quién sos, con tu id (tiene que llevar {'{id}'})</span>
-        <textarea rows={2} maxLength={1000} value={b.pistas.yoConId} onChange={(e) => pista('yoConId', e.target.value)} />
+        <Textarea rows={2} maxLength={1000} value={b.pistas.yoConId} onChange={(e) => pista('yoConId', e.target.value)} />
       </label>
       <label className="field">
         <span>Quién sos, sin id</span>
-        <textarea rows={2} maxLength={1000} value={b.pistas.yoSinId} onChange={(e) => pista('yoSinId', e.target.value)} />
+        <Textarea rows={2} maxLength={1000} value={b.pistas.yoSinId} onChange={(e) => pista('yoSinId', e.target.value)} />
       </label>
       {hayApoyo && (
         <label className="field">
           <span>Cuándo usar las de apoyo (admite {'{ticket}'})</span>
-          <textarea rows={2} maxLength={1000} value={b.pistas.apoyo} onChange={(e) => pista('apoyo', e.target.value)} />
+          <Textarea rows={2} maxLength={1000} value={b.pistas.apoyo} onChange={(e) => pista('apoyo', e.target.value)} />
         </label>
       )}
       <label className="field">
         <span>Id del conector</span>
-        <input value={b.id} maxLength={32} spellCheck={false} onChange={(e) => cambiar((x) => ({ ...x, id: e.target.value.trim() }))} />
+        <Input value={b.id} maxLength={32} spellCheck={false} onChange={(e) => cambiar((x) => ({ ...x, id: e.target.value.trim() }))} />
         <span className="field-help">Minúsculas, números y guiones; empieza con letra.</span>
       </label>
     </div>

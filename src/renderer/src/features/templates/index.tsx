@@ -7,6 +7,7 @@ import { createFrom, loadTemplates, openDialog, setView, useTemplates, usesTicke
 const TemplatesScreen = lazy(() => import('./TemplatesScreen').then((m) => ({ default: m.TemplatesScreen })))
 import { colorHex, iconPath } from './catalog'
 import './templates.css'
+import { IconButton } from '../../ui'
 
 const accLabel = (ctx: UiCtx, id: string): string => (id === 'sugerida' ? 'Cuenta sugerida' : (ctx.accounts.find((a) => a.id === id)?.label ?? 'cuenta borrada'))
 
@@ -113,9 +114,7 @@ function Sidebar(): React.JSX.Element {
             Plantillas <span className="count">{list.length}</span>
           </button>
         </h2>
-        <button className="icon-btn" onClick={() => openDialog({ kind: 'manage' })} aria-label="Administrar plantillas" title="Administrar plantillas">
-          <NewSpaceIcon size={14} />
-        </button>
+        <IconButton label="Administrar plantillas" icon={<NewSpaceIcon size={14} />} onClick={() => openDialog({ kind: 'manage' })} />
       </div>
       <div id="f-templates-body" hidden={!open}>
         {loaded && list.length === 0 && <p className="hint">Guardá un espacio como plantilla con el marcador de su panel.</p>}
@@ -125,16 +124,7 @@ function Sidebar(): React.JSX.Element {
             const color = colorHex(t.color)
             return (
               <li key={t.id} className="f-templates-row">
-                <button
-                  className="icon-btn f-templates-play"
-                  onClick={() => void createFrom(ctx, t)}
-                  disabled={busy !== null}
-                  aria-label={`Crear espacio desde la plantilla ${t.name}${tk ? ' (pide ticket)' : ''}`}
-                  title={tk ? 'Crear espacio (pide el ticket)' : t.repoPath ? 'Crear espacio' : 'Crear espacio (elegí la carpeta)'}
-                  style={{ color }}
-                >
-                  <NewSpaceIcon size={12} />
-                </button>
+                <IconButton label={`Crear espacio desde la plantilla ${t.name}${tk ? ' (pide ticket)' : ''}`} icon={<NewSpaceIcon size={12} />} className="f-templates-play" onClick={() => void createFrom(ctx, t)} disabled={busy !== null} style={{ color }} />
                 <span className="grow-min">
                   <span className="item-title">
                     <span className="f-templates-name">{t.name}</span>
@@ -158,9 +148,7 @@ function Sidebar(): React.JSX.Element {
                   </span>
                 </span>
                 <span className="f-templates-actions">
-                  <button className="icon-btn" onClick={() => openDialog({ kind: 'manage', id: t.id })} aria-label={`Editar plantilla ${t.name}`} title="Editar">
-                    <ChangesIcon size={13} />
-                  </button>
+                  <IconButton label={`Editar plantilla ${t.name}`} icon={<ChangesIcon size={13} />} onClick={() => openDialog({ kind: 'manage', id: t.id })} />
                 </span>
               </li>
             )
@@ -171,23 +159,14 @@ function Sidebar(): React.JSX.Element {
   )
 }
 
-function PaneHeader({ paneId }: { paneId: string }): React.JSX.Element | null {
-  const ctx = useUi()
-  if (isLoginPane(paneId)) return null
-  const ws = ctx.workspaces.find((w) => w.id === paneId)
-  if (!ws) return null
-  return (
-    <button className="icon-btn" onClick={() => void saveFromWorkspace(ctx, ws)} aria-label={`Guardar ${ws.name} como plantilla`} title="Guardar espacio como plantilla">
-      <TemplatesIcon size={15} />
-    </button>
-  )
-}
-
 const ui: FeatureUi = {
   name: 'templates',
   Global,
   Sidebar,
-  PaneHeader,
+  paneActions: (ctx, paneId) => {
+    const ws = isLoginPane(paneId) ? undefined : ctx.workspaces.find((w) => w.id === paneId)
+    return ws ? [{ id: 'plantilla', label: 'Guardar como plantilla', group: 'compartir', order: 10, icon: <TemplatesIcon size={15} />, run: () => void saveFromWorkspace(ctx, ws) }] : []
+  },
   commands: (ctx) => {
     const cmds: Command[] = getTemplates().map((t) => ({
       id: `templates:create:${t.id}`,

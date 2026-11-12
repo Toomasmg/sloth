@@ -22,16 +22,24 @@ export const NAV: readonly NavItem[] = [
   { id: 'atajos', name: 'Atajos de teclado', sub: 'Cambiá cualquier atajo a tu gusto.', color: '#c9cdd6', icon: 'Keyboard' },
   { id: 'notif', name: 'Notificaciones y sonido', sub: 'Qué te avisa Sloth y cómo suena.', color: '#f0b45a', icon: 'Bell' },
   {
+    id: 'plantillas',
+    name: 'Plantillas',
+    sub: 'Espacios que se arman solos: carpeta, cuenta, rama y primer mensaje.',
+    color: '#f0b45a',
+    icon: 'Templates',
+    sepBefore: true
+  },
+  { id: 'tickets', name: 'Tickets', sub: 'De dónde salen tus tickets y con qué cuenta se leen.', color: '#7fc8e8', icon: 'Ticket' },
+  {
     id: 'equipo',
     name: 'Equipo y chat',
     sub: 'Conexión del chat del equipo (Supabase) y tu sesión de GitHub.',
     color: '#b59cff',
-    icon: 'Team',
-    sepBefore: true
+    icon: 'Team'
   },
   { id: 'updates', name: 'Actualizaciones', sub: 'Sloth se actualiza solo. Acá elegís cómo.', color: '#5fd4a6', icon: 'Update' },
   { id: 'backup', name: 'Copia de seguridad', sub: 'Llevá tu configuración a otra PC o guardala en un archivo.', color: '#7fc8e8', icon: 'Export' },
-  { id: 'about', name: 'Acerca de Sloth', sub: 'Versión, repositorio y reportes.', color: '#a6abb8', icon: 'Help' }
+  { id: 'about', name: 'Acerca de Sloth', sub: 'Versión, repositorio y reportes.', color: '#a6abb8', icon: 'Help', sepBefore: true }
 ]
 
 export const navOf = (id: SectionId): NavItem => NAV.find((n) => n.id === id) ?? NAV[0]
@@ -86,7 +94,15 @@ const INDEX: readonly [string, SectionId][] = [
   ['Exportar configuración', 'backup'],
   ['Importar configuración', 'backup'],
   ['Reglas de permisos y decisiones', 'notif'],
-  ['Plantillas del equipo', 'equipo']
+  ['Plantillas del equipo', 'equipo'],
+  ['Plantillas de espacio', 'plantillas'],
+  ['Nueva plantilla', 'plantillas'],
+  ['Editar una plantilla', 'plantillas'],
+  ['Conector de tickets', 'tickets'],
+  ['Cuenta para consultar tickets', 'tickets'],
+  ['Modelo para leer tickets', 'tickets'],
+  ['Carpeta del repo de tickets', 'tickets'],
+  ['Conectores propios de tickets', 'tickets']
 ]
 
 const norm = (s: string): string => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()

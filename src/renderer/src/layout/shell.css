@@ -1,10 +1,10 @@
-/* ---------- Ventana principal (diseño «Espacios»): barra superior, barra lateral por cuenta,
-   barra de paneles y barra de estado. Clases propias (sl-*) para no pelear con los estilos viejos. ---------- */
+/* Ventana principal: barra superior, riel de navegación, barra lateral de espacios, barra de pestañas,
+   paneles y barra de estado. Clases propias (sl-*) para no pelear con los estilos viejos. */
 
 .sl-shell {
   display: grid;
-  grid-template-rows: 48px minmax(0, 1fr) 28px;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: var(--top-h) minmax(0, 1fr) var(--status-h);
+  grid-template-columns: var(--rail-w) minmax(0, 1fr);
   height: 100%;
   min-height: 0;
   background: var(--bg);
@@ -12,91 +12,67 @@
 
 /* ---------- Barra superior ---------- */
 .sl-top {
+  grid-column: 1 / -1;
   position: relative;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 48px;
+  /* La lista de la paleta vive acá adentro: tiene que tapar Vistas y paneles laterales (--z-panel). */
+  z-index: var(--z-menu);
   min-width: 0;
-  /* Tres columnas iguales a los lados: el buscador queda centrado en la ventana. */
+  /* Tres columnas: el buscador queda centrado en la ventana. */
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(240px, 520px) minmax(0, 1fr);
-  padding: 0;
+  align-items: center;
+  gap: var(--s-2);
   background: var(--surface);
-  box-shadow: inset 0 -1px 0 var(--line);
+  box-shadow: inset 0 -1px 0 var(--divider);
   -webkit-app-region: drag;
   user-select: none;
 }
 .sl-top button,
 .sl-top a,
 .sl-top input,
-.sl-top label {
-  -webkit-app-region: no-drag;
-}
+.sl-top label,
 .sl-top-search,
-.sl-top-status,
-.sl-top-tools {
+.sl-top-status {
   -webkit-app-region: no-drag;
-}
-.sl-top-brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-  padding: 0 4px 0 2px;
-}
-.sl-top-brand .logo-mark {
-  height: 34px;
-  width: auto;
-}
-/* El logo + «Sloth» es el disparador del menú de la app: botón sin marco, con chevron chico. */
-button.sl-top-brand {
-  padding: 2px 6px 2px 2px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-button.sl-top-brand:hover,
-button.sl-top-brand.on {
-  background: var(--hover);
-}
-button.sl-top-brand:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-.sl-top-chev {
-  flex: none;
-  margin-left: -2px;
-  color: var(--fg-muted);
-  transition: transform var(--t-fast) var(--ease);
-}
-button.sl-top-brand.on .sl-top-chev {
-  transform: rotate(180deg);
-}
-.sl-top-name {
-  font-size: 14px;
-  font-weight: 700;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--fg);
 }
 .sl-top-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   min-width: 0;
-  padding-left: 10px;
+  padding-left: var(--s-2);
 }
-/* Chips, aviso de actualización y herramientas a la derecha; Windows dibuja sus botones (~140 px) ahí. */
+.sl-top-left .logo-mark {
+  margin: 0 var(--s-1);
+}
+/* Ubicación corta: el destino, o «cuenta › espacio» del panel enfocado. */
+.sl-where {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-width: 0;
+  white-space: nowrap;
+  color: var(--text-3);
+  font-size: var(--fs-13);
+}
+.sl-where-acc {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sl-where strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+  font-weight: 600;
+}
+/* Estados, aviso de actualización y chat a la derecha; Windows dibuja sus botones (~140 px) ahí. */
 .sl-top-right {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: var(--s-2);
   min-width: 0;
   padding-right: 148px;
 }
@@ -104,6 +80,53 @@ button.sl-top-brand.on .sl-top-chev {
   min-width: 0;
   display: flex;
   justify-content: center;
+}
+.sl-top-status {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+/* Resumen de estados: lleva al primer espacio en ese estado. Forma + color + texto. */
+.sl-sum {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  height: var(--h-xs);
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-full);
+  font: inherit;
+  font-size: var(--fs-12);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sl-sum.is-waiting {
+  background: var(--waiting-soft);
+  color: var(--waiting);
+}
+.sl-sum.is-working {
+  background: var(--working-soft);
+  color: var(--working);
+}
+.sl-sum.is-done {
+  background: var(--done-soft);
+  color: var(--done);
+}
+.sl-sum .ic {
+  color: currentColor;
+}
+.sl-sum:hover {
+  filter: brightness(1.15);
+}
+.sl-sum:focus-visible,
+.sl-chat:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 /* Aviso de actualización: píldora verde (solo aparece si hay versión disponible). */
 .sl-upd:empty {
@@ -113,111 +136,129 @@ button.sl-top-brand.on .sl-top-chev {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px 8px;
-  min-height: 30px;
-  padding: 3px 4px 3px 10px;
-  border-radius: 15px;
-  background: var(--success-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 28%, transparent);
-  color: var(--fg-2);
-  font-size: var(--fs-sm);
+  gap: var(--s-1) var(--s-2);
+  min-height: var(--h-sm);
+  padding: 2px var(--s-1) 2px var(--s-3); /* 2px: ajuste óptico para el botón de adentro */
+  border-radius: var(--r-full);
+  background: var(--done-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--done) 28%, transparent);
+  color: var(--text-2);
+  font-size: var(--fs-12);
   max-width: 100%;
 }
 .sl-upd .btn {
-  height: 24px;
-  padding: 0 9px;
-  border-radius: 12px;
-  font-size: var(--fs-sm);
+  height: var(--h-xs);
+  padding: 0 var(--s-2);
+  border-radius: var(--r-full);
+  font-size: var(--fs-12);
 }
-.sl-top-status {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-}
-.sl-top-status .chip {
-  height: 26px;
-  gap: 6px;
-  padding: 0 10px 0 8px;
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  border: 0;
-  cursor: pointer;
-  font-family: inherit;
-}
-.sl-top-status .chip:hover {
-  filter: brightness(1.15);
-}
-.sl-top-status .chip > svg {
-  width: 13px;
-  height: 13px;
-}
-/* Chat y Configuración: solo íconos de 30 px, sin fondo ni texto. */
-.sl-tool {
+.sl-chat {
   position: relative;
-  width: 30px;
-  height: 30px;
+  width: var(--h-md);
+  height: var(--h-md);
   flex: none;
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--r-md);
   background: transparent;
-  color: var(--fg-2);
+  color: var(--text-2);
   cursor: pointer;
 }
-.sl-tool:hover {
+.sl-chat:hover {
   background: var(--hover);
-  color: var(--fg);
+  color: var(--text);
 }
-.sl-tool-badge {
+.sl-chat-badge,
+.sl-rail-badge {
   position: absolute;
-  top: 2px;
-  right: 1px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
-  background: var(--team);
-  color: var(--team-on);
-  font-size: 11px;
-  font-weight: 700;
+  top: 1px;
+  right: 0;
+  min-width: var(--s-4);
+  height: var(--s-4);
+  padding: 0 var(--s-1);
+  border-radius: var(--r-full);
   display: grid;
   place-items: center;
+  font-size: var(--fs-11);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   box-shadow: 0 0 0 2px var(--surface);
 }
-.sl-top-tools {
+.sl-chat-badge {
+  background: var(--team);
+  color: var(--team-on);
+}
+
+/* ---------- Riel de navegación ---------- */
+.sl-rail {
+  grid-column: 1;
+  grid-row: 2;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: var(--s-1);
+  min-height: 0;
+  padding: var(--s-2) 0;
+  background: var(--surface);
+  box-shadow: inset -1px 0 0 var(--divider);
+}
+.sl-rail-grow {
+  flex: 1;
+}
+.sl-rail-btn {
+  position: relative;
+  width: 36px;
+  height: 36px;
   flex: none;
-  min-width: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 }
-.sl-top-sep {
-  flex: none;
-  width: 1px;
-  height: 18px;
-  margin: 0 4px;
-  background: var(--line-strong);
-}
-.sl-top .icon-btn {
-  width: 30px;
-  height: 30px;
-}
-.sl-top .icon-btn[aria-pressed='true'] {
-  color: var(--fg);
+.sl-rail-btn:hover {
   background: var(--hover);
+  color: var(--text);
+}
+.sl-rail-btn.is-on {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+/* Dónde estás: además del fondo, una barrita de acento contra el borde (no solo color). */
+.sl-rail-btn.is-on::before {
+  content: '';
+  position: absolute;
+  left: calc(-1 * var(--s-1) - 2px); /* pegada al borde izquierdo del riel */
+  top: var(--s-2);
+  bottom: var(--s-2);
+  width: 3px;
+  border-radius: var(--r-full);
+  background: var(--accent);
+}
+.sl-rail-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.sl-rail-badge {
+  background: var(--waiting);
+  color: var(--on-accent);
 }
 
 /* ---------- Cuerpo: barra lateral + paneles ---------- */
 .sl-body {
+  grid-column: 2;
+  grid-row: 2;
   position: relative;
   display: grid;
   grid-template-columns: var(--side-w, 264px) minmax(0, 1fr);
   min-height: 0;
   min-width: 0;
+  /* Un panel lateral (chat, git) empuja los paneles en vez de taparlos. */
+  margin-right: var(--side-panel-w, 0px);
 }
 .sl-body.no-side {
   grid-template-columns: minmax(0, 1fr);
@@ -233,7 +274,7 @@ button.sl-top-brand.on .sl-top-chev {
   bottom: 0;
   left: calc(var(--side-w, 264px) - 3px);
   width: 6px;
-  z-index: 3;
+  z-index: var(--z-sticky);
   cursor: col-resize;
   touch-action: none;
   outline: none;
@@ -246,13 +287,11 @@ button.sl-top-brand.on .sl-top-chev {
   left: 50%;
   width: 1px;
   transform: translateX(-50%);
-  background: var(--line);
+  background: var(--divider);
   transition: background var(--t-fast) var(--ease);
 }
 .sl-resize:hover::before,
-.sl-resize:focus-visible::before {
-  background: var(--accent);
-}
+.sl-resize:focus-visible::before,
 body.is-resizing-side .sl-resize::before {
   background: var(--accent);
 }
@@ -270,157 +309,276 @@ body.is-resizing-side .panes {
 .sl-side {
   display: flex;
   flex-direction: column;
-  gap: 12px;
   min-height: 0;
   min-width: 0;
-  padding: 12px 10px 10px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
   background: var(--surface);
-  box-shadow: inset -1px 0 0 var(--line);
+  box-shadow: inset -1px 0 0 var(--divider);
 }
-.sl-filter {
+.sl-side-head {
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex: none;
-  height: 30px;
-  padding: 0 10px;
-  border-radius: 8px;
-  background: var(--search-bg);
-  color: var(--fg-muted);
-  box-shadow: inset 0 0 0 1px var(--line);
+  gap: var(--s-1);
+  height: 40px;
+  padding: 0 var(--s-2) 0 var(--s-4);
 }
-.sl-filter input {
+.sl-side-title {
   flex: 1;
-  min-width: 0;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
+  margin: 0;
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--text);
 }
-.sl-filter input:focus,
-.sl-filter input:hover {
-  border: 0;
-  box-shadow: none;
+.sl-filter {
+  flex: none;
+  height: var(--h-md);
+  margin: 0 var(--s-2) var(--s-2);
+  padding: 0 var(--s-3);
+  border: 1px solid var(--control-border);
+  border-radius: var(--r-md);
+  background: var(--sunken);
+  color: var(--text);
+  font: inherit;
 }
-.sl-filter:focus-within {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent);
+.sl-filter::placeholder {
+  color: var(--placeholder);
+}
+.sl-filter:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 0;
+}
+.sl-groups {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--s-2) var(--s-2);
 }
 
+/* Cuenta: encabezado de grupo de 28 px, sin caja. El color de la cuenta queda en el avatar. */
 .sl-acc {
-  flex: none;
-  padding: 4px;
-  border-radius: 12px;
-  background: var(--card-acc);
-  box-shadow: inset 0 0 0 1px var(--line);
   --acc: var(--accent);
+}
+.sl-acc + .sl-acc {
+  margin-top: var(--s-2);
 }
 .sl-acc-head {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 4px 6px 6px;
-}
-.sl-acc-head > .icon-btn {
-  width: 28px;
   height: 28px;
-  border-radius: 7px;
 }
 .sl-acc-toggle {
   flex: 1;
   min-width: 0;
+  height: 100%;
   display: flex;
   align-items: center;
-  gap: 9px;
-  height: 34px;
-  padding: 0 6px;
+  gap: var(--s-2);
+  padding: 0 var(--s-2);
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: transparent;
-  color: var(--fg);
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-12);
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
 }
 .sl-acc-toggle:hover {
   background: var(--hover);
+  color: var(--text);
+}
+.sl-acc-toggle.is-static {
+  cursor: default;
+}
+.sl-acc-toggle.is-static:hover {
+  background: transparent;
+}
+.sl-acc-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+/* Plegada: el avatar queda atenuado y el grupo no muestra filas (aria-expanded lo dice). */
+.sl-acc-toggle[aria-expanded='false'] .sl-avatar {
+  opacity: 0.6;
 }
 .sl-avatar {
-  position: relative;
-  width: 26px;
-  height: 26px;
+  width: 16px;
+  height: 16px;
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 50%;
-  font-size: 11px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-11);
   font-weight: 700;
-  color: var(--acc);
-  background: color-mix(in srgb, var(--acc) 18%, transparent);
-}
-.sl-dot {
-  position: absolute;
-  right: -1px;
-  bottom: -1px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--fg-muted);
-  box-shadow: 0 0 0 2px var(--card-acc);
-}
-.sl-dot.on {
-  background: var(--success);
-}
-.sl-acc-meta {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+  color: var(--bg);
+  background: var(--acc);
 }
 .sl-acc-name {
-  font-weight: 600;
-  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.sl-acc-sub {
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-.sl-acc-sub.warn {
-  color: var(--warn-fg);
-}
-.sl-chev {
+.sl-acc-plan {
   flex: none;
-  color: var(--fg-muted);
-  transition: transform var(--t-fast) var(--ease);
+  color: var(--text-3);
+  font-size: var(--fs-11);
 }
-.sl-acc-toggle[aria-expanded='false'] .sl-chev {
-  transform: rotate(-90deg);
+.sl-acc-warn {
+  flex: none;
+  color: var(--waiting);
+  font-size: var(--fs-11);
+  font-weight: 600;
 }
-.sl-acc-body {
+/* «+» de la cuenta: aparece al pasar o con el foco en el grupo (con teclado siempre se llega). */
+.sl-acc-add {
+  opacity: 0;
+}
+.sl-acc-head:hover .sl-acc-add,
+.sl-acc-head:focus-within .sl-acc-add {
+  opacity: 1;
+}
+.sl-acc-empty {
+  margin: 0;
+  padding: var(--s-1) var(--s-2) var(--s-2) 32px; /* alineado con el nombre, después del avatar */
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+
+.sl-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sl-li {
+  position: relative;
+  min-width: 0;
+}
+/* Espacio: una línea de 32 px (nombre, ticket y glifo de estado). La ruta y la rama van en el tooltip. */
+.sl-row {
+  width: 100%;
+  height: 32px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sl-row:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.sl-row.open {
+  color: var(--text);
+}
+.sl-row.focused {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.sl-row:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+/* Ícono del espacio: el emoji, o un punto con su color (gris si no tiene). */
+.sl-ico {
+  --ws: var(--text-3);
+  width: 16px;
+  height: 16px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: var(--fs-12);
+  line-height: 1;
+}
+.sl-ico:not(.has-emoji)::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--ws);
+}
+.sl-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.sl-glyph {
+  flex: none;
+  display: inline-flex;
+}
+.sl-perm-n {
+  flex: none;
+  margin-left: calc(-1 * var(--s-1));
+  color: var(--waiting);
+  font-size: var(--fs-11);
+  font-weight: 700;
+}
+.sl-hint {
+  margin: 0;
+  padding: var(--s-2);
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+.sl-acc-none {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin-top: 2px;
-  padding: 4px 0 2px;
-  box-shadow: inset 0 1px 0 var(--line);
+  gap: var(--s-2);
+  padding: var(--s-1) 0;
 }
-.sl-acc-tools {
+
+.sl-foot {
+  flex: none;
+  padding: var(--s-2);
+  box-shadow: inset 0 1px 0 var(--divider);
+}
+/* «Nuevo espacio»: botón neutro con el atajo como texto (no de acento). */
+.sl-newbtn {
+  width: 100%;
+  height: 36px;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 6px 6px 4px;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  padding: 0 var(--s-3);
+  border: 1px solid var(--control-border);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
 }
+.sl-newbtn:hover:not(:disabled) {
+  background: var(--hover);
+}
+.sl-newbtn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.sl-newbtn kbd {
+  font-family: var(--font-ui);
+  font-size: var(--fs-11);
+  color: var(--text-3);
+}
+
+/* Clases que viven acá pero usa Configuración → Cuentas. */
 .sl-usage {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
+  gap: var(--s-1);
   margin: 0;
 }
 .sl-usage div {
@@ -429,331 +587,27 @@ body.is-resizing-side .panes {
   gap: 1px;
 }
 .sl-usage dt {
-  font-size: 10.5px;
-  color: var(--fg-muted);
+  font-size: var(--fs-11);
+  color: var(--text-3);
 }
 .sl-usage dd {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  color: var(--fg-2);
+  font-size: var(--fs-11);
+  color: var(--text-2);
 }
-/* Menú «más» de una fila de cuenta en Configuración: el interruptor y «Quitar» debajo de la fila. */
 .f-set-acc-menu {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 2px 0 8px 46px;
-  padding: 10px 12px;
-  border-radius: 10px;
+  gap: var(--s-2);
+  margin: 2px 0 var(--s-2) 46px;
+  padding: 10px var(--s-3);
+  border-radius: var(--r-lg);
   background: var(--card-hover);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 .f-set-acc-menu .btn.danger {
   align-self: flex-start;
-}
-.sl-acc-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.sl-acc-actions .btn.sm {
-  height: 26px;
-}
-.sl-acc-actions .switch {
-  width: 100%;
-}
-.sl-acc-empty {
-  margin: 0;
-  padding: 6px 8px 8px;
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
-}
-
-.sl-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.sl-li {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-}
-.sl-row {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 8px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--fg);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.sl-row:hover {
-  background: var(--hover);
-}
-.sl-row.open {
-  background: var(--open-bg, rgba(255, 255, 255, 0.03));
-}
-.sl-row.focused {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
-}
-.sl-ico {
-  width: 28px;
-  height: 28px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1;
-  /* Color del espacio (ws.color). Sin color: gris neutro. */
-  --ws: var(--fg-muted);
-  color: var(--ws);
-  background: color-mix(in srgb, var(--ws) 18%, transparent);
-}
-.sl-acc-plan {
-  flex: none;
-  margin-left: 6px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  font-size: 11px;
-  color: var(--fg-muted);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-.sl-txt {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.sl-name {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-}
-.sl-name-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.sl-sub {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
-  white-space: nowrap;
-  overflow: hidden;
-}
-.sl-sub > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.sl-state {
-  flex: none;
-  height: 20px;
-  padding: 0 7px 0 6px;
-  font-size: var(--fs-xs);
-}
-.sl-del {
-  opacity: 0;
-  transition: opacity var(--t-fast);
-}
-.sl-li:hover .sl-del,
-.sl-li:focus-within .sl-del,
-.sl-del:focus-visible {
-  opacity: 1;
-}
-.sl-hint {
-  margin: 0;
-  padding: 6px 8px;
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
-}
-
-.sl-foot {
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: none;
-  padding-top: 6px;
-}
-.sl-foot .inline-form {
-  margin-top: 0;
-}
-.sl-foot .inline-form input {
-  height: 30px;
-}
-/* ---------- Herramientas (sidebar, plegable) ---------- */
-.tools {
-  display: flex;
-  flex-direction: column;
-  flex: none;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid var(--line);
-}
-.tools-head {
-  margin: 0;
-  font: inherit;
-}
-.tools-toggle {
-  width: 100%;
-  min-height: 24px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--fg-muted);
-  font: inherit;
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-}
-.tools-toggle:hover {
-  color: var(--fg);
-}
-.tools-toggle:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-.tools-chev {
-  width: 10px;
-  flex: none;
-  text-align: center;
-}
-.tools-body {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  margin-top: 2px;
-}
-.tools-body[hidden] {
-  display: none;
-}
-/* Fila de 30 px: ícono de 16 y texto de 13, como el resto de la barra lateral. */
-.tools-row {
-  width: 100%;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--fg);
-  font: inherit;
-  font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-}
-.tools-row:hover:not(:disabled) {
-  background: var(--hover);
-}
-.tools-row:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-.tools-row:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.tools-row-ico {
-  width: 16px;
-  height: 16px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  color: var(--fg-2);
-}
-.tools-row-text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.tools-row-badge {
-  flex: none;
-  min-width: 20px;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: 9px;
-  display: inline-grid;
-  place-items: center;
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  color: var(--fg-2);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
-}
-
-/* «Nuevo espacio»: botón neutro de 36 px con el atajo como texto (no de acento). */
-.sl-newbtn {
-  width: 100%;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 9px;
-  background: var(--newbtn-bg);
-  color: var(--fg);
-  font: inherit;
-  font-weight: 500;
-  box-shadow: inset 0 0 0 1px var(--line-strong);
-  cursor: pointer;
-}
-.sl-newbtn:hover:not(:disabled) {
-  background: var(--surface-hover);
-}
-.sl-newbtn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.sl-newbtn kbd {
-  font-family: var(--font-ui);
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
-  margin-left: 2px;
-}
-.sl-acc-none {
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.sl-acc-none .sl-hint {
-  padding: 4px;
 }
 
 /* ---------- Área de paneles ---------- */
@@ -762,176 +616,97 @@ body.is-resizing-side .panes {
   min-height: 0;
   gap: 0;
 }
-.sl-bar {
+/* Una sola barra sobre los paneles: pestañas a la izquierda, «Enviar a varios» y distribución a la derecha. */
+.sl-tabbar {
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex: none;
-  min-height: 46px;
-  padding: 6px 14px 6px 16px;
+  gap: var(--s-2);
+  height: 36px;
   min-width: 0;
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  padding: 0 var(--s-2) 0 var(--s-1);
+  box-shadow: inset 0 -1px 0 var(--divider);
 }
-.sl-crumb {
-  flex: 1 1 160px;
-  min-width: 0;
+.sl-tabbar-tools {
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 6px;
-  /* visible: los menús de cada parte se despliegan debajo de la ruta (ellos mismos truncan su texto). */
-  overflow: visible;
-  white-space: nowrap;
-  color: var(--fg-muted);
-  font-size: var(--fs-md);
+  gap: var(--s-2);
 }
-.sl-crumb strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--fg);
-  font-weight: 600;
-}
-.sl-crumb svg {
-  flex: none;
-}
-/* Partes de la ruta con menú: botón sin marco, chevron chico que dice que se puede tocar. */
-.crumb-menu-wrap {
-  position: relative;
-  display: inline-flex;
-  min-width: 0;
-  max-width: 100%;
-}
-.sl-crumb-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  max-width: 100%;
-  height: 26px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-.sl-crumb-btn:hover,
-.sl-crumb-btn.on {
-  background: var(--hover);
-  color: var(--fg);
-}
-.sl-crumb-btn > svg {
-  opacity: 0.6;
-  transition: transform var(--t-fast) var(--ease);
-}
-.sl-crumb-btn.on > svg {
-  opacity: 1;
-  transform: rotate(180deg);
-}
-.sl-crumb-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sl-crumb-space {
-  color: var(--fg);
-  font-weight: 600;
-}
-.sl-bar-tools {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-}
-.sl-bar .seg {
-  background: var(--search-bg);
-}
-.sl-bar .seg > button {
-  height: 26px;
-  padding: 0 9px;
-  font-size: var(--fs-sm);
-}
-.sl-bar .seg > button[aria-pressed='true'] {
-  background: var(--seg-on);
-}
-/* «Enviar a todos»: 30 px, con ícono y sin fondo. */
 .sl-bcast {
-  height: 30px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--fg-2);
-  font: inherit;
-  font-size: var(--fs-sm);
-  display: flex;
+  height: var(--h-sm);
+  display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--s-2);
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-12);
   cursor: pointer;
 }
-.sl-bcast:hover:not(:disabled) {
+.sl-bcast:hover {
   background: var(--hover);
-  color: var(--fg);
+  color: var(--text);
 }
-.sl-bcast:disabled {
-  opacity: 0.5;
-  cursor: default;
+.sl-bcast:focus-visible,
+.sl-layout > button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
-/* Sin paneles: «No hay espacios abiertos» y Crear espacio, centrados sobre el fondo de la grilla. */
+/* Distribución 1‑2‑3‑4: segmentado compacto. */
+.sl-layout {
+  display: inline-flex;
+  padding: 2px; /* ajuste óptico: el activo queda inscripto */
+  border-radius: var(--r-md);
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--divider);
+}
+.sl-layout > button {
+  min-width: var(--h-xs);
+  height: 22px;
+  padding: 0 var(--s-1);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: var(--fs-12);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.sl-layout > button:hover {
+  color: var(--text);
+}
+.sl-layout > button[aria-pressed='true'] {
+  background: var(--raised);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: var(--e-1);
+}
+/* Sin paneles: estado vacío centrado sobre el fondo de la grilla. */
 .sl-empty {
   flex: 1;
   min-height: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
   background: var(--panes-bg);
-  text-align: center;
-}
-.sl-empty-title {
-  margin: 0;
-  font-size: var(--fs-md);
-  font-weight: 600;
-  color: var(--fg);
-}
-.sl-empty-btn {
-  height: 32px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 8px;
-  background: var(--accent);
-  color: var(--accent-fg);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-.sl-empty-hint {
-  margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
-}
-.sl-tabsrow {
-  flex: none;
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  padding: 0 4px 4px 8px;
 }
 .sl-maxnote {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--s-2);
   min-width: 0;
-  padding: 0 4px 4px 10px;
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  padding: var(--s-1) var(--s-1) 0 var(--s-3);
+  font-size: var(--fs-12);
+  color: var(--text-3);
 }
 .sl-maxnote strong {
-  color: var(--fg);
+  color: var(--text);
   font-weight: 600;
 }
 .sl-maxnote button {
@@ -941,280 +716,114 @@ body.is-resizing-side .panes {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  padding: 0 4px;
-  border-radius: var(--r-xs);
+  padding: 0 var(--s-1);
+  border-radius: var(--r-sm);
 }
 .sl-maxnote button:hover {
   text-decoration: underline;
 }
 
-/* Encabezado del panel: un poco más alto, con rama y el menú «más». */
-.pane-head {
-  height: 42px;
-  padding: 6px 8px 6px 12px;
-  gap: 6px 8px;
+/* ---------- Cabecera del panel ---------- */
+/* Barrita de 3 px con el color de la cuenta, nombre, rama o ticket, estado, insignias, maximizar y «…».
+   El nombre es lo último que se recorta: primero se van la rama, el ticket y el texto del estado. */
+.sl-main .pane-head {
+  position: relative;
+  height: var(--pane-head-h);
+  gap: var(--s-2);
+  padding: 0 var(--s-1) 0 var(--s-3);
+  background: transparent;
+  border-bottom: 1px solid var(--divider);
 }
-/* Ícono del espacio: cuadrado de 22 px con el color del espacio. */
-.pane-icon-btn {
-  --ws: var(--acc);
-  width: 24px;
-  height: 24px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--ws) 16%, transparent);
-  color: var(--ws);
-  font-size: 12px;
-  cursor: pointer;
+.sl-main .pane-head::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: var(--s-2);
+  bottom: var(--s-2);
+  width: 3px;
+  border-radius: 0 var(--r-full) var(--r-full) 0;
+  background: var(--acc);
 }
-.pane-head .pane-title {
-  font-weight: 600;
-}
-/* Solo los botones de ícono del encabezado son cuadrados de 28 px (no los ítems del menú «más» ni «Cambios»). */
-.pane-head .pane-actions .icon-btn {
-  width: 28px;
-  height: 28px;
-}
-.pane-head .pane-menu-item {
-  width: 100%;
-  height: auto;
-  min-height: 32px;
-  white-space: nowrap;
-}
-.pane-head .pane-id {
+.sl-main .pane-id {
   align-items: center;
-  gap: 6px;
+  gap: var(--s-2);
 }
-.pane-head .pane-title {
-  font-size: var(--fs-md);
+.pane-emoji {
+  flex: none;
+  font-size: var(--fs-13);
+  line-height: 1;
+}
+.sl-main .pane-title {
+  flex: 0 1 auto;
+  min-width: min(8ch, 100%);
+  font-family: var(--font-ui);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--text);
 }
 .pane-branch {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--s-1);
   min-width: 0;
-  max-width: 180px;
-  flex: 0 1 auto;
+  /* Cede su lugar mucho antes que el nombre. */
+  flex: 0 1000 auto;
   font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
+  font-size: var(--fs-11);
+  color: var(--text-3);
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 .pane-branch svg {
   flex: none;
-  color: var(--success-fg);
 }
-.pane-head .pane-meta {
-  flex: 0 1 auto;
+.pane-branch-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.pane-head .pill {
-  height: 22px;
-  gap: 6px;
-  padding: 0 8px;
+.pane-state {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  font-size: var(--fs-12);
   font-weight: 500;
-  border-radius: 11px;
+  white-space: nowrap;
 }
-.pane-head .pill > svg {
-  width: 11px;
-  height: 11px;
+.pane-state .ic {
+  color: currentColor;
 }
-.pane-head .pane-actions {
+.pane-state.is-working {
+  color: var(--working);
+}
+.pane-state.is-waiting {
+  color: var(--waiting);
+}
+.pane-state.is-done {
+  color: var(--done);
+}
+.pane-state.is-exited {
+  color: var(--danger);
+}
+.pane-state.is-sleeping {
+  color: var(--text-3);
+}
+.sl-main .pane-actions {
   gap: 2px;
-  margin-left: auto;
 }
-.pane-head .pane-actions .icon-btn {
-  opacity: 1;
-}
-.pane-menu-wrap {
-  position: relative;
-  display: inline-flex;
-}
-.app-menu-wrap {
-  position: relative;
-  display: inline-flex;
-}
-/* Menú de la app: sale desde el logo, alineado a la izquierda. */
-.pane-menu.app-menu {
-  left: 0;
-  right: auto;
-  top: calc(100% + 6px);
-  min-width: 248px;
-}
-.pane-menu-sep {
-  height: 1px;
-  margin: 4px 6px;
-  background: var(--line);
-}
-.pane-menu-btn.on {
-  background: var(--btn-2);
-  color: var(--fg);
-}
-.pane-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 30;
-  min-width: 232px;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 5px;
-  border-radius: 10px;
-  background: var(--card-hover);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55), inset 0 0 0 1px var(--line-strong);
-  transform-origin: top right;
-  animation: menu-in var(--t-fast) var(--ease);
-}
-/* El menú de la app sale del logo: crece desde su esquina de arriba a la izquierda. */
-.pane-menu.app-menu {
-  transform-origin: top left;
-}
-/* Los menús se despliegan hacia abajo desde su botón (no de costado). */
-@keyframes menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.97);
+@container (max-width: 480px) {
+  .pane-state-detail,
+  .pane-branch {
+    display: none;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .pane-menu {
-    animation: none;
+@container (max-width: 380px) {
+  .pane-state-label,
+  .pane-id .ui-tag {
+    display: none;
   }
-}
-.pane-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 32px;
-  padding: 0 9px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--fg);
-  font: inherit;
-  font-size: var(--fs-md);
-  text-align: left;
-  cursor: pointer;
-}
-.pane-menu-item:hover,
-.pane-menu-item:focus-visible {
-  background: var(--hover);
-  outline: none;
-}
-.pane-menu-item.danger {
-  color: var(--danger-fg);
-}
-.pane-menu-ico {
-  display: inline-flex;
-  flex: none;
-  color: var(--fg-2);
-}
-.pane-menu-item.danger .pane-menu-ico {
-  color: var(--danger-fg);
-}
-.pane-menu-label {
-  flex: 1;
-  min-width: 0;
-}
-.pane-menu-hint {
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
-}
-
-/* Menú de la ruta «cuenta › espacio»: el mismo panel del menú «más», con grupos por cuenta y filas de espacio. */
-.pane-menu.crumb-menu {
-  left: 0;
-  right: auto;
-  min-width: 280px;
-  max-width: 340px;
-  max-height: min(440px, 70vh);
-  overflow-y: auto;
-  font-weight: 400;
-  white-space: normal;
-}
-.crumb-menu-group + .crumb-menu-group {
-  margin-top: 4px;
-  padding-top: 4px;
-  box-shadow: inset 0 1px 0 var(--line);
-}
-.crumb-menu-title {
-  padding: 6px 9px 4px;
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  color: var(--fg-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.crumb-menu-empty {
-  padding: 6px 9px;
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
-}
-.crumb-menu-item {
-  width: 100%;
-  min-height: 40px;
-  padding: 5px 9px;
-  white-space: nowrap;
-}
-.crumb-menu-item[aria-current='true'] {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-}
-.crumb-menu-item > svg {
-  flex: none;
-  color: var(--accent);
-}
-.crumb-ws-ico {
-  width: 24px;
-  height: 24px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: 7px;
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-  /* Color del espacio (ws.color). Sin color: gris neutro. */
-  --ws: var(--fg-muted);
-  color: var(--ws);
-  background: color-mix(in srgb, var(--ws) 18%, transparent);
-}
-.crumb-ws-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.crumb-ws-name {
-  min-width: 0;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.crumb-ws-branch {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.crumb-ws-branch svg {
-  flex: none;
-}
-.chip.crumb-chip {
-  flex: none;
-  height: 20px;
-  padding: 0 7px;
-  font-size: var(--fs-xs);
 }
 
 /* Foco: el panel activo lleva un anillo de acento (no el color de la cuenta). */
@@ -1224,42 +833,34 @@ body.is-resizing-side .panes {
 
 /* ---------- Barra de estado ---------- */
 .sl-status {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: var(--s-5);
   min-width: 0;
-  padding: 0 14px;
+  padding: 0 var(--s-4);
   overflow: hidden;
   white-space: nowrap;
   background: var(--surface);
-  box-shadow: inset 0 1px 0 var(--line);
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
+  box-shadow: inset 0 1px 0 var(--divider);
+  font-size: var(--fs-11);
+  color: var(--text-3);
 }
 .sl-status-count {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--s-2);
 }
 .sl-status-dot {
   width: 7px;
   height: 7px;
-  border-radius: 50%;
-  background: var(--success);
+  border-radius: var(--r-full);
+  background: var(--done);
 }
 .sl-status-keys {
   margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
   min-width: 0;
   overflow: hidden;
-}
-.sl-status kbd {
-  font-size: 11px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
 }
 
 /* ---------- Ventanas angostas: la barra lateral se apila arriba y los paneles quedan debajo ---------- */
@@ -1271,32 +872,17 @@ body.is-resizing-side .panes {
   }
   .sl-side {
     max-height: 36vh;
-    box-shadow: inset 0 -1px 0 var(--line);
+    box-shadow: inset 0 -1px 0 var(--divider);
   }
-  .sl-body.no-side > .sl-side {
-    display: none;
-  }
-  .sl-resize {
-    display: none;
-  }
-  .sl-top-search {
-    flex-basis: 160px;
-  }
-  .sl-status-keys {
-    display: none;
-  }
-}
-@media (max-width: 1100px) {
-  .sl-top-brand .sl-top-name {
+  .sl-resize,
+  .sl-status-keys,
+  .sl-where {
     display: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sl-chev,
-  .sl-del,
-  .pane-menu {
+  .sl-rail-btn {
     transition: none;
-    animation: none;
   }
 }

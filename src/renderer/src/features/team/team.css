@@ -4,12 +4,12 @@
 }
 .f-team-tb[aria-pressed='true'] {
   background: var(--press);
-  color: var(--fg);
+  color: var(--text);
 }
 .f-team-tb:focus-visible,
 .f-team-rowbtn:focus-visible,
 .f-team-repoerr summary:focus-visible {
-  outline: 2px solid var(--ring);
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 .f-team-tb-dot {
@@ -23,62 +23,25 @@
   box-shadow: 0 0 0 2px var(--bg);
 }
 
-.f-team-backdrop {
-  position: fixed;
-  inset: 40px 0 0 0;
-  z-index: 9;
-  background: rgba(10, 11, 15, 0.5);
-  animation: fade var(--t-fast) var(--ease);
-}
 .f-team-drawer {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(1080px, calc(100vw - 48px));
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 0;
-  background: var(--surface);
-  border-left: 1px solid var(--line-2);
-  box-shadow: -16px 0 48px rgba(0, 0, 0, 0.4);
-  animation: f-team-slide var(--t-med) var(--ease);
-}
-@keyframes f-team-slide {
-  from {
-    transform: translateX(24px);
-    opacity: 0;
-  }
+  min-width: 0;
 }
 .f-team-pad {
   padding: var(--s-4);
 }
 
-.f-team-head {
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  height: 52px;
-  flex: none;
-  padding: 0 var(--s-3) 0 var(--s-4);
-  border-bottom: 1px solid var(--line);
-}
-.f-team-head h2 {
-  margin: 0;
-  font-size: var(--fs-lg);
-  font-weight: 600;
-}
-.f-team-head-ic {
-  color: var(--accent);
-}
 .f-team-meta {
   flex: 1;
   min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+  font-size: var(--fs-12);
+  color: var(--text-3);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -90,7 +53,7 @@
 }
 .f-team-subbtn {
   font-weight: 400;
-  color: var(--fg-muted);
+  color: var(--text-3);
   margin-left: 2px;
 }
 
@@ -101,35 +64,18 @@
   gap: var(--s-2) var(--s-3);
   flex: none;
   padding: var(--s-2) var(--s-4);
-  background: var(--card);
-  border-bottom: 1px solid var(--line);
-  font-size: var(--fs-sm);
+  background: var(--raised);
+  border-bottom: 1px solid var(--divider);
+  font-size: var(--fs-12);
 }
 .f-team-confirm > span {
   flex: 1;
   min-width: 260px;
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 .f-team-warn {
-  color: var(--warn);
+  color: var(--waiting);
   flex: none;
-}
-.f-team-settings {
-  align-items: flex-end;
-}
-.f-team-field {
-  margin: 0;
-  min-width: 180px;
-}
-.f-team-field > span {
-  display: block;
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
-  margin-bottom: 4px;
-}
-.f-team-field select,
-.f-team-field input {
-  width: 100%;
 }
 .f-team-link {
   flex-direction: column;
@@ -157,8 +103,8 @@
   min-width: 0;
 }
 .f-team-links .mono {
-  font-size: var(--fs-sm);
-  color: var(--fg);
+  font-size: var(--fs-12);
+  color: var(--text);
 }
 .f-team-links .f-team-sub {
   flex: 1;
@@ -174,7 +120,7 @@
   min-height: 0;
   padding-top: 0;
   padding-bottom: 0;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
 }
 
 .f-team-body {
@@ -188,10 +134,10 @@
   align-items: center;
   gap: 6px;
   margin: 0 0 var(--s-2);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
 }
 .f-team-ok {
-  color: var(--success);
+  color: var(--done);
 }
 
 .f-team-summary {
@@ -208,14 +154,14 @@
   height: var(--h-md);
   padding: 0 var(--s-3);
   border-radius: var(--r-md);
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
-  background: var(--card);
+  font-size: var(--fs-12);
+  color: var(--text-2);
+  background: var(--raised);
 }
 .f-team-stat b {
-  font-size: var(--fs-lg);
+  font-size: var(--fs-15);
   font-variant-numeric: tabular-nums;
-  color: var(--fg);
+  color: var(--text);
 }
 .f-team-stat.bad {
   background: var(--danger-soft);
@@ -224,16 +170,16 @@
   color: var(--danger);
 }
 .f-team-stat.warn {
-  background: var(--warn-soft);
+  background: var(--waiting-soft);
 }
 .f-team-stat.warn svg {
-  color: var(--warn);
+  color: var(--waiting);
 }
 .f-team-stat.zero {
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-team-stat.zero b {
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-team-tot {
   margin: 0 0 0 auto;
@@ -241,20 +187,20 @@
 
 .f-team-repoerr {
   margin-bottom: var(--s-3);
-  font-size: var(--fs-sm);
-  color: var(--warn);
+  font-size: var(--fs-12);
+  color: var(--waiting);
 }
 .f-team-repoerr summary {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  border-radius: var(--r-xs);
+  border-radius: var(--r-sm);
 }
 .f-team-repoerr ul {
   margin: 6px 0 0;
   padding-left: var(--s-4);
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 
 .f-team-grid {
@@ -272,7 +218,7 @@
   min-width: 0;
   padding: var(--s-3);
   border-radius: var(--r-lg);
-  background: var(--card);
+  background: var(--raised);
 }
 .f-team-card-head {
   display: flex;
@@ -288,13 +234,13 @@
   height: 32px;
   border-radius: 50%;
   color: var(--on-accent);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 .f-team-avatar-empty {
   background: var(--muted);
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-team-who {
   flex: 1;
@@ -302,7 +248,7 @@
 }
 .f-team-who h3 {
   margin: 0;
-  font-size: var(--fs-md);
+  font-size: var(--fs-13);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -310,8 +256,8 @@
 }
 .f-team-sub {
   margin: 0;
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
+  font-size: var(--fs-11);
+  color: var(--text-3);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -321,8 +267,8 @@
   align-items: center;
   gap: 4px;
   flex: none;
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
+  font-size: var(--fs-11);
+  color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
 .f-team-counts svg + svg,
@@ -331,9 +277,9 @@
 }
 .f-team-h4 {
   margin: var(--s-2) 0 2px;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-11);
   font-weight: 600;
-  color: var(--fg-muted);
+  color: var(--text-3);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -359,15 +305,15 @@
   border: none;
   border-radius: var(--r-sm);
   background: transparent;
-  color: var(--fg-2);
+  color: var(--text-2);
   font: inherit;
-  font-size: var(--fs-sm);
+  font-size: var(--fs-12);
   text-align: left;
   cursor: pointer;
 }
 .f-team-rowbtn:hover {
   background: var(--hover);
-  color: var(--fg);
+  color: var(--text);
 }
 .f-team-title {
   flex: 1;
@@ -379,15 +325,15 @@
 .f-team-id,
 .f-team-repo {
   flex: none;
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
+  font-size: var(--fs-11);
+  color: var(--text-3);
 }
 .f-team-age {
   flex: none;
   min-width: 34px;
   text-align: right;
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
+  font-size: var(--fs-11);
+  color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
 .f-team-has {
@@ -395,7 +341,7 @@
   align-items: center;
   gap: 3px;
   flex: none;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-11);
   color: var(--accent);
 }
 .f-team-ext {
@@ -414,19 +360,19 @@
   font-weight: 600;
   white-space: nowrap;
   background: var(--hover);
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 .f-team-chip.ok {
-  background: var(--success-soft);
-  color: var(--success);
+  background: var(--done-soft);
+  color: var(--done);
 }
 .f-team-chip.bad {
   background: var(--danger-soft);
   color: var(--danger);
 }
 .f-team-chip.warn {
-  background: var(--warn-soft);
-  color: var(--warn);
+  background: var(--waiting-soft);
+  color: var(--waiting);
 }
 .f-team-chip.run,
 .f-team-chip.info {
@@ -443,8 +389,8 @@
   padding: 6px var(--s-2);
   border-radius: var(--r-sm);
   background: var(--surface);
-  font-size: var(--fs-sm);
-  color: var(--fg-2);
+  font-size: var(--fs-12);
+  color: var(--text-2);
 }
 .f-team-start > span {
   flex: 1;
@@ -453,17 +399,8 @@
 .f-team-none {
   margin: 4px 0 0;
 }
-.f-team-empty {
-  margin: var(--s-5) auto;
-  max-width: 520px;
-  text-align: center;
-}
 
 @media (prefers-reduced-motion: reduce) {
-  .f-team-backdrop,
-  .f-team-drawer {
-    animation: none;
-  }
   .f-team-chip .spin,
   .f-team-actions .spin,
   .f-team-meta .spin {

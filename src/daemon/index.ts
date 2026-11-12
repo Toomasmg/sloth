@@ -130,7 +130,7 @@ function checkIdle(): void {
   if (idle && !idleTimer) {
     idleTimer = setTimeout(() => {
       idleTimer = null
-      if (clients.size === 0 && core.runningCount() === 0) shutdown('inactivo')
+      if (clients.size === 0 && core.runningCount() === 0) void shutdown('inactivo')
     }, IDLE_SHUTDOWN_MS)
   } else if (!idle && idleTimer) {
     clearTimeout(idleTimer)
@@ -139,16 +139,17 @@ function checkIdle(): void {
 }
 
 let shuttingDown = false
-function shutdown(reason: string): void {
+async function shutdown(reason: string): Promise<void> {
   if (shuttingDown) return
   shuttingDown = true
   log(`shutdown: ${reason}`)
-  core.killAll()
+  // Primero las terminales, de a una: así conpty también alcanza a cerrar los procesos hijos.
+  await core.closeAll()
   core.close()
   server.close()
   for (const c of clients) c.sock.end()
-  // Un momento para que conpty cierre los procesos y se vacíen los sockets.
-  setTimeout(() => process.exit(0), 300)
+  // Un momento para que se vacíen los sockets.
+  setTimeout(() => process.exit(0), 100)
 }
 
 function reply(c: Client, rid: number, fn: () => unknown): void {
@@ -208,7 +209,7 @@ function handle(c: Client, msg: ClientMessage): void {
       break
     case 'shutdown':
       reply(c, msg.rid, () => null)
-      shutdown('pedido por un cliente')
+      void shutdown('pedido por un cliente')
       break
   }
 }

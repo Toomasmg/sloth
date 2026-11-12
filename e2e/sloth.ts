@@ -12,13 +12,15 @@ import { join } from 'node:path'
 
 export interface Seed {
   /** Espacios de prueba (con su cuenta). Las carpetas se crean solas. */
-  workspaces?: { id: string; name: string; open?: boolean }[]
+  workspaces?: { id: string; name: string; open?: boolean; accountId?: string; ticket?: string; branch?: string }[]
   /** Cuentas de más (sin sesión), por nombre: para las pantallas que piden dos cuentas. */
   extraAccounts?: string[]
   /** Espacios que arrancan dormidos. */
   asleep?: string[]
   /** Parche de Configuración (features/settings.json). */
   settings?: Record<string, unknown>
+  /** Deja el asistente de bienvenida sin completar (por defecto se saltea). */
+  onboarding?: boolean
 }
 
 export const ACCOUNT_ID = 'acc-e2e'
@@ -31,20 +33,20 @@ function seedUserData(dir: string, seed: Seed): void {
   const features = join(dir, 'features')
   mkdirSync(features, { recursive: true })
   // Sin asistente de bienvenida: se prueba la app ya usada.
-  writeFileSync(join(features, 'onboarding.json'), JSON.stringify({ version: 1, completed: true, step: 0, updatedAt: 1 }))
+  if (!seed.onboarding) writeFileSync(join(features, 'onboarding.json'), JSON.stringify({ version: 1, completed: true, step: 0, updatedAt: 1 }))
   // Sin «Novedades» al abrir: la versión actual ya se vio.
   const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }
   writeFileSync(join(features, 'help.json'), JSON.stringify({ lastSeen: version }))
   if (seed.settings) writeFileSync(join(features, 'settings.json'), JSON.stringify(seed.settings))
   if (seed.asleep?.length) writeFileSync(join(features, 'sleep.json'), JSON.stringify({ asleep: seed.asleep }))
   const ws = seed.workspaces ?? []
-  if (!ws.length) return
+  if (!ws.length && !seed.extraAccounts?.length) return
   const configDir = join(dir, 'accounts', ACCOUNT_ID)
   mkdirSync(configDir, { recursive: true })
   const workspaces = ws.map((w, i) => {
     const cwd = join(dir, 'repos', w.id)
     mkdirSync(cwd, { recursive: true })
-    return { id: w.id, name: w.name, repoPath: cwd, cwd, accountId: ACCOUNT_ID, autoStartClaude: false, createdAt: 1_700_000_000_000 + i }
+    return { id: w.id, name: w.name, repoPath: cwd, cwd, accountId: w.accountId ?? ACCOUNT_ID, autoStartClaude: false, createdAt: 1_700_000_000_000 + i, ticket: w.ticket, branch: w.branch }
   })
   const state = {
     version: 1,

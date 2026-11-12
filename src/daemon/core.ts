@@ -14,6 +14,7 @@ import {
   type SessionInfo,
   type SpawnSpec
 } from '../shared/daemon-protocol'
+import { closeSerially, type CloseLimits } from './shutdown'
 
 export type PtyModule = typeof NodePty
 
@@ -23,6 +24,8 @@ export const FLUSH_MS = 16
 export const PERMISSION_TIMEOUT_MS = 120_000
 const HOOK_BODY_LIMIT = 64 * 1024
 const PERMISSION_BODY_LIMIT = 256 * 1024
+/** Main espera 5 s el apagado (pedido, cierre y que se vaya el pipe): las terminales tienen menos. */
+export const SHUTDOWN_LIMITS: CloseLimits = { perPtyMs: 1500, totalMs: 3500 }
 
 export interface CoreSink {
   /** Salida agrupada de una sesión (solo se llama si streaming() es true). */
@@ -48,6 +51,8 @@ interface Session {
   seq: number
   running: boolean
   exitCode?: number
+  /** Se resuelve cuando node-pty avisó la salida (su hilo nativo ya terminó). */
+  exited: Promise<void>
   /** Chunks pendientes de mandar al cliente (se vacía cada FLUSH_MS). */
   out: PtyChunk[]
 }
@@ -75,6 +80,8 @@ export class TerminalCore {
   private server?: Server
   private waiting = new Map<string, Waiting>()
   private lastHooks = new Map<string, HookEventPayload>()
+  /** Apagando: no se llama a node-pty salvo para matar de a una (ver shutdown.ts). */
+  private closing = false
   readonly hookToken = randomBytes(24).toString('hex')
   hookUrl = ''
 
@@ -108,6 +115,7 @@ export class TerminalCore {
 
   /** Si la sesión corre devuelve su buffer sin respawnear; si terminó o no existe, la arranca. */
   start(id: string, spec: SpawnSpec): PtyStartResult {
+    if (this.closing) throw new Error('Sloth se está cerrando.')
     const prev = this.sessions.get(id)
     if (prev?.running) return this.snapshot(prev)
     if (typeof spec?.file !== 'string' || !spec.file) throw new Error('spawn.file inválido')
@@ -119,13 +127,18 @@ export class TerminalCore {
       env: spec.env,
       useConpty: true
     })
-    const s: Session = { proc, chunks: [], head: 0, size: 0, seq: prev?.seq ?? 0, running: true, out: [] }
+    let markExited: () => void = () => {}
+    const exited = new Promise<void>((r) => {
+      markExited = r
+    })
+    const s: Session = { proc, chunks: [], head: 0, size: 0, seq: prev?.seq ?? 0, running: true, out: [], exited }
     this.sessions.set(id, s)
     this.log(`start ${id} pid=${proc.pid}`)
     proc.onData((data) => this.onData(s, data))
     proc.onExit(({ exitCode }) => {
       s.running = false
       s.exitCode = exitCode
+      markExited()
       const current = this.sessions.get(id)
       // Si la sesión ya fue borrada (kill) o reemplazada, no confundimos al cliente.
       if (current === s) {
@@ -172,12 +185,12 @@ export class TerminalCore {
 
   write(id: string, data: string): void {
     const s = this.sessions.get(id)
-    if (s?.running && typeof data === 'string') s.proc.write(data)
+    if (s?.running && !this.closing && typeof data === 'string') s.proc.write(data)
   }
 
   resize(id: string, cols: number, rows: number): void {
     const s = this.sessions.get(id)
-    if (s?.running && cols > 0 && rows > 0) {
+    if (s?.running && !this.closing && cols > 0 && rows > 0) {
       try {
         s.proc.resize(Math.floor(cols), Math.floor(rows))
       } catch {
@@ -200,8 +213,15 @@ export class TerminalCore {
     this.sink.sessionsChanged?.()
   }
 
-  killAll(): void {
-    for (const id of [...this.sessions.keys()]) this.kill(id)
+  /** Apagado: cierra todas de a una esperando la salida de cada una, sin volver a matar las que ya salieron. */
+  async closeAll(limits: CloseLimits = SHUTDOWN_LIMITS): Promise<void> {
+    this.closing = true
+    const list = [...this.sessions.values()].map((s) => ({ isRunning: () => s.running, kill: () => s.proc.kill(), exited: s.exited }))
+    const r = await closeSerially(list, limits, (e) => this.log(`kill al cerrar: ${(e as Error)?.message ?? String(e)}`))
+    if (r.timedOut) this.log(`cierre: ${r.timedOut} terminal(es) no avisaron su salida a tiempo`)
+    this.sessions.clear()
+    this.lastHooks.clear()
+    this.sink.sessionsChanged?.()
   }
 
   // ---------------- Hooks HTTP ----------------

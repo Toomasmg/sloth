@@ -1,11 +1,10 @@
 import { useEffect, useState, lazy, Suspense } from 'react'
 import type { FeatureUi } from '../host'
 import { useUi } from '../host'
-import { PageShell } from '../help/PageShell'
+import { View } from '../../ui/View'
 const ExportTab = lazy(() => import('./ExportTab').then((m) => ({ default: m.ExportTab })))
 const ImportTab = lazy(() => import('./ImportTab').then((m) => ({ default: m.ImportTab })))
 import { onRequest, request } from './bus'
-import { Ico } from './ico'
 import './export-import.css'
 
 type Tab = 'exportar' | 'importar'
@@ -19,17 +18,11 @@ function EiPage({ initial, onClose }: { initial: Tab; onClose: () => void }): Re
   const [tab, setTab] = useState<Tab>(initial)
 
   return (
-    <PageShell
-      labelId="f-ei-page-name"
+    <View
+      labelId="f-ei-view-title"
       title="Exportar e importar"
       onClose={onClose}
-      className="f-ei-page"
-      backLabel={
-        <>
-          <Ico d="M15 5l-7 7 7 7" size={14} sw={2} />
-          Configuración
-        </>
-      }
+      backLabel="Configuración"
     >
       <div className="f-ei-wrap">
         <div className="f-ei-head">
@@ -74,7 +67,7 @@ function EiPage({ initial, onClose }: { initial: Tab; onClose: () => void }): Re
           </Suspense>
         </div>
       </div>
-    </PageShell>
+    </View>
   )
 }
 

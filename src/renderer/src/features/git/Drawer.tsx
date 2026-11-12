@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CloseIcon, BranchIcon } from '../../icons/SlothIcons'
+import { SidePanel } from '../../ui/SidePanel'
 import { CheckGlyph } from './glyphs'
 import { useUi } from '../host'
 import { isLoginPane } from '../../../../shared/types'
@@ -29,7 +30,6 @@ export function Drawer(): React.JSX.Element | null {
   const [prOpen, setPrOpen] = useState(false)
   const [prs, setPrs] = useState<SessionPr[]>([])
   const panelRef = useRef<HTMLDivElement>(null)
-  const prevFocus = useRef<HTMLElement | null>(null)
   const toastT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const say = useCallback((m: string) => {
@@ -66,7 +66,6 @@ export function Drawer(): React.JSX.Element | null {
 
   useEffect(() => {
     if (!wsId) return
-    prevFocus.current = document.activeElement as HTMLElement | null
     setSt(null)
     setSync(null)
     setStash(null)
@@ -98,15 +97,13 @@ export function Drawer(): React.JSX.Element | null {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsId, reload])
 
-  const close = useCallback(() => {
-    closeDrawer()
-    prevFocus.current?.focus?.()
-  }, [])
+  const close = useCallback(() => closeDrawer(), [])
 
   useEffect(() => {
     if (!wsId) return
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape') return
+      // Panel no modal: con el foco en la terminal, Esc es de Claude.
+      if (e.key !== 'Escape' || !panelRef.current?.contains(document.activeElement)) return
       e.preventDefault()
       e.stopPropagation()
       if (prOpen) setPrOpen(false)
@@ -130,9 +127,8 @@ export function Drawer(): React.JSX.Element | null {
   ]
 
   return (
-    <>
-      <div className="f-git-backdrop" onMouseDown={close} aria-hidden="true" />
-      <aside ref={panelRef} className="f-git-drawer" role="dialog" aria-modal="true" aria-label={`Git de ${ws?.name ?? 'espacio'}`} tabIndex={-1}>
+    <SidePanel labelId="f-git-title" title={`Git de ${ws?.name ?? 'espacio'}`} onClose={close} width={600}>
+      <div ref={panelRef} className="f-git-drawer" tabIndex={-1}>
         <header className="f-git-head">
           <div role="tablist" aria-label="Vista de Git" className="g-tabs">
             {tabs.map((t) => (
@@ -158,9 +154,6 @@ export function Drawer(): React.JSX.Element | null {
               <span className="g-branch-name">{cur}</span>
             </span>
           )}
-          <button className="icon-btn" onClick={close} aria-label="Cerrar Git" title="Cerrar (Esc)">
-            <CloseIcon size={12} aria-hidden="true" />
-          </button>
         </header>
 
         {st && !st.isRepo && <p className="f-git-empty">La carpeta del espacio no es un repositorio git.</p>}
@@ -211,8 +204,8 @@ export function Drawer(): React.JSX.Element | null {
             }}
           />
         )}
-      </aside>
-    </>
+      </div>
+    </SidePanel>
   )
 }
 

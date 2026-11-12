@@ -15,22 +15,25 @@ import {
 } from '../../shared/types'
 import { api } from './api'
 import { UiContext, type NewWorkspacePreset, type PaneGuard, type UiCtx } from './features/host'
+import { FEATURE_UIS } from './features/registry'
 import { resolveAccountColor, useSettings } from './features/settings/store'
 import { openChat, useChatAttach, useChatSnapshot } from './features/chat/store'
 import { openSettings } from './features/settings/bus'
 import { openHelp } from './features/help/bus'
 import { colorHex } from './features/templates/catalog'
-import { bindingOf, comboLabel, isCapturingShortcut, matchShortcut } from './shortcuts'
+import { comboLabel, isCapturingShortcut, matchShortcut } from './shortcuts'
 import type { ShortcutId } from '../../main/features/settings-model'
 import { GlobalSlot, PaneBannerSlot, PaneHeaderSlot, TitlebarOnly } from './features/slots'
 import { openPermissionReview } from './features/permissions/store'
-import { PaletteBar, PALETTE_REMOVE_EVENT, PALETTE_RENAME_EVENT, runFeatureCommand } from './features/palette'
+import { PaletteBar, runFeatureCommand } from './features/palette'
 import { TerminalView } from './TerminalView'
 import { NewWorkspaceDialog } from './NewWorkspaceDialog'
 import { ConfirmDialog, type ConfirmRequest } from './ConfirmDialog'
 import { EmptyState } from './EmptyState'
-import { StateIcon, StatePill } from './StateIcon'
+import { FirstRun } from './features/onboarding/FirstRun'
+import { StateIcon } from './StateIcon'
 import { PermissionCard, toolLabel } from './PermissionCard'
+import { LogoMark } from './Logo'
 import { decidePermission } from './features/permissions/api'
 import { setPaneVisible, useDocumentVisible, useVisiblePolling } from './visibility'
 import {
@@ -59,50 +62,44 @@ import { onEqualize, safeStorage, setViewMode, useViewMode } from './layout/stor
 import { useReorderDrag } from './layout/useReorderDrag'
 import { Separators } from './layout/Separators'
 import { SIDE_DEFAULT, SideResizer, clampSide, sideMax } from './layout/SideResizer'
-import { PaneMenu, type PaneMenuItem } from './layout/PaneMenu'
 import { SleepingCard } from './SleepingCard'
-import { CrumbMenu, type CrumbGroup, type CrumbItem } from './layout/CrumbMenu'
 import { openRamas } from './features/worktrees/store'
 import { openHistory } from './features/history/index'
-import { AppMenu } from './layout/AppMenu'
-import { ToolsSection } from './layout/ToolsSection'
+import { NavRail } from './layout/NavRail'
+import { useNavDest } from './layout/nav'
+import { NAV_LABEL } from './layout/nav-model'
+import { sortPaneActions, type PaneAction } from './layout/pane-actions'
+import { WorkspaceContextMenu, WorkspaceMenuButton } from './layout/WorkspaceMenu'
 import { TabBar, type TabInfo } from './layout/TabBar'
+import { IconButton, Tag, ToastHost, Tooltip, toast } from './ui'
 import './layout/layout.css'
 import './layout/shell.css'
 import { WorkspaceIconPicker } from './WorkspaceIconPicker'
 import { useFolderDrop } from './useFolderDrop'
 import './workspace.css'
-import { cleanError, fmtTok, shortPath, STATE_LABEL, totalTok, usageTitle } from './format'
+import { cleanError, shortPath, STATE_LABEL } from './format'
 import {
-  BranchIcon,
   BroadcastIcon,
-  CheckIcon,
-  ChangesIcon,
+  BranchIcon,
   ChatIcon,
   CloseIcon,
-  HideIcon,
   EditorIcon,
-  ErrorIcon,
   FolderIcon,
-  FourPanesIcon,
+  HideIcon,
   HistoryIcon,
   MaximizeIcon,
-  MoveAccountIcon,
-  OnePaneIcon,
+  PencilIcon,
   PermissionIcon,
+  PlusIcon,
   SearchIcon,
-  SettingsIcon,
   SidebarIcon,
-  SpaceIcon,
-  TemplatesIcon,
-  ThreePanesIcon,
-  TwoPanesIcon,
+  TrashIcon,
   UpdateIcon,
   WorktreeIcon
 } from './icons/SlothIcons'
 
 /* Íconos que SlothIcons todavía no tiene: mismo trazo (grilla 24, 1,6) que el resto. */
-type GlyphProps = { size?: number; weight?: string; 'aria-hidden'?: boolean | 'true' | 'false' }
+type GlyphProps = { size?: number; 'aria-hidden'?: boolean | 'true' | 'false' }
 function Glyph({ size = 16, children }: GlyphProps & { children: React.ReactNode }): React.JSX.Element {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" focusable="false" style={{ flex: 'none' }}>
@@ -110,29 +107,10 @@ function Glyph({ size = 16, children }: GlyphProps & { children: React.ReactNode
     </svg>
   )
 }
-const Plus = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><path d="M12 5v14M5 12h14" /></Glyph>
-const Trash = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></Glyph>
-const PencilSimple = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><path d="M4 20l1-4L16 5l3 3L8 19l-4 1zM14 7l3 3" /></Glyph>
 const Equals = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><path d="M5 9h14M5 15h14" /></Glyph>
 const DotsSixVertical = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" strokeWidth={2.6} /></Glyph>
 const ArrowsLeftRight = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><path d="M4 8h15l-3-3M20 16H5l3 3" /></Glyph>
 const Smiley = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><circle cx="12" cy="12" r="8" /><path d="M9 10h.01M15 10h.01M9 14.5c.9 1 1.9 1.5 3 1.5s2.1-.5 3-1.5" /></Glyph>
-
-/** Texto de un atajo como teclas («Ctrl + K»), siempre al día con Configuración. */
-function Keys({ id }: { id: ShortcutId }): React.JSX.Element {
-  return (
-    <>
-      {bindingOf(id)
-        .split(' ')
-        .map((k, i) => (
-          <span key={i}>
-            {i > 0 && '+'}
-            <kbd>{k}</kbd>
-          </span>
-        ))}
-    </>
-  )
-}
 
 /** Distribución por tecla de Ctrl+Alt+1–4. */
 const LAYOUT_BY_DIGIT: Record<string, ViewMode> = { Digit1: 'uno', Digit2: 'dos', Digit3: 'tres', Digit4: 'cuatro' }
@@ -156,15 +134,6 @@ function writeStorage(key: string, value: string): void {
   }
 }
 
-const STATE_CHIP: Record<AgentStatus['state'], string> = {
-  working: 'chip-working',
-  waiting: 'chip-waiting',
-  done: 'chip-done',
-  exited: 'chip-error',
-  idle: 'chip-idle',
-  sleeping: 'chip-idle'
-}
-
 export function App(): React.JSX.Element {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [statuses, setStatuses] = useState<Record<string, AccountStatus>>({})
@@ -175,7 +144,6 @@ export function App(): React.JSX.Element {
   const [generations, setGenerations] = useState<Record<string, number>>({})
   const [focused, setFocused] = useState<string | null>(null)
   const [maximized, setMaximized] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [confirmReq, setConfirmReq] = useState<ConfirmRequest | null>(null)
   const askConfirm = (o: Omit<ConfirmRequest, 'resolve'>): Promise<boolean> => new Promise((resolve) => setConfirmReq({ ...o, resolve }))
   const [newWsMode, setNewWsMode] = useState<null | 'normal' | 'ticket'>(null)
@@ -186,9 +154,9 @@ export function App(): React.JSX.Element {
   const [announceId, setAnnounceId] = useState<string | null>(null)
   // Renombrar un espacio desde el sidebar o desde el header de su panel (uno a la vez).
   const [renaming, setRenaming] = useState<{ id: string; from: 'side' | 'pane' } | null>(null)
-  // Picker de ícono: `back` devuelve el foco a quien lo abrió. Menú chico del sidebar (clic derecho).
+  // Picker de ícono y menú del espacio en un punto (clic derecho): `back` devuelve el foco a quien los abrió.
   const [iconPick, setIconPick] = useState<{ wsId: string; x: number; y: number; back: () => void } | null>(null)
-  const [wsMenu, setWsMenu] = useState<{ wsId: string; x: number; y: number } | null>(null)
+  const [ctxMenu, setCtxMenu] = useState<{ paneId: string; from: 'side' | 'pane'; x: number; y: number; back: () => void } | null>(null)
   // Barra lateral: visible o no, cuentas plegadas y filtro de espacios.
   const [sideShown, setSideShown] = useState(() => readStorage(SIDEBAR_KEY) !== '0')
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
@@ -200,6 +168,7 @@ export function App(): React.JSX.Element {
     }
   })
   const [wsQuery, setWsQuery] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
   // Ancho de la barra lateral (tirador): lo guardado o el por defecto; se acota a la ventana al mostrarlo.
   const [sideW, setSideW] = useState(() => {
     const n = Number.parseInt(readStorage(SIDE_W_KEY) ?? '', 10)
@@ -219,6 +188,9 @@ export function App(): React.JSX.Element {
     writeStorage(SIDE_W_KEY, String(v))
   }
   const docVisible = useDocumentVisible()
+  const navDest = useNavDest()
+  // Un solo lugar para los avisos de error: la cola de ui/Toast (se quedan hasta que se cierran).
+  const notifyError = useCallback((m: string): void => void toast({ tone: 'danger', message: m, duration: 0 }), [])
 
   useEffect(() => writeStorage(COLLAPSED_KEY, JSON.stringify(collapsed)), [collapsed])
 
@@ -386,7 +358,7 @@ export function App(): React.JSX.Element {
     try {
       await api.ptyKill(id)
     } catch (e) {
-      setError(cleanError(e))
+      notifyError(cleanError(e))
     }
   }
   const requestRestartPane = async (id: string): Promise<void> => {
@@ -403,7 +375,7 @@ export function App(): React.JSX.Element {
       setAccounts((a) => a.filter((x) => x.id !== acc.id))
       closePane(loginPaneId(acc.id))
     } catch (e) {
-      setError(cleanError(e))
+      notifyError(cleanError(e))
     }
   }
 
@@ -413,7 +385,7 @@ export function App(): React.JSX.Element {
       await api.setShareSetup(acc.id, next)
       setAccounts((list) => list.map((a) => (a.id === acc.id ? { ...a, shareSetup: next } : a)))
     } catch (e) {
-      setError(cleanError(e))
+      notifyError(cleanError(e))
     }
   }
 
@@ -426,7 +398,7 @@ export function App(): React.JSX.Element {
       setWorkspaces((w) => w.filter((x) => x.id !== ws.id))
       setOpenPanesState((p) => p.filter((x) => x !== ws.id))
     } catch (e) {
-      setError(cleanError(e))
+      notifyError(cleanError(e))
     }
   }
 
@@ -436,14 +408,14 @@ export function App(): React.JSX.Element {
       const updated = await api.updateWorkspace(ws.id, patch)
       setWorkspaces((list) => list.map((w) => (w.id === ws.id ? updated : w)))
     } catch (e) {
-      setError(cleanError(e))
+      notifyError(cleanError(e))
     }
   }
   const revealWs = async (ws: Workspace, target: RevealTarget): Promise<void> => {
     try {
       await api.revealWorkspace(ws.id, target)
     } catch (e) {
-      setError(cleanError(e))
+      notifyError(cleanError(e))
     }
   }
   /** Cierra la edición y devuelve el foco. `next` null = cancelar. */
@@ -462,10 +434,10 @@ export function App(): React.JSX.Element {
       setNewWsPreset({ repoPath, name })
       setNewWsMode('normal')
     },
-    onError: (m) => setError(m)
+    onError: (m) => notifyError(m)
   })
 
-  const onTermError = useCallback((m: string) => setError(m), [])
+  const onTermError = notifyError
 
   // ---------- Layout de paneles: distribución (Uno/Dos/Cuatro), proporciones y orden ----------
   const viewMode = useViewMode()
@@ -483,7 +455,6 @@ export function App(): React.JSX.Element {
       ? 0
       : Math.max(0, Math.min(openPanes.indexOf(activeId) - (cap - 1), openPanes.length - cap))
   const visiblePanes = maxId ? [maxId] : openPanes.slice(winStart, winStart + cap)
-  const showTabs = openPanes.length > 0 && (viewMode === 'uno' || openPanes.length > cap)
   const nVisible = visiblePanes.length
   const shape = useMemo(() => shapeFor(viewMode, nVisible, winW >= TRES_WIDE_PX), [viewMode, nVisible, winW])
   const shapeK = shapeKey(shape)
@@ -705,42 +676,19 @@ export function App(): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKey, true)
   }, [])
 
-  // Pedidos desde la paleta: renombrar o quitar un espacio (la lógica vive acá, con su confirmación).
-  const latestRef = useRef({ wsById, removeWorkspace })
-  latestRef.current = { wsById, removeWorkspace }
-  useEffect(() => {
-    const onRename = (e: Event): void => {
-      const id = (e as CustomEvent<string>).detail
-      if (typeof id === 'string' && latestRef.current.wsById.has(id)) setRenaming({ id, from: 'pane' })
+  const tabs: TabInfo[] = openPanes.map((id) => {
+    const login = isLoginPane(id)
+    const accId = login ? accountIdFromLoginPane(id) : wsById.get(id)?.accountId
+    return {
+      id,
+      title: login ? 'Terminal de cuenta' : (wsById.get(id)?.name ?? 'Panel'),
+      account: (accId && accountById.get(accId)?.label) || 'cuenta borrada',
+      state: login ? undefined : agents[id]?.state,
+      perms: permsByWs.get(id)?.length ?? 0,
+      icon: login ? undefined : wsById.get(id)?.icon,
+      onScreen: rectOf.has(id)
     }
-    const onRemove = (e: Event): void => {
-      const ws = latestRef.current.wsById.get((e as CustomEvent<string>).detail)
-      if (ws) void latestRef.current.removeWorkspace(ws)
-    }
-    window.addEventListener(PALETTE_RENAME_EVENT, onRename)
-    window.addEventListener(PALETTE_REMOVE_EVENT, onRemove)
-    return () => {
-      window.removeEventListener(PALETTE_RENAME_EVENT, onRename)
-      window.removeEventListener(PALETTE_REMOVE_EVENT, onRemove)
-    }
-  }, [])
-
-  const tabs: TabInfo[] =
-    showTabs
-      ? openPanes.map((id) => {
-          const login = isLoginPane(id)
-          const accId = login ? accountIdFromLoginPane(id) : wsById.get(id)?.accountId
-          return {
-            id,
-            title: login ? 'Terminal de cuenta' : (wsById.get(id)?.name ?? 'Panel'),
-            account: (accId && accountById.get(accId)?.label) || 'cuenta borrada',
-            color: colorOf(accId),
-            state: login ? undefined : agents[id]?.state,
-            perms: permsByWs.get(id)?.length ?? 0,
-            icon: login ? undefined : wsById.get(id)?.icon
-          }
-        })
-      : []
+  })
   const countBy = (s: AgentStatus['state']): number => workspaces.filter((w) => agents[w.id]?.state === s).length
   const needsYou = countBy('waiting')
   const working = countBy('working')
@@ -750,6 +698,64 @@ export function App(): React.JSX.Element {
   const activeTerms = workspaces.filter((w) => agents[w.id] && agents[w.id].state !== 'exited' && agents[w.id].state !== 'sleeping').length
   /** Primer espacio con ese estado (para ir al tocar un resumen). */
   const firstWs = (s: AgentStatus['state']): Workspace | undefined => workspaces.find((w) => agents[w.id]?.state === s)
+
+  const editorName = appSettings.settings.editor
+  const editorLabel = editorName === 'Bloc de notas' ? 'carpeta' : editorName
+
+  /** Picker de ícono al lado de la fila de la barra lateral o del título del panel. */
+  const pickIconFor = (wsId: string, from: 'side' | 'pane'): void => {
+    if (from === 'pane') openPane(wsId)
+    requestAnimationFrame(() => {
+      const sel = from === 'side' ? `[data-ws-btn="${CSS.escape(wsId)}"]` : `[data-pane-id="${CSS.escape(wsId)}"] .pane-title`
+      const r = document.querySelector<HTMLElement>(sel)?.getBoundingClientRect()
+      const back = (): void => {
+        if (from === 'side') document.querySelector<HTMLElement>(`[data-ws-btn="${CSS.escape(wsId)}"]`)?.focus()
+        else focusTerminal(wsId)
+      }
+      openIconPicker(wsId, r?.left ?? 120, (r?.bottom ?? 120) + 6, back)
+    })
+  }
+
+  /**
+   * Acciones del núcleo para un panel o espacio. `from` dice dónde se pidió: renombrar y el ícono se
+   * hacen ahí mismo (en la fila de la barra lateral o en la cabecera del panel).
+   */
+  const coreActions = (paneId: string, from: 'side' | 'pane'): PaneAction[] => {
+    const ws = isLoginPane(paneId) ? undefined : wsById.get(paneId)
+    const list: PaneAction[] = []
+    if (ws) {
+      list.push(
+        {
+          id: 'rename',
+          label: 'Renombrar',
+          group: 'editar',
+          order: 10,
+          shortcut: 'F2',
+          icon: <PencilIcon size={15} />,
+          run: () => {
+            if (from === 'pane') openPane(ws.id)
+            setRenaming({ id: ws.id, from })
+          }
+        },
+        { id: 'icon', label: 'Cambiar ícono', group: 'editar', order: 20, icon: <Smiley size={15} />, run: () => pickIconFor(ws.id, from) },
+        { id: 'historial', label: 'Historial de este espacio', group: 'ver', order: 20, icon: <HistoryIcon size={15} />, run: () => openHistory(ws.id) },
+        { id: 'ramas', label: 'Ramas aparte de este repo', group: 'ver', order: 30, icon: <WorktreeIcon size={15} />, run: () => openRamas(null, ws.repoPath) },
+        ...(editorLabel === 'carpeta'
+          ? []
+          : [{ id: 'vscode', label: `Abrir en ${editorLabel}`, group: 'abrir' as const, order: 10, icon: <EditorIcon size={15} />, run: () => void revealWs(ws, 'vscode') }]),
+        { id: 'folder', label: 'Abrir carpeta', group: 'abrir', order: 20, icon: <FolderIcon size={15} />, run: () => void revealWs(ws, 'folder') },
+        { id: 'remove', label: 'Quitar espacio', group: 'quitar', order: 10, danger: true, icon: <TrashIcon size={15} />, run: () => void removeWorkspace(ws) }
+      )
+    }
+    if (openPanes.includes(paneId)) {
+      list.push(
+        { id: 'restart', label: 'Reiniciar terminal', hint: 'cierra el proceso', group: 'panel', order: 10, icon: <UpdateIcon size={15} />, run: () => void requestRestartPane(paneId) },
+        { id: 'hide', label: 'Ocultar panel', hint: 'la terminal sigue', group: 'panel', order: 20, icon: <HideIcon size={15} />, run: () => void requestHidePane(paneId) },
+        { id: 'close', label: 'Cerrar panel', hint: 'corta la terminal', group: 'panel', order: 30, icon: <CloseIcon size={15} />, run: () => void requestClosePane(paneId) }
+      )
+    }
+    return list
+  }
 
   const uiCtx: UiCtx = {
     accounts,
@@ -771,34 +777,43 @@ export function App(): React.JSX.Element {
       setNewWsMode(mode)
     },
     onBeforeClosePane,
-    notifyError: (m) => setError(m),
+    notifyError,
+    paneActions: (paneId) => actionsFor(paneId, 'pane'),
     invoke: (channel, ...args) => api.feat.invoke(channel, ...args),
     on: (channel, cb) => api.feat.on(channel, cb)
+  }
+  /** Lo que muestra el menú del espacio: lo del núcleo más lo que suma cada función, en un solo orden. */
+  function actionsFor(paneId: string, from: 'side' | 'pane'): PaneAction[] {
+    const extra: PaneAction[] = []
+    for (const f of FEATURE_UIS) {
+      if (!f.paneActions) continue
+      try {
+        extra.push(...f.paneActions(uiCtx, paneId))
+      } catch (e) {
+        console.error(`[función ${f.name}]`, e)
+      }
+    }
+    return sortPaneActions([...coreActions(paneId, from), ...extra])
   }
   // Chat del equipo: el botón de la barra muestra los no leídos (useChatAttach conecta la función).
   useChatAttach(uiCtx)
   const chatUnread = useChatSnapshot()?.unreadTotal ?? 0
 
-  // Barra de paneles: distribución elegida (se guarda en esta PC). Uno = 1 a la vista; Dos = 2; Cuatro = 4.
-  const layoutPressed = { uno: viewMode === 'uno', dos: viewMode === 'dos', tres: viewMode === 'tres', cuatro: viewMode === 'cuatro' }
+  // Distribución elegida (se guarda en esta PC). Uno = 1 a la vista; Dos = 2; Tres = 3; Cuatro = 4.
   const pickLayout = (k: ViewMode): void => {
     setViewMode(k)
     if (maximized) setMaximized(null)
     setLayoutMsg(`Distribución ${LAYOUT_LABEL[k]}: hasta ${LAYOUT_CAP[k]} ${LAYOUT_CAP[k] === 1 ? 'panel' : 'paneles'} a la vista. El resto queda en pestañas.`)
   }
-  const editorName = appSettings.settings.editor
-  const editorLabel = editorName === 'Bloc de notas' ? 'carpeta' : editorName
+  const openBroadcast = (): void =>
+    workspaces.length ? runFeatureCommand('broadcast:open', uiCtx) : notifyError('Abrí un espacio con la terminal para mandarle un mensaje.')
 
-  // Ruta «cuenta › espacio» del panel enfocado.
+  // Ubicación corta en la barra superior: el destino, o «cuenta › espacio» del panel enfocado.
   const focusedAccId = focused ? (isLoginPane(focused) ? accountIdFromLoginPane(focused) : wsById.get(focused)?.accountId) : undefined
-  const crumbAccount = focusedAccId ? (accountById.get(focusedAccId)?.label ?? 'cuenta borrada') : 'Sloth'
+  const crumbAccount = focusedAccId ? (accountById.get(focusedAccId)?.label ?? 'cuenta borrada') : null
 
-  /** Chip de estado de un espacio: el permiso pendiente manda sobre el estado de su terminal. */
-  const chipOf = (ws: Workspace): { cls: string; label: string } | null => {
-    const nPerm = permsByWs.get(ws.id)?.length ?? 0
-    const ag = agents[ws.id]
-    return nPerm > 0 ? { cls: 'chip-perm', label: `Permiso${nPerm > 1 ? ` ×${nPerm}` : ''}` } : ag ? { cls: STATE_CHIP[ag.state], label: STATE_LABEL[ag.state] } : null
-  }
+  const openSideMenu = (ws: Workspace, x: number, y: number): void =>
+    setCtxMenu({ paneId: ws.id, from: 'side', x, y, back: () => document.querySelector<HTMLElement>(`[data-ws-btn="${CSS.escape(ws.id)}"]`)?.focus() })
 
   const renderWs = (ws: Workspace): React.JSX.Element => {
     const ag = agents[ws.id]
@@ -806,7 +821,9 @@ export function App(): React.JSX.Element {
     const open = openPanes.includes(ws.id)
     const nPerm = permsByWs.get(ws.id)?.length ?? 0
     const editing = renaming?.id === ws.id && renaming.from === 'side'
-    const chip = chipOf(ws)
+    // En reposo no hay glifo: solo se marca lo que pide mirar (trabaja, espera, terminó, permiso).
+    const glyph = nPerm > 0 ? <PermissionIcon size={13} className="ic ic-waiting" /> : ag && ag.state !== 'idle' ? <StateIcon state={ag.state} size={12} /> : null
+    const where = ws.branch ?? shortPath(ws.cwd)
     return (
       <li
         key={ws.id}
@@ -814,168 +831,122 @@ export function App(): React.JSX.Element {
         data-account-id={ws.accountId}
         onContextMenu={(e) => {
           e.preventDefault()
-          setWsMenu({ wsId: ws.id, x: e.clientX, y: e.clientY })
+          openSideMenu(ws, e.clientX, e.clientY)
         }}
       >
         {editing ? (
           <div className="ws-edit">
-            <StateIcon state={ag?.state} />
             <RenameInput className="ws-rename" initial={ws.name} label={`Nuevo nombre del espacio ${ws.name}`} onDone={(next) => endRename(ws, 'side', next)} />
           </div>
         ) : (
           <button
             type="button"
-            className={`sl-row ${open ? 'open' : ''} ${focused === ws.id ? 'focused' : ''}`}
-            style={{ '--acc': colorOf(ws.accountId) } as CSSProperties}
+            className={`sl-row ${open ? 'open' : ''} ${focused === ws.id && open ? 'focused' : ''}`}
             data-ws-btn={ws.id}
             onClick={() => openPane(ws.id)}
             onDoubleClick={() => setRenaming({ id: ws.id, from: 'side' })}
             onKeyDown={(e) => {
-              if (e.key !== 'F2') return
-              e.preventDefault()
-              setRenaming({ id: ws.id, from: 'side' })
+              if (e.key === 'F2') {
+                e.preventDefault()
+                setRenaming({ id: ws.id, from: 'side' })
+              } else if ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu') {
+                e.preventDefault()
+                const r = e.currentTarget.getBoundingClientRect()
+                openSideMenu(ws, r.left + 24, r.bottom + 2)
+              }
             }}
             aria-label={`${ws.icon ? `${ws.icon} ` : ''}${ws.name}, ${acc?.label ?? 'cuenta borrada'}, ${ag ? STATE_LABEL[ag.state] : 'sin abrir'}${nPerm ? `, ${nPerm === 1 ? 'permiso pendiente' : `${nPerm} permisos pendientes`}` : ''}`}
-            title="Doble clic o F2 para renombrar · clic derecho para más opciones"
+            title={`${ws.name} · ${where}\nDoble clic o F2 para renombrar · clic derecho para más opciones`}
           >
-            <span className={`sl-ico${ws.color ? '' : ' no-color'}`} aria-hidden="true" style={ws.color ? ({ '--ws': colorHex(ws.color) } as CSSProperties) : undefined}>
-              {ws.icon ? ws.icon : <SpaceIcon size={15} />}
+            <span className={`sl-ico${ws.icon ? ' has-emoji' : ''}`} aria-hidden="true" style={ws.color ? ({ '--ws': colorHex(ws.color) } as CSSProperties) : undefined}>
+              {ws.icon ?? null}
             </span>
-            <span className="sl-txt">
-              <span className="sl-name">
-                <span className="sl-name-text">{ws.name}</span>
-                {ws.ticket && <span className="tag">{ws.ticket}</span>}
-              </span>
-              <span className="sl-sub">
-                <BranchIcon size={11} aria-hidden="true" />
-                <span className="mono">{ws.branch ?? shortPath(ws.cwd)}</span>
-              </span>
-            </span>
-            {chip && <span className={`chip sl-state ${chip.cls}`}>{chip.label}</span>}
+            <span className="sl-name">{ws.name}</span>
+            {ws.ticket && <Tag>{ws.ticket}</Tag>}
+            {glyph && <span className="sl-glyph">{glyph}</span>}
+            {nPerm > 1 && <span className="sl-perm-n">{nPerm}</span>}
           </button>
         )}
-        <button type="button" className="icon-btn danger sl-del" onClick={() => void removeWorkspace(ws)} aria-label={`Quitar espacio ${ws.name}`} title="Quitar espacio">
-          <Trash size={14} aria-hidden="true" />
-        </button>
       </li>
     )
   }
 
   const q = wsQuery.trim().toLowerCase()
-  const matchWs = (ws: Workspace): boolean => !q || (ws.name + ' ' + (ws.branch ?? '')).toLowerCase().includes(q)
+  const matchWs = (ws: Workspace): boolean => !q || (ws.name + ' ' + (ws.branch ?? '') + ' ' + (ws.ticket ?? '')).toLowerCase().includes(q)
   const orphans = workspaces.filter((w) => !accountById.has(w.accountId))
-
-  // Ruta «cuenta › espacio»: cada parte abre su menú. Elegir un espacio = el mismo openPane del sidebar.
-  const spaceItem = (ws: Workspace): CrumbItem => {
-    const chip = chipOf(ws)
-    return {
-      id: ws.id,
-      current: focused === ws.id,
-      onSelect: () => openPane(ws.id),
-      body: (
-        <>
-          <span className={`crumb-ws-ico${ws.color ? '' : ' no-color'}`} style={ws.color ? ({ '--ws': colorHex(ws.color) } as CSSProperties) : undefined} aria-hidden="true">
-            {ws.icon ? ws.icon : <SpaceIcon size={13} aria-hidden="true" />}
-          </span>
-          <span className="crumb-ws-main">
-            <span className="crumb-ws-name">{ws.name}</span>
-            {ws.branch && (
-              <span className="crumb-ws-branch mono">
-                <BranchIcon size={11} aria-hidden="true" />
-                {ws.branch}
-              </span>
-            )}
-          </span>
-          {chip && <span className={`chip crumb-chip ${chip.cls}`}>{chip.label}</span>}
-          {focused === ws.id && <CheckIcon size={13} aria-hidden="true" />}
-        </>
-      )
-    }
-  }
-  const accountGroups: CrumbGroup[] = [
-    ...accounts.map((acc) => ({
-      id: acc.id,
-      title: acc.label,
-      items: workspaces.filter((w) => w.accountId === acc.id).map(spaceItem),
-      empty: 'Sin espacios. Usá + en la barra lateral para crear uno.'
-    })),
-    ...(orphans.length ? [{ id: 'huerfanos', title: 'Cuenta borrada', items: orphans.map(spaceItem), empty: '' }] : [])
-  ]
-  const spaceGroups: CrumbGroup[] = focusedAccId
-    ? [
-        {
-          id: focusedAccId,
-          title: crumbAccount,
-          items: workspaces.filter((w) => w.accountId === focusedAccId).map(spaceItem),
-          empty: 'Sin espacios. Usá + en la barra lateral para crear uno.'
-        }
-      ]
-    : []
+  const menuWs = ctxMenu ? wsById.get(ctxMenu.paneId) : undefined
 
   return (
     <UiContext.Provider value={uiCtx}>
       <div className={`sl-shell ${docVisible ? '' : 'doc-hidden'}`}>
         <header className="sl-top">
           <div className="sl-top-left">
-            <button
-              type="button"
-              className="icon-btn"
+            <IconButton
+              label={sideShown ? 'Ocultar la barra lateral' : 'Mostrar la barra lateral'}
+              shortcut={comboLabel('sidebar')}
+              icon={<SidebarIcon size={17} />}
+              pressed={sideShown}
+              disabled={navDest !== 'espacios'}
               onClick={toggleSide}
-              aria-pressed={sideShown}
-              aria-label="Mostrar u ocultar la barra lateral"
-              title={`Barra lateral (${comboLabel('sidebar')})`}
-            >
-              <SidebarIcon size={17} aria-hidden="true" />
-            </button>
-            <AppMenu ctx={uiCtx} />
+            />
+            <LogoMark size={26} />
+            <nav className="sl-where" aria-label="Ubicación">
+              {navDest !== 'espacios' ? (
+                <strong>{NAV_LABEL[navDest]}</strong>
+              ) : focused && openPanes.includes(focused) ? (
+                <>
+                  {crumbAccount && <span className="sl-where-acc">{crumbAccount}</span>}
+                  {crumbAccount && <span aria-hidden="true">›</span>}
+                  <strong>{paneName(focused)}</strong>
+                </>
+              ) : (
+                <strong>Espacios</strong>
+              )}
+            </nav>
           </div>
           <div className="sl-top-search">
             <PaletteBar />
           </div>
           <div className="sl-top-right">
             <div className="sl-top-status" role="status" aria-live="polite">
-              {working > 0 && (
-                <button type="button" className="chip chip-working" onClick={() => { const w = firstWs('working'); if (w) openPane(w.id) }} title="Ir al primero que está trabajando">
-                  <StateIcon state="working" size={12} />
-                  {working} trabajando
+              {pendingPerms > 0 && (
+                <button type="button" className="sl-sum is-waiting" onClick={() => openPermissionReview()} title="Revisar los pedidos de permiso">
+                  <PermissionIcon size={12} />
+                  {pendingPerms === 1 ? '1 pide permiso' : `${pendingPerms} piden permiso`}
                 </button>
               )}
               {needsYou > 0 && (
-                <button type="button" className="chip chip-waiting" onClick={() => { const w = firstWs('waiting'); if (w) openPane(w.id) }} title="Ir al que te espera">
+                <button type="button" className="sl-sum is-waiting" onClick={() => { const w = firstWs('waiting'); if (w) openPane(w.id) }} title="Ir al que te espera">
                   <StateIcon state="waiting" size={12} />
                   {needsYou} te {needsYou === 1 ? 'espera' : 'esperan'}
                 </button>
               )}
-              {done > 0 && (
-                <button type="button" className="chip chip-done" onClick={() => { const w = firstWs('done'); if (w) openPane(w.id) }} title="Ir al que terminó">
-                  <StateIcon state="done" size={12} />
-                  {done} {done === 1 ? 'listo' : 'listos'}
+              {working > 0 && (
+                <button type="button" className="sl-sum is-working" onClick={() => { const w = firstWs('working'); if (w) openPane(w.id) }} title="Ir al primero que está trabajando">
+                  <StateIcon state="working" size={12} />
+                  {working} trabajando
                 </button>
               )}
-              {pendingPerms > 0 && (
-                <button type="button" className="chip chip-perm" onClick={() => openPermissionReview()} title="Revisar los pedidos de permiso">
-                  <PermissionIcon size={12} strokeWidth={2.2} />
-                  {pendingPerms === 1 ? '1 pide permiso' : `${pendingPerms} piden permiso`}
+              {done > 0 && (
+                <button type="button" className="sl-sum is-done" onClick={() => { const w = firstWs('done'); if (w) openPane(w.id) }} title="Ir al que terminó">
+                  <StateIcon state="done" size={12} />
+                  {done} {done === 1 ? 'listo' : 'listos'}
                 </button>
               )}
             </div>
             <div className="sl-upd">
               <TitlebarOnly name="updater" />
             </div>
-            <div className="sl-top-tools">
-              <span className="sl-top-sep" aria-hidden="true" />
-              <button type="button" className="sl-tool" onClick={() => openChat()} aria-label={chatUnread > 0 ? `Chat del equipo, ${chatUnread} sin leer` : 'Chat del equipo'} title="Chat del equipo">
+            <Tooltip text="Chat del equipo" shortcut={comboLabel('chat')}>
+              <button type="button" className="sl-chat" onClick={() => openChat()} aria-label={chatUnread > 0 ? `Chat del equipo, ${chatUnread} sin leer` : 'Chat del equipo'}>
                 <ChatIcon size={17} aria-hidden="true" />
                 {chatUnread > 0 && (
-                  <span className="sl-tool-badge" aria-hidden="true">
+                  <span className="sl-chat-badge" aria-hidden="true">
                     {chatUnread > 99 ? '99+' : chatUnread}
                   </span>
                 )}
               </button>
-              <button type="button" className="sl-tool" onClick={() => openSettings()} aria-label="Configuración" title={`Configuración (${comboLabel('settings')})`}>
-                <SettingsIcon size={17} aria-hidden="true" />
-              </button>
-            </div>
+            </Tooltip>
           </div>
           <div className="sr-only" role="alert">
             {announced
@@ -984,97 +955,119 @@ export function App(): React.JSX.Element {
           </div>
         </header>
 
+        <NavRail />
+
         <div ref={sideBodyRef} className={`sl-body ${sideShown ? '' : 'no-side'}`} style={{ '--side-w': `${sideWidth}px` } as CSSProperties}>
           <aside className="sl-side" aria-label="Cuentas y espacios">
-            <label className="sl-filter">
-              <SearchIcon size={14} aria-hidden="true" />
+            <div className="sl-side-head">
+              <h2 className="sl-side-title">Espacios</h2>
+              <IconButton
+                label="Buscar un espacio"
+                icon={<SearchIcon size={15} />}
+                size="sm"
+                pressed={filterOpen}
+                onClick={() => {
+                  if (filterOpen) setWsQuery('')
+                  setFilterOpen(!filterOpen)
+                }}
+              />
+            </div>
+            {filterOpen && (
               <input
+                className="sl-filter"
                 type="search"
+                autoFocus
                 value={wsQuery}
                 onChange={(e) => setWsQuery(e.target.value)}
-                placeholder="Filtrar espacios"
+                onKeyDown={(e) => {
+                  if (e.key !== 'Escape') return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setWsQuery('')
+                  setFilterOpen(false)
+                }}
+                placeholder="Filtrar por nombre, rama o ticket"
                 aria-label="Filtrar espacios"
                 spellCheck={false}
               />
-            </label>
-
-            {accounts.length === 0 && (
-              <section className="sl-acc sl-acc-none" aria-label="Sin cuentas">
-                <p className="sl-hint">Agregá una cuenta para empezar.</p>
-                <button type="button" className="sl-newbtn" onClick={() => openSettings('cuentas')}>
-                  Agregar cuenta
-                </button>
-              </section>
             )}
 
-            {accounts.map((acc) => {
-              const st = statuses[acc.id]
-              const u = usage[acc.id]
-              const mine = workspaces.filter((w) => w.accountId === acc.id)
-              const shown = mine.filter(matchWs)
-              const open = !collapsed[acc.id] || !!q
-              const bodyId = `acc-body-${acc.id}`
-              return (
-                <section key={acc.id} className="sl-acc" data-account-id={acc.id} aria-label={`Cuenta ${acc.label}`} style={{ '--acc': colorOf(acc.id) } as CSSProperties}>
-                  <div className="sl-acc-head">
-                    <button
-                      type="button"
-                      className="sl-acc-toggle"
-                      aria-expanded={open}
-                      aria-controls={bodyId}
-                      aria-label={`Mostrar u ocultar los espacios de ${acc.label}`}
-                      onClick={() => setCollapsed((c) => ({ ...c, [acc.id]: open }))}
-                    >
-                      <span className="sl-avatar" aria-hidden="true">
-                        {acc.label.slice(0, 1).toUpperCase()}
-                        <span className={`sl-dot ${st?.loggedIn ? 'on' : ''}`} />
-                      </span>
-                      <span className="sl-acc-meta">
-                        <span className="sl-acc-name">{acc.label}</span>
-                        {appSettings.settings.accountPlans[acc.id] && <span className="sl-acc-plan">{appSettings.settings.accountPlans[acc.id]}</span>}
-                        <span className={`sl-acc-sub ${st?.loggedIn ? '' : 'warn'}`} title={st?.email}>
-                          {mine.length === 1 ? '1 espacio' : `${mine.length} espacios`} · {st?.loggedIn ? 'Sesión iniciada' : 'Sin sesión'}
-                        </span>
-                      </span>
-                      <svg className="sl-chev" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M6 9l6 6 6-6" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      onClick={() => {
-                        setNewWsPreset({ accountId: acc.id })
-                        setNewWsMode('normal')
-                      }}
-                      aria-label={`Nuevo espacio en ${acc.label}`}
-                      title={`Nuevo espacio en ${acc.label}`}
-                    >
-                      <Plus size={15} weight="bold" aria-hidden="true" />
-                    </button>
-                  </div>
-                  {open && (
-                    <div id={bodyId} className="sl-acc-body">
-                      {shown.length > 0 && <ul className="sl-list">{shown.map(renderWs)}</ul>}
-                      {shown.length === 0 && <p className="sl-acc-empty">{mine.length ? 'Ningún espacio coincide.' : 'Sin espacios. Usá el botón + de esta cuenta para crear uno.'}</p>}
-                    </div>
-                  )}
+            <div className="sl-groups">
+              {accounts.length === 0 && (
+                <section className="sl-acc-none" aria-label="Sin cuentas">
+                  <p className="sl-hint">Agregá una cuenta de Claude para crear tu primer espacio.</p>
+                  <button type="button" className="sl-newbtn" onClick={() => openSettings('cuentas')}>
+                    <PlusIcon size={15} />
+                    Agregar cuenta
+                  </button>
                 </section>
-              )
-            })}
+              )}
 
-            {orphans.length > 0 && (
-              <section className="sl-acc" aria-label="Espacios de una cuenta borrada">
-                <p className="sl-acc-empty">Cuenta borrada</p>
-                <ul className="sl-list">{orphans.filter(matchWs).map(renderWs)}</ul>
-              </section>
-            )}
+              {accounts.map((acc) => {
+                const st = statuses[acc.id]
+                const mine = workspaces.filter((w) => w.accountId === acc.id)
+                const shown = mine.filter(matchWs)
+                if (q && shown.length === 0) return null
+                const open = !collapsed[acc.id] || !!q
+                const bodyId = `acc-body-${acc.id}`
+                const plan = appSettings.settings.accountPlans[acc.id]
+                return (
+                  <section key={acc.id} className="sl-acc" data-account-id={acc.id} aria-label={`Cuenta ${acc.label}`} style={{ '--acc': colorOf(acc.id) } as CSSProperties}>
+                    <div className="sl-acc-head">
+                      <button
+                        type="button"
+                        className="sl-acc-toggle"
+                        aria-expanded={open}
+                        aria-controls={bodyId}
+                        aria-label={`Mostrar u ocultar los espacios de ${acc.label}`}
+                        title={st?.email ? `${acc.label} · ${st.email}` : acc.label}
+                        onClick={() => setCollapsed((c) => ({ ...c, [acc.id]: open }))}
+                      >
+                        <span className="sl-avatar" aria-hidden="true">
+                          {acc.label.slice(0, 1).toUpperCase()}
+                        </span>
+                        <span className="sl-acc-name">{acc.label}</span>
+                        {st?.loggedIn ? plan && <span className="sl-acc-plan">{plan}</span> : <span className="sl-acc-warn">Sin sesión</span>}
+                      </button>
+                      <IconButton
+                        label={`Nuevo espacio en ${acc.label}`}
+                        icon={<PlusIcon size={14} />}
+                        size="sm"
+                        className="sl-acc-add"
+                        onClick={() => {
+                          setNewWsPreset({ accountId: acc.id })
+                          setNewWsMode('normal')
+                        }}
+                      />
+                    </div>
+                    {open && (
+                      <div id={bodyId}>
+                        {shown.length > 0 ? <ul className="sl-list">{shown.map(renderWs)}</ul> : <p className="sl-acc-empty">Sin espacios. Usá el + de la cuenta para crear uno.</p>}
+                      </div>
+                    )}
+                  </section>
+                )
+              })}
 
-            <ToolsSection ctx={uiCtx} />
+              {orphans.length > 0 && (
+                <section className="sl-acc" aria-label="Espacios de una cuenta borrada">
+                  <div className="sl-acc-head">
+                    <span className="sl-acc-toggle is-static">
+                      <span className="sl-acc-name">Cuenta borrada</span>
+                    </span>
+                  </div>
+                  <ul className="sl-list">{orphans.filter(matchWs).map(renderWs)}</ul>
+                </section>
+              )}
+
+              {q && accounts.every((acc) => !workspaces.some((w) => w.accountId === acc.id && matchWs(w))) && !orphans.some(matchWs) && (
+                <p className="sl-hint">Ningún espacio coincide con «{wsQuery.trim()}».</p>
+              )}
+            </div>
 
             <div className="sl-foot">
               <button type="button" className="sl-newbtn" onClick={() => (accounts.length ? setNewWsMode('normal') : openSettings('cuentas'))} title={accounts.length ? undefined : 'Primero agregá una cuenta de Claude'}>
-                <Plus size={15} weight="bold" aria-hidden="true" />
+                <PlusIcon size={15} />
                 Nuevo espacio
                 <kbd>{comboLabel('new')}</kbd>
               </button>
@@ -1082,87 +1075,57 @@ export function App(): React.JSX.Element {
           </aside>
 
           <main className={`panes sl-main view-${viewMode} ${openPanes.length === 0 ? 'is-empty' : ''}`} aria-label="Paneles">
-            {loaded && openPanes.length === 0 && <EmptyState onCreate={() => setNewWsMode('normal')} />}
+            {loaded && openPanes.length === 0 && (workspaces.length === 0 ? <FirstRun /> : <EmptyState onCreate={() => (accounts.length ? setNewWsMode('normal') : openSettings('cuentas'))} />)}
             {openPanes.length > 0 && (
-              <>
-                <div className="sl-bar">
-                  <nav className="sl-crumb" aria-label="Ubicación">
-                    <CrumbMenu
-                      label={`Elegir cuenta y espacio. Ahora: ${crumbAccount}`}
-                      trigger={crumbAccount}
-                      groups={accountGroups}
-                      emptyText="Todavía no hay cuentas. Agregá una en Configuración."
+              <div className="sl-tabbar">
+                <TabBar
+                  tabs={tabs}
+                  active={activeId}
+                  drag={tabDrag.drag}
+                  scope={tabsRef}
+                  onSelect={selectPane}
+                  onHide={hideTab}
+                  onPointerDown={tabDrag.onPointerDown}
+                  onMenu={(id, x, y) =>
+                    setCtxMenu({ paneId: id, from: 'pane', x, y, back: () => tabsRef.current?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(id)}"]`)?.focus() })
+                  }
+                />
+                <div className="sl-tabbar-tools">
+                  {cap > 1 && nVisible > 1 && !sizesAreEqual(sizes) && (
+                    <IconButton
+                      label="Repartir los paneles por igual"
+                      icon={<Equals size={14} />}
+                      size="sm"
+                      onClick={() => {
+                        commitSizes(defaultSizes(shape))
+                        setLayoutMsg('Paneles repartidos por igual.')
+                      }}
                     />
-                    <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                      <path d="M9 6l6 6-6 6" />
-                    </svg>
-                    {focusedAccId && focused ? (
-                      <CrumbMenu
-                        label={`Elegir espacio de ${crumbAccount}. Ahora: ${paneName(focused)}`}
-                        trigger={<span className="sl-crumb-space">{paneName(focused)}</span>}
-                        groups={spaceGroups}
-                        emptyText=""
-                      />
-                    ) : (
-                      <strong>{focused ? paneName(focused) : 'Sloth'}</strong>
-                    )}
-                  </nav>
-                  <div className="sl-bar-tools">
-                    {cap > 1 && nVisible > 1 && !sizesAreEqual(sizes) && (
-                      <button
-                        type="button"
-                        className="icon-btn"
-                        onClick={() => {
-                          commitSizes(defaultSizes(shape))
-                          setLayoutMsg('Paneles repartidos por igual.')
-                        }}
-                        aria-label="Repartir los paneles por igual"
-                        title="Repartir por igual (o doble clic en un separador)"
-                      >
-                        <Equals size={14} aria-hidden="true" />
-                      </button>
-                    )}
-                    <div className="seg" role="group" aria-label="Distribución de paneles">
-                      <button type="button" aria-pressed={layoutPressed.uno} onClick={() => pickLayout('uno')} title="Uno (Ctrl+Alt+1): 1 panel a la vista; el resto en pestañas">
-                        <OnePaneIcon size={14} aria-hidden="true" /> Uno
-                      </button>
-                      <button type="button" aria-pressed={layoutPressed.dos} onClick={() => pickLayout('dos')} title="Dos (Ctrl+Alt+2): hasta 2 paneles a la vista; el resto en pestañas">
-                        <TwoPanesIcon size={14} aria-hidden="true" /> Dos
-                      </button>
-                      <button type="button" aria-pressed={layoutPressed.tres} onClick={() => pickLayout('tres')} title="Tres (Ctrl+Alt+3): hasta 3 paneles a la vista; el resto en pestañas">
-                        <ThreePanesIcon size={14} aria-hidden="true" /> Tres
-                      </button>
-                      <button type="button" aria-pressed={layoutPressed.cuatro} onClick={() => pickLayout('cuatro')} title="Cuatro (Ctrl+Alt+4): hasta 4 paneles a la vista; el resto en pestañas">
-                        <FourPanesIcon size={14} aria-hidden="true" /> Cuatro
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      className="sl-bcast"
-                      onClick={() => (workspaces.length ? runFeatureCommand('broadcast:open', uiCtx) : setError('Abrí un espacio con la terminal para mandarle un mensaje.'))}
-                      title="Mandar un mensaje a varios espacios con terminal"
-                    >
-                      <BroadcastIcon size={14} aria-hidden="true" />
-                      Enviar a varios
-                    </button>
+                  )}
+                  <button type="button" className="sl-bcast" onClick={openBroadcast} aria-label="Enviar a varios espacios" title={`Mandar un mensaje a varios espacios (${comboLabel('broadcast')})`}>
+                    <BroadcastIcon size={14} aria-hidden="true" />
+                    Enviar a varios
+                  </button>
+                  <div className="sl-layout" role="group" aria-label="Distribución de paneles">
+                    {(['uno', 'dos', 'tres', 'cuatro'] as const).map((k, i) => (
+                      <Tooltip key={k} text={`${LAYOUT_LABEL[k]}: ${LAYOUT_CAP[k] === 1 ? '1 panel' : `hasta ${LAYOUT_CAP[k]} paneles`} a la vista`} shortcut={`Ctrl+Alt+${i + 1}`}>
+                        <button type="button" aria-pressed={viewMode === k} aria-label={`${LAYOUT_LABEL[k]}: ${LAYOUT_CAP[k] === 1 ? '1 panel' : `hasta ${LAYOUT_CAP[k]} paneles`} a la vista`} onClick={() => pickLayout(k)}>
+                          {i + 1}
+                        </button>
+                      </Tooltip>
+                    ))}
                   </div>
                 </div>
-
-                {showTabs && (
-                  <div className="sl-tabsrow">
-                    <TabBar tabs={tabs} active={activeId} drag={tabDrag.drag} scope={tabsRef} onSelect={selectPane} onHide={hideTab} onPointerDown={tabDrag.onPointerDown} />
-                  </div>
-                )}
-                {cap > 1 && maxId && (
-                  <div className="sl-maxnote">
-                    <MaximizeIcon size={13} aria-hidden="true" />
-                    Maximizado: <strong>{paneName(maxId)}</strong>
-                    <button type="button" onClick={() => setMaximized(null)}>
-                      Volver a la grilla
-                    </button>
-                  </div>
-                )}
-              </>
+              </div>
+            )}
+            {cap > 1 && maxId && (
+              <div className="sl-maxnote">
+                <MaximizeIcon size={13} aria-hidden="true" />
+                Maximizado: <strong>{paneName(maxId)}</strong>
+                <button type="button" onClick={() => setMaximized(null)}>
+                  Volver a la grilla
+                </button>
+              </div>
             )}
             <div ref={areaRef} className="panes-area">
               {openPanes.map((paneId) => {
@@ -1175,91 +1138,8 @@ export function App(): React.JSX.Element {
                 const hidden = !rect
                 const paneQueue = ws ? permsByWs.get(ws.id) : undefined
                 const perm = paneQueue?.[0]
-                const menuItems: PaneMenuItem[] = [
-                  ...(ws
-                    ? [
-                        {
-                          id: 'rename',
-                          label: 'Renombrar',
-                          hint: 'F2',
-                          icon: <PencilSimple size={15} aria-hidden="true" />,
-                          onSelect: () => setRenaming({ id: ws.id, from: 'pane' })
-                        },
-                        {
-                          id: 'git',
-                          label: 'Ver cambios (Git)',
-                          icon: <ChangesIcon size={15} aria-hidden="true" />,
-                          sepBefore: true,
-                          onSelect: () => runFeatureCommand('git:changes', { ...uiCtx, focused: paneId })
-                        },
-                        {
-                          id: 'historial',
-                          label: 'Historial de este espacio',
-                          icon: <HistoryIcon size={15} aria-hidden="true" />,
-                          onSelect: () => openHistory(ws.id)
-                        },
-                        {
-                          id: 'ramas',
-                          label: 'Ramas aparte de este repo',
-                          icon: <WorktreeIcon size={15} aria-hidden="true" />,
-                          onSelect: () => openRamas(null, ws.repoPath)
-                        },
-                        {
-                          id: 'plantilla',
-                          label: 'Guardar como plantilla',
-                          icon: <TemplatesIcon size={15} aria-hidden="true" />,
-                          onSelect: () => runFeatureCommand('templates:from-focused', { ...uiCtx, focused: paneId })
-                        },
-                        {
-                          id: 'vscode',
-                          label: editorLabel === 'carpeta' ? 'Abrir carpeta' : `Abrir en ${editorLabel}`,
-                          icon: <EditorIcon size={15} aria-hidden="true" />,
-                          sepBefore: true,
-                          onSelect: () => void revealWs(ws, 'vscode')
-                        },
-                        {
-                          id: 'folder',
-                          label: 'Abrir carpeta',
-                          icon: <FolderIcon size={15} aria-hidden="true" />,
-                          onSelect: () => void revealWs(ws, 'folder')
-                        }
-                      ]
-                    : []),
-                  ...(ws && accounts.length >= 2
-                    ? [
-                        {
-                          id: 'move',
-                          label: 'Mover a otra cuenta',
-                          icon: <MoveAccountIcon size={15} aria-hidden="true" />,
-                          onSelect: () => runFeatureCommand('move-account.focused', { ...uiCtx, focused: paneId })
-                        }
-                      ]
-                    : []),
-                  {
-                    id: 'restart',
-                    label: 'Reiniciar terminal',
-                    hint: 'cierra el proceso',
-                    icon: <UpdateIcon size={15} />,
-                    sepBefore: Boolean(ws),
-                    onSelect: () => void requestRestartPane(paneId)
-                  },
-                  {
-                    id: 'hide',
-                    label: 'Ocultar panel',
-                    hint: 'la terminal sigue',
-                    icon: <HideIcon size={15} aria-hidden="true" />,
-                    sepBefore: true,
-                    onSelect: () => void requestHidePane(paneId)
-                  },
-                  {
-                    id: 'close',
-                    label: 'Cerrar panel',
-                    hint: 'corta la terminal',
-                    icon: <CloseIcon size={15} aria-hidden="true" />,
-                    onSelect: () => void requestClosePane(paneId)
-                  }
-                ]
                 const title = login ? 'Terminal de cuenta' : (ws?.name ?? '')
+                const showState = !!ag && ag.state !== 'idle' && !perm
                 return (
                   <section
                     key={paneId}
@@ -1277,50 +1157,52 @@ export function App(): React.JSX.Element {
                       onPointerDown={canDragPanes ? (e) => paneDrag.onPointerDown(e, paneId) : undefined}
                     >
                       <span className="pane-id">
-                        {ws && (
-                          <button
-                            type="button"
-                            className="pane-icon-btn"
-                            style={ws.color ? ({ '--ws': colorHex(ws.color) } as CSSProperties) : undefined}
-                            onClick={(e) => {
-                              const btn = e.currentTarget
-                              const r = btn.getBoundingClientRect()
-                              openIconPicker(ws.id, r.left, r.bottom + 6, () => btn.focus())
-                            }}
-                            aria-label={`Elegir ícono de ${ws.name}`}
-                            title="Elegir ícono"
-                          >
-                            {ws.icon ? <span aria-hidden="true">{ws.icon}</span> : <SpaceIcon size={13} aria-hidden="true" />}
-                          </button>
+                        {ws?.icon && (
+                          <span className="pane-emoji" aria-hidden="true">
+                            {ws.icon}
+                          </span>
                         )}
                         {ws && renaming?.id === ws.id && renaming.from === 'pane' ? (
                           <RenameInput className="pane-title-input" initial={ws.name} label={`Nuevo nombre de ${ws.name}`} onDone={(next) => endRename(ws, 'pane', next)} />
                         ) : (
-                          <span className="pane-title" title={login ? undefined : ws?.name} onDoubleClick={ws ? () => setRenaming({ id: ws.id, from: 'pane' }) : undefined}>
+                          <span className="pane-title" title={login ? acc?.label : `${ws?.name ?? ''} · ${acc?.label ?? 'cuenta borrada'}`} onDoubleClick={ws ? () => setRenaming({ id: ws.id, from: 'pane' }) : undefined}>
                             {title}
                           </span>
                         )}
-                        {ws?.ticket && <span className="tag">{ws.ticket}</span>}
+                        {ws?.ticket && <Tag>{ws.ticket}</Tag>}
                         {ws?.branch && (
                           <span className="pane-branch" title={`Rama ${ws.branch}`}>
                             <BranchIcon size={12} aria-hidden="true" />
-                            {ws.branch}
+                            <span className="pane-branch-text">{ws.branch}</span>
                           </span>
                         )}
                       </span>
-                      {ag && <StatePill state={ag.state} detail={ag.detail} />}
+                      {perm && (
+                        <span className="pane-state is-waiting" role="status">
+                          <PermissionIcon size={12} />
+                          <span className="pane-state-label">Pide permiso</span>
+                        </span>
+                      )}
+                      {showState && (
+                        <span className={`pane-state is-${ag.state}`} role="status" title={ag.detail}>
+                          <StateIcon state={ag.state} size={12} />
+                          <span className="pane-state-label">
+                            {STATE_LABEL[ag.state]}
+                            {ag.state === 'working' && ag.detail ? <span className="pane-state-detail"> · {ag.detail}</span> : null}
+                          </span>
+                        </span>
+                      )}
                       <span className="pane-actions">
                         <PaneHeaderSlot paneId={paneId} />
-                        <button
-                          className="icon-btn"
-                          onClick={() => setMaximized(maximized === paneId ? null : paneId)}
-                          hidden={cap < 2}
-                          aria-label={maximized === paneId ? 'Volver a la grilla' : 'Maximizar'}
-                          title={maximized === paneId ? 'Volver a la grilla' : 'Maximizar'}
-                        >
-                          {maximized === paneId ? <ArrowsInIcon /> : <MaximizeIcon size={15} aria-hidden="true" />}
-                        </button>
-                        <PaneMenu label={`Más acciones de ${title}`} items={menuItems} />
+                        {cap > 1 && (
+                          <IconButton
+                            label={maximized === paneId ? 'Volver a la grilla' : 'Maximizar'}
+                            icon={maximized === paneId ? <ArrowsInIcon /> : <MaximizeIcon size={15} />}
+                            size="sm"
+                            onClick={() => setMaximized(maximized === paneId ? null : paneId)}
+                          />
+                        )}
+                        <WorkspaceMenuButton name={title} actions={actionsFor(paneId, 'pane')} />
                       </span>
                     </header>
                     {perm && (
@@ -1375,12 +1257,11 @@ export function App(): React.JSX.Element {
             Terminales activas: {activeTerms}
           </span>
           <span className="sl-status-persist">Siguen corriendo aunque cierres la ventana</span>
-          <span className="sl-status-keys">
-            {comboLabel('palette')} buscar · {comboLabel('new')} nuevo · {bindingOf('layout')} distribución
-          </span>
+          <span className="sl-status-keys">{comboLabel('palette')} para todo lo demás</span>
         </footer>
 
         <GlobalSlot />
+        <ToastHost />
 
         {newWsMode && (
           <NewWorkspaceDialog
@@ -1409,24 +1290,16 @@ export function App(): React.JSX.Element {
           </div>
         )}
 
-        {wsMenu && wsById.get(wsMenu.wsId) && (
-          <WsMenu
-            x={wsMenu.x}
-            y={wsMenu.y}
-            onClose={() => {
-              setWsMenu(null)
-              requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-ws-btn="${CSS.escape(wsMenu.wsId)}"]`)?.focus())
-            }}
-            onRename={() => {
-              const id = wsMenu.wsId
-              setWsMenu(null)
-              setRenaming({ id, from: 'side' })
-            }}
-            onIcon={() => {
-              const id = wsMenu.wsId
-              const { x, y } = wsMenu
-              setWsMenu(null)
-              openIconPicker(id, x, y, () => document.querySelector<HTMLElement>(`[data-ws-btn="${CSS.escape(id)}"]`)?.focus())
+        {ctxMenu && (menuWs || openPanes.includes(ctxMenu.paneId)) && (
+          <WorkspaceContextMenu
+            name={menuWs?.name ?? paneName(ctxMenu.paneId)}
+            x={ctxMenu.x}
+            y={ctxMenu.y}
+            actions={actionsFor(ctxMenu.paneId, ctxMenu.from)}
+            onClose={(returnFocus) => {
+              const back = ctxMenu.back
+              setCtxMenu(null)
+              if (returnFocus) back()
             }}
           />
         )}
@@ -1460,16 +1333,6 @@ export function App(): React.JSX.Element {
               setConfirmReq(null)
             }}
           />
-        )}
-
-        {error && (
-          <div className="toast" role="alert">
-            <ErrorIcon size={18} />
-            <span className="grow-min">{error}</span>
-            <button className="icon-btn" onClick={() => setError(null)} aria-label="Cerrar aviso">
-              <CloseIcon size={14} aria-hidden="true" />
-            </button>
-          </div>
         )}
       </div>
     </UiContext.Provider>
@@ -1564,68 +1427,5 @@ function RenameInput({
       }}
       onBlur={() => finish(value())}
     />
-  )
-}
-
-/** Menú chico de un espacio en el sidebar (clic derecho). Escape o clic afuera lo cierran. */
-function WsMenu({
-  x,
-  y,
-  onRename,
-  onIcon,
-  onClose
-}: {
-  x: number
-  y: number
-  onRename(): void
-  onIcon(): void
-  onClose(): void
-}): React.JSX.Element {
-  const ref = useRef<HTMLDivElement>(null)
-  const closeRef = useRef(onClose)
-  closeRef.current = onClose
-  useEffect(() => {
-    ref.current?.querySelector<HTMLElement>('button')?.focus()
-    const onDown = (e: PointerEvent): void => {
-      if (!ref.current?.contains(e.target as Node)) closeRef.current()
-    }
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        e.stopPropagation()
-        closeRef.current()
-      }
-    }
-    document.addEventListener('pointerdown', onDown, true)
-    document.addEventListener('keydown', onKey, true)
-    return () => {
-      document.removeEventListener('pointerdown', onDown, true)
-      document.removeEventListener('keydown', onKey, true)
-    }
-  }, [])
-  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>): void => {
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
-    const items = [...(ref.current?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
-    const i = items.indexOf(document.activeElement as HTMLButtonElement)
-    e.preventDefault()
-    const j = e.key === 'ArrowDown' ? (i + 1) % items.length : (i - 1 + items.length) % items.length
-    items[j]?.focus()
-  }
-  return (
-    <div
-      ref={ref}
-      className="ws-menu"
-      role="menu"
-      aria-label="Opciones del espacio"
-      style={{ left: Math.max(8, Math.min(x, window.innerWidth - 196)), top: Math.max(8, Math.min(y, window.innerHeight - 110)) }}
-      onKeyDown={onKeyDown}
-    >
-      <button type="button" role="menuitem" onClick={onRename}>
-        <PencilSimple size={14} aria-hidden="true" /> Renombrar
-      </button>
-      <button type="button" role="menuitem" onClick={onIcon}>
-        <Smiley size={14} aria-hidden="true" /> Cambiar ícono
-      </button>
-    </div>
   )
 }

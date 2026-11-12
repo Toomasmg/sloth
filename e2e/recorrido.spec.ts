@@ -1,0 +1,214 @@
+import { test, expect } from './sloth'
+import type { Page, ElectronApplication } from '@playwright/test'
+
+/**
+ * Recorrido por las pantallas principales (tema oscuro, 1280×800). Es la red de seguridad del rediseño:
+ * cada captura de referencia se regenera a propósito y con explicación, nunca para que un test pase.
+ * Lo de adentro de las terminales cambia de PC a PC: se esconde.
+ */
+
+test.use({ seed: { settings: { theme: 'oscuro' } } })
+
+let n = 0
+async function shot(page: Page, name: string): Promise<void> {
+  n++
+  await page.waitForTimeout(450)
+  // Lo de adentro de las terminales cambia de PC a PC: se esconde en vez de enmascararlo, porque la
+  // máscara se pinta encima de todo y tapaba los menús que se abren sobre un panel.
+  await page.addStyleTag({ content: '.terminal-host .xterm { visibility: hidden !important; }' })
+  await expect.soft(page).toHaveScreenshot(`${String(n).padStart(2, '0')}-${name}.png`)
+}
+
+async function esc(page: Page, veces = 3): Promise<void> {
+  for (let i = 0; i < veces; i++) {
+    await page.keyboard.press('Escape')
+    await page.waitForTimeout(120)
+  }
+}
+
+const boton = (page: Page, name: string | RegExp) => page.getByRole('button', { name, exact: typeof name === 'string' }).first()
+const riel = (page: Page, destino: string) => page.locator(`.sl-rail [data-nav="${destino}"]`)
+
+/** Corre un comando de la paleta por su título (lo que no tiene botón propio vive ahí). */
+async function paleta(page: Page, titulo: string): Promise<void> {
+  await page.keyboard.press('Control+K')
+  await page.keyboard.type(titulo)
+  await page.keyboard.press('Enter')
+}
+
+test.beforeEach(() => {
+  n = 0
+})
+
+test.describe('primer uso', () => {
+  test.use({ seed: { settings: { theme: 'oscuro' }, onboarding: true } })
+
+  test('empecemos y sin cuentas', async ({ sloth: { page } }) => {
+    await shot(page, 'primer-uso-inicio')
+    await page.keyboard.press('Control+k')
+    await page.getByRole('combobox').first().fill('Primeros pasos')
+    await page.keyboard.press('Enter')
+    // Con «Empecemos» ya en el área principal, Primeros pasos no abre otra encima: lleva el foco ahí.
+    await expect(page.getByRole('heading', { name: 'Empecemos' })).toHaveCount(1)
+    await expect(page.getByRole('heading', { name: 'Empecemos' })).toBeFocused()
+    await expect(page.getByRole('dialog', { name: 'Primeros pasos' })).toHaveCount(0)
+    await expect(page.getByText(/Revisando lo que ya/)).toBeHidden()
+    await shot(page, 'primer-uso-empecemos')
+    await esc(page)
+    await shot(page, 'primer-uso-sin-cuentas')
+  })
+})
+
+test.describe('inicio vacío', () => {
+  test.use({ seed: { settings: { theme: 'oscuro' }, workspaces: [{ id: 'ws-web', name: 'web' }, { id: 'ws-api', name: 'api-pagos' }] } })
+
+  test('espacios sin abrir', async ({ sloth: { page } }) => {
+    await shot(page, 'inicio-vacio')
+  })
+})
+
+const USO_REAL = {
+  settings: { theme: 'oscuro' },
+  extraAccounts: ['Trabajo'],
+  workspaces: [
+    { id: 'ws-web', name: 'web', open: true, branch: 'feat/checkout' },
+    { id: 'ws-api', name: 'api-pagos', open: true, ticket: 'TCK-212' },
+    { id: 'ws-docs', name: 'docs' },
+    { id: 'ws-infra', name: 'infra', accountId: 'acc-extra-0' }
+  ]
+}
+
+test.describe('uso real', () => {
+  test.use({ seed: USO_REAL })
+
+  test('paneles, menús y diálogos', async ({ sloth: { page } }) => {
+    await expect(page.locator('.xterm')).toHaveCount(2)
+    await page.waitForTimeout(1200)
+    await shot(page, 'principal-dos-paneles')
+    await page.locator('.sl-side').getByText('docs', { exact: true }).first().click()
+    await expect(page.locator('.xterm')).toHaveCount(3)
+    await page.waitForTimeout(800)
+    await shot(page, 'principal-tres-paneles')
+    await page.getByRole('button', { name: /^Uno/ }).first().click()
+    await shot(page, 'principal-uno-con-pestanas')
+    await page.getByRole('button', { name: /^Tres/ }).first().click()
+    await page.keyboard.press('Control+K')
+    await shot(page, 'paleta')
+    await page.keyboard.type('plan')
+    await shot(page, 'paleta-busqueda')
+    await esc(page)
+    await page.getByRole('button', { name: /^Más acciones de web/ }).first().click()
+    await shot(page, 'menu-panel')
+    await esc(page)
+    await page.locator('.sl-side').getByText('docs', { exact: true }).first().click({ button: 'right' })
+    await shot(page, 'menu-espacio-lateral')
+    await esc(page)
+    await page.getByRole('tab', { name: /^web,/ }).click({ button: 'right' })
+    await shot(page, 'menu-pestana')
+    await esc(page)
+    await page.locator('.sl-foot').getByRole('button', { name: /Nuevo espacio/ }).click()
+    await shot(page, 'nuevo-espacio')
+    await esc(page)
+  })
+
+  test('ajustes', async ({ sloth: { page } }) => {
+    await page.keyboard.press('Control+,')
+    const items = page.locator('.f-set-item')
+    await expect(items.first()).toBeVisible()
+    const total = await items.count()
+    for (let i = 0; i < total; i++) {
+      const etiqueta = (await items.nth(i).innerText()).split('\n')[0]!.trim().toLowerCase().replace(/[^a-záéíóúñ]+/g, '-')
+      await items.nth(i).click()
+      await shot(page, `ajustes-${i}-${etiqueta}`)
+    }
+  })
+
+  test('riel, paleta, chat y ayuda', async ({ sloth: { page } }) => {
+    await riel(page, 'tickets').click()
+    await shot(page, 'tickets-sin-conector')
+    await esc(page)
+    for (const [destino, name] of [
+      ['historial', 'historial'],
+      ['ramas', 'ramas'],
+      ['equipo', 'equipo']
+    ]) {
+      await riel(page, destino).click()
+      await shot(page, name)
+      await esc(page)
+    }
+    for (const [titulo, name] of [
+      ['Nueva plantilla', 'plantillas'],
+      ['Limpiar ramas que ya no se usan', 'limpiar-ramas'],
+      ['Exportar configuración', 'exportar']
+    ]) {
+      await paleta(page, titulo)
+      await shot(page, name)
+      await esc(page)
+    }
+    await boton(page, 'Enviar a varios espacios').click()
+    await shot(page, 'enviar-a-varios')
+    await esc(page)
+    await boton(page, /^Chat del equipo/).click()
+    await shot(page, 'chat')
+    await esc(page)
+    await riel(page, 'ayuda').click()
+    await shot(page, 'ayuda')
+    for (const [label, name] of [
+      ['Novedades', 'novedades'],
+      ['Invitar a un compañero', 'invitar'],
+      ['Reportar un problema', 'reportar'],
+      ['Asistente de bienvenida', 'primeros-pasos']
+    ]) {
+      await riel(page, 'ayuda').click()
+      await page.getByRole('dialog', { name: 'Ayuda y atajos' }).getByRole('button', { name: label, exact: true }).first().click()
+      if (name === 'primeros-pasos') {
+        await expect(page.getByRole('heading', { name: 'Empecemos' })).toBeVisible()
+        await expect(page.getByText(/Revisando lo que ya/)).toBeHidden()
+      }
+      await shot(page, name)
+      await esc(page)
+    }
+    await page.getByRole('button', { name: /^Más acciones de web/ }).first().click()
+    await page.getByRole('menuitem', { name: /Ver cambios/ }).click()
+    await shot(page, 'git-cambios')
+  })
+
+  test('tickets con conector', async ({ sloth: { app, page } }) => {
+    await inyectarTickets(app, page)
+    await riel(page, 'tickets').click()
+    await shot(page, 'tickets-con-conector')
+    await page.getByText('Reintentos en el webhook', { exact: false }).first().click()
+    await shot(page, 'tickets-detalle')
+  })
+})
+
+// No hay conector real en datos aislados: se le inyecta a la UI una foto falsa del estado con tickets.
+async function inyectarTickets(app: ElectronApplication, page: Page): Promise<void> {
+  type Estado = { conectores?: { id?: string; nombre?: string }[]; conector?: Record<string, unknown>; config?: Record<string, unknown> }
+  const s = (await page.evaluate(() => window.sloth.feat.invoke('feat:tickets:state'))) as Estado
+  const c = s.conectores?.find((x) => /github/i.test(x.id ?? x.nombre ?? '')) ?? s.conectores?.[0]
+  const estados = [
+    { clave: 'todo', nombre: 'Por hacer', categoria: 'pendiente' },
+    { clave: 'doing', nombre: 'En curso', categoria: 'curso' },
+    { clave: 'review', nombre: 'En revisión', categoria: 'revision' },
+    { clave: 'done', nombre: 'Hecho', categoria: 'hecho' }
+  ]
+  const fake = {
+    ...s,
+    conector: { ...s.conector, id: c?.id ?? 'github', nombre: c?.nombre ?? 'GitHub Issues', disponible: true, verificado: true, estados, acciones: s.conector?.acciones ?? [] },
+    config: { ...s.config, conectorId: c?.id ?? 'github' },
+    estados,
+    me: { id: 'u1', nombre: 'Tomás' },
+    fetchedAt: Date.now() - 4 * 60_000,
+    running: false,
+    tickets: [
+      { id: 'TCK-212', titulo: 'Reintentos en el webhook de pagos cuando Mercado Pago devuelve 502', estado: 'doing', prioridad: 'Alta', proyecto: 'api-pagos', responsable: 'Tomás', responsableId: 'u1' },
+      { id: 'TCK-219', titulo: 'Checkout: el botón Pagar queda deshabilitado tras volver atrás', estado: 'todo', prioridad: 'Crítica', proyecto: 'web', responsable: 'Tomás', responsableId: 'u1' },
+      { id: 'TCK-220', titulo: 'Migrar el envío de mails a la cola nueva', estado: 'review', prioridad: 'Media', proyecto: 'api-pagos', responsable: 'Tomás', responsableId: 'u1' },
+      { id: 'TCK-198', titulo: 'Dark mode en el panel de admin', estado: 'todo', prioridad: 'Baja', proyecto: 'web', responsable: 'Ana', responsableId: 'u2' },
+      { id: 'TCK-205', titulo: 'Logs estructurados en el worker de facturas', estado: 'doing', prioridad: 'Media', proyecto: 'infra', responsable: 'Pablo', responsableId: 'u3' },
+      { id: 'TCK-230', titulo: 'Rate limit por cliente en la API pública', estado: 'todo', prioridad: 'Alta', proyecto: 'api-pagos' }
+    ]
+  }
+  await app.evaluate(({ BrowserWindow }, snap) => BrowserWindow.getAllWindows()[0]!.webContents.send('feat:tickets:changed', snap), fake)
+}

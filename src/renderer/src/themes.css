@@ -1,81 +1,241 @@
-/* Sloth — temas y densidad (función «settings»).
-   Se carga después de styles.css. Los atributos los pone features/settings/store.ts en <html>:
-   data-theme="dark|light", data-density="compact|comfortable" y --ui-font-size.
-   Sin atributos, todo queda como en styles.css (oscuro y compacto).
-   Acento elegible: html[data-accent="cielo|hoja|lila|ambar"] (al final del archivo). */
-
-/* ---------- Tokens nuevos (propuestos al núcleo para reemplazar colores fijos) ---------- */
+/* Sloth — ajustes por tema sobre los componentes (los tokens están en tokens.css).
+   Se carga después de styles.css: solo sobrescribe. Reúne lo que antes estaba en theme-a.css
+   (el estilo «Minimal») y en themes.css (tema claro y densidad). */
 :root {
-  --danger-fg-strong: #ffb8b8;
-  --placeholder: #6f7480;
-  --backdrop: rgba(10, 11, 15, 0.78);
-  --backdrop-soft: rgba(10, 11, 15, 0.6);
-  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 16px 40px rgba(0, 0, 0, 0.45);
-  --toast-bg: #1f2330;
-  --toast-border: rgba(255, 122, 122, 0.35);
-  --warn-ring: rgba(240, 180, 90, 0.4);
-  --warn-tint: rgba(240, 180, 90, 0.06);
-  --warn-line: rgba(240, 180, 90, 0.22);
-  --brand-text: var(--accent);
-  --mark: rgba(240, 180, 90, 0.28);
-  /* Terminal (v0.5): settings/store.ts arma el tema de xterm leyendo estos tokens. */
-  --term-fg: #c9cdd6;
-  --term-cursor: #8ab4ff;
-  --term-selection: rgba(138, 180, 255, 0.3);
-  /* Logo (Logo.tsx): en oscuro, azules de la paleta Sloth. */
-  --logo-1: #8ab4ff;
-  --logo-2: #5b86c9;
-  --logo-core-fill: #1b1f29;
-  --logo-prompt: #8ab4ff;
-  /* Ventana principal (diseño Espacios): tarjetas de cuenta, grilla de paneles, paneles y campos. */
-  --card-acc: #14171f;
-  --panes-bg: #090a0e;
-  --pane-bg: #0f1117;
-  --term-bg: #0f1117;
-  /* Buscadores y filtros (filtro de la barra lateral, buscador de Configuración). */
-  --search-bg: #171a22;
-  --newbtn-bg: #191c25;
-  --seg-on: #3a4152;
-  --fg-label: #c9cdd6;
-  --row-hover: rgba(255, 255, 255, 0.045);
-  --chip-bg: #20242e;
-  --warn-strong-fg: #ffd699;
-  --check-border: #4a5160;
-  --confirm-bg: #1a1d26;
-  --perm-bg: #1a1d26;
-  --team-on: #140f24;
+  font-size: 13px;
+  letter-spacing: 0.002em;
 }
 
-/* ---------- Tamaño de letra de la interfaz (12–15 px) ---------- */
-html[data-theme] {
-  --fs-xs: calc(var(--ui-font-size, 13px) - 2px);
-  --fs-sm: calc(var(--ui-font-size, 13px) - 1px);
-  --fs-md: var(--ui-font-size, 13px);
-  --fs-lg: calc(var(--ui-font-size, 13px) + 2px);
-  --fs-xl: calc(var(--ui-font-size, 13px) + 5px);
+/* ---------- Layout ---------- */
+.app {
+  grid-template-columns: var(--side-w) minmax(0, 1fr);
+}
+/* La barra de título no puede ensanchar la grilla: si no entra, se achica (y no empuja los paneles). */
+.shell {
+  grid-template-columns: minmax(0, 1fr);
+}
+.wordmark-name span {
+  background: none;
+  color: var(--text);
+}
+/* Estados arriba: texto + ícono coloreado, sin pastillas rellenas. */
+.tb-chip {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--text-2) !important;
+  font-weight: 500;
+  font-size: 12px;
+}
+.tb-chip svg {
+  opacity: 1;
+}
+/* ---------- Sidebar ---------- */
+.sidebar {
+  background: var(--surface);
+  border-right: 0;
+  padding: 4px 0 12px;
+}
+.section {
+  border-bottom: 0;
+  padding: 14px 12px 6px;
+}
+.section-title {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  padding-left: 8px;
+}
+.count {
+  background: transparent;
+  color: var(--text-3);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0;
+  min-width: 0;
+}
+.acc-chip {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 11px;
+  color: var(--bg);
+  background: var(--acc);
+}
+/* Espacios: filas de navegación limpias. */
+.section-row {
+  margin-bottom: 4px;
+}
+.section-row .btn.sm {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.section-row .btn.sm:not(.primary) {
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-3);
+}
+.section-row .btn.sm:not(.primary):hover {
+  color: var(--text);
+}
+.list {
+  gap: 1px;
+}
+.ws {
+  min-height: var(--row-min-h);
+  padding: 6px 32px 6px 10px;
+  gap: 10px;
+  border-radius: 8px;
+}
+.ws.open {
+  background: transparent;
+}
+.ws.focused,
+.ws.focused:hover {
+  background: var(--raised);
+}
+.ws.focused::before {
+  display: none;
+}
+.ws .item-sub {
+  font-size: 11.5px;
+}
+.ws .tag,
+.tag {
+  background: transparent;
+  color: var(--text-3);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
+  font-weight: 500;
+  border-radius: 4px;
 }
 
-/* ---------- Densidad «cómoda»: más aire y controles más altos ---------- */
-html[data-density='comfortable'] {
-  --s-1: 5px;
-  --s-2: 10px;
-  --s-3: 14px;
-  --s-4: 18px;
-  --s-5: 26px;
-  --s-6: 36px;
-  --h-xs: 26px;
-  --h-sm: 30px;
-  --h-md: 36px;
-  /* Propias de la densidad (el núcleo las puede usar en vez de alturas fijas). */
-  --pane-head-h: 42px;
-  --row-min-h: 54px;
-  line-height: 1.5;
+/* Secciones colapsables al pie: discretas. */
+.f-wt-section,
+.f-templates {
+  border-top: 0 !important;
 }
-html[data-density='compact'] {
-  --pane-head-h: 36px;
-  --row-min-h: 48px;
+.f-wt-title,
+.f-templates-toggle {
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  font-size: 12px !important;
 }
+
+/* ---------- Paneles ---------- */
+.panes {
+  padding: 2px 4px 4px;
+  background: var(--bg);
+}
+.pane {
+  border-radius: 10px;
+  background: var(--term-bg);
+  box-shadow: 0 0 0 1px var(--divider);
+}
+.pane.focused {
+  box-shadow: 0 0 0 1px var(--divider-strong);
+}
+.pane::after {
+  height: 1px;
+}
+.pane-head {
+  height: var(--pane-head-h);
+  padding: 0 8px 0 14px;
+  background: transparent;
+  border-bottom: 1px solid var(--divider);
+}
+.pane-title {
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+.terminal-host {
+  padding: 10px 6px 0 14px;
+}
+.xterm .xterm-scrollable-element {
+  background-color: var(--term-bg) !important;
+}
+
+/* ---------- Modal ---------- */
+.modal-backdrop {
+  background: var(--scrim);
+}
+.modal {
+  width: min(540px, calc(100vw - 32px));
+  border: 0;
+  box-shadow: 0 0 0 1px var(--divider), var(--e-3);
+  padding: 0 28px 24px;
+  gap: 18px;
+  background: var(--surface);
+}
+.modal-head {
+  height: 64px;
+  border-bottom: 0;
+  margin: 0 -28px -6px;
+  padding: 8px 14px 0 28px;
+}
+.modal-head h2 {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.field > label {
+  font-weight: 500;
+  color: var(--text-2);
+}
+.modal-actions {
+  border-top: 0;
+  margin: 4px -28px 0;
+  padding: 8px 28px 0;
+}
+.modal .btn {
+  height: 34px;
+  padding: 0 16px;
+}
+
+/* Scrollbars aún más discretas */
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+.sidebar:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* Bordes de los controles con 3:1 contra el fondo (WCAG 1.4.11): campos, interruptor apagado y botón secundario. */
+input,
+select,
+textarea {
+  box-shadow: inset 0 0 0 1px var(--control-border);
+}
+input:hover,
+select:hover,
+textarea:hover {
+  box-shadow: inset 0 0 0 1px var(--text-3);
+}
+input:focus,
+select:focus,
+textarea:focus {
+  box-shadow: inset 0 0 0 1px var(--control-border), var(--brand-glow);
+}
+.switch-track {
+  box-shadow: inset 0 0 0 1px var(--control-border);
+}
+.btn {
+  box-shadow: inset 0 0 0 1px var(--control-border);
+}
+
 /* Densidad «cómoda» en filas (las alturas salen de --pane-head-h / --row-min-h, en styles.css). */
 html[data-density='comfortable'] .ws {
   padding-top: 9px;
@@ -85,123 +245,22 @@ html[data-density='comfortable'] .list {
   gap: 6px;
 }
 
-/* ---------- Tema claro (paleta Sloth en claro: misma estructura de tokens que el oscuro) ----------
-   Redefine TODOS los tokens de :root bajo html[data-theme='light'], que gana en especificidad a :root
-   y a las reglas de styles.css/theme-a.css sin depender del orden de carga.
-   Fondo #f6f6f4, superficie #ffffff, texto #1d2027, acento #2f6fe0 (5:1 con blanco). Contraste ≥ 4.5:1. */
-html[data-theme='light'] {
-  --term-fg: #1f2430;
-  --term-bg: #ffffff;
-  --term-cursor: #2f6fe0;
-  --term-selection: rgba(47, 111, 224, 0.2);
-  /* Logo en claro: los azules oscuros de la misma familia, legibles sobre blanco. */
-  --logo-1: #2f6fe0;
-  --logo-2: #2459b8;
-  --logo-core-fill: #12151c;
-  --logo-prompt: #2f6fe0;
-  --card-acc: #ffffff;
-  --panes-bg: #e6e6e2;
-  --pane-bg: #ffffff;
-  --search-bg: #ebebe7;
-  --newbtn-bg: #ffffff;
-  --seg-on: #ffffff;
-  --fg-label: #3d4250;
-  --row-hover: rgba(0, 0, 0, 0.04);
-  --chip-bg: #ebebe7;
-  --warn-strong-fg: #8a5a00;
-  --check-border: #a3a7b0;
-  --confirm-bg: #fdf7ec;
-  --perm-bg: #fdf7ec;
-  /* Texto sobre --team (claro: lila oscuro #6f4fd6, con blanco 5,8:1). */
-  --team-on: #ffffff;
-
-  /* Superficies y bordes. */
-  --bg: #f6f6f4; /* fondo */
-  --surface: #ededea; /* barras y sidebar */
-  --surface-2: #e8e8e4; /* sidebar alterno */
-  --card: #ffffff; /* superficie / tarjeta */
-  --card-hover: #f3f3f0; /* elevada */
-  --surface-hover: #ebebe7; /* hover */
-  --muted: #e2e2dd; /* activo */
-  --input-bg: #ffffff;
-  --btn-2: #ffffff; /* botón secundario */
-  --border: rgba(16, 22, 34, 0.08);
-  --border-strong: rgba(16, 22, 34, 0.14);
-  --line: rgba(16, 22, 34, 0.08);
-  --line-strong: rgba(16, 22, 34, 0.14);
-  --line-2: rgba(16, 22, 34, 0.14);
-  --fg: #1d2027;
-  --fg-2: #434a57;
-  --fg-3: #5c6270;
-  --fg-muted: #5c6270;
-  --placeholder: #6b7180;
-
-  /* Acento y estados (texto ≥ 4.5:1 sobre #f6f6f4 y #ffffff). */
-  --accent: #2f6fe0;
-  --accent-fg: #ffffff;
-  --accent-soft: rgba(47, 111, 224, 0.12);
-  --on-accent: #ffffff;
-  --brand-1: #2f6fe0;
-  --brand-2: #2f6fe0;
-  --brand-grad: #2f6fe0;
-  --brand-glow: 0 0 0 3px rgba(47, 111, 224, 0.28);
-  --brand-text: #2f6fe0;
-  --selection: rgba(47, 111, 224, 0.22);
-  --ring: #2f6fe0;
-  --acc: #2f6fe0;
-  --info: #2f6fe0;
-  --info-soft: rgba(47, 111, 224, 0.12);
-  --ok: #1a7f57;
-  --ok-fg: #13663f;
-  --success: #1a7f57;
-  --success-fg: #13663f;
-  --success-soft: rgba(26, 127, 87, 0.12);
-  --warn: #a35a00;
-  --warn-fg: #8a4a00;
-  --warn-soft: rgba(163, 90, 0, 0.12);
-  --danger: #c62828;
-  --danger-fg: #b3261e;
-  --danger-fg-strong: #8e1b16;
-  --danger-soft: rgba(198, 40, 40, 0.1);
-  --team: #6f4fd6;
-  --team-fg: #5a3cc0;
-  --team-soft: rgba(111, 79, 214, 0.12);
-  --diff-add: rgba(26, 127, 87, 0.12);
-  --diff-del: rgba(198, 40, 40, 0.1);
-  --mark: rgba(163, 90, 0, 0.22);
-
-  --hover: rgba(16, 22, 34, 0.045);
-  --press: rgba(16, 22, 34, 0.07);
-  --open-bg: rgba(16, 22, 34, 0.03);
-  --warn-ring: rgba(163, 90, 0, 0.4);
-  --warn-tint: #fbf7ef;
-  --warn-line: rgba(163, 90, 0, 0.16);
-  --backdrop: rgba(18, 22, 32, 0.28);
-  --backdrop-soft: rgba(18, 22, 32, 0.22);
-  --shadow-lg: 0 0 0 1px rgba(16, 22, 34, 0.08), 0 24px 64px rgba(16, 22, 34, 0.18);
-  --shadow-md: 0 0 0 1px rgba(16, 22, 34, 0.08), 0 16px 40px rgba(16, 22, 34, 0.14);
-  --toast-bg: #fdf0f0;
-  --toast-border: rgba(198, 40, 40, 0.25);
-
-  color-scheme: light;
-}
 
 /* Valores fijos del tema claro (colores fijos del núcleo y funciones): ahora salen de los tokens. */
-html[data-theme='light'] .wordmark-name span,
-html[data-theme='light'] .empty h1 span {
-  background: var(--brand-text);
+html[data-theme='light'] .wordmark-name span {
+  background: var(--accent);
   -webkit-background-clip: text;
   background-clip: text;
 }
 html[data-theme='light'] .pane {
-  box-shadow: 0 0 0 1px var(--line-2), 0 1px 2px rgba(16, 22, 34, 0.04);
+  box-shadow: 0 0 0 1px var(--divider-strong), var(--e-1);
 }
 html[data-theme='light'] .pane.focused {
-  box-shadow: 0 0 0 1px rgba(47, 111, 224, 0.45), 0 1px 3px rgba(16, 22, 34, 0.06);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), var(--e-1);
 }
 html[data-theme='light'] .btn {
   background: var(--btn-2);
-  box-shadow: inset 0 0 0 1px var(--line-2), 0 1px 1px rgba(16, 22, 34, 0.04);
+  box-shadow: inset 0 0 0 1px var(--control-border);
 }
 html[data-theme='light'] .btn:hover:not(:disabled) {
   background: var(--surface-hover);
@@ -241,37 +300,16 @@ html[data-theme='light'] input,
 html[data-theme='light'] select {
   background: var(--input-bg);
 }
-html[data-theme='light'] .inline-form input {
-  background: transparent;
-}
 html[data-theme='light'] .ws.open:hover {
   background: var(--hover);
 }
 html[data-theme='light'] .ws.focused,
 html[data-theme='light'] .ws.focused:hover {
-  background: var(--card);
-}
-html[data-theme='light'] .steps li.done {
-  box-shadow: inset 0 0 0 1px rgba(47, 111, 224, 0.35);
-}
-html[data-theme='light'] .empty-logo,
-html[data-theme='light'] .steps li {
-  background: #fff;
-  box-shadow: 0 0 0 1px var(--line-2), 0 1px 3px rgba(16, 22, 34, 0.05);
-}
-html[data-theme='light'] .steps li.done .step-n {
-  color: #fff;
-}
-html[data-theme='light'] .modal-backdrop {
-  background: var(--backdrop);
+  background: var(--raised);
 }
 html[data-theme='light'] .modal {
   background: #fff;
-  box-shadow: var(--shadow-lg);
-}
-html[data-theme='light'] .daemon-pop {
-  background: #fff;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--e-3);
 }
 html[data-theme='light'] ::-webkit-scrollbar-thumb {
   background: rgba(16, 22, 34, 0.16);
@@ -284,20 +322,20 @@ html[data-theme='light'] .sidebar:hover::-webkit-scrollbar-thumb {
 /* Clases base en claro (chips, segmentado, grupos y teclas). */
 html[data-theme='light'] .seg {
   background: var(--muted);
-  box-shadow: inset 0 0 0 1px var(--line);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 html[data-theme='light'] .seg > button[aria-pressed='true'],
 html[data-theme='light'] .seg > button.on {
   background: #fff;
-  color: var(--fg);
+  color: var(--text);
 }
 html[data-theme='light'] .chip {
   background: rgba(16, 22, 34, 0.06);
-  color: var(--fg-2);
+  color: var(--text-2);
 }
 html[data-theme='light'] .chip-working {
-  background: rgba(47, 111, 224, 0.12);
-  color: #2459b8;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 html[data-theme='light'] .chip-perm {
   background: rgba(163, 90, 0, 0.2);
@@ -316,7 +354,7 @@ html[data-theme='light'] .chip-error {
   color: #b3261e;
 }
 html[data-theme='light'] .group {
-  box-shadow: inset 0 0 0 1px var(--line-2);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 html[data-theme='light'] kbd,
 html[data-theme='light'] .kbd {
@@ -329,25 +367,19 @@ html[data-theme='light'] .acc-chip {
   color: #12151c;
   background: color-mix(in srgb, var(--acc) 34%, transparent);
 }
-html[data-theme='light'] .acc-badge {
-  color: color-mix(in srgb, var(--acc) 35%, var(--fg));
-}
-html[data-theme='light'] .acc-dot {
-  filter: saturate(1.8) brightness(0.72);
-}
 html[data-theme='light'] .ws.focused::before {
   background: color-mix(in srgb, var(--acc) 55%, #12151c);
 }
 
 /* Funciones (colores fijos en sus .css). */
 html[data-theme='light'] .f-git-sub-backdrop {
-  background: var(--backdrop);
+  background: var(--scrim);
 }
 html[data-theme='light'] .f-git-drawer {
   box-shadow: -16px 0 48px rgba(16, 22, 34, 0.16);
 }
 html[data-theme='light'] .f-git-ln {
-  color: var(--fg-muted);
+  color: var(--text-3);
 }
 /* Texto atenuado (SGR 2) de xterm: con opacidad 0,5 queda ilegible sobre blanco. */
 html[data-theme='light'] .xterm .xterm-dim {
@@ -356,62 +388,6 @@ html[data-theme='light'] .xterm .xterm-dim {
 /* La terminal clara la pinta xterm con su propio tema (features/settings/store.ts). */
 
 /* Configuración en claro: tarjetas blancas sobre el modal blanco necesitan contorno. */
-
-/* ---------- Acento elegible (Configuración lo setea en <html data-accent>) ----------
-   Cielo es el de por defecto (styles.css). En oscuro: Cielo #8ab4ff, Hoja #5fd4a6, Lila #b59cff, Ámbar #f0b45a.
-   Texto encima del acento: #0b1020 en oscuro. Al final del archivo para ganar a los temas. */
-html[data-accent='cielo'] {
-  --accent: #8ab4ff;
-  --accent-fg: #0b1020;
-  --accent-soft: rgba(138, 180, 255, 0.14);
-}
-html[data-accent='hoja'] {
-  --accent: #5fd4a6;
-  --accent-fg: #0b1020;
-  --accent-soft: rgba(95, 212, 166, 0.14);
-}
-html[data-accent='lila'] {
-  --accent: #b59cff;
-  --accent-fg: #0b1020;
-  --accent-soft: rgba(181, 156, 255, 0.14);
-}
-html[data-accent='ambar'] {
-  --accent: #f0b45a;
-  --accent-fg: #0b1020;
-  --accent-soft: rgba(240, 180, 90, 0.14);
-}
-/* En claro el acento tiene que dar 4.5:1 con blanco: versiones más oscuras de la misma familia. */
-html[data-theme='light'][data-accent='cielo'] {
-  --accent: #2f6fe0;
-  --accent-fg: #ffffff;
-  --accent-soft: rgba(47, 111, 224, 0.12);
-}
-html[data-theme='light'][data-accent='hoja'] {
-  --accent: #1a7f57;
-  --accent-fg: #ffffff;
-  --accent-soft: rgba(26, 127, 87, 0.12);
-}
-html[data-theme='light'][data-accent='lila'] {
-  --accent: #6f4fd6;
-  --accent-fg: #ffffff;
-  --accent-soft: rgba(111, 79, 214, 0.12);
-}
-html[data-theme='light'][data-accent='ambar'] {
-  --accent: #a35a00;
-  --accent-fg: #ffffff;
-  --accent-soft: rgba(163, 90, 0, 0.12);
-}
-
-/* ---------- «Más oscuro» (Configuración › Apariencia: html[data-night='true']) ----------
-   Solo cambia fondos y superficies: fondo #07080b, barras #0b0c10, tarjetas #101218.
-   El resto sigue el tema oscuro. No aplica en claro. Reemplaza a la regla vieja de
-   features/settings/settings-page.css (esa se puede borrar; esta gana por especificidad). */
-html[data-night='true']:not([data-theme='light']) {
-  --bg: #07080b;
-  --surface: #0b0c10;
-  --surface-2: #0b0c10;
-  --card: #101218;
-}
 
 /* Cambio de tema suave, salvo con «reducir movimiento». */
 @media (prefers-reduced-motion: no-preference) {

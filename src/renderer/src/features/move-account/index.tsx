@@ -16,18 +16,6 @@ function canMove(ui: UiCtx, paneId: string): boolean {
   return ui.workspaces.some((w) => w.id === paneId) && ui.accounts.length >= 2
 }
 
-// ---------- Botón del header del panel ----------
-
-function PaneHeader({ paneId }: { paneId: string }): React.JSX.Element | null {
-  const ui = useUi()
-  if (!canMove(ui, paneId)) return null
-  return (
-    <button type="button" className="icon-btn" onClick={() => openMove(paneId)} aria-label="Mover a otra cuenta" title="Mover a otra cuenta">
-      <MoveAccountIcon size={15} />
-    </button>
-  )
-}
-
 function Global(): React.JSX.Element | null {
   const ui = useUi()
   const t = useMoveTarget()
@@ -63,9 +51,10 @@ function commands(ui: UiCtx): Command[] {
 
 const ui: FeatureUi = {
   name: 'move-account',
-  PaneHeader,
   Global,
-  commands
+  commands,
+  paneActions: (ctx, paneId) =>
+    canMove(ctx, paneId) ? [{ id: 'move', label: 'Mover a otra cuenta', group: 'compartir', order: 20, icon: <MoveAccountIcon size={15} />, run: () => openMove(paneId) }] : []
 }
 
 export default ui

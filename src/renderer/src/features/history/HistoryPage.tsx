@@ -3,7 +3,9 @@ import { useUi } from '../host'
 import { cleanError } from '../../format'
 import { getSettings } from '../settings/store'
 import { CheckIcon, DoneIcon, IdleIcon, PermissionIcon } from '../../icons/SlothIcons'
-import { PageShell } from '../help/PageShell'
+import { View } from '../../ui/View'
+import { Button, EmptyState } from '../../ui'
+import { HistoryIcon } from '../../icons/SlothIcons'
 import { marks, wordsOf } from '../help/text'
 import { SessionDetail } from './SessionDetail'
 import {
@@ -235,22 +237,31 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
       if (loadErr) return null
       if (all.length === 0) {
         return (
-          <div className="hist-empty">
-            <span className="hist-empty-title">Todavía no hay sesiones guardadas</span>
-            <span className="hint">Cada vez que trabajes con Claude en un espacio, la sesión aparece acá.</span>
-          </div>
+          <EmptyState
+            icon={<HistoryIcon size={24} />}
+            title="Todavía no hay sesiones guardadas"
+            description="Cada vez que trabajes con Claude en un espacio, la sesión aparece acá."
+            action={
+              <Button variant="primary" onClick={() => ui.openNewWorkspace('normal')}>
+                Nuevo espacio
+              </Button>
+            }
+          />
         )
       }
       return (
-        <div className="hist-empty">
-          <span className="hist-empty-title">No hay sesiones con estos filtros</span>
-          <span className="hint">Probá con otra palabra o ampliá el rango de fechas.</span>
-          {filtersOn && (
-            <button type="button" className="btn primary" onClick={clearFilters}>
-              Limpiar filtros
-            </button>
-          )}
-        </div>
+        <EmptyState
+          size="sm"
+          title="No hay sesiones con estos filtros"
+          description="Probá con otra palabra o ampliá el rango de fechas."
+          action={
+            filtersOn ? (
+              <Button variant="primary" onClick={clearFilters}>
+                Limpiar filtros
+              </Button>
+            ) : undefined
+          }
+        />
       )
     }
     return (
@@ -276,11 +287,11 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
   }
 
   return (
-    <PageShell
-      labelId="hist-title"
+    <View
+      labelId="hist-view-title"
       title="Historial"
       onClose={onClose}
-      right={<span className="hist-head-count">{rows ? plural(total, 'sesión guardada', 'sesiones guardadas') : ''}</span>}
+      actions={<span className="hist-head-count">{rows ? plural(total, 'sesión guardada', 'sesiones guardadas') : ''}</span>}
     >
       <div className="hist-wrap">
         <div className="hist-intro">
@@ -415,7 +426,7 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
           {toast}
         </div>
       )}
-    </PageShell>
+    </View>
   )
 }
 

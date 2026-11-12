@@ -1,0 +1,92 @@
+/* Vista: ocupa el lugar de la barra lateral y los paneles; quedan a la vista la barra superior, el riel y la de estado. */
+.ui-view {
+  position: fixed;
+  inset: var(--top-h) var(--side-panel-w, 0px) var(--status-h) var(--rail-w);
+  z-index: var(--z-panel);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-13);
+  animation: fade var(--t-fast) var(--ease);
+}
+
+.ui-view-head {
+  flex: none;
+  min-height: calc(var(--h-lg) + var(--s-3));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
+  padding: var(--s-2) var(--s-4);
+  background: var(--surface);
+  box-shadow: inset 0 -1px 0 var(--divider);
+}
+
+.ui-view-back {
+  height: var(--h-md);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: 0 var(--s-3) 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.ui-view-back:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.ui-view-sep {
+  width: 1px;
+  height: var(--s-4);
+  background: var(--divider-strong);
+}
+
+.ui-view-title {
+  margin: 0;
+  font-size: var(--fs-15);
+  font-weight: 600;
+  line-height: var(--lh-title);
+}
+
+.ui-view-grow {
+  flex: 1;
+}
+
+.ui-view-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.ui-view-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.ui-view-body.flush {
+  display: flex;
+  overflow: hidden;
+}
+
+.ui-view button:focus-visible,
+.ui-view a:focus-visible,
+.ui-view input:focus-visible,
+.ui-view textarea:focus-visible,
+.ui-view select:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-view {
+    animation: none;
+  }
+}

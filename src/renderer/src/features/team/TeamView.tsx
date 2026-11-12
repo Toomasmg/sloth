@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ArrowClockwise,
   ArrowSquareOut,
@@ -12,12 +12,14 @@ import {
   Prohibit,
   Robot,
   Ticket,
-  UsersThree,
   WarningCircle,
   X,
   XCircle
 } from '@phosphor-icons/react'
 import { useUi } from '../host'
+import { View } from '../../ui/View'
+import { Button, EmptyState } from '../../ui'
+import { TeamIcon } from '../../icons/SlothIcons'
 import { cleanError, fmtTok } from '../../format'
 import type { Workspace } from '../../../../shared/types'
 import { espacioDelTicket } from '../../../../shared/templates-shared'
@@ -60,18 +62,10 @@ export function TeamView(): React.JSX.Element {
   const [starting, setStarting] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [tarde, setTarde] = useState(false)
-  const firstBtn = useRef<HTMLButtonElement>(null)
-  const closeBtn = useRef<HTMLButtonElement>(null)
 
   const accLabel = (id?: string): string => ui.accounts.find((a) => a.id === id)?.label ?? '—'
   const conector = snap?.tickets.conector ?? null
   const n = conector?.nombre ?? ''
-
-  useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null
-    ;(firstBtn.current ?? closeBtn.current)?.focus()
-    return () => prev?.focus?.()
-  }, [])
 
   const close = (): void => setTeamOpen(false)
   useEffect(() => {
@@ -153,17 +147,8 @@ export function TeamView(): React.JSX.Element {
       void ui.invoke<TeamSnapshot>('feat:team:state').then(apply, (e) => setErr(cleanError(e)))
     }
     return (
-      <div className="f-team-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-        <aside className="f-team-drawer" role="dialog" aria-modal="true" aria-labelledby="f-team-title">
-          <header className="f-team-head">
-            <UsersThree size={18} weight="bold" aria-hidden="true" className="f-team-head-ic" />
-            <h2 id="f-team-title">Equipo</h2>
-            <div className="f-team-actions">
-              <button ref={closeBtn} type="button" className="icon-btn" aria-label="Cerrar equipo" title="Cerrar (Esc)" onClick={close}>
-                <X size={16} aria-hidden="true" />
-              </button>
-            </div>
-          </header>
+      <View labelId="f-team-title" title="Equipo" onClose={close} className="f-team-view" flush>
+        <div className="f-team-drawer">
           {tarde ? (
             <p className="form-error f-team-pad" role="alert">
               No se pudo leer el equipo.{' '}
@@ -174,8 +159,8 @@ export function TeamView(): React.JSX.Element {
           ) : (
             <p className="hint f-team-pad">Cargando…</p>
           )}
-        </aside>
-      </div>
+        </div>
+      </View>
     )
   }
 
@@ -308,11 +293,14 @@ export function TeamView(): React.JSX.Element {
   )
 
   return (
-    <div className="f-team-backdrop" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <aside className="f-team-drawer" role="dialog" aria-modal="true" aria-labelledby="f-team-title">
-        <header className="f-team-head">
-          <UsersThree size={18} weight="bold" aria-hidden="true" className="f-team-head-ic" />
-          <h2 id="f-team-title">Equipo</h2>
+    <View
+      labelId="f-team-title"
+      title="Equipo"
+      onClose={close}
+      className="f-team-view"
+      flush
+      actions={
+        <>
           <span className="f-team-meta" aria-live="polite">
             {ghRunning ? (
               <>
@@ -336,7 +324,7 @@ export function TeamView(): React.JSX.Element {
               ))}
           </span>
           <div className="f-team-actions">
-            <button ref={firstBtn} type="button" className="btn sm" disabled={ghRunning} onClick={() => void refreshGithub()} title="Vuelve a leer los PRs abiertos con gh (no usa tokens)">
+            <button type="button" className="btn sm" disabled={ghRunning} onClick={() => void refreshGithub()} title="Vuelve a leer los PRs abiertos con gh (no usa tokens)">
               <ArrowClockwise size={14} aria-hidden="true" className={ghRunning ? 'spin' : undefined} /> Actualizar
             </button>
             {conector &&
@@ -360,12 +348,11 @@ export function TeamView(): React.JSX.Element {
                 <LinkSimple size={14} aria-hidden="true" /> Vincular
               </button>
             )}
-            <button type="button" className="icon-btn" aria-label="Cerrar equipo" title="Cerrar (Esc)" onClick={close}>
-              <X size={16} aria-hidden="true" />
-            </button>
           </div>
-        </header>
-
+        </>
+      }
+    >
+      <div className="f-team-drawer">
         {confirmar && conector?.via === 'mcp' && (
           <div className="f-team-bar f-team-confirm" role="alertdialog" aria-label={`Confirmar consulta a ${n}`}>
             <WarningCircle size={16} weight="fill" aria-hidden="true" className="f-team-warn" />
@@ -430,7 +417,16 @@ export function TeamView(): React.JSX.Element {
           </div>
 
           {sinRepos && (
-            <p className="hint f-team-msg">Ningún espacio tiene un repo con remoto de GitHub (origin), así que no hay PRs para mostrar. Creá un espacio en una carpeta con remoto de GitHub.</p>
+            <EmptyState
+              icon={<TeamIcon size={24} />}
+              title="No hay PRs para mostrar"
+              description="Ningún espacio tiene un repo con remoto de GitHub (origin). Creá un espacio en una carpeta con remoto de GitHub."
+              action={
+                <Button variant="primary" onClick={() => ui.openNewWorkspace('normal')}>
+                  Nuevo espacio
+                </Button>
+              }
+            />
           )}
           {repoErrors.length > 0 && (
             <details className="f-team-repoerr">
@@ -466,14 +462,20 @@ export function TeamView(): React.JSX.Element {
             {idle.map(card)}
           </div>
           {!snap.people.length && !ghRunning && !sinRepos && (
-            <p className="hint f-team-empty">
-              Todavía no hay nadie para mostrar. Tocá «Actualizar» para leer los PRs abiertos de los repos de tus espacios.
-              {conector ? ` Tocá «Traer de ${n}» para ver en qué ticket anda cada uno.` : ' Elegí un conector en los ajustes de Tickets para ver en qué ticket anda cada uno.'}
-            </p>
+            <EmptyState
+              icon={<TeamIcon size={24} />}
+              title="Todavía no hay nadie para mostrar"
+              description={`Actualizá para leer los PRs abiertos de los repos de tus espacios.${conector ? ` Después «Traer de ${n}» muestra en qué ticket anda cada uno.` : ' Con un conector de tickets ves también en qué ticket anda cada uno.'}`}
+              action={
+                <Button variant="primary" onClick={() => void refreshGithub()} disabled={ghRunning}>
+                  Actualizar
+                </Button>
+              }
+            />
           )}
         </div>
-      </aside>
-    </div>
+      </div>
+    </View>
   )
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { ArrowClockwise, ArrowLeft, CircleNotch, PaperPlaneRight, PencilSimple, UserPlus, UsersThree, WarningCircle, X } from '@phosphor-icons/react'
+import { ArrowClockwise, ArrowLeft, CircleNotch, PaperPlaneRight, PencilSimple, UserPlus, UsersThree, WarningCircle } from '@phosphor-icons/react'
 import { CHAT_LIMITS, type ChatConvRef, type ChatMessage, type ChatRole } from '../../../../shared/chat'
 import { Av, dayLabel, LinkedText, sameDay, timeLabel } from './view-utils'
 import {
@@ -27,7 +27,6 @@ interface Props {
   role?: ChatRole
   meId?: string
   onBack(): void
-  onClose(): void
   onModal(kind: ChatModalKind): void
 }
 
@@ -35,7 +34,7 @@ interface Props {
  * Una conversación (equipo o DM). Se monta con `key` por conversación, así el borrador y la carga
  * inicial son por conversación. Sin timers: los mensajes nuevos llegan por el store.
  */
-export function Conversation({ conv, title, photo, initial, role, meId, onBack, onClose, onModal }: Props): React.JSX.Element {
+export function Conversation({ conv, title, photo, initial, role, meId, onBack, onModal }: Props): React.JSX.Element {
   const list = useConvMessages(conv)
   const info = useConvMeta(conv)
   const announce = useAnnouncement()
@@ -131,9 +130,6 @@ export function Conversation({ conv, title, photo, initial, role, meId, onBack, 
         <h3 className="f-chat-title" title={title}>
           {title}
         </h3>
-        <button type="button" className="icon-btn" onClick={onClose} aria-label="Cerrar chat">
-          <X size={16} aria-hidden="true" />
-        </button>
       </header>
       {isTeam && (
         <div className="f-chat-subbar">

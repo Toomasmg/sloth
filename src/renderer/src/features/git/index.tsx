@@ -9,7 +9,7 @@ import './git.css'
 
 const PROTECTED = ['main', 'master', 'staging']
 
-// El panel (cambios, historial, ramas, PR) se carga recién al abrirlo: el botón del header siempre está montado.
+// El panel (cambios, historial, ramas, PR) se carga recién al abrirlo: la insignia del header siempre está montada.
 const Drawer = lazy(() => import('./Drawer').then((m) => ({ default: m.Drawer })))
 
 function DrawerGate(): React.JSX.Element | null {
@@ -21,9 +21,7 @@ function DrawerGate(): React.JSX.Element | null {
   ) : null
 }
 
-// ---------- Botón del header ----------
-
-function ChangesButton({ paneId }: { paneId: string }): React.JSX.Element | null {
+function ChangesBadge({ paneId }: { paneId: string }): React.JSX.Element | null {
   const ui = useUi()
   const ws = isLoginPane(paneId) ? undefined : ui.workspaces.find((w) => w.id === paneId)
   const wsId = ws?.id
@@ -71,21 +69,26 @@ function ChangesButton({ paneId }: { paneId: string }): React.JSX.Element | null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wsId, refresh])
 
-  if (!ws || count === null) return null
-  const label = count === 0 ? 'Cambios: sin archivos modificados' : `Cambios: ${count} archivo${count === 1 ? '' : 's'} modificado${count === 1 ? '' : 's'}`
+  // Sin cambios no hay insignia: el menú del espacio igual tiene «Ver cambios (Git)».
+  if (!ws || !count) return null
+  const label = `Cambios: ${count} archivo${count === 1 ? '' : 's'} modificado${count === 1 ? '' : 's'}`
   return (
-    <button className={`f-git-btn ${count > 0 ? 'has' : ''}`} onClick={() => openDrawer(ws.id)} aria-label={label} title={label}>
-      <ChangesIcon size={14} />
-      <span className="f-git-btn-label">Cambios</span>
-      <span className="f-git-btn-n mono">{count}</span>
+    <button type="button" className="f-git-badge" onClick={() => openDrawer(ws.id)} aria-label={label} title={label}>
+      <ChangesIcon size={12} />
+      <span className="mono">{count}</span>
+      <span className="f-git-badge-label">{count === 1 ? 'cambio' : 'cambios'}</span>
     </button>
   )
 }
 
 const ui: FeatureUi = {
   name: 'git',
-  PaneHeader: ChangesButton,
+  PaneHeader: ChangesBadge,
   Global: DrawerGate,
+  paneActions(ctx, paneId) {
+    if (isLoginPane(paneId) || !ctx.workspaces.some((w) => w.id === paneId)) return []
+    return [{ id: 'git', label: 'Ver cambios (Git)', group: 'ver', order: 10, icon: <ChangesIcon size={15} />, run: () => openDrawer(paneId, 'changes') }]
+  },
   commands(ctx) {
     const ws = ctx.workspaces.find((w) => w.id === ctx.focused)
     const need = (): string | null => {

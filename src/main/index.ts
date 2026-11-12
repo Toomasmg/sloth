@@ -506,7 +506,8 @@ app.whenReady().then(async () => {
   app.on('before-quit', (e) => {
     if (quitPrepared) return
     const b = term
-    if (b && !currentSettings().keepTerminalsAlive) {
+    // En proceso no hay daemon que las conserve: se espera el cierre ordenado igual (ver daemon/shutdown.ts).
+    if (b && (!currentSettings().keepTerminalsAlive || b.info().mode === 'inprocess')) {
       e.preventDefault()
       quitPrepared = true
       void Promise.race([b.shutdown(), new Promise((r) => setTimeout(r, 5000))])

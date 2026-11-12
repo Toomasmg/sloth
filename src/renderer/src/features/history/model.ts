@@ -36,7 +36,7 @@ export function durLabel(start: number, end: number): string {
 export const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 
 /** Color estable por espacio (tokens del tema, nunca solo color: el nombre va al lado). */
-const PALETTE = ['var(--accent)', 'var(--success)', 'var(--warn)', 'var(--info)', 'var(--team)', 'var(--fg-muted)']
+const PALETTE = ['var(--accent)', 'var(--done)', 'var(--waiting)', 'var(--info)', 'var(--team)', 'var(--text-3)']
 export function spaceColor(key: string): string {
   let h = 0
   for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0

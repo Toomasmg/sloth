@@ -28,10 +28,10 @@ const ICON_UPDATE = 'M12 4l1.8 4.7 4.7 1.8-4.7 1.8L12 17l-1.8-4.7-4.7-1.8 4.7-1.
 /** Color, fondo y ícono por grupo de novedades: Nuevo / Mejoras / Arreglos (artboard: los tonos «-fg» claros). */
 const GROUP_TONE: Record<string, { fg: string; bg: string; icon: string }> = {
   nuevo: { fg: 'var(--info)', bg: 'var(--info-soft)', icon: ICON_UPDATE },
-  mejoras: { fg: 'var(--success-fg)', bg: 'var(--success-soft)', icon: 'M5 16l4.5-4.5 3 3L19 7.5M14.5 7.5H19v4.5' },
-  arreglos: { fg: 'var(--warn-fg)', bg: 'var(--warn-soft)', icon: 'M12 3.5a8.5 8.5 0 1 0 0 17a8.5 8.5 0 1 0 0-17zM8.5 12.5l2.5 2.5 4.5-5' }
+  mejoras: { fg: 'var(--success-fg)', bg: 'var(--done-soft)', icon: 'M5 16l4.5-4.5 3 3L19 7.5M14.5 7.5H19v4.5' },
+  arreglos: { fg: 'var(--warn-fg)', bg: 'var(--waiting-soft)', icon: 'M12 3.5a8.5 8.5 0 1 0 0 17a8.5 8.5 0 1 0 0-17zM8.5 12.5l2.5 2.5 4.5-5' }
 }
-const toneOf = (g: NoteGroup): { fg: string; bg: string; icon: string } => GROUP_TONE[g.id] ?? { fg: 'var(--fg-2)', bg: 'var(--card)', icon: ICON_UPDATE }
+const toneOf = (g: NoteGroup): { fg: string; bg: string; icon: string } => GROUP_TONE[g.id] ?? { fg: 'var(--text-2)', bg: 'var(--raised)', icon: ICON_UPDATE }
 
 function statusLine(st: UpdateStatus): { icon: React.ReactNode; text: string; tone: string } {
   switch (st.state) {
