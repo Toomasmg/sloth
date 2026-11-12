@@ -26,6 +26,14 @@ async function esc(page: Page, veces = 3): Promise<void> {
 }
 
 const boton = (page: Page, name: string | RegExp) => page.getByRole('button', { name, exact: typeof name === 'string' }).first()
+const riel = (page: Page, destino: string) => page.locator(`.sl-rail [data-nav="${destino}"]`)
+
+/** Corre un comando de la paleta por su título (lo que no tiene botón propio vive ahí). */
+async function paleta(page: Page, titulo: string): Promise<void> {
+  await page.keyboard.press('Control+K')
+  await page.keyboard.type(titulo)
+  await page.keyboard.press('Enter')
+}
 
 test.beforeEach(() => {
   n = 0
@@ -81,17 +89,14 @@ test.describe('uso real', () => {
     await page.keyboard.type('plan')
     await shot(page, 'paleta-busqueda')
     await esc(page)
-    await page.getByRole('button', { name: 'Menú de Sloth' }).click()
-    await shot(page, 'menu-app')
-    await esc(page)
     await page.getByRole('button', { name: /^Más acciones de web/ }).first().click()
     await shot(page, 'menu-panel')
     await esc(page)
     await page.locator('.sl-side').getByText('docs', { exact: true }).first().click({ button: 'right' })
     await shot(page, 'menu-espacio-lateral')
     await esc(page)
-    await page.locator('.sl-crumb button').first().click()
-    await shot(page, 'menu-migas')
+    await page.getByRole('tab', { name: /^web,/ }).click({ button: 'right' })
+    await shot(page, 'menu-pestana')
     await esc(page)
     await page.locator('.sl-foot').getByRole('button', { name: /Nuevo espacio/ }).click()
     await shot(page, 'nuevo-espacio')
@@ -110,37 +115,44 @@ test.describe('uso real', () => {
     }
   })
 
-  test('herramientas, chat y menú de Sloth', async ({ sloth: { page } }) => {
-    await page.locator('.tools-row').first().click()
+  test('riel, paleta, chat y ayuda', async ({ sloth: { page } }) => {
+    await riel(page, 'tickets').click()
     await shot(page, 'tickets-sin-conector')
     await esc(page)
-    const herramientas: [string, string][] = [
-      ['Historial de sesiones', 'historial'],
-      ['Plantillas', 'plantillas'],
-      ['Ramas aparte', 'ramas'],
-      ['Enviar a varios espacios', 'enviar-a-varios'],
-      ['Limpiar ramas que ya no se usan', 'limpiar-ramas'],
-      ['Ver equipo', 'equipo']
-    ]
-    for (const [b, name] of herramientas) {
-      await boton(page, b).click()
+    for (const [destino, name] of [
+      ['historial', 'historial'],
+      ['ramas', 'ramas'],
+      ['equipo', 'equipo']
+    ]) {
+      await riel(page, destino).click()
       await shot(page, name)
       await esc(page)
     }
+    for (const [titulo, name] of [
+      ['Nueva plantilla', 'plantillas'],
+      ['Limpiar ramas que ya no se usan', 'limpiar-ramas'],
+      ['Exportar configuración', 'exportar']
+    ]) {
+      await paleta(page, titulo)
+      await shot(page, name)
+      await esc(page)
+    }
+    await boton(page, 'Enviar a varios espacios').click()
+    await shot(page, 'enviar-a-varios')
+    await esc(page)
     await boton(page, /^Chat del equipo/).click()
     await shot(page, 'chat')
     await esc(page)
-    const menu: [string, string][] = [
-      ['Ayuda y atajos', 'ayuda'],
+    await riel(page, 'ayuda').click()
+    await shot(page, 'ayuda')
+    for (const [label, name] of [
       ['Novedades', 'novedades'],
       ['Invitar a un compañero', 'invitar'],
       ['Reportar un problema', 'reportar'],
-      ['Exportar configuración…', 'exportar'],
       ['Asistente de bienvenida', 'asistente']
-    ]
-    for (const [label, name] of menu) {
-      await page.getByRole('button', { name: 'Menú de Sloth' }).click()
-      await page.getByRole('menuitem', { name: label }).click()
+    ]) {
+      await riel(page, 'ayuda').click()
+      await page.getByRole('dialog', { name: 'Ayuda y atajos' }).getByRole('button', { name: label, exact: true }).first().click()
       await shot(page, name)
       await esc(page)
     }
@@ -151,7 +163,7 @@ test.describe('uso real', () => {
 
   test('tickets con conector', async ({ sloth: { app, page } }) => {
     await inyectarTickets(app, page)
-    await page.locator('.tools-row').first().click()
+    await riel(page, 'tickets').click()
     await shot(page, 'tickets-con-conector')
     await page.getByText('Reintentos en el webhook', { exact: false }).first().click()
     await shot(page, 'tickets-detalle')

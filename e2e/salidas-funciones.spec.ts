@@ -31,16 +31,10 @@ const PANTALLAS: Pantalla[] = [
     dialogo: /.+/,
     salida: 'Volver a los espacios'
   },
-  {
-    nombre: 'Plantillas',
-    abrir: async (page) => {
-      const b = page.getByRole('button', { name: 'Plantillas', exact: true })
-      await b.click()
-      return b
-    },
-    dialogo: 'Plantillas de espacio',
-    salida: 'Cerrar'
-  },
+  { nombre: 'Plantillas', abrir: (p) => porPaleta(p, 'Nueva plantilla'), dialogo: 'Plantillas de espacio', salida: 'Cerrar' },
+  { nombre: 'Acerca de Sloth (actualizaciones)', abrir: (p) => porPaleta(p, 'Buscar actualizaciones'), dialogo: 'Acerca de Sloth', salida: 'Cerrar' },
+  { nombre: 'Reportar un problema', abrir: (p) => porPaleta(p, 'Reportar un problema'), dialogo: 'Reportar un problema', salida: 'Volver a los espacios' },
+  { nombre: 'Exportar configuración', abrir: (p) => porPaleta(p, 'Exportar configuración'), dialogo: /Exportar/, salida: 'Volver a Configuración' },
   { nombre: 'Decisiones', abrir: (p) => porPaleta(p, 'Decisiones de permisos'), dialogo: 'Decisiones', salida: 'Cerrar' },
   { nombre: 'Pedidos de permiso', abrir: (p) => porPaleta(p, 'Revisar pedidos de permiso'), dialogo: 'Pedidos de permiso', salida: 'Cerrar' },
   { nombre: 'Ayuda', abrir: (p) => porPaleta(p, 'Ayuda y atajos'), dialogo: /Ayuda/, salida: 'Volver a los espacios' },

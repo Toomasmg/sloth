@@ -26,11 +26,12 @@ interface Pantalla {
   salida(page: Page): Locator
 }
 
-async function desdeMenuApp(page: Page, item: string): Promise<Locator> {
-  const trigger = page.getByRole('button', { name: 'Menú de Sloth' })
-  await trigger.click()
+/** Clic derecho en la fila de la barra lateral: el mismo menú del espacio que el «…» del panel. */
+async function desdeMenuLateral(page: Page, item: string): Promise<Locator> {
+  const fila = page.locator('[data-ws-btn="ws-web"]')
+  await fila.click({ button: 'right' })
   await page.getByRole('menuitem', { name: item }).click()
-  return trigger
+  return fila
 }
 
 async function desdeMenuPanel(page: Page, item: string): Promise<Locator> {
@@ -70,11 +71,7 @@ const PANTALLAS: Pantalla[] = [
   },
   {
     nombre: 'Quitar espacio',
-    abrir: async (page) => {
-      const b = page.getByRole('button', { name: 'Quitar espacio web' })
-      await b.click()
-      return b
-    },
+    abrir: (page) => desdeMenuLateral(page, 'Quitar espacio'),
     contenedor: dialogo(/¿Quitar el espacio/),
     salida: (page) => page.getByRole('dialog').getByRole('button', { name: 'Cancelar' })
   },
@@ -91,26 +88,8 @@ const PANTALLAS: Pantalla[] = [
     salida: botonCerrar
   },
   {
-    nombre: 'Acerca de Sloth (actualizaciones)',
-    abrir: (page) => desdeMenuApp(page, 'Buscar actualizaciones'),
-    contenedor: dialogo('Acerca de Sloth'),
-    salida: botonCerrar
-  },
-  {
-    nombre: 'Reportar un problema',
-    abrir: (page) => desdeMenuApp(page, 'Reportar un problema'),
-    contenedor: dialogo('Reportar un problema'),
-    salida: volver
-  },
-  {
-    nombre: 'Exportar configuración',
-    abrir: (page) => desdeMenuApp(page, 'Exportar configuración…'),
-    contenedor: pagina,
-    salida: (page) => page.getByRole('dialog').getByRole('button', { name: 'Volver a Configuración' })
-  },
-  {
     nombre: 'Historial de sesiones',
-    abrir: (page) => desdeBoton(page, 'Historial de sesiones'),
+    abrir: (page) => desdeBoton(page, 'Historial'),
     contenedor: pagina,
     salida: volver
   },
@@ -128,7 +107,7 @@ const PANTALLAS: Pantalla[] = [
   },
   {
     nombre: 'Equipo',
-    abrir: (page) => desdeBoton(page, 'Ver equipo'),
+    abrir: (page) => desdeBoton(page, 'Equipo'),
     contenedor: pagina,
     salida: volver
   }
@@ -153,16 +132,18 @@ for (const p of PANTALLAS) {
 }
 
 test('Quitar espacio: Cancelar no lo quita y confirmar sí', async ({ sloth: { page } }) => {
-  await page.getByRole('button', { name: 'Quitar espacio web' }).click()
+  await desdeMenuLateral(page, 'Quitar espacio')
   await page.getByRole('dialog').getByRole('button', { name: 'Cancelar' }).click()
-  await expect(page.getByRole('button', { name: 'Quitar espacio web' })).toBeVisible()
-  await page.getByRole('button', { name: 'Quitar espacio web' }).click()
+  await expect(page.locator('[data-ws-btn="ws-web"]')).toBeVisible()
+  await desdeMenuLateral(page, 'Quitar espacio')
   await page.getByRole('dialog').getByRole('button', { name: 'Quitar espacio', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Quitar espacio web' })).toHaveCount(0)
+  await expect(page.locator('[data-ws-btn="ws-web"]')).toHaveCount(0)
 })
 
 test('Reportar: con texto escrito, Esc y «‹ Espacios» preguntan antes de descartar', async ({ sloth: { page } }) => {
-  const opener = await desdeMenuApp(page, 'Reportar un problema')
+  await page.keyboard.press('Control+k')
+  await page.getByRole('combobox').first().fill('Reportar un problema')
+  await page.keyboard.press('Enter')
   await page.getByLabel(/^Título/).fill('Se cuelga al abrir')
   await page.keyboard.press('Escape')
   const alerta = page.getByRole('alertdialog', { name: '¿Descartar lo que escribiste?' })
@@ -174,7 +155,6 @@ test('Reportar: con texto escrito, Esc y «‹ Espacios» preguntan antes de des
   await expect(alerta).toBeVisible()
   await page.getByRole('button', { name: 'Descartar', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Reportar un problema' })).toBeHidden()
-  await expect(opener).toBeFocused()
 })
 
 test('Nuevo espacio: con la ruta escrita, Esc pregunta antes de descartar', async ({ sloth: { page } }) => {

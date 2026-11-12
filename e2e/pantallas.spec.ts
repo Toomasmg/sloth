@@ -1,4 +1,5 @@
 import { test, expect } from './sloth'
+import type { Page } from '@playwright/test'
 
 /**
  * Capturas de las pantallas principales con datos de prueba (una cuenta sin sesión y dos espacios).
@@ -7,17 +8,26 @@ import { test, expect } from './sloth'
 
 test.use({ seed: { workspaces: [{ id: 'ws-web', name: 'web' }, { id: 'ws-api', name: 'api-pagos' }] } })
 
-const PANTALLAS: { herramienta: string; lista: string; captura: string }[] = [
-  { herramienta: 'Tickets', lista: 'Todavía no elegiste de dónde traer tickets.', captura: 'tickets.png' },
-  { herramienta: 'Historial de sesiones', lista: 'Todavía no hay sesiones guardadas', captura: 'historial.png' },
-  { herramienta: 'Plantillas', lista: 'Todavía no hay plantillas.', captura: 'plantillas.png' },
-  { herramienta: 'Ramas aparte', lista: 'Ningún espacio apunta a un repo git.', captura: 'ramas.png' },
-  { herramienta: 'Enviar a varios espacios', lista: 'No hay espacios con la terminal abierta.', captura: 'enviar.png' }
+type Abrir = (page: Page) => Promise<void>
+const riel = (nombre: string): Abrir => (page) => page.getByRole('navigation', { name: 'Navegación' }).getByRole('button', { name: nombre, exact: true }).click()
+const paleta = (titulo: string): Abrir => async (page) => {
+  await page.keyboard.press('Control+K')
+  await page.keyboard.type(titulo)
+  await page.keyboard.press('Enter')
+}
+
+/** Cada pantalla, abierta desde su lugar canónico: el riel, la paleta o su atajo. */
+const PANTALLAS: { nombre: string; abrir: Abrir; lista: string; captura: string }[] = [
+  { nombre: 'Tickets', abrir: riel('Tickets'), lista: 'Todavía no elegiste de dónde traer tickets.', captura: 'tickets.png' },
+  { nombre: 'Historial de sesiones', abrir: riel('Historial'), lista: 'Todavía no hay sesiones guardadas', captura: 'historial.png' },
+  { nombre: 'Plantillas', abrir: paleta('Nueva plantilla'), lista: 'Todavía no hay plantillas.', captura: 'plantillas.png' },
+  { nombre: 'Ramas aparte', abrir: riel('Ramas aparte'), lista: 'Ningún espacio apunta a un repo git.', captura: 'ramas.png' },
+  { nombre: 'Enviar a varios espacios', abrir: (page) => page.keyboard.press('Control+Shift+B'), lista: 'No hay espacios con la terminal abierta.', captura: 'enviar.png' }
 ]
 
 for (const p of PANTALLAS) {
-  test(`${p.herramienta}`, async ({ sloth: { page } }) => {
-    await page.getByRole('button', { name: p.herramienta, exact: true }).first().click()
+  test(`${p.nombre}`, async ({ sloth: { page } }) => {
+    await p.abrir(page)
     await expect(page.getByText(p.lista, { exact: false })).toBeVisible()
     await expect(page).toHaveScreenshot(p.captura)
   })
