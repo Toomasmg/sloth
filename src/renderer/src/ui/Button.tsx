@@ -1,4 +1,5 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { loadingClick } from './loading-click'
 import './ui.css'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
@@ -11,7 +12,7 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
   icon?: ReactNode
   /** Atajo que se muestra dentro del botón, ya formateado (ej. «Ctrl+Enter»). */
   kbd?: string
-  /** Mientras algo se hace: no responde a clics, muestra un indicador y avisa a los lectores. */
+  /** Mientras algo se hace: no responde a clics ni envía su form, muestra un indicador y avisa a los lectores. */
   loading?: boolean
   block?: boolean
   className?: string
@@ -31,7 +32,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={disabled}
       aria-busy={loading || undefined}
       aria-disabled={loading || undefined}
-      onClick={loading ? undefined : onClick}
+      onClick={loadingClick(loading, onClick)}
     >
       {loading ? <span className="ui-spinner" aria-hidden="true" /> : icon}
       {children != null && <span className="ui-btn-label">{children}</span>}
