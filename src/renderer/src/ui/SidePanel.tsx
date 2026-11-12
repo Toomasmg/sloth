@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
+import { captureOpener } from '../return-focus'
 import './SidePanel.css'
 
 export interface SidePanelProps {
@@ -24,6 +25,9 @@ export function SidePanel({ labelId, title, onClose, actions, width = 400, class
   closeRef.current = onClose
 
   useEffect(() => {
+    const restore = captureOpener()
+    // Foco adentro al abrir, sin pisar lo que el contenido ya haya enfocado (un campo, p. ej.).
+    if (!rootRef.current?.contains(document.activeElement)) rootRef.current?.querySelector<HTMLElement>('.ui-side-x')?.focus()
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape' || e.defaultPrevented) return
       if (!rootRef.current?.contains(document.activeElement)) return
@@ -31,11 +35,14 @@ export function SidePanel({ labelId, title, onClose, actions, width = 400, class
       closeRef.current()
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      restore()
+    }
   }, [])
 
   return (
-    <aside ref={rootRef} className={`ui-side ${className ?? ''}`} style={{ width }} aria-labelledby={labelId}>
+    <aside ref={rootRef} className={`ui-side ${className ?? ''}`} style={{ width }} role="dialog" aria-modal="false" aria-labelledby={labelId}>
       <header className="ui-side-head">
         <h2 className="ui-side-title" id={labelId}>
           {title}

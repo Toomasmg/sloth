@@ -78,9 +78,9 @@ export function View({ labelId, title, onClose, actions, backLabel = 'Espacios',
           {backLabel}
         </button>
         <span className="ui-view-sep" aria-hidden="true" />
-        <h1 className="ui-view-title" id={labelId}>
+        <span className="ui-view-title" id={labelId}>
           {title}
-        </h1>
+        </span>
         <span className="ui-view-grow" />
         {actions && <div className="ui-view-actions">{actions}</div>}
       </header>
