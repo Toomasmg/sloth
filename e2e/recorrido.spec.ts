@@ -49,6 +49,7 @@ test.describe('primer uso', () => {
     await page.getByRole('combobox').first().fill('Primeros pasos')
     await page.keyboard.press('Enter')
     await expect(page.getByRole('heading', { name: 'Empecemos' })).toBeVisible()
+    await expect(page.getByText(/Revisando lo que ya/)).toBeHidden()
     await shot(page, 'primer-uso-empecemos')
     await esc(page)
     await shot(page, 'primer-uso-sin-cuentas')
@@ -157,6 +158,10 @@ test.describe('uso real', () => {
     ]) {
       await riel(page, 'ayuda').click()
       await page.getByRole('dialog', { name: 'Ayuda y atajos' }).getByRole('button', { name: label, exact: true }).first().click()
+      if (name === 'primeros-pasos') {
+        await expect(page.getByRole('heading', { name: 'Empecemos' })).toBeVisible()
+        await expect(page.getByText(/Revisando lo que ya/)).toBeHidden()
+      }
       await shot(page, name)
       await esc(page)
     }

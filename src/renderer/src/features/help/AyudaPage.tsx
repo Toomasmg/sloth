@@ -195,7 +195,7 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
       onClose={onClose}
       actions={
         <>
-          <Button size="sm" variant="ghost" onClick={() => runFeatureCommand('onboarding:open', ui)}>
+          <Button size="sm" variant="ghost" onClick={() => { onClose(); runFeatureCommand('onboarding:open', ui) }}>
             Asistente de bienvenida
           </Button>
           <Button size="sm" variant="ghost" onClick={() => openHelp('whatsnew')}>
