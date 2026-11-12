@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from './sloth'
-import { cursorHidden, termText } from './terminal'
+import { cursorHidden, shellReady } from './terminal'
 
 /**
  * Claude Code dibuja su propio cursor. El de xterm (que ConPTY muestra a mitad de cada redibujo
@@ -19,7 +19,7 @@ test.describe('cursor de la terminal', () => {
   test.use({ seed: { workspaces: [{ id: 'ws-cursor', name: 'web', open: true }] } })
 
   test('se oculta mientras Claude está abierto y vuelve en la shell', async ({ sloth: { page } }) => {
-    await expect.poll(() => termText(page), { timeout: 30_000 }).toContain('PS ')
+    await shellReady(page)
     expect(await cursorHidden(page)).toBe(false)
 
     await emit(page, '[?2031h')
@@ -34,7 +34,7 @@ test.describe('cursor de la terminal', () => {
   })
 
   test('en la pantalla alternativa (vim, nvim) el cursor queda como lo pide el programa', async ({ sloth: { page } }) => {
-    await expect.poll(() => termText(page), { timeout: 30_000 }).toContain('PS ')
+    await shellReady(page)
     await emit(page, '[?1049h')
     // nvim activa 2031 dentro de la pantalla alternativa: no es Claude.
     await emit(page, '[?2031h')

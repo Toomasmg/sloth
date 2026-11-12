@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Page } from '@playwright/test'
 import { test, expect } from './sloth'
-import { termText } from './terminal'
+import { shellReady, termText } from './terminal'
 
 /**
  * Pegar y soltar en la terminal: además de texto, las rutas de archivos copiados (un .zip, una foto)
@@ -16,12 +16,6 @@ const ps = (script: string): void => {
   execFileSync('powershell.exe', ['-NoProfile', '-Sta', '-Command', `Add-Type -AssemblyName System.Windows.Forms,System.Drawing; ${script}`])
 }
 const psQuote = (s: string): string => `'${s.replace(/'/g, "''")}'`
-
-/** PowerShell ya mostró el prompt y terminó de cargar PSReadLine (si no, se come lo que llega). */
-async function shellReady(page: Page): Promise<void> {
-  await expect.poll(() => termText(page), { timeout: 30_000 }).toContain('PS ')
-  await page.waitForTimeout(1500)
-}
 
 async function pasteInTerminal(page: Page): Promise<void> {
   await page.locator('.terminal-host').click()
