@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { DiscardConfirm } from '../Modal'
 import { captureOpener } from '../return-focus'
 import { FOCUSABLE, nextFocusIndex } from '../focus-trap'
-import { pushView } from './view-stack'
+import { isTopView, pushView, type ViewEntry } from './view-stack'
 import './View.css'
 
 export interface ViewProps {
@@ -52,17 +52,21 @@ export function View({ labelId, title, onClose, actions, backLabel = 'Espacios',
     list[i].focus()
   }
 
-  useEffect(
-    () => pushView({ id: labelId, request: () => requestRef.current(), isDirty: () => dirtyRef.current }),
-    [labelId]
-  )
-
+  const entryRef = useRef<ViewEntry | null>(null)
   useEffect(() => {
-    const restore = captureOpener()
+    const entry: ViewEntry = { id: labelId, request: () => requestRef.current(), isDirty: () => dirtyRef.current }
+    entryRef.current = entry
+    return pushView(entry)
+  }, [labelId])
+
+  // Se toma en el render: en los efectos el contenido (Ajustes, Historial) ya movió el foco adentro.
+  const [restore] = useState(captureOpener)
+  useEffect(() => {
     // Si el contenido ya tomó el foco al montarse (p. ej. el título de Ajustes), se respeta.
     if (!rootRef.current?.contains(document.activeElement)) backRef.current?.focus()
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape' && !e.defaultPrevented) {
+      // Con Vistas apiladas cada una escucha, pero solo cierra la de arriba (la que se ve).
+      if (e.key === 'Escape' && !e.defaultPrevented && entryRef.current && isTopView(entryRef.current)) {
         e.preventDefault()
         requestRef.current()
       }
@@ -72,7 +76,7 @@ export function View({ labelId, title, onClose, actions, backLabel = 'Espacios',
       window.removeEventListener('keydown', onKey)
       restore()
     }
-  }, [])
+  }, [restore])
 
   return (
     <div ref={rootRef} className={`ui-view ${className ?? ''}`} role="dialog" aria-modal="true" aria-labelledby={labelId} onKeyDown={trapTab}>

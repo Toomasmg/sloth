@@ -45,3 +45,6 @@ export function closeAllViews(): boolean {
   }
   return true
 }
+
+/** Solo la Vista de arriba responde a Esc: las de abajo no se ven. */
+export const isTopView = (entry: ViewEntry): boolean => stack[stack.length - 1] === entry

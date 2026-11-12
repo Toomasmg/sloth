@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { closeAllViews, getViews, pushView, topViewId } from './view-stack'
+import { closeAllViews, getViews, isTopView, pushView, topViewId } from './view-stack'
 
 test('la Vista de arriba es la última que se montó y al sacarla vuelve la anterior', () => {
   const offA = pushView({ id: 'a', request: () => {}, isDirty: () => false })
@@ -29,4 +29,17 @@ test('closeAllViews para en la primera con cambios sin guardar y no cierra las d
   assert.deepEqual(order, ['b'])
   offB()
   offA()
+})
+
+test('isTopView: solo la Vista de arriba es la de arriba', () => {
+  const a = { id: 'a', request: () => {}, isDirty: () => false }
+  const b = { id: 'b', request: () => {}, isDirty: () => false }
+  const offA = pushView(a)
+  const offB = pushView(b)
+  assert.equal(isTopView(b), true)
+  assert.equal(isTopView(a), false)
+  offB()
+  assert.equal(isTopView(a), true)
+  offA()
+  assert.equal(isTopView(a), false)
 })
