@@ -13,7 +13,7 @@ let n = 0
 async function shot(page: Page, name: string): Promise<void> {
   n++
   await page.waitForTimeout(450)
-  await expect(page).toHaveScreenshot(`${String(n).padStart(2, '0')}-${name}.png`, { mask: [page.locator('.terminal-host')] })
+  await expect.soft(page).toHaveScreenshot(`${String(n).padStart(2, '0')}-${name}.png`, { mask: [page.locator('.terminal-host')] })
 }
 
 async function esc(page: Page, veces = 3): Promise<void> {
