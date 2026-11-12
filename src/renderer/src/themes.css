@@ -2,7 +2,7 @@
    Se carga después de styles.css: solo sobrescribe. Reúne lo que antes estaba en theme-a.css
    (el estilo «Minimal») y en themes.css (tema claro y densidad). */
 :root {
-  font-size: 13px;
+  font-size: var(--fs-13);
   letter-spacing: 0.002em;
 }
 
@@ -22,12 +22,12 @@
 .tb-chip {
   height: 26px;
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: var(--r-md);
   background: transparent !important;
   box-shadow: none !important;
   color: var(--text-2) !important;
   font-weight: 500;
-  font-size: 12px;
+  font-size: var(--fs-12);
 }
 .tb-chip svg {
   opacity: 1;
@@ -45,7 +45,7 @@
 .section-title {
   text-transform: none;
   letter-spacing: 0;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   color: var(--text-3);
   padding-left: 8px;
@@ -54,7 +54,7 @@
   background: transparent;
   color: var(--text-3);
   font-family: var(--font-ui);
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 500;
   padding: 0;
   min-width: 0;
@@ -63,7 +63,7 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: var(--bg);
   background: var(--acc);
 }
@@ -74,7 +74,7 @@
 .section-row .btn.sm {
   height: 26px;
   padding: 0 9px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 500;
 }
 .section-row .btn.sm:not(.primary) {
@@ -92,7 +92,7 @@
   min-height: var(--row-min-h);
   padding: 6px 32px 6px 10px;
   gap: 10px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
 }
 .ws.open {
   background: transparent;
@@ -105,7 +105,7 @@
   display: none;
 }
 .ws .item-sub {
-  font-size: 11.5px;
+  font-size: var(--fs-11);
 }
 .ws .tag,
 .tag {
@@ -113,7 +113,7 @@
   color: var(--text-3);
   box-shadow: inset 0 0 0 1px var(--divider-strong);
   font-weight: 500;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
 }
 
 /* Secciones colapsables al pie: discretas. */
@@ -125,7 +125,7 @@
 .f-templates-toggle {
   text-transform: none !important;
   letter-spacing: 0 !important;
-  font-size: 12px !important;
+  font-size: var(--fs-12) !important;
 }
 
 /* ---------- Paneles ---------- */
@@ -134,7 +134,7 @@
   background: var(--bg);
 }
 .pane {
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: var(--term-bg);
   box-shadow: 0 0 0 1px var(--divider);
 }
@@ -152,7 +152,7 @@
 }
 .pane-title {
   font-family: var(--font-display);
-  font-size: 13.5px;
+  font-size: var(--fs-13);
   font-weight: 600;
   letter-spacing: -0.005em;
 }
@@ -183,7 +183,7 @@
 }
 .modal-head h2 {
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: var(--fs-18);
   font-weight: 600;
   letter-spacing: -0.015em;
 }
@@ -203,14 +203,14 @@
 
 /* Scrollbars aún más discretas */
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--chip-bg);
 }
 
 .sidebar::-webkit-scrollbar-thumb {
   background: transparent;
 }
 .sidebar:hover::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--chip-bg);
 }
 
 /* Bordes de los controles con 3:1 contra el fondo (WCAG 1.4.11): campos, interruptor apagado y botón secundario. */
@@ -286,15 +286,15 @@ html[data-theme='light'] .btn.danger {
   box-shadow: none;
 }
 html[data-theme='light'] .btn.danger:hover:not(:disabled) {
-  background: rgba(198, 40, 40, 0.16);
+  background: var(--danger-strong);
 }
 html[data-theme='light'] .switch-track::after,
 html[data-theme='light'] .switch input:checked + .switch-track::after {
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(16, 22, 34, 0.25);
+  background: var(--knob);
+  box-shadow: var(--knob-shadow);
 }
 html[data-theme='light'] .switch-track {
-  background: #d4d6dc;
+  background: var(--track-off);
 }
 html[data-theme='light'] input,
 html[data-theme='light'] select {
@@ -308,15 +308,15 @@ html[data-theme='light'] .ws.focused:hover {
   background: var(--raised);
 }
 html[data-theme='light'] .modal {
-  background: #fff;
+  background: var(--knob);
   box-shadow: var(--e-3);
 }
 html[data-theme='light'] ::-webkit-scrollbar-thumb {
-  background: rgba(16, 22, 34, 0.16);
+  background: var(--thumb);
   background-clip: padding-box;
 }
 html[data-theme='light'] .sidebar:hover::-webkit-scrollbar-thumb {
-  background: rgba(16, 22, 34, 0.16);
+  background: var(--thumb);
 }
 
 /* Clases base en claro (chips, segmentado, grupos y teclas). */
@@ -326,11 +326,11 @@ html[data-theme='light'] .seg {
 }
 html[data-theme='light'] .seg > button[aria-pressed='true'],
 html[data-theme='light'] .seg > button.on {
-  background: #fff;
+  background: var(--knob);
   color: var(--text);
 }
 html[data-theme='light'] .chip {
-  background: rgba(16, 22, 34, 0.06);
+  background: var(--chip-bg);
   color: var(--text-2);
 }
 html[data-theme='light'] .chip-working {
@@ -338,37 +338,37 @@ html[data-theme='light'] .chip-working {
   color: var(--accent);
 }
 html[data-theme='light'] .chip-perm {
-  background: rgba(163, 90, 0, 0.2);
-  color: #7a4300;
+  background: var(--waiting-strong);
+  color: var(--warn-fg);
 }
 html[data-theme='light'] .chip-waiting {
-  background: rgba(163, 90, 0, 0.12);
-  color: #8a4a00;
+  background: var(--waiting-soft);
+  color: var(--warn-fg);
 }
 html[data-theme='light'] .chip-done {
-  background: rgba(26, 127, 87, 0.12);
-  color: #13663f;
+  background: var(--done-soft);
+  color: var(--success-fg);
 }
 html[data-theme='light'] .chip-error {
-  background: rgba(198, 40, 40, 0.1);
-  color: #b3261e;
+  background: var(--danger-soft);
+  color: var(--danger-fg);
 }
 html[data-theme='light'] .group {
   box-shadow: inset 0 0 0 1px var(--divider-strong);
 }
 html[data-theme='light'] kbd,
 html[data-theme='light'] .kbd {
-  background: #fff;
+  background: var(--knob);
 }
 
 /* Colores de cuenta: los tonos automáticos son pastel (pensados para oscuro). En claro el texto va
    oscuro y los puntos y marcas se oscurecen para tener 3:1 sobre el fondo. */
 html[data-theme='light'] .acc-chip {
-  color: #12151c;
+  color: var(--text);
   background: color-mix(in srgb, var(--acc) 34%, transparent);
 }
 html[data-theme='light'] .ws.focused::before {
-  background: color-mix(in srgb, var(--acc) 55%, #12151c);
+  background: color-mix(in srgb, var(--acc) 55%, var(--text));
 }
 
 /* Funciones (colores fijos en sus .css). */
@@ -376,7 +376,7 @@ html[data-theme='light'] .f-git-sub-backdrop {
   background: var(--scrim);
 }
 html[data-theme='light'] .f-git-drawer {
-  box-shadow: -16px 0 48px rgba(16, 22, 34, 0.16);
+  box-shadow: var(--e-side);
 }
 html[data-theme='light'] .f-git-ln {
   color: var(--text-3);

@@ -55,7 +55,7 @@
   gap: 8px;
   height: 32px;
   padding: 0 10px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--input-bg);
   color: var(--text-3);
   box-shadow: inset 0 0 0 1px var(--divider);
@@ -90,7 +90,7 @@
   gap: 1px;
   padding: 7px 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: transparent;
   color: var(--text);
   font: inherit;
@@ -117,7 +117,7 @@
   display: block;
   height: 1px;
   margin: 0 8px 6px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--chip-bg);
 }
 .f-set-item {
   width: 100%;
@@ -127,7 +127,7 @@
   height: 34px;
   padding: 0 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: transparent;
   color: var(--text);
   font: inherit;
@@ -149,8 +149,8 @@
   width: 24px;
   height: 24px;
   flex: none;
-  border-radius: 7px;
-  color: #0b0d12;
+  border-radius: var(--r-md);
+  color: var(--ink);
   display: grid;
   place-items: center;
 }
@@ -159,9 +159,9 @@
   height: 18px;
   padding: 0 5px;
   box-sizing: border-box;
-  border-radius: 9px;
-  background: #f0b45a;
-  color: #1c1406;
+  border-radius: var(--r-lg);
+  background: var(--amber);
+  color: var(--amber-fg);
   font-size: var(--fs-11);
   font-weight: 700;
   display: grid;
@@ -180,7 +180,7 @@
 }
 .f-set-head h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--fs-24);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -213,12 +213,12 @@
 }
 .f-set-group-h {
   margin: 0 0 0 4px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   color: var(--text-2);
 }
 .f-set-card {
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--raised);
   box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
@@ -311,7 +311,7 @@ button.f-set-toggle:disabled {
 .f-set-link:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
 }
 .f-set-note {
   margin: 0 4px;
@@ -327,7 +327,7 @@ button.f-set-toggle:disabled {
 .f-set-preview {
   margin: 0 16px 16px;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: var(--input-bg);
   box-shadow: inset 0 0 0 1px var(--divider);
   line-height: 1.5;
@@ -351,8 +351,8 @@ button.f-set-toggle:disabled {
   width: 36px;
   height: 21px;
   flex: none;
-  border-radius: 11px;
-  background: #3a4152;
+  border-radius: var(--r-lg);
+  background: var(--track-off);
   position: relative;
   transition: background 0.15s;
 }
@@ -366,8 +366,8 @@ button.f-set-toggle:disabled {
   width: 17px;
   height: 17px;
   border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  background: var(--knob);
+  box-shadow: var(--knob-shadow);
   transition: left 0.15s;
 }
 .f-set-track.on .f-set-knob {
@@ -378,7 +378,7 @@ button.f-set-toggle:disabled {
   height: 18px;
   flex: none;
   border-radius: 50%;
-  box-shadow: inset 0 0 0 1.5px #4a5160;
+  box-shadow: inset 0 0 0 1.5px var(--control-border);
   position: relative;
 }
 .f-set-radio.on {
@@ -396,7 +396,7 @@ button.f-set-toggle:disabled {
 .f-set-seg {
   display: inline-flex;
   padding: 2px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--input-bg);
   box-shadow: inset 0 0 0 1px var(--divider);
 }
@@ -404,7 +404,7 @@ button.f-set-toggle:disabled {
   height: 26px;
   padding: 0 12px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--r-md);
   background: transparent;
   color: var(--text-2);
   font: inherit;
@@ -413,9 +413,9 @@ button.f-set-toggle:disabled {
   cursor: pointer;
 }
 .f-set-seg button.on {
-  background: #3a4152;
-  color: #ffffff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  background: var(--track-off);
+  color: var(--text);
+  box-shadow: var(--knob-shadow);
 }
 
 /* Controles de formulario */
@@ -424,7 +424,7 @@ button.f-set-toggle:disabled {
   min-width: 0;
   padding: 0 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--input-bg);
   color: var(--text);
   font: inherit;
@@ -505,8 +505,8 @@ button.f-set-toggle:disabled {
   appearance: none;
   flex: 1 1 160px;
   height: 4px;
-  border-radius: 2px;
-  background: #2a2f3b;
+  border-radius: var(--r-sm);
+  background: var(--muted);
   outline: none;
 }
 .f-set-slider input[type='range']::-webkit-slider-thumb {
@@ -514,8 +514,8 @@ button.f-set-toggle:disabled {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  background: var(--knob);
+  box-shadow: var(--knob-shadow);
   cursor: pointer;
 }
 .f-set-slider output {
@@ -524,7 +524,7 @@ button.f-set-toggle:disabled {
   text-align: right;
   font-family: var(--font-mono);
   font-size: var(--fs-12);
-  color: #c9cdd6;
+  color: var(--text-2);
 }
 
 /* Toast «Guardado» */
@@ -538,7 +538,7 @@ button.f-set-toggle:disabled {
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: var(--toast-bg);
   color: var(--text);
   box-shadow: var(--e-2), inset 0 0 0 1px var(--divider-strong);
@@ -629,7 +629,7 @@ button.f-set-toggle:disabled {
 .f-set-theme {
   padding: 10px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--raised);
   color: var(--text);
   font: inherit;
@@ -645,10 +645,10 @@ button.f-set-toggle:disabled {
 }
 .f-set-pv {
   height: 74px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   display: flex;
   overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px var(--divider);
 }
 .f-set-pv-side {
   width: 30%;
@@ -662,7 +662,7 @@ button.f-set-toggle:disabled {
 }
 .f-set-pv-main i {
   height: 6px;
-  border-radius: 3px;
+  border-radius: var(--r-sm);
   display: block;
 }
 .f-set-theme-name {
@@ -681,7 +681,7 @@ button.f-set-toggle:disabled {
   height: 34px;
   padding: 0 12px 0 8px;
   border: 0;
-  border-radius: 17px;
+  border-radius: var(--r-lg);
   background: transparent;
   color: var(--text);
   font: inherit;
@@ -700,7 +700,7 @@ button.f-set-toggle:disabled {
 .f-set-term {
   margin: 0;
   padding: 14px 16px;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   box-shadow: inset 0 0 0 1px var(--divider);
   white-space: pre;
   overflow: hidden;
@@ -725,7 +725,7 @@ button.f-set-toggle:disabled {
   height: 30px;
   padding: 0 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--input-bg);
   color: var(--text);
   display: inline-flex;
@@ -772,7 +772,7 @@ button.f-set-toggle:disabled {
   width: 38px;
   height: 38px;
   flex: none;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   display: grid;
   place-items: center;
 }
@@ -795,7 +795,7 @@ button.f-set-toggle:disabled {
   align-items: center;
   gap: 10px;
   padding: 28px;
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   text-align: center;
 }
 .f-set-about > .f-set-hint {
@@ -805,7 +805,7 @@ button.f-set-toggle:disabled {
   margin-top: 8px;
 }
 .f-set-about-name {
-  font-size: 20px;
+  font-size: var(--fs-18);
   font-weight: 700;
 }
 
@@ -847,7 +847,7 @@ button.f-set-toggle:disabled {
   min-height: 24px;
   margin-left: 8px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   background: transparent;
   color: inherit;
   font: inherit;

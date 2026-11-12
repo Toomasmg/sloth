@@ -220,7 +220,7 @@
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   font-size: var(--fs-11);
   font-weight: 600;
   color: var(--text-3);

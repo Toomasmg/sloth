@@ -7,7 +7,7 @@
   gap: 18px;
   box-sizing: border-box;
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   background: var(--raised);
   box-shadow: var(--e-3), inset 0 0 0 1px var(--divider-strong);
 }
@@ -21,7 +21,7 @@
   flex: none;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: var(--accent-soft);
   color: var(--accent);
   display: grid;
@@ -33,7 +33,7 @@
 }
 .f-broadcast-titles h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--fs-18);
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -49,7 +49,7 @@
 .f-broadcast-note {
   margin: 0;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: color-mix(in srgb, var(--done) 8%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--done) 30%, transparent);
   color: var(--text-2);
@@ -116,14 +116,14 @@
   flex: none;
   display: grid;
   place-items: center;
-  font-size: 11px;
+  font-size: var(--fs-11);
   font-weight: 700;
 }
 .f-broadcast-ico {
   flex: none;
   width: 26px;
   height: 26px;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--btn-2);
   color: var(--text-2);
   display: grid;
@@ -133,7 +133,7 @@
   background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 .f-broadcast-row:hover {
-  background: var(--row-hover, rgba(255, 255, 255, 0.045));
+  background: var(--row-hover);
 }
 .f-broadcast-group-count {
   margin-left: auto;
@@ -230,7 +230,7 @@
   flex: none;
   width: 30px;
   height: 30px;
-  border-radius: 9px;
+  border-radius: var(--r-lg);
   background: color-mix(in srgb, var(--waiting) 18%, transparent);
   color: var(--warn-fg);
   display: grid;
@@ -275,7 +275,7 @@
   min-height: 132px;
   padding: 11px 13px;
   border: 0;
-  border-radius: var(--r-md, 10px);
+  border-radius: var(--r-md);
   background: var(--input-bg);
   color: var(--text);
   font: inherit;
@@ -314,7 +314,7 @@
   height: 26px;
   padding: 0 10px;
   border: 0;
-  border-radius: 13px;
+  border-radius: var(--r-lg);
   background: var(--btn-2);
   color: var(--text-2);
   font: inherit;
@@ -327,11 +327,11 @@
   color: var(--text);
 }
 .chip-btn.var {
-  border-radius: 7px;
+  border-radius: var(--r-md);
   background: var(--accent-soft);
   color: var(--accent);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--fs-12);
   box-shadow: none;
 }
 .chip-btn:focus-visible,
@@ -344,7 +344,7 @@
   height: 28px;
   padding: 0 10px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--r-md);
   background: transparent;
   color: var(--info);
   font: inherit;
@@ -359,7 +359,7 @@
   flex-direction: column;
   margin-top: 6px;
   padding: 4px 12px;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: var(--input-bg);
   box-shadow: inset 0 0 0 1px var(--divider);
 }
@@ -373,7 +373,7 @@
   box-shadow: inset 0 1px 0 var(--divider);
 }
 .f-broadcast-preview-body {
-  font-size: 12.5px;
+  font-size: var(--fs-12);
   line-height: 1.5;
   color: var(--text);
   white-space: pre-wrap;
@@ -440,7 +440,7 @@
 .f-broadcast-time {
   flex: none;
   width: 44px;
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: var(--text-3);
 }
 .f-broadcast-hist-main {
@@ -451,12 +451,12 @@
   gap: 2px;
 }
 .f-broadcast-hist-text {
-  font-size: 12.5px;
+  font-size: var(--fs-12);
   color: var(--text);
   overflow-wrap: anywhere;
 }
 .f-broadcast-hist-meta {
-  font-size: 11px;
+  font-size: var(--fs-11);
   color: var(--text-3);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -531,7 +531,7 @@
   display: inline-block;
   max-width: min(440px, calc(100vw - 36px));
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: var(--toast-bg);
   color: var(--text);
   box-shadow: var(--e-2);

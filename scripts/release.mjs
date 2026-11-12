@@ -4,10 +4,22 @@
 // correr `npm run release`.
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 
-// npm/npx son .cmd en Windows y necesitan shell; gh es un .exe y va sin shell (si no, parte los textos con espacios).
+// npm y npx son .cmd en Windows y execFileSync no los corre sin shell (y `shell: true` con args da DEP0190):
+// se llama a node con el script JS de npm. gh es un .exe y va directo.
+const npmCli = (nombre) => {
+  const junto = join(dirname(process.execPath), 'node_modules', 'npm', 'bin', `${nombre}-cli.js`)
+  if (existsSync(junto)) return junto
+  const deNpm = process.env.npm_execpath
+  const hermano = deNpm && join(dirname(deNpm), `${nombre}-cli.js`)
+  if (hermano && existsSync(hermano)) return hermano
+  throw new Error(`No encuentro ${nombre}-cli.js junto a node (${process.execPath}).`)
+}
 const run = (cmd, args) =>
-  execFileSync(cmd, args, { stdio: 'inherit', shell: process.platform === 'win32' && (cmd === 'npm' || cmd === 'npx') })
+  process.platform === 'win32' && (cmd === 'npm' || cmd === 'npx')
+    ? execFileSync(process.execPath, [npmCli(cmd), ...args], { stdio: 'inherit' })
+    : execFileSync(cmd, args, { stdio: 'inherit' })
 const { version } = JSON.parse(readFileSync('package.json', 'utf8'))
 const tag = `v${version}`
 const files = [`dist/Sloth-Setup-${version}.exe`, `dist/Sloth-Setup-${version}.exe.blockmap`, 'dist/latest.yml']

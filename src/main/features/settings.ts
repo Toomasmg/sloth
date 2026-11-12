@@ -11,6 +11,7 @@ import {
   type SlothSettings,
   type ThemeChoice
 } from './settings-model'
+import { SURFACE } from '../../shared/surfaces'
 
 /**
  * Función «settings» (lado main): guarda la Configuración en userData/features/settings.json,
@@ -35,12 +36,14 @@ function read(): SlothSettings {
   }
 }
 
-/** Colores de la barra de título que dibuja Windows (los botones de ventana), por tema. */
+/** Colores de la barra de título que dibuja Windows (los botones de ventana): el fondo es el --surface del tema (src/shared/surfaces.ts). */
 const CHROME = {
-  // Igual a --bg del estilo A (tokens.css) y del claro (tokens.css).
-  dark: { bg: '#111318', symbol: '#8b93a3' },
-  light: { bg: '#f1f2f5', symbol: '#5c6474' }
+  dark: { bg: SURFACE.dark, symbol: '#8b93a3' },
+  night: { bg: SURFACE.night, symbol: '#8b93a3' },
+  light: { bg: SURFACE.light, symbol: '#5c6474' }
 }
+const chromeFor = (theme: ThemeChoice, dark: boolean): { bg: string; symbol: string } =>
+  !dark ? CHROME.light : theme === 'noche' ? CHROME.night : CHROME.dark
 
 /**
  * Colores de la ventana ANTES de crearla (los usa src/main/index.ts en new BrowserWindow): así no
@@ -50,7 +53,7 @@ export function initialChrome(): { bg: string; symbol: string; dark: boolean } {
   const s = read()
   nativeTheme.themeSource = themeSource(s.theme)
   const dark = resolveDark(s.theme, nativeTheme.shouldUseDarkColors)
-  return { ...(dark ? CHROME.dark : CHROME.light), dark }
+  return { ...chromeFor(s.theme, dark), dark }
 }
 
 /** «Según Windows» sigue al sistema en vivo (evento nativeTheme «updated»); los demás fijan el tema. */
@@ -78,7 +81,7 @@ function payload(): SettingsPayload {
 
 function paintWindow(win: BrowserWindow | null, dark: boolean): void {
   if (!win || win.isDestroyed()) return
-  const c = dark ? CHROME.dark : CHROME.light
+  const c = chromeFor(settings.theme, dark)
   try {
     win.setBackgroundColor(c.bg)
     win.setTitleBarOverlay({ color: c.bg, symbolColor: c.symbol })

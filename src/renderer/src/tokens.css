@@ -135,6 +135,18 @@
   --search-bg: #171a22;
   --seg-on: #3a4152;
   --perm-bg: #1a1d26;
+  --chip-bg: rgba(255, 255, 255, 0.06);
+  --waiting-strong: rgba(240, 180, 90, 0.22);
+  --danger-strong: rgba(255, 122, 122, 0.22);
+  --thumb: rgba(255, 255, 255, 0.1);
+  --thumb-hover: rgba(255, 255, 255, 0.18);
+  --track-off: #3a4152;
+  --knob: #ffffff;
+  --knob-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --e-side: -16px 0 48px rgba(0, 0, 0, 0.4);
+  --ink: #0b0d12;
+  --amber: #f0b45a;
+  --amber-fg: #1c1406;
 
   /* Terminal: settings/store.ts arma el tema de xterm leyendo estos. */
   --term-bg: #0f1117;
@@ -229,6 +241,14 @@ html[data-theme='light'] {
   --search-bg: #ebebe7;
   --seg-on: #ffffff;
   --perm-bg: #fdf7ec;
+  --chip-bg: rgba(16, 22, 34, 0.06);
+  --waiting-strong: rgba(163, 90, 0, 0.2);
+  --danger-strong: rgba(198, 40, 40, 0.16);
+  --thumb: rgba(16, 22, 34, 0.16);
+  --thumb-hover: rgba(16, 22, 34, 0.26);
+  --track-off: #d4d6dc;
+  --knob-shadow: 0 1px 2px rgba(16, 22, 34, 0.25);
+  --e-side: -16px 0 48px rgba(16, 22, 34, 0.16);
 
   --term-bg: #ffffff;
   --term-fg: #1f2430;

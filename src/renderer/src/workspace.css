@@ -3,7 +3,7 @@
 /* Ícono del espacio (sidebar, pestañas y header). Nunca solo color: es un emoji. */
 .pane-tab-icon {
   flex: none;
-  font-size: 13px;
+  font-size: var(--fs-13);
   line-height: 1;
   min-width: 1.2em;
   text-align: center;
@@ -37,7 +37,7 @@
 .pane-title-input {
   width: min(24ch, 100%);
   flex: 0 1 auto;
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 .ws-rename:focus-visible,
 .pane-title-input:focus-visible {
@@ -67,7 +67,7 @@
   width: 26px;
   height: 26px;
   padding: 0;
-  font-size: 16px;
+  font-size: var(--fs-15);
   line-height: 1;
   background: transparent;
   border: 0;
@@ -99,12 +99,12 @@
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  background: var(--backdrop-soft, rgba(10, 11, 15, 0.6));
+  background: var(--backdrop-soft);
 }
 .folder-drop-card {
   padding: 18px 26px;
   font-weight: 600;
-  font-size: 15px;
+  font-size: var(--fs-15);
   color: var(--text);
   background: var(--surface);
   border: 2px dashed var(--accent);
