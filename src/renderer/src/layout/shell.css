@@ -258,7 +258,7 @@
   min-height: 0;
   min-width: 0;
   /* Un panel lateral (chat, git) empuja los paneles en vez de taparlos. */
-  margin-right: var(--side-panel-w);
+  margin-right: var(--side-panel-w, 0px);
 }
 .sl-body.no-side {
   grid-template-columns: minmax(0, 1fr);

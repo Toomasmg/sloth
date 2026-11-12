@@ -1,7 +1,7 @@
 /* Vista: ocupa el lugar de la barra lateral y los paneles; quedan a la vista la barra superior, el riel y la de estado. */
 .ui-view {
   position: fixed;
-  inset: var(--top-h) var(--side-panel-w) var(--status-h) var(--rail-w);
+  inset: var(--top-h) var(--side-panel-w, 0px) var(--status-h) var(--rail-w);
   z-index: var(--z-panel);
   display: flex;
   flex-direction: column;
