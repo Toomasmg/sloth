@@ -1,0 +1,345 @@
+/* Sloth — tokens de diseño. Es el único lugar con colores, tamaños y capas escritos a mano:
+   el resto del CSS usa var(--…) (lo verifica `npm run lint:css`). Se carga antes que styles.css.
+   El contraste de los pares texto/fondo lo prueba tokens.test.ts.
+   Atributos que pone features/settings/store.ts en <html>: data-theme="dark|light", data-density,
+   data-accent y --ui-font-size (12–15), que mueve toda la escala tipográfica. */
+
+:root {
+  /* ---------- Tipografía: 6 tamaños, todos relativos a --ui-font-size ---------- */
+  --fs-11: calc(var(--ui-font-size, 13px) - 2px);
+  --fs-12: calc(var(--ui-font-size, 13px) - 1px);
+  --fs-13: var(--ui-font-size, 13px);
+  --fs-15: calc(var(--ui-font-size, 13px) + 2px);
+  --fs-18: calc(var(--ui-font-size, 13px) + 5px);
+  --fs-24: calc(var(--ui-font-size, 13px) + 11px);
+  --lh-body: 1.45;
+  --lh-title: 1.25;
+  --font-ui: 'Inter Variable', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --font-display: var(--font-ui);
+  --font-mono: 'JetBrains Mono Variable', 'Cascadia Code', Consolas, monospace;
+
+  /* ---------- Espaciado (base 4) y medidas de control ---------- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --h-xs: 24px;
+  --h-sm: 28px;
+  --h-md: 32px;
+  --h-lg: 40px;
+  --pane-head-h: 36px;
+  --row-min-h: 48px;
+  --side-w: 264px;
+
+  /* ---------- Radios ---------- */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 10px;
+  --r-full: 999px;
+
+  /* ---------- Movimiento ---------- */
+  --t-fast: 120ms;
+  --t-med: 200ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* ---------- Capas ---------- */
+  --z-pane: 1;
+  --z-sticky: 10;
+  --z-panel: 20;
+  --z-menu: 30;
+  --z-modal: 40;
+  --z-toast: 50;
+  --z-palette: 60;
+
+  /* ---------- Color: superficies (se separan por tono) ---------- */
+  --bg: #0c0e13;
+  --sunken: #090a0e;
+  --surface: #101218;
+  --raised: #161922;
+  --overlay: #1c202a;
+
+  /* ---------- Color: texto ---------- */
+  --text: #ececf0;
+  --text-2: #a6abb8;
+  --text-3: #8b909c;
+  --placeholder: #80869a;
+
+  /* ---------- Color: bordes ---------- */
+  --divider: rgba(255, 255, 255, 0.07);
+  --divider-strong: rgba(255, 255, 255, 0.12);
+  --control-border: #646b7d;
+
+  /* ---------- Color: acción y estados de Claude ---------- */
+  --accent: #8ab4ff;
+  --accent-fg: #0b1020;
+  --on-accent: var(--accent-fg);
+  --accent-soft: rgba(138, 180, 255, 0.14);
+  --focus: var(--accent);
+  --working: #8ab4ff;
+  --working-soft: rgba(138, 180, 255, 0.14);
+  --waiting: #f0b45a;
+  --waiting-soft: rgba(240, 180, 90, 0.14);
+  --done: #5fd4a6;
+  --done-soft: rgba(95, 212, 166, 0.14);
+  --danger: #ff8a8a;
+  --danger-soft: rgba(255, 138, 138, 0.14);
+  --team: #b59cff;
+  --team-soft: rgba(181, 156, 255, 0.14);
+  --info: #a9c7ff;
+  --info-soft: rgba(138, 180, 255, 0.14);
+
+  /* ---------- Elevación y capa oscura de los modales ---------- */
+  --e-0: none;
+  --e-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --e-2: 0 16px 40px rgba(0, 0, 0, 0.45);
+  --e-3: 0 24px 64px rgba(0, 0, 0, 0.5);
+  --scrim: rgba(8, 9, 12, 0.66);
+
+  /* ---------- Alias de los nombres de antes (obsoletos: se van en la fase 7) ---------- */
+  --fg: var(--text);
+  --fg-2: var(--text-2);
+  --fg-3: var(--text-3);
+  --fg-muted: var(--text-3);
+  --card: var(--raised);
+  --border: var(--divider);
+  --line: var(--divider);
+  --border-strong: var(--divider-strong);
+  --line-strong: var(--divider-strong);
+  --line-2: var(--divider-strong);
+  --warn: var(--waiting);
+  --warn-soft: var(--waiting-soft);
+  --success: var(--done);
+  --success-soft: var(--done-soft);
+  --ok: var(--done);
+  --ring: var(--accent);
+  --acc: var(--accent);
+  --brand-1: var(--accent);
+  --brand-2: var(--accent);
+  --brand-grad: var(--accent);
+  --brand-text: var(--accent);
+  --brand-glow: 0 0 0 3px rgba(138, 180, 255, 0.28);
+  --check-border: var(--control-border);
+  --r-xs: var(--r-sm);
+  --radius-sm: var(--r-md);
+  --radius: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --fs-xs: var(--fs-11);
+  --fs-sm: var(--fs-12);
+  --fs-md: var(--fs-13);
+  --fs-lg: var(--fs-15);
+  --fs-xl: var(--fs-18);
+  --backdrop: var(--scrim);
+  --shadow-md: var(--e-2);
+  --shadow-lg: var(--e-3);
+  --press: var(--muted);
+  --hover: var(--surface-hover);
+
+  /* ---------- Superficies y controles heredados (aún los usan estilos viejos) ---------- */
+  --surface-2: #111319;
+  --card-hover: #1b1f29;
+  --surface-hover: #222734;
+  --muted: #2b3242;
+  --input-bg: #0f1117;
+  --btn-2: #262b37;
+  --open-bg: rgba(255, 255, 255, 0.03);
+  --row-hover: rgba(255, 255, 255, 0.045);
+  --diff-add: rgba(95, 212, 166, 0.1);
+  --diff-del: rgba(255, 122, 122, 0.1);
+  --selection: rgba(138, 180, 255, 0.3);
+  --mark: rgba(240, 180, 90, 0.28);
+  --info-fg: var(--info);
+  --warn-fg: #f5c77e;
+  --warn-strong-fg: #ffd699;
+  --warn-ring: rgba(240, 180, 90, 0.4);
+  --warn-tint: rgba(240, 180, 90, 0.06);
+  --warn-line: rgba(240, 180, 90, 0.22);
+  --danger-fg: #ff9a9a;
+  --danger-fg-strong: #ffb8b8;
+  --success-fg: #7fe0b9;
+  --ok-fg: var(--success-fg);
+  --team-fg: #c9b8ff;
+  --team-on: #140f24;
+  --backdrop-soft: rgba(10, 11, 15, 0.6);
+  --toast-bg: #1f2330;
+  --toast-border: rgba(255, 122, 122, 0.35);
+  --card-acc: #14171f;
+  --panes-bg: var(--sunken);
+  --pane-bg: #0f1117;
+  --search-bg: #171a22;
+  --newbtn-bg: #191c25;
+  --seg-on: #3a4152;
+  --fg-label: #c9cdd6;
+  --chip-bg: #20242e;
+  --confirm-bg: #1a1d26;
+  --perm-bg: #1a1d26;
+
+  /* Terminal: settings/store.ts arma el tema de xterm leyendo estos. */
+  --term-bg: #0f1117;
+  --term-fg: #c9cdd6;
+  --term-cursor: #8ab4ff;
+  --term-selection: rgba(138, 180, 255, 0.3);
+  /* Logo (Logo.tsx). */
+  --logo-1: #8ab4ff;
+  --logo-2: #5b86c9;
+  --logo-core-fill: #1b1f29;
+  --logo-prompt: #8ab4ff;
+}
+
+/* ---------- Densidad «cómoda»: más aire y controles más altos ---------- */
+html[data-density='comfortable'] {
+  --s-1: 5px;
+  --s-2: 10px;
+  --s-3: 14px;
+  --s-4: 18px;
+  --s-5: 26px;
+  --s-6: 36px;
+  --h-xs: 26px;
+  --h-sm: 30px;
+  --h-md: 36px;
+  --h-lg: 44px;
+  --pane-head-h: 42px;
+  --row-min-h: 54px;
+}
+
+/* ---------- Tema claro: misma estructura que el oscuro ---------- */
+html[data-theme='light'] {
+  --bg: #f6f6f4;
+  --sunken: #ededea;
+  --surface: #ededea;
+  --raised: #ffffff;
+  --overlay: #ffffff;
+
+  --text: #1d2027;
+  --text-2: #434a57;
+  --text-3: #5c6270;
+  --placeholder: #6b7180;
+
+  --divider: rgba(16, 22, 34, 0.08);
+  --divider-strong: rgba(16, 22, 34, 0.14);
+  --control-border: #858b97;
+
+  --accent: #2862d0;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(40, 98, 208, 0.12);
+  --working: #2862d0;
+  --working-soft: rgba(40, 98, 208, 0.12);
+  --waiting: #a35a00;
+  --waiting-soft: rgba(163, 90, 0, 0.12);
+  --done: #1a7f57;
+  --done-soft: rgba(26, 127, 87, 0.12);
+  --danger: #c62828;
+  --danger-soft: rgba(198, 40, 40, 0.1);
+  --team: #6f4fd6;
+  --team-soft: rgba(111, 79, 214, 0.12);
+  --info: #2862d0;
+  --info-soft: rgba(40, 98, 208, 0.12);
+
+  --e-1: 0 1px 2px rgba(16, 22, 34, 0.08);
+  --e-2: 0 0 0 1px rgba(16, 22, 34, 0.08), 0 16px 40px rgba(16, 22, 34, 0.14);
+  --e-3: 0 0 0 1px rgba(16, 22, 34, 0.08), 0 24px 64px rgba(16, 22, 34, 0.18);
+  --scrim: rgba(18, 22, 32, 0.28);
+
+  --brand-glow: 0 0 0 3px rgba(40, 98, 208, 0.28);
+  --surface-2: #e8e8e4;
+  --card-hover: #f3f3f0;
+  --surface-hover: #ebebe7;
+  --muted: #e2e2dd;
+  --input-bg: #ffffff;
+  --btn-2: #ffffff;
+  --open-bg: rgba(16, 22, 34, 0.03);
+  --row-hover: rgba(16, 22, 34, 0.04);
+  --hover: rgba(16, 22, 34, 0.045);
+  --press: rgba(16, 22, 34, 0.07);
+  --diff-add: rgba(26, 127, 87, 0.12);
+  --diff-del: rgba(198, 40, 40, 0.1);
+  --selection: rgba(40, 98, 208, 0.22);
+  --mark: rgba(163, 90, 0, 0.22);
+  --warn-fg: #8a4a00;
+  --warn-strong-fg: #8a5a00;
+  --warn-ring: rgba(163, 90, 0, 0.4);
+  --warn-tint: #fbf7ef;
+  --warn-line: rgba(163, 90, 0, 0.16);
+  --danger-fg: #b3261e;
+  --danger-fg-strong: #8e1b16;
+  --success-fg: #13663f;
+  --team-fg: #5a3cc0;
+  --team-on: #ffffff;
+  --backdrop-soft: rgba(18, 22, 32, 0.22);
+  --toast-bg: #fdf0f0;
+  --toast-border: rgba(198, 40, 40, 0.25);
+  --card-acc: #ffffff;
+  --panes-bg: #e6e6e2;
+  --pane-bg: #ffffff;
+  --search-bg: #ebebe7;
+  --newbtn-bg: #ffffff;
+  --seg-on: #ffffff;
+  --fg-label: #3d4250;
+  --chip-bg: #ebebe7;
+  --confirm-bg: #fdf7ec;
+  --perm-bg: #fdf7ec;
+
+  --term-bg: #ffffff;
+  --term-fg: #1f2430;
+  --term-cursor: #2862d0;
+  --term-selection: rgba(40, 98, 208, 0.2);
+  --logo-1: #2862d0;
+  --logo-2: #2459b8;
+  --logo-core-fill: #12151c;
+  --logo-prompt: #2862d0;
+
+  color-scheme: light;
+}
+
+/* ---------- Acento elegible (Configuración › Apariencia) ----------
+   En claro cada acento tiene que dar 4,5:1 contra el fondo y con el texto blanco encima. */
+html[data-accent='cielo'] {
+  --accent: #8ab4ff;
+  --accent-fg: #0b1020;
+  --accent-soft: rgba(138, 180, 255, 0.14);
+}
+html[data-accent='hoja'] {
+  --accent: #5fd4a6;
+  --accent-fg: #0b1020;
+  --accent-soft: rgba(95, 212, 166, 0.14);
+}
+html[data-accent='lila'] {
+  --accent: #b59cff;
+  --accent-fg: #0b1020;
+  --accent-soft: rgba(181, 156, 255, 0.14);
+}
+html[data-accent='ambar'] {
+  --accent: #f0b45a;
+  --accent-fg: #0b1020;
+  --accent-soft: rgba(240, 180, 90, 0.14);
+}
+html[data-theme='light'][data-accent='cielo'] {
+  --accent: #2862d0;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(40, 98, 208, 0.12);
+}
+html[data-theme='light'][data-accent='hoja'] {
+  --accent: #1a7f57;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(26, 127, 87, 0.12);
+}
+html[data-theme='light'][data-accent='lila'] {
+  --accent: #6f4fd6;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(111, 79, 214, 0.12);
+}
+html[data-theme='light'][data-accent='ambar'] {
+  --accent: #a35a00;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(163, 90, 0, 0.12);
+}
+
+/* ---------- «Más oscuro» (data-night): solo fondos y superficies; no aplica en claro ---------- */
+html[data-night='true']:not([data-theme='light']) {
+  --bg: #07080b;
+  --surface: #0b0c10;
+  --surface-2: #0b0c10;
+  --raised: #101218;
+}
