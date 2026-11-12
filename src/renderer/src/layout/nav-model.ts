@@ -16,7 +16,7 @@ export const NAV_LABEL: Record<NavDest, string> = {
 
 /**
  * A qué destino pertenece cada Vista, por el id de su título. Las que se abren desde otra (Reportar
- * desde Ayuda, Exportar desde Configuración) marcan a su madre.
+ * y Primeros pasos desde Ayuda, Exportar desde Configuración) marcan a su madre.
  */
 const VIEW_DEST: Record<string, NavDest> = {
   'f-tickets-view-title': 'tickets',
@@ -25,6 +25,7 @@ const VIEW_DEST: Record<string, NavDest> = {
   'f-wt-view-title': 'ramas',
   'ay-view-title': 'ayuda',
   'rp-view-title': 'ayuda',
+  'fr-view-title': 'ayuda',
   'f-set-view-title': 'ajustes',
   'f-ei-view-title': 'ajustes'
 }

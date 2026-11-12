@@ -30,6 +30,7 @@ test('la Vista de arriba define el destino; Reportar y Exportar marcan a su madr
   assert.equal(destOf(null), 'espacios')
   assert.equal(destOf('f-tickets-view-title'), 'tickets')
   assert.equal(destOf('rp-view-title'), 'ayuda')
+  assert.equal(destOf('fr-view-title'), 'ayuda')
   assert.equal(destOf('f-ei-view-title'), 'ajustes')
   assert.equal(destOf('otra-cosa'), 'espacios')
 })
