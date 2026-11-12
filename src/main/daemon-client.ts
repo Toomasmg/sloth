@@ -131,7 +131,7 @@ class InProcessBackend extends EventEmitter implements TerminalBackend {
     return this.core.isRunning(id)
   }
   async shutdown(): Promise<void> {
-    this.core.killAll()
+    await this.core.closeAll()
     this.core.close()
   }
   answerPermission(reqId: string, decision: object | null): void {
