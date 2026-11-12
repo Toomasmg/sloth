@@ -63,7 +63,7 @@ function infracciones(ruta, texto) {
 }
 
 if (process.argv.includes('--todo')) {
-  const todos = git('ls-files', '--cached', '--others', '--exclude-standard', '--', '*.css').split('\n').filter(Boolean)
+  const todos = git('ls-files', '--', 'src/**/*.css').split('\n').filter(Boolean)
   const todas = todos.flatMap((ruta) => infracciones(ruta, readFileSync(ruta, 'utf8')))
   const porRegla = {}
   for (const v of todas) porRegla[v.regla.id] = (porRegla[v.regla.id] ?? 0) + 1

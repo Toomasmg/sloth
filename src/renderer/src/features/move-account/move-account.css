@@ -2,7 +2,7 @@
    Medidas en px literales (los --s-* de themes.css no coinciden con el diseño); colores por token. */
 
 .f-move-backdrop {
-  background: rgba(4, 5, 8, 0.66);
+  background: var(--scrim);
 }
 html[data-theme='light'] .f-move-backdrop {
   background: var(--scrim);
@@ -16,11 +16,11 @@ html[data-theme='light'] .f-move-backdrop {
   gap: 16px;
   padding: 22px;
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   background: var(--raised);
   box-shadow: var(--e-3), inset 0 0 0 1px var(--divider-strong);
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--fs-13);
 }
 
 .f-move-head {
@@ -39,30 +39,30 @@ html[data-theme='light'] .f-move-backdrop {
 }
 .f-move-titles h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--fs-18);
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--text);
 }
 .f-move-titles p {
   margin: 6px 0 0;
-  font-size: 13px;
+  font-size: var(--fs-13);
   color: var(--text-2);
   line-height: 1.5;
 }
 
 .f-move-muted {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-3);
   line-height: 1.5;
 }
 .f-move-hint {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-3);
 }
 .f-move-label {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-2);
 }
 
@@ -72,7 +72,7 @@ html[data-theme='light'] .f-move-backdrop {
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--divider);
 }
@@ -80,7 +80,7 @@ html[data-theme='light'] .f-move-backdrop {
   width: 36px;
   height: 36px;
   flex: none;
-  border-radius: 9px;
+  border-radius: var(--r-lg);
   background: var(--accent-soft);
   color: var(--info);
   display: grid;
@@ -99,14 +99,14 @@ html[data-theme='light'] .f-move-backdrop {
 .f-move-space-path {
   margin-top: 2px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-2);
   overflow-wrap: anywhere;
 }
 .f-move-space-acc {
   flex: none;
   text-align: right;
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-3);
 }
 .f-move-space-acc strong {
@@ -123,14 +123,14 @@ html[data-theme='light'] .f-move-backdrop {
 }
 .f-move-h3 {
   margin: 0 0 0 4px;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   color: var(--text-2);
 }
 
 /* Cuentas destino (radiogroup) */
 .f-move-list {
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
@@ -163,7 +163,7 @@ html[data-theme='light'] .f-move-backdrop {
 }
 .f-move-opt.on {
   background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px rgba(138, 180, 255, 0.55);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent);
 }
 .f-move-opt:focus-within {
   outline: 2px solid var(--accent);
@@ -200,7 +200,7 @@ html[data-theme='light'] .f-move-backdrop {
   font-weight: 600;
 }
 .f-move-opt-sub {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--text-2);
 }
 .f-move-opt-sub.warn {
@@ -208,9 +208,9 @@ html[data-theme='light'] .f-move-backdrop {
 }
 .f-move-badge {
   flex: none;
-  font-size: 11px;
+  font-size: var(--fs-11);
   padding: 3px 8px;
-  border-radius: 9px;
+  border-radius: var(--r-lg);
   background: var(--btn-2);
   color: var(--text-2);
 }
@@ -219,7 +219,7 @@ html[data-theme='light'] .f-move-backdrop {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  box-shadow: inset 0 0 0 1.5px #4a5160;
+  box-shadow: inset 0 0 0 1.5px var(--control-border);
   display: grid;
   place-items: center;
 }
@@ -241,11 +241,11 @@ html[data-theme='light'] .f-move-backdrop {
   margin-right: 12px;
   padding: 0 12px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--accent);
   color: var(--accent-fg);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--fs-12);
   font-weight: 600;
   cursor: pointer;
   transition: filter 0.12s;
@@ -258,7 +258,7 @@ html[data-theme='light'] .f-move-backdrop {
 .f-move-box {
   margin: 0;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--surface);
   box-shadow: inset 0 0 0 1px var(--divider);
 }
@@ -298,7 +298,7 @@ html[data-theme='light'] .f-move-backdrop {
   width: 100%;
   padding: 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--input-bg);
   color: var(--text);
   font: inherit;
@@ -308,7 +308,7 @@ html[data-theme='light'] .f-move-backdrop {
 }
 .f-move-text:focus {
   outline: none;
-  box-shadow: inset 0 0 0 1px rgba(138, 180, 255, 0.7), 0 0 0 3px rgba(138, 180, 255, 0.18);
+  box-shadow: inset 0 0 0 1px var(--accent), var(--brand-glow);
 }
 .f-move-text:disabled {
   opacity: 0.6;
@@ -321,7 +321,7 @@ html[data-theme='light'] .f-move-backdrop {
   align-items: center;
   gap: 10px 12px;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   line-height: 1.4;
 }
 .f-move-banner.warn {
@@ -333,7 +333,7 @@ html[data-theme='light'] .f-move-backdrop {
   flex: none;
   width: 30px;
   height: 30px;
-  border-radius: 9px;
+  border-radius: var(--r-lg);
   background: color-mix(in srgb, var(--waiting) 18%, transparent);
   color: var(--warn-fg);
   display: grid;
@@ -365,7 +365,7 @@ html[data-theme='light'] .f-move-backdrop {
   height: 30px;
   padding: 0 12px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--btn-2);
   color: var(--text);
   font: inherit;
@@ -394,7 +394,7 @@ html[data-theme='light'] .f-move-backdrop {
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: color-mix(in srgb, var(--done) 8%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--done) 30%, transparent);
   color: var(--text);
@@ -411,7 +411,7 @@ html[data-theme='light'] .f-move-backdrop {
   gap: 10px;
 }
 .f-move-err {
-  font-size: 12px;
+  font-size: var(--fs-12);
   color: var(--danger-fg);
   line-height: 1.5;
 }
@@ -431,7 +431,7 @@ html[data-theme='light'] .f-move-backdrop {
   height: 34px;
   padding: 0 12px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: transparent;
   color: var(--text-2);
   font: inherit;
@@ -441,7 +441,7 @@ html[data-theme='light'] .f-move-backdrop {
   min-height: 34px;
   padding: 0 16px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   background: var(--accent);
   color: var(--accent-fg);
   font: inherit;
@@ -467,7 +467,7 @@ html[data-theme='light'] .f-move-backdrop {
   align-items: center;
   gap: 14px;
   padding: 16px;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--surface);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
 }
@@ -503,7 +503,7 @@ html[data-theme='light'] .f-move-backdrop {
   flex-direction: column;
   gap: 8px;
   padding: 16px;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: color-mix(in srgb, var(--done) 8%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--done) 30%, transparent);
 }

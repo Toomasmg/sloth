@@ -5,12 +5,12 @@
 .pc-card {
   margin: 0 10px 10px;
   padding: 14px;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   display: flex;
   flex-direction: column;
   gap: 10px;
   background: var(--perm-bg);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 0 0 1px var(--warn-ring);
+  box-shadow: var(--e-2), inset 0 0 0 1px var(--warn-ring);
   animation: pc-in 160ms var(--ease);
 }
 @keyframes pc-in {
@@ -30,8 +30,8 @@
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 9px;
-  background: rgba(240, 180, 90, 0.18);
+  border-radius: var(--r-lg);
+  background: var(--waiting-strong);
   color: var(--waiting);
 }
 .pc-head-text {
@@ -73,7 +73,7 @@
   background: var(--bg);
   box-shadow: inset 0 0 0 1px var(--divider);
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: var(--fs-12);
   color: var(--text);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -145,7 +145,7 @@
   overflow: hidden;
   outline: none;
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--r-lg);
   background: var(--raised);
   box-shadow: var(--e-3), inset 0 0 0 1px var(--divider-strong);
 }
@@ -170,7 +170,7 @@
   align-items: center;
   min-height: 22px;
   padding: 0 9px;
-  border-radius: 11px;
+  border-radius: var(--r-lg);
   font-size: var(--fs-12);
   font-weight: 500;
 }
@@ -198,8 +198,8 @@
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 10px;
-  background: rgba(240, 180, 90, 0.18);
+  border-radius: var(--r-lg);
+  background: var(--waiting-strong);
   color: var(--warn-fg);
 }
 .pr-head-text {
@@ -281,7 +281,7 @@
   display: block;
   margin: 0;
   padding: 11px 13px;
-  border-radius: 9px;
+  border-radius: var(--r-lg);
   background: var(--bg);
   box-shadow: inset 0 0 0 1px var(--divider);
   font-family: var(--font-mono);
@@ -298,7 +298,7 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  border-radius: 9px;
+  border-radius: var(--r-lg);
   background: var(--bg);
   box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
@@ -326,7 +326,7 @@
   padding: 0 6px;
   display: inline-flex;
   align-items: center;
-  border-radius: 9px;
+  border-radius: var(--r-lg);
   background: var(--accent-soft);
   color: var(--accent);
   font-size: var(--fs-11);
@@ -342,7 +342,7 @@
 .pr-diff {
   margin-top: 4px;
   padding: 8px 0;
-  border-radius: 9px;
+  border-radius: var(--r-lg);
   background: var(--bg);
   box-shadow: inset 0 0 0 1px var(--divider);
   font-family: var(--font-mono);
@@ -373,7 +373,7 @@
   height: 28px;
   padding: 0 10px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--r-md);
   background: transparent;
   color: var(--accent);
   font: inherit;
@@ -413,7 +413,7 @@
   min-height: 64px;
   padding: 9px 11px;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--r-lg);
   background: var(--input-bg);
   resize: vertical;
   box-shadow: inset 0 0 0 1px var(--divider-strong);
@@ -485,7 +485,7 @@
   overflow: hidden;
   margin-left: auto;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   background: var(--raised);
   box-shadow: var(--e-3), inset 0 0 0 1px var(--divider);
 }
@@ -494,10 +494,10 @@
   height: 18px;
 }
 .pd-modal .switch input:not(:checked) + .switch-track {
-  background: var(--seg-on, #3a4152);
+  background: var(--seg-on);
 }
 .pd-tabs .seg > button[aria-pressed='true'] {
-  background: var(--seg-on, #3a4152);
+  background: var(--seg-on);
 }
 .pd-dnd .switch-track::after {
   width: 14px;
@@ -595,7 +595,7 @@
   border-radius: var(--r-sm);
 }
 .pd-row:hover {
-  background: var(--row-hover, rgba(255, 255, 255, 0.045));
+  background: var(--row-hover);
 }
 .pd-time {
   flex: none;
@@ -623,7 +623,7 @@
   align-items: center;
   height: 18px;
   padding: 0 7px;
-  border-radius: 9px;
+  border-radius: var(--r-lg);
   font-size: var(--fs-11);
   font-weight: 500;
   background: var(--hover);
@@ -634,7 +634,7 @@
   color: var(--success-fg);
 }
 .pd-tag.lila {
-  background: rgba(181, 156, 255, 0.16);
+  background: var(--team-soft);
   color: var(--team-fg);
 }
 .pd-tag.coral {

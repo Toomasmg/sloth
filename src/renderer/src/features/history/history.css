@@ -23,7 +23,7 @@
 
 .hist-intro h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--fs-24);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
@@ -252,7 +252,7 @@
   box-sizing: border-box;
   padding: 10px 12px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: transparent;
   color: var(--text);
   font: inherit;
@@ -278,7 +278,7 @@
   background: var(--selection);
   color: inherit;
   font-weight: 700;
-  border-radius: 3px;
+  border-radius: var(--r-sm);
 }
 .hist-snip {
   font-size: var(--fs-12);
@@ -310,7 +310,7 @@
   height: 20px;
   padding: 0 7px;
   gap: 5px;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   font-size: inherit;
   font-weight: 500;
 }
@@ -375,7 +375,7 @@
 }
 .hd-title {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--fs-18);
   font-weight: 700;
   letter-spacing: -0.01em;
   line-height: 1.3;
@@ -392,7 +392,7 @@
 .hd-meta .chip {
   height: 20px;
   padding: 0 8px;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   font-size: inherit;
   font-weight: 500;
 }
@@ -475,7 +475,7 @@
 .hd-summary {
   margin: 0;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: var(--input-bg);
   box-shadow: inset 0 0 0 1px var(--divider);
   line-height: 1.55;
@@ -526,7 +526,7 @@
 
 .hd-tool {
   margin-left: 36px;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: var(--input-bg);
   box-shadow: inset 0 0 0 1px var(--divider);
   overflow: hidden;
@@ -609,7 +609,7 @@
 }
 
 .hd-files {
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: var(--input-bg);
   box-shadow: inset 0 0 0 1px var(--divider);
 }
@@ -656,7 +656,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--r-lg);
   background: var(--toast-bg);
   color: var(--text);
   box-shadow: var(--e-2), inset 0 0 0 1px var(--divider-strong);

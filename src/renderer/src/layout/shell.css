@@ -254,11 +254,11 @@
   grid-row: 2;
   position: relative;
   display: grid;
-  grid-template-columns: var(--side-w, 264px) minmax(0, 1fr);
+  grid-template-columns: var(--side-w) minmax(0, 1fr);
   min-height: 0;
   min-width: 0;
   /* Un panel lateral (chat, git) empuja los paneles en vez de taparlos. */
-  margin-right: var(--side-panel-w, 0px);
+  margin-right: var(--side-panel-w);
 }
 .sl-body.no-side {
   grid-template-columns: minmax(0, 1fr);
@@ -272,7 +272,7 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(var(--side-w, 264px) - 3px);
+  left: calc(var(--side-w) - 3px);
   width: 6px;
   z-index: var(--z-sticky);
   cursor: col-resize;

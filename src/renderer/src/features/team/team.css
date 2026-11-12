@@ -355,8 +355,8 @@
   flex: none;
   height: 18px;
   padding: 0 6px;
-  border-radius: 999px;
-  font-size: 10.5px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-11);
   font-weight: 600;
   white-space: nowrap;
   background: var(--hover);

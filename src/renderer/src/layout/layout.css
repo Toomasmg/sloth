@@ -116,7 +116,7 @@ body.is-resizing-row * {
   top: 3px;
   bottom: 3px;
   width: 2px;
-  border-radius: 1px;
+  border-radius: var(--r-sm);
   background: var(--accent);
 }
 .pane-tab.drop-before::before {
@@ -149,7 +149,7 @@ body.is-resizing-row * {
   cursor: row-resize;
 }
 .pane-sep-line {
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   background: var(--accent);
   opacity: 0;
   transition: opacity var(--t-fast) var(--ease);
@@ -182,7 +182,7 @@ body.is-resizing-row * {
   z-index: calc(var(--z-pane) + 3);
   pointer-events: none;
   background: var(--accent);
-  border-radius: 1px;
+  border-radius: var(--r-sm);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .pane-guide[hidden] {
@@ -207,7 +207,7 @@ body.is-resizing-row * {
   top: 50%;
   transform: translate(-50%, -50%);
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--raised);
   color: var(--text);
   font-size: var(--fs-11);
@@ -252,7 +252,7 @@ body.is-resizing-row * {
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: var(--raised);
   color: var(--text);
   font-size: var(--fs-12);
