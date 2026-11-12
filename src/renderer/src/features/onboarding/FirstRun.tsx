@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useState } from 'react'
-import { AccountIcon, AddAccountIcon, ChangesIcon, ChevronDownIcon, DoneIcon, ErrorIcon, ExportIcon, HelpIcon, KeyboardIcon, TeamIcon, TicketIcon, UpdateIcon } from '../../icons/SlothIcons'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { AccountIcon, AddAccountIcon, ChangesIcon, ChevronDownIcon, DoneIcon, ErrorIcon, ExportIcon, FolderIcon, HelpIcon, IdleIcon, KeyboardIcon, TeamIcon, TemplatesIcon, TicketIcon, UpdateIcon } from '../../icons/SlothIcons'
 import { loginPaneId, type AccountStatus } from '../../../../shared/types'
 import { useUi } from '../host'
 import { useVisiblePolling } from '../../visibility'
 import { setBoardOpen } from '../tickets/model'
 import { setTeamOpen } from '../team/model'
 import { openHelp } from '../help/bus'
-import { cleanMsg } from '../team-config/store'
-import { Button, EmptyState, IconButton, Input } from '../../ui'
-import { setDocked } from './bus'
+import { applyTeamSettings, cleanMsg, importTeam, repoName, scanTeams, settingsText, type ImportPlan, type TeamStatus } from '../team-config/store'
+import { closeAllViews } from '../../ui/view-stack'
+import { Button, EmptyState, IconButton, InlineAlert, Input, Switch } from '../../ui'
+import { setDocked, showingFirstRun } from './bus'
 import './onboarding.css'
 
 type CheckState = 'ok' | 'warn' | 'missing'
@@ -104,12 +105,17 @@ function AccountsBody({ statuses }: { statuses: Record<string, AccountStatus> })
   const ui = useUi()
   const [label, setLabel] = useState(ui.accounts.length ? '' : 'Trabajo')
   const [busy, setBusy] = useState(false)
+  // El estado tarda un render: con dos Enter seguidos el segundo todavía vería busy en false.
+  const busyRef = useRef(false)
   const login = (id: string): void => {
+    // La terminal de login va en el área de paneles: desde la Vista «Primeros pasos» quedaría tapada.
+    closeAllViews()
     ui.openPane(loginPaneId(id))
     setDocked(id)
   }
   const add = async (): Promise<void> => {
-    if (!label.trim()) return
+    if (!label.trim() || busyRef.current) return
+    busyRef.current = true
     setBusy(true)
     try {
       const acc = await window.sloth.addAccount(label.trim())
@@ -119,6 +125,7 @@ function AccountsBody({ statuses }: { statuses: Record<string, AccountStatus> })
     } catch (e) {
       ui.notifyError(cleanMsg(e))
     } finally {
+      busyRef.current = false
       setBusy(false)
     }
   }
@@ -177,6 +184,139 @@ function AccountsBody({ statuses }: { statuses: Record<string, AccountStatus> })
   )
 }
 
+/** Si el repo trae `.sloth/team.json`, se cargan sus plantillas (y, si se quiere, los ajustes que recomienda). */
+function TeamLoad(): React.JSX.Element {
+  const ui = useUi()
+  const [list, setList] = useState<string[] | null>(null)
+  const [repo, setRepo] = useState('')
+  const [info, setInfo] = useState<{ isGit: boolean } | null>(null)
+  const [team, setTeam] = useState<TeamStatus | null | undefined>(undefined)
+  const [plan, setPlan] = useState<ImportPlan | null>(null)
+  const [withSettings, setWithSettings] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    ui.invoke<{ list: string[] }>('feat:onboarding:suggestRepos').then(
+      (r) => {
+        setList(r.list)
+        setRepo((cur) => cur || r.list[0] || '')
+      },
+      () => setList([])
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    setInfo(null)
+    setTeam(undefined)
+    setPlan(null)
+    setDone(null)
+    setErr(null)
+    if (!repo) return
+    let alive = true
+    ui.invoke<{ isGit: boolean }>('feat:onboarding:inspectRepo', repo)
+      .then(async (r) => {
+        if (!alive) return
+        setInfo(r)
+        const t = await ui.invoke<TeamStatus | null>('feat:team-config:inspect', repo)
+        if (!alive) return
+        setTeam(t)
+        if (t?.state === 'ok') {
+          const pl = await ui.invoke<ImportPlan>('feat:team-config:plan', repo)
+          if (alive) setPlan(pl)
+        }
+      })
+      .catch((e) => alive && setErr(cleanMsg(e)))
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repo])
+
+  const pick = async (): Promise<void> => {
+    const p = await window.sloth.pickFolder()
+    if (p) setRepo(p)
+  }
+  const load = async (): Promise<void> => {
+    if (!team || !plan || busy) return
+    setBusy(true)
+    setErr(null)
+    try {
+      const r = await importTeam(ui, repo, plan)
+      if (withSettings && team.ajustes && team.settingsPending) await applyTeamSettings(ui, repo, team.ajustes)
+      await scanTeams(ui, [repo])
+      const n = r.created + r.updated
+      setDone(`Listo: ${n} plantilla${n === 1 ? '' : 's'} del equipo en tu lista.`)
+      if (r.errors.length) setErr(r.errors.join('\n'))
+    } catch (e) {
+      setErr(cleanMsg(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  const todo = plan?.items.filter((i) => !i.error && i.action !== 'same').length ?? 0
+  const settingsTodo = Boolean(withSettings && team?.ajustes && team.settingsPending)
+
+  return (
+    <div className="fr-team" id="fr-team">
+      <p className="fr-step-sub">
+        Si tu equipo comparte <span className="mono">.sloth/team.json</span> en el repo, elegilo y cargá sus plantillas.
+      </p>
+      {list && list.length > 0 && (
+        <div className="fr-repos" role="radiogroup" aria-label="Repos encontrados">
+          {list.map((p) => (
+            <button key={p} type="button" role="radio" aria-checked={repo === p} className={`fr-repo${repo === p ? ' on' : ''}`} onClick={() => setRepo(p)}>
+              {repo === p ? <DoneIcon size={14} /> : <IdleIcon size={14} />}
+              <span className="fr-grow">
+                <span className="fr-item-title">{repoName(p)}</span>
+                <span className="fr-item-sub mono">{p}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      {list && list.length === 0 && <p className="fr-step-sub">No encontré repos en las carpetas de siempre: elegí la carpeta a mano.</p>}
+      <div className="fr-team-row">
+        {repo && <span className="fr-item-sub mono fr-grow">{repo}</span>}
+        <Button size="sm" icon={<FolderIcon size={13} />} onClick={() => void pick()}>
+          Elegir carpeta
+        </Button>
+      </div>
+      {info && !info.isGit && <InlineAlert tone="warning">Esa carpeta no parece un repo de git (no tiene .git).</InlineAlert>}
+      {info && team === null && <p className="fr-step-sub">Este repo no trae configuración del equipo.</p>}
+      {team?.state === 'invalid' && <InlineAlert tone="warning">El repo trae .sloth/team.json pero tiene un error: {team.error}</InlineAlert>}
+      {team?.state === 'ok' && (
+        <div className="fr-team-box">
+          <span className="fr-item-title">
+            <TeamIcon size={14} /> Configuración del equipo «{team.equipo}»
+          </span>
+          <span className="fr-item-sub">
+            {team.total} plantilla{team.total === 1 ? '' : 's'}
+            {team.links.length ? ` · ${team.links.map((l) => l.nombre).join(', ')}` : ''}
+          </span>
+          {team.ajustes && team.settingsPending && (
+            <Switch checked={withSettings} onChange={setWithSettings}>
+              Aplicar los ajustes que recomienda el equipo ({settingsText(team.ajustes)})
+            </Switch>
+          )}
+          {done ? (
+            <p className="fr-team-ok" role="status">
+              <DoneIcon size={14} /> {done}
+            </p>
+          ) : (
+            <Button variant="primary" size="sm" loading={busy} disabled={!plan || (todo === 0 && !settingsTodo)} onClick={() => void load()}>
+              {todo || settingsTodo ? 'Cargar configuración del equipo' : 'Ya está cargada'}
+            </Button>
+          )}
+        </div>
+      )}
+      {err && <InlineAlert tone="danger">{err}</InlineAlert>}
+    </div>
+  )
+}
+
 /** «Empecemos»: la guía de primer uso, dentro del área principal. Sin espacios abiertos reemplaza al estado vacío. */
 export function FirstRun({ embedded = false }: { embedded?: boolean }): React.JSX.Element {
   const ui = useUi()
@@ -184,7 +324,9 @@ export function FirstRun({ embedded = false }: { embedded?: boolean }): React.JS
   const [busy, setBusy] = useState(false)
   const [detail, setDetail] = useState(false)
   const [hidden, setHidden] = useState<boolean | null>(embedded ? false : null)
-  const statuses = useLiveStatuses(true)
+  const [showTeam, setShowTeam] = useState(false)
+  const statuses = useLiveStatuses(hidden === false)
+  const titleRef = useRef<HTMLHeadingElement>(null)
 
   const run = useCallback(() => {
     setBusy(true)
@@ -194,7 +336,15 @@ export function FirstRun({ embedded = false }: { embedded?: boolean }): React.JS
       .finally(() => setBusy(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  useEffect(run, [run])
+  useEffect(() => {
+    if (hidden === false) run()
+  }, [hidden, run])
+
+  // Pedir «Primeros pasos» con esta guía a la vista no abre otra encima: se trae el foco acá.
+  useEffect(() => {
+    if (embedded || hidden !== false) return
+    return showingFirstRun(() => titleRef.current?.focus())
+  }, [embedded, hidden])
 
   useEffect(() => {
     if (embedded) return
@@ -244,7 +394,9 @@ export function FirstRun({ embedded = false }: { embedded?: boolean }): React.JS
   return (
     <div className="fr-wrap">
       <div className="fr-col">
-        <h1 className="fr-title">Empecemos</h1>
+        <h1 className="fr-title" ref={titleRef} tabIndex={-1}>
+          Empecemos
+        </h1>
         <p className="fr-lead">Tres pasos y tenés a Claude trabajando en tu repo. Podés usar varias cuentas a la vez, cada una en su terminal.</p>
 
         <ol className="fr-steps" aria-label="Pasos para empezar">
@@ -313,7 +465,14 @@ export function FirstRun({ embedded = false }: { embedded?: boolean }): React.JS
             </span>
             <span className="fr-card-sub">Ctrl K abre todo</span>
           </button>
+          <button type="button" className="fr-card" aria-expanded={showTeam} aria-controls="fr-team" onClick={() => setShowTeam((v) => !v)}>
+            <span className="fr-card-title">
+              <TemplatesIcon size={14} /> Cargar la config. del equipo
+            </span>
+            <span className="fr-card-sub">Plantillas de .sloth/team.json</span>
+          </button>
         </div>
+        {showTeam && <TeamLoad />}
         {!embedded && (
           <p className="fr-hide">
             <button type="button" className="fr-link" onClick={hide}>

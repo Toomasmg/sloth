@@ -6,7 +6,20 @@ export const onOpen = (cb: () => void): (() => void) => {
   listeners.add(cb)
   return () => listeners.delete(cb)
 }
-export const requestOpen = (): void => listeners.forEach((l) => l())
+
+// «Empecemos» en el área principal (sin espacios): si ya se ve, no se abre una segunda encima.
+let shownFocus: (() => void) | null = null
+export const showingFirstRun = (focus: () => void): (() => void) => {
+  shownFocus = focus
+  return () => {
+    if (shownFocus === focus) shownFocus = null
+  }
+}
+
+export const requestOpen = (): void => {
+  if (shownFocus) shownFocus()
+  else listeners.forEach((l) => l())
+}
 
 // La tarjeta de «iniciá sesión» tiene que seguir viva aunque «Empecemos» se desmonte al abrirse la terminal de login.
 let docked: string | null = null

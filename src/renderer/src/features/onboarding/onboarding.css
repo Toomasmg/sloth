@@ -251,6 +251,71 @@
   font-size: var(--fs-12);
   color: var(--text-2);
 }
+.fr-team {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  border: 1px solid var(--divider);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.fr-repos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+.fr-repo {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: var(--sunken);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.fr-repo:hover {
+  background: var(--raised);
+}
+.fr-repo.on {
+  border-color: var(--accent);
+}
+.fr-repo:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.fr-team-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+.fr-team-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--sunken);
+}
+.fr-team-box .fr-item-title,
+.fr-team-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.fr-team-ok {
+  margin: 0;
+  color: var(--success-fg);
+}
+/* Recibe el foco al pedir «Primeros pasos» con la guía ya a la vista; es un título, no un control. */
+.fr-title:focus {
+  outline: none;
+}
 .fr-hide {
   margin: 0;
   font-size: var(--fs-12);

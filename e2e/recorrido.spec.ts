@@ -48,7 +48,10 @@ test.describe('primer uso', () => {
     await page.keyboard.press('Control+k')
     await page.getByRole('combobox').first().fill('Primeros pasos')
     await page.keyboard.press('Enter')
-    await expect(page.getByRole('heading', { name: 'Empecemos' })).toBeVisible()
+    // Con «Empecemos» ya en el área principal, Primeros pasos no abre otra encima: lleva el foco ahí.
+    await expect(page.getByRole('heading', { name: 'Empecemos' })).toHaveCount(1)
+    await expect(page.getByRole('heading', { name: 'Empecemos' })).toBeFocused()
+    await expect(page.getByRole('dialog', { name: 'Primeros pasos' })).toHaveCount(0)
     await expect(page.getByText(/Revisando lo que ya/)).toBeHidden()
     await shot(page, 'primer-uso-empecemos')
     await esc(page)
