@@ -156,32 +156,6 @@
   background: var(--surface);
   box-shadow: inset -1px 0 0 var(--line);
 }
-.tp-search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 10px;
-  border-radius: 8px;
-  background: var(--card);
-  color: var(--fg-3);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-.tp-search input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: var(--fg);
-  font: inherit;
-  box-shadow: none;
-}
-.tp-search input:focus {
-  outline: none;
-}
-.tp-search:focus-within {
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
 .tp-new-btn {
   width: 100%;
   height: 32px;
@@ -297,13 +271,6 @@
 .tp-badge.mine {
   background: var(--seg-on);
   color: var(--fg-2);
-}
-.tp-empty {
-  margin: 0;
-  padding: 10px 8px;
-  font-size: 12px;
-  color: var(--fg-3);
-  line-height: 1.5;
 }
 .tp-foot {
   margin: auto 6px 0;
@@ -579,19 +546,6 @@
   font-size: 12px;
   color: var(--fg-3);
 }
-.tp-chip {
-  height: 26px;
-  padding: 0 9px;
-  border: 0;
-  border-radius: 7px;
-  background: var(--btn-2);
-  color: var(--info);
-  font-size: 12px;
-  cursor: pointer;
-}
-.tp-chip:hover {
-  background: var(--surface-hover);
-}
 .tp-preview {
   display: flex;
   flex-direction: column;
@@ -702,20 +656,6 @@
   margin: 0;
   font-size: 12px;
   color: var(--warn-fg);
-}
-.tp-toast {
-  position: absolute;
-  right: 18px;
-  bottom: 18px;
-  max-width: calc(100% - 36px);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--toast-bg);
-  color: var(--fg);
-  box-shadow: var(--shadow-md);
 }
 
 @media (max-width: 720px) {

@@ -35,7 +35,7 @@
   --danger: #ff7a7a;
   --danger-fg: #ff9a9a;
   --danger-soft: rgba(255, 122, 122, 0.12);
-  --placeholder: #6f7587;
+  --placeholder: #80869a; /* lint-css-ok: mismo valor que el tema oscuro de tokens.css (esta paleta es siempre oscura) */
   color-scheme: dark;
 }
 
@@ -403,8 +403,8 @@
   box-shadow: none;
   color: var(--danger-fg);
 }
-:root :is(.f-onboarding, .f-onboarding-dock) input:not([type='checkbox']):not([type='radio']),
-:root :is(.f-onboarding, .f-onboarding-dock) select {
+:root :is(.f-onboarding, .f-onboarding-dock) input:not([type='checkbox']):not([type='radio']):not(.ui-input),
+:root :is(.f-onboarding, .f-onboarding-dock) select:not(.ui-input) {
   height: 32px;
   box-sizing: border-box;
   padding: 0 10px;
@@ -415,10 +415,10 @@
   font: inherit;
   box-shadow: inset 0 0 0 1px var(--line-2);
 }
-:root :is(.f-onboarding, .f-onboarding-dock) input[aria-invalid='true'] {
+:root :is(.f-onboarding, .f-onboarding-dock) input[aria-invalid='true']:not(.ui-input) {
   box-shadow: inset 0 0 0 1.5px var(--danger-fg);
 }
-:root :is(.f-onboarding, .f-onboarding-dock) textarea {
+:root :is(.f-onboarding, .f-onboarding-dock) textarea:not(.ui-input) {
   background: var(--input-bg);
   color: var(--fg);
 }
@@ -675,7 +675,7 @@
   display: flex;
   gap: 8px;
 }
-.f-onboarding-body > .input-row input {
+.f-onboarding-body > .input-row .ui-field {
   flex: 1;
   min-width: 0;
 }

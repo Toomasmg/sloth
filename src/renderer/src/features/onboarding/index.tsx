@@ -10,6 +10,7 @@ import { applyTeamSettings, cleanMsg, importTeam, repoName, scanTeams, settingsT
 import { onOpen, requestOpen } from './bus'
 import heroUrl from '../../assets/sloth-hero.webp'
 import './onboarding.css'
+import { Button, IconButton, Input, Select } from '../../ui'
 
 type CheckState = 'ok' | 'warn' | 'missing'
 interface CheckItem {
@@ -113,14 +114,12 @@ function EnvStep(): React.JSX.Element {
                     </code>
                   )}
                   {it.command && (
-                    <button type="button" className="icon-btn" onClick={() => copy(it.command!)} aria-label={`Copiar «${it.command}»`} title="Copiar">
-                      {copied === it.command ? <DoneIcon size={14} /> : <ChangesIcon size={14} />}
-                    </button>
+                    <IconButton label={`Copiar «${it.command}»`} icon={copied === it.command ? <DoneIcon size={14} /> : <ChangesIcon size={14} />} onClick={() => copy(it.command!)} />
                   )}
                   {it.doc && (
-                    <button type="button" className="btn sm ghost" onClick={() => void ui.invoke('feat:onboarding:openDoc', it.doc).catch((e) => ui.notifyError(cleanMsg(e)))}>
+                    <Button variant="ghost" size="sm" onClick={() => void ui.invoke('feat:onboarding:openDoc', it.doc).catch((e) => ui.notifyError(cleanMsg(e)))}>
                       Guía oficial <ExportIcon size={12} />
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
@@ -129,9 +128,9 @@ function EnvStep(): React.JSX.Element {
         ))}
         {!items && <li className="f-onboarding-loading">Revisando tu PC…</li>}
       </ul>
-      <button type="button" className="btn sm ghost" disabled={busy} onClick={run}>
+      <Button variant="ghost" size="sm" disabled={busy} onClick={run}>
         <UpdateIcon size={13} className={busy ? 'spin' : ''} /> {busy ? 'Revisando…' : 'Volver a revisar'}
-      </button>
+      </Button>
     </>
   )
 }
@@ -187,9 +186,9 @@ function AccountsStep({ onLogin, statuses }: { onLogin: (id: string) => void; st
                     <DoneIcon size={13} /> Sesión iniciada
                   </span>
                 ) : (
-                  <button type="button" className="btn sm" onClick={() => onLogin(a.id)}>
+                  <Button size="sm" onClick={() => onLogin(a.id)}>
                     <AccountIcon size={13} /> Iniciar sesión
-                  </button>
+                  </Button>
                 )}
               </li>
             )
@@ -207,11 +206,11 @@ function AccountsStep({ onLogin, statuses }: { onLogin: (id: string) => void; st
           <label htmlFor="f-ob-acc" className="f-onboarding-label">
             Nombre para reconocerla
           </label>
-          <input id="f-ob-acc" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} placeholder="Ej.: Tomy" />
+          <Input id="f-ob-acc" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} placeholder="Ej.: Tomy" />
         </div>
-        <button type="submit" className="btn primary" disabled={!label.trim() || busy}>
+        <Button variant="primary" type="submit" disabled={!label.trim() || busy}>
           <AddAccountIcon size={13} /> {ui.accounts.length ? 'Agregar otra cuenta' : 'Agregar cuenta'}
-        </button>
+        </Button>
       </form>
       <div className="f-onboarding-note">
         <HelpIcon size={15} />
@@ -258,9 +257,9 @@ function LoginDock({ accountId, statuses, onBack }: { accountId: string; statuse
             <IdleIcon size={10} className="f-onboarding-pulse" /> Esperando…
           </span>
         )}
-        <button type="button" className="btn sm" onClick={onBack}>
+        <Button size="sm" onClick={onBack}>
           Volver al asistente
-        </button>
+        </Button>
       </div>
       <span className="sr-only">{ui.openPanes.includes(loginPaneId(accountId)) ? '' : 'La terminal de la cuenta está cerrada.'}</span>
     </aside>
@@ -353,10 +352,10 @@ function RepoStep({ repo, setRepo }: { repo: string; setRepo: (p: string) => voi
         )}
       </div>
       <div className="input-row">
-        <input aria-label="Carpeta del repo" className="mono" value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="C:\ruta\a\tu-repo" />
-        <button type="button" className="btn" onClick={() => void pick()}>
+        <Input aria-label="Carpeta del repo" mono value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="C:\ruta\a\tu-repo" />
+        <Button onClick={() => void pick()}>
           <FolderIcon size={15} /> Elegir
-        </button>
+        </Button>
       </div>
       {info && !info.isGit && (
         <p className="f-onboarding-warn">
@@ -404,9 +403,9 @@ function RepoStep({ repo, setRepo }: { repo: string; setRepo: (p: string) => voi
               <DoneIcon size={14} /> {done}
             </p>
           ) : (
-            <button type="button" className="btn primary sm" disabled={busy || !plan || (todo === 0 && !(withSettings && team.settingsPending))} onClick={() => void load()}>
+            <Button variant="primary" size="sm" disabled={busy || !plan || (todo === 0 && !(withSettings && team.settingsPending))} onClick={() => void load()}>
               {busy ? 'Cargando…' : todo ? `Cargar configuración del equipo` : 'Ya está cargada'}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -448,9 +447,9 @@ function SpaceStep({ repo, statuses, onCreated, onGoAccounts }: { repo: string; 
       <>
         <p className="f-onboarding-warn">Agregá una cuenta primero (paso 2) para poder crear un espacio.</p>
         <div>
-          <button type="button" className="btn primary" onClick={onGoAccounts}>
+          <Button variant="primary" onClick={onGoAccounts}>
             Ir al paso 2
-          </button>
+          </Button>
         </div>
       </>
     )
@@ -459,25 +458,25 @@ function SpaceStep({ repo, statuses, onCreated, onGoAccounts }: { repo: string; 
       <div className="f-onboarding-grid2">
         <div className="field">
           <label htmlFor="f-ob-name">Nombre</label>
-          <input id="f-ob-name" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />
+          <Input id="f-ob-name" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} />
         </div>
         <div className="field">
           <label htmlFor="f-ob-accsel">Cuenta</label>
-          <select id="f-ob-accsel" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+          <Select id="f-ob-accsel" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
             {ui.accounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.label}
                 {statuses[a.id]?.loggedIn ? '' : ' (sin sesión)'}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       </div>
       {err && <p className="form-error" role="alert">{err}</p>}
       <div>
-        <button type="button" className="btn primary" disabled={!can || busy} onClick={() => void create()}>
+        <Button variant="primary" disabled={!can || busy} onClick={() => void create()}>
           <NewSpaceIcon size={13} /> {busy ? 'Creando…' : 'Crear espacio'}
-        </button>
+        </Button>
       </div>
     </>
   )
@@ -615,27 +614,27 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
   const renderFoot = (): React.JSX.Element => (
     <footer className="f-onboarding-foot">
       {(step > 0 || tour) && (
-        <button type="button" className="btn" onClick={() => (tour ? setTour(false) : setStep(step - 1))}>
+        <Button onClick={() => (tour ? setTour(false) : setStep(step - 1))}>
           Atrás
-        </button>
+        </Button>
       )}
       <span className="spacer" />
       {last && tour ? (
-        <button type="button" className="btn primary" onClick={() => finish(false)}>
+        <Button variant="primary" onClick={() => finish(false)}>
           Abrir Sloth
-        </button>
+        </Button>
       ) : last ? (
-        <button type="button" className="btn ghost" onClick={() => setTour(true)}>
+        <Button variant="ghost" onClick={() => setTour(true)}>
           {ui.workspaces.length ? 'Ver los tips' : 'Saltar'}
-        </button>
+        </Button>
       ) : (
         <>
-          <button type="button" className="btn ghost" onClick={() => setStep(step + 1)}>
+          <Button variant="ghost" onClick={() => setStep(step + 1)}>
             Saltar
-          </button>
-          <button type="button" className="btn primary" onClick={() => setStep(step + 1)}>
+          </Button>
+          <Button variant="primary" onClick={() => setStep(step + 1)}>
             Siguiente
-          </button>
+          </Button>
         </>
       )}
     </footer>
@@ -663,9 +662,7 @@ function Wizard({ initial, onClose }: { initial: ObState; onClose: (completed: b
                 ))}
               </div>
             </div>
-            <button type="button" className="icon-btn" onClick={() => onClose(false)} aria-label="Cerrar el asistente (seguís después desde Ctrl+K)" title="Cerrar (se vuelve a abrir desde Ctrl+K)">
-              <CloseIcon size={16} />
-            </button>
+            <IconButton label="Cerrar el asistente (seguís después desde Ctrl+K)" icon={<CloseIcon size={16} />} onClick={() => onClose(false)} />
           </div>
 
           <header className="f-onboarding-head">

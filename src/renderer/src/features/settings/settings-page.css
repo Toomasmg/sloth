@@ -826,8 +826,8 @@ button.f-set-toggle:disabled {
 
 /* Teclado: foco visible para todo lo interactivo. */
 .f-set-page button:focus-visible,
-.f-set-page input:focus-visible,
-.f-set-page select:focus-visible,
+.f-set-page input:not(.ui-input):focus-visible,
+.f-set-page select:not(.ui-input):focus-visible,
 .f-set-page a:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
