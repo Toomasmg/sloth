@@ -6,7 +6,7 @@ import { colorHex, iconPath, TEMPLATE_COLORS, TEMPLATE_ICONS, VAR_CHIPS } from '
 import { loadTemplates, openDialog, setPreselect, useTemplates, type TemplateDto } from './store'
 import { Modal } from '../../Modal'
 import { SearchIcon } from '../../icons/SlothIcons'
-import { Button, Chip, EmptyState, Input, Select, Textarea, ToastHost, toast as showToast } from '../../ui'
+import { Button, Chip, EmptyState, Input, Select, Textarea, toast as showToast } from '../../ui'
 
 /** Campos que se editan en el formulario (lo que el usuario puede cambiar de una plantilla propia). */
 interface Fields {
@@ -797,7 +797,6 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
         </main>
       </div>
 
-      <ToastHost />
     </Modal>
   )
 }

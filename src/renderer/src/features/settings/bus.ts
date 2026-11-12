@@ -11,4 +11,16 @@ export const onOpenSettings = (cb: (tab?: SettingsTab) => void): (() => void) =>
   listeners.add(cb)
   return () => listeners.delete(cb)
 }
-export const openSettings = (tab?: SettingsTab): void => listeners.forEach((l) => l(tab))
+let alVolver: (() => void) | null = null
+
+/** `alVolver` corre una sola vez al cerrar Configuración: sirve para devolver a quien la pidió al lugar de donde salió. */
+export const openSettings = (tab?: SettingsTab, alVolver_?: () => void): void => {
+  alVolver = alVolver_ ?? null
+  listeners.forEach((l) => l(tab))
+}
+
+export const takeAlVolver = (): (() => void) | null => {
+  const f = alVolver
+  alVolver = null
+  return f
+}

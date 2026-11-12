@@ -30,6 +30,7 @@ import { TerminalView } from './TerminalView'
 import { NewWorkspaceDialog } from './NewWorkspaceDialog'
 import { ConfirmDialog, type ConfirmRequest } from './ConfirmDialog'
 import { EmptyState } from './EmptyState'
+import { FirstRun } from './features/onboarding/FirstRun'
 import { StateIcon } from './StateIcon'
 import { PermissionCard, toolLabel } from './PermissionCard'
 import { LogoMark } from './Logo'
@@ -1075,7 +1076,7 @@ export function App(): React.JSX.Element {
           </aside>
 
           <main className={`panes sl-main view-${viewMode} ${openPanes.length === 0 ? 'is-empty' : ''}`} aria-label="Paneles">
-            {loaded && openPanes.length === 0 && <EmptyState onCreate={() => (accounts.length ? setNewWsMode('normal') : openSettings('cuentas'))} />}
+            {loaded && openPanes.length === 0 && (workspaces.length === 0 ? <FirstRun /> : <EmptyState onCreate={() => (accounts.length ? setNewWsMode('normal') : openSettings('cuentas'))} />)}
             {openPanes.length > 0 && (
               <div className="sl-tabbar">
                 <TabBar

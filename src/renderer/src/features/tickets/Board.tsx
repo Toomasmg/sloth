@@ -99,7 +99,7 @@ export function Board(): React.JSX.Element {
   const close = (): void => setBoardOpen(false)
   const elegirConector = (): void => {
     close()
-    openSettings('tickets')
+    openSettings('tickets', () => setBoardOpen(true))
   }
 
   useEffect(() => {
