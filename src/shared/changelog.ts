@@ -9,6 +9,12 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.11',
+    date: '2026-11-12',
+    title: 'Sin ventana negra al cerrar terminales',
+    items: ['Cerrar o reiniciar una terminal ya no hace aparecer un instante una ventana negra.']
+  },
+  {
     version: '0.6.10',
     date: '2026-11-12',
     title: 'Copiar con Ctrl+C',
