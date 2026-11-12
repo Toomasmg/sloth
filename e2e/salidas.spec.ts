@@ -49,7 +49,7 @@ async function desdeBoton(page: Page, nombre: string): Promise<Locator> {
 const dialogo = (nombre: string | RegExp) => (page: Page): Locator => page.getByRole('dialog', { name: nombre })
 const botonCerrar = (page: Page): Locator => page.getByRole('dialog').getByRole('button', { name: /^Cerrar/ }).first()
 const volver = (page: Page): Locator => page.getByRole('dialog').getByRole('button', { name: 'Volver a los espacios' })
-const pagina = (page: Page): Locator => page.locator('.page-shell')
+const pagina = (page: Page): Locator => page.locator('.ui-view')
 
 const PANTALLAS: Pantalla[] = [
   {
@@ -106,7 +106,7 @@ const PANTALLAS: Pantalla[] = [
     nombre: 'Exportar configuración',
     abrir: (page) => desdeMenuApp(page, 'Exportar configuración…'),
     contenedor: pagina,
-    salida: (page) => pagina(page).locator('.page-back')
+    salida: (page) => page.getByRole('dialog').getByRole('button', { name: 'Volver a Configuración' })
   },
   {
     nombre: 'Historial de sesiones',
@@ -118,7 +118,19 @@ const PANTALLAS: Pantalla[] = [
     nombre: 'Ramas aparte',
     abrir: (page) => desdeBoton(page, 'Ramas aparte'),
     contenedor: pagina,
-    salida: (page) => pagina(page).getByRole('button', { name: /Espacios/ }).first()
+    salida: volver
+  },
+  {
+    nombre: 'Tickets',
+    abrir: (page) => desdeBoton(page, 'Tickets'),
+    contenedor: pagina,
+    salida: volver
+  },
+  {
+    nombre: 'Equipo',
+    abrir: (page) => desdeBoton(page, 'Ver equipo'),
+    contenedor: pagina,
+    salida: volver
   }
 ]
 

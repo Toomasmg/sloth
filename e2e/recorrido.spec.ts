@@ -13,7 +13,9 @@ let n = 0
 async function shot(page: Page, name: string): Promise<void> {
   n++
   await page.waitForTimeout(450)
-  await expect.soft(page).toHaveScreenshot(`${String(n).padStart(2, '0')}-${name}.png`, { mask: [page.locator('.terminal-host')] })
+  // Con una Vista abierta las terminales quedan tapadas: no hace falta enmascararlas y la máscara taparía la Vista.
+  const mask = (await page.locator('.ui-view').count()) > 0 ? [] : [page.locator('.terminal-host')]
+  await expect.soft(page).toHaveScreenshot(`${String(n).padStart(2, '0')}-${name}.png`, { mask })
 }
 
 async function esc(page: Page, veces = 3): Promise<void> {
