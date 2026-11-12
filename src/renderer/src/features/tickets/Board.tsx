@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUi } from '../host'
+import { View } from '../../ui/View'
 import { cleanError } from '../../format'
 import { SPACE_CHIP, SPACE_LABEL, spaceStatus } from '../broadcast/state'
 import { CloseIcon, SearchIcon, SettingsIcon, SpaceIcon } from '../../icons/SlothIcons'
@@ -62,14 +63,6 @@ const byIdDesc = (a: Ticket, b: Ticket): number => {
   return nb - na
 }
 
-function BackGlyph(): React.JSX.Element {
-  return (
-    <svg width={14} height={14} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M15 5l-7 7 7 7" />
-    </svg>
-  )
-}
-
 function RefreshGlyph(): React.JSX.Element {
   return (
     <svg width={14} height={14} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
@@ -102,16 +95,8 @@ export function Board(): React.JSX.Element {
   const [detTick, setDetTick] = useState(0)
   /** Candado sincrónico: evita dos escrituras en el mismo ticket aunque se clickee rápido. */
   const lock = useRef(new Set<string>())
-  const backRef = useRef<HTMLButtonElement>(null)
 
   const close = (): void => setBoardOpen(false)
-
-  // Foco al abrir y vuelta a lo que tenía el foco al cerrar.
-  useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null
-    backRef.current?.focus()
-    return () => prev?.focus?.()
-  }, [])
 
   useEffect(() => {
     void ui.invoke<TemplateLite[]>('feat:templates:list').then((l) => setTpls(Array.isArray(l) ? l : []), () => setTpls([]))
@@ -338,47 +323,47 @@ export function Board(): React.JSX.Element {
   const showRows = !bodyLoading && visible.length > 0
 
   return (
-    <div className="f-tickets-page" role="dialog" aria-modal="true" aria-labelledby="f-tickets-title">
-      <header className="f-tickets-bar">
-        <button ref={backRef} type="button" className="f-tickets-back" onClick={close}>
-          <BackGlyph />
-          Espacios
-        </button>
-        <span className="f-tickets-sep" aria-hidden="true" />
-        <span role="status" className="f-tickets-conn" data-tone={tone}>
-          <span className="f-tickets-conn-dot" aria-hidden="true" />
-          {connText}
-        </span>
-        <span className="f-tickets-grow" />
-        {running ? (
-          <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => void ui.invoke('feat:tickets:cancel')}>
-            <CloseIcon size={13} /> Cancelar consulta
+    <View
+      labelId="f-tickets-view-title"
+      title="Tickets"
+      onClose={close}
+      className="f-tickets-page"
+      actions={
+        <>
+          <span role="status" className="f-tickets-conn" data-tone={tone}>
+            <span className="f-tickets-conn-dot" aria-hidden="true" />
+            {connText}
+          </span>
+          {running ? (
+            <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => void ui.invoke('feat:tickets:cancel')}>
+              <CloseIcon size={13} /> Cancelar consulta
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="f-tickets-b f-tickets-b--sm"
+            onClick={askRefresh}
+            disabled={running || !snap || unavailable || sinConector}
+            title={porGh ? `Lee los issues de ${n} con gh (solo lectura)` : `Lee los tickets de ${n} con la cuenta que la consulta (solo lectura)`}
+          >
+            <RefreshGlyph />
+            {running ? 'Actualizando…' : 'Actualizar'}
           </button>
-        ) : null}
-        <button
-          type="button"
-          className="f-tickets-b f-tickets-b--sm"
-          onClick={askRefresh}
-          disabled={running || !snap || unavailable || sinConector}
-          title={porGh ? `Lee los issues de ${n} con gh (solo lectura)` : `Lee los tickets de ${n} con la cuenta que la consulta (solo lectura)`}
-        >
-          <RefreshGlyph />
-          {running ? 'Actualizando…' : 'Actualizar'}
-        </button>
-        <button
-          type="button"
-          className="f-tickets-b f-tickets-b--sm"
-          onClick={() => setAjustes((v) => !v)}
-          disabled={!snap}
-          aria-label="Ajustes de tickets"
-          aria-expanded={ajustes}
-          aria-controls="f-tickets-ajustes"
-          title="Ajustes de tickets"
-        >
-          <SettingsIcon size={14} />
-        </button>
-      </header>
-
+          <button
+            type="button"
+            className="f-tickets-b f-tickets-b--sm"
+            onClick={() => setAjustes((v) => !v)}
+            disabled={!snap}
+            aria-label="Ajustes de tickets"
+            aria-expanded={ajustes}
+            aria-controls="f-tickets-ajustes"
+            title="Ajustes de tickets"
+          >
+            <SettingsIcon size={14} />
+          </button>
+        </>
+      }
+    >
       <main className="f-tickets-main">
         <div>
           <h1 id="f-tickets-title" className="f-tickets-h1">
@@ -691,6 +676,6 @@ export function Board(): React.JSX.Element {
           {toast}
         </div>
       )}
-    </div>
+    </View>
   )
 }

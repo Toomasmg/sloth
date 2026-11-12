@@ -8,9 +8,9 @@
 
 /* ---------- Pantalla ---------- */
 .f-set-page {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
+  position: relative;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-wrap: wrap;
   background: var(--bg);
@@ -47,28 +47,6 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
-}
-
-.f-set-back {
-  align-self: flex-start;
-  height: 30px;
-  padding: 0 10px 0 6px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: #c9cdd6;
-  font: inherit;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-}
-.f-set-back:hover {
-  background: var(--hover);
-  color: var(--fg);
-}
-.f-set-back:focus:not(:focus-visible) {
-  outline: none;
 }
 
 .f-set-search {

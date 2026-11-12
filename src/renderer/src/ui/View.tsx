@@ -71,7 +71,7 @@ export function View({ labelId, title, onClose, actions, backLabel = 'Espacios',
   return (
     <div ref={rootRef} className={`ui-view ${className ?? ''}`} role="dialog" aria-modal="true" aria-labelledby={labelId} onKeyDown={trapTab}>
       <header className="ui-view-head">
-        <button ref={backRef} type="button" className="ui-view-back" title="Volver (Esc)" onClick={request}>
+        <button ref={backRef} type="button" className="ui-view-back" title="Volver (Esc)" aria-label={backLabel === 'Espacios' ? 'Volver a los espacios' : `Volver a ${backLabel}`} onClick={request}>
           <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 5l-7 7 7 7" />
           </svg>

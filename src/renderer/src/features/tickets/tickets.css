@@ -33,51 +33,6 @@
   --g-c9: color-mix(in srgb, var(--fg) 50%, var(--fg-2)); /* #c9cdd6 en oscuro */
   --g-dc: color-mix(in srgb, var(--fg) 80%, var(--fg-2)); /* #dcdfe6 en oscuro */
   --g-box: color-mix(in srgb, var(--fg-muted) 45%, var(--card)); /* borde del check vacío (#4a5160) */
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg);
-  color: var(--fg);
-  overflow: auto;
-  animation: fade var(--t-fast) var(--ease);
-}
-.f-tickets-bar {
-  flex: none;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  padding: 8px clamp(12px, 3vw, 20px);
-  background: var(--surface);
-  box-shadow: inset 0 -1px 0 var(--line);
-}
-.f-tickets-back {
-  height: 30px;
-  padding: 0 10px 0 6px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--g-c9);
-  font: inherit;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-}
-.f-tickets-back:hover {
-  background: var(--card);
-  color: var(--fg);
-}
-.f-tickets-back:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 1px;
-}
-.f-tickets-sep {
-  width: 1px;
-  height: 18px;
-  background: var(--line-strong);
 }
 .f-tickets-grow {
   flex: 1 1 0;
@@ -927,7 +882,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .f-tickets-page,
   .f-tickets-skel > div {
     animation: none;
   }
