@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { cloneElement, useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactElement, type Ref } from 'react'
 import './ui.css'
 
@@ -99,18 +100,20 @@ export function Tooltip({ text, shortcut, placement = 'bottom', children }: Tool
           hide()
         }
       } as Partial<ChildProps>)}
-      {open && (
-        <span
-          ref={tipRef}
-          id={id}
-          role="tooltip"
-          className="ui-tooltip"
-          style={{ left: pos?.left ?? 0, top: pos?.top ?? 0, visibility: pos ? 'visible' : 'hidden' }}
-        >
-          {text}
-          {shortcut && <kbd className="ui-tooltip-kbd">{shortcut}</kbd>}
-        </span>
-      )}
+      {open &&
+        createPortal(
+          <span
+            ref={tipRef}
+            id={id}
+            role="tooltip"
+            className="ui-tooltip"
+            style={{ left: pos?.left ?? 0, top: pos?.top ?? 0, visibility: pos ? 'visible' : 'hidden' }}
+          >
+            {text}
+            {shortcut && <kbd className="ui-tooltip-kbd">{shortcut}</kbd>}
+          </span>,
+          document.body
+        )}
     </>
   )
 }

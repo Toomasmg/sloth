@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref } from 'react'
+import { createPortal } from 'react-dom'
 import { keyToMove, moveIndex, typeaheadIndex } from './nav'
 import './ui.css'
 
@@ -137,7 +138,8 @@ function MenuPopup({
     }
   }
 
-  return (
+  // Al body: la cabecera de un panel tiene `container-type` y `overflow: hidden`, que encerrarían y cortarían un `fixed`.
+  return createPortal(
     <div
       ref={popRef}
       id={id}
@@ -174,7 +176,8 @@ function MenuPopup({
           </button>
         )
       })}
-    </div>
+    </div>,
+    document.body
   )
 }
 
