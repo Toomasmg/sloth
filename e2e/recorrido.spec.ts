@@ -34,10 +34,13 @@ test.beforeEach(() => {
 test.describe('primer uso', () => {
   test.use({ seed: { settings: { theme: 'oscuro' }, onboarding: true } })
 
-  test('asistente y sin cuentas', async ({ sloth: { page } }) => {
-    await shot(page, 'primer-uso-asistente')
-    await page.getByRole('button', { name: /Siguiente|Empezar|Continuar/ }).first().click()
-    await shot(page, 'primer-uso-asistente-paso2')
+  test('empecemos y sin cuentas', async ({ sloth: { page } }) => {
+    await shot(page, 'primer-uso-inicio')
+    await page.keyboard.press('Control+k')
+    await page.getByRole('combobox').first().fill('Primeros pasos')
+    await page.keyboard.press('Enter')
+    await expect(page.getByRole('heading', { name: 'Empecemos' })).toBeVisible()
+    await shot(page, 'primer-uso-empecemos')
     await esc(page)
     await shot(page, 'primer-uso-sin-cuentas')
   })
@@ -136,7 +139,7 @@ test.describe('uso real', () => {
       ['Invitar a un compañero', 'invitar'],
       ['Reportar un problema', 'reportar'],
       ['Exportar configuración…', 'exportar'],
-      ['Asistente de bienvenida', 'asistente']
+      ['Asistente de bienvenida', 'primeros-pasos']
     ]
     for (const [label, name] of menu) {
       await page.getByRole('button', { name: 'Menú de Sloth' }).click()

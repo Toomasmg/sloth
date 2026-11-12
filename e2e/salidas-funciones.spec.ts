@@ -46,7 +46,7 @@ const PANTALLAS: Pantalla[] = [
   { nombre: 'Ayuda', abrir: (p) => porPaleta(p, 'Ayuda y atajos'), dialogo: /Ayuda/, salida: 'Volver a los espacios' },
   { nombre: 'Novedades', abrir: (p) => porPaleta(p, 'Novedades'), dialogo: 'Novedades', salida: 'Cerrar' },
   { nombre: 'Invitar', abrir: (p) => porPaleta(p, 'Invitar a un compañero'), dialogo: 'Invitar a un compañero', salida: 'Cerrar' },
-  { nombre: 'Asistente de bienvenida', abrir: (p) => porPaleta(p, 'Asistente de bienvenida'), dialogo: /Revisá tu PC|Bienvenido/, salida: /^Cerrar el asistente/ },
+  { nombre: 'Primeros pasos', abrir: (p) => porPaleta(p, 'Primeros pasos'), dialogo: 'Primeros pasos', salida: 'Volver a los espacios' },
   { nombre: 'Exportar equipo', abrir: (p) => porPaleta(p, 'Exportar mi configuración como configuración del equipo'), dialogo: 'Exportar como configuración del equipo', salida: 'Cerrar' },
   {
     nombre: 'Chat',
