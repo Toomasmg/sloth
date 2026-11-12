@@ -9,6 +9,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.10',
+    date: '2026-11-12',
+    title: 'Copiar con Ctrl+C',
+    items: [
+      'En la terminal, Ctrl+C copia lo que tengas seleccionado. Si no hay nada seleccionado, corta el proceso como siempre.',
+      'Ctrl+V pega texto e imágenes al instante.',
+      'Los botones de la ventana tienen el mismo color que la barra de arriba en cada tema.',
+      'Retoques de diseño en toda la app para que tamaños, esquinas y colores sean parejos.'
+    ]
+  },
+  {
     version: '0.6.9',
     date: '2026-11-12',
     title: 'Sloth renovado',
