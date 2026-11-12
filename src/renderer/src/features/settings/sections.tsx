@@ -18,7 +18,12 @@ import { SoundTest } from '../sound/SoundTest'
 import { resolveAccountColor, pickProjectsDir, projectsDirOf, updateSettings, useSettings } from './store'
 import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, EDITORS, LINE_HEIGHT, PLAN_SUGGESTIONS, SCROLLBACK, SHELLS, SLEEP_MINUTES, TERM_FONTS, TERM_FONT, UI_FONT, UPDATE_CHANNELS, type AccentChoice, type CursorShape, type Density, type EditorChoice, type ShellChoice, type ShortcutId, type SleepMinutes, type SoundName, type TermFont, type ThemeChoice, type UpdateChannel } from '../../../../main/features/settings-model'
 import { errText, Group, Row, Slider, ToggleRow, useSave, SectionHint } from './ui'
-import { Button, IconButton, Input, Segmented, Select } from '../../ui'
+import { Button, EmptyState, IconButton, Input, Segmented, Select, Tag } from '../../ui'
+import { Ajustes as TicketsAjustes } from '../tickets/Ajustes'
+import { setBoardOpen, useSnapshot } from '../tickets/model'
+import { openDialog, useTemplates, usesTicket } from '../templates/store'
+import { colorHex } from '../templates/catalog'
+import { shortPath } from '../../format'
 
 /* ---------- General ---------- */
 
@@ -1196,3 +1201,76 @@ function ToggleLikeButton({ title, hint, onClick }: { title: string; hint: strin
   )
 }
 
+/* ---------- Plantillas ---------- */
+
+export function TemplatesSection(): React.JSX.Element {
+  const ui = useUi()
+  const { list, defaultId, loaded } = useTemplates()
+  const accLabel = (id: string): string => (id === 'sugerida' ? 'Cuenta sugerida' : (ui.accounts.find((a) => a.id === id)?.label ?? 'cuenta borrada'))
+  if (loaded && list.length === 0)
+    return (
+      <EmptyState
+        title="Todavía no hay plantillas"
+        description="Una plantilla arma el espacio por vos: carpeta, cuenta, rama y primer mensaje. Creá una o guardá un espacio como plantilla desde su panel."
+        action={
+          <Button variant="primary" onClick={() => openDialog({ kind: 'manage' })}>
+            Nueva plantilla
+          </Button>
+        }
+      />
+    )
+  return (
+    <>
+      <div className="f-set-actions">
+        <Button variant="primary" size="sm" onClick={() => openDialog({ kind: 'manage' })}>
+          Nueva plantilla
+        </Button>
+      </div>
+      <Group id="g-plantillas" label="Tus plantillas">
+        {list.map((t) => (
+          <div key={t.id} className="f-set-row">
+            <span className="f-set-swatch" style={{ background: colorHex(t.color) }} aria-hidden="true" />
+            <div className="f-set-row-text">
+              <span className="f-set-row-title">
+                {t.name}
+                {t.id === defaultId && <Tag>Predeterminada</Tag>}
+                {t.team && <Tag>Del equipo</Tag>}
+              </span>
+              <span className="f-set-hint">
+                {accLabel(t.accountId)}
+                {usesTicket(t) ? ' · pide ticket' : ''}
+                {t.useWorktree ? ` · rama ${t.useWorktree.branchPattern}` : t.repoPath ? ` · ${shortPath(t.repoPath)}` : ''}
+              </span>
+            </div>
+            <div className="f-set-row-ctl">
+              <Button size="sm" onClick={() => openDialog({ kind: 'manage', id: t.id })} aria-label={`Editar plantilla ${t.name}`}>
+                Editar
+              </Button>
+            </div>
+          </div>
+        ))}
+      </Group>
+    </>
+  )
+}
+
+/* ---------- Tickets ---------- */
+
+export function TicketsSection({ onClose }: { onClose(): void }): React.JSX.Element {
+  const snap = useSnapshot()
+  if (!snap) return <SectionHint>Cargando…</SectionHint>
+  return (
+    <>
+      <TicketsAjustes snap={snap} />
+      <SectionHint>
+        Los tickets se leen, no se cambian solos.{' '}
+        <button type="button" className="f-set-link" onClick={() => {
+            onClose()
+            setBoardOpen(true)
+          }}>
+          Ir a Tickets
+        </button>
+      </SectionHint>
+    </>
+  )
+}

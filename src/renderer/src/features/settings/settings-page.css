@@ -868,3 +868,13 @@ button.f-set-toggle:disabled {
   font: inherit;
   cursor: pointer;
 }
+
+.f-set-swatch {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border-radius: var(--r-full);
+}
+.f-set-row-title .ui-tag {
+  margin-left: var(--s-2);
+}
