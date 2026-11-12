@@ -18,6 +18,8 @@ import {
 } from '@phosphor-icons/react'
 import { useUi } from '../host'
 import { View } from '../../ui/View'
+import { Button, EmptyState } from '../../ui'
+import { TeamIcon } from '../../icons/SlothIcons'
 import { cleanError, fmtTok } from '../../format'
 import type { Workspace } from '../../../../shared/types'
 import { espacioDelTicket } from '../../../../shared/templates-shared'
@@ -415,7 +417,16 @@ export function TeamView(): React.JSX.Element {
           </div>
 
           {sinRepos && (
-            <p className="hint f-team-msg">Ningún espacio tiene un repo con remoto de GitHub (origin), así que no hay PRs para mostrar. Creá un espacio en una carpeta con remoto de GitHub.</p>
+            <EmptyState
+              icon={<TeamIcon size={24} />}
+              title="No hay PRs para mostrar"
+              description="Ningún espacio tiene un repo con remoto de GitHub (origin). Creá un espacio en una carpeta con remoto de GitHub."
+              action={
+                <Button variant="primary" onClick={() => ui.openNewWorkspace('normal')}>
+                  Nuevo espacio
+                </Button>
+              }
+            />
           )}
           {repoErrors.length > 0 && (
             <details className="f-team-repoerr">
@@ -451,10 +462,16 @@ export function TeamView(): React.JSX.Element {
             {idle.map(card)}
           </div>
           {!snap.people.length && !ghRunning && !sinRepos && (
-            <p className="hint f-team-empty">
-              Todavía no hay nadie para mostrar. Tocá «Actualizar» para leer los PRs abiertos de los repos de tus espacios.
-              {conector ? ` Tocá «Traer de ${n}» para ver en qué ticket anda cada uno.` : ' Elegí un conector en los ajustes de Tickets para ver en qué ticket anda cada uno.'}
-            </p>
+            <EmptyState
+              icon={<TeamIcon size={24} />}
+              title="Todavía no hay nadie para mostrar"
+              description={`Actualizá para leer los PRs abiertos de los repos de tus espacios.${conector ? ` Después «Traer de ${n}» muestra en qué ticket anda cada uno.` : ' Con un conector de tickets ves también en qué ticket anda cada uno.'}`}
+              action={
+                <Button variant="primary" onClick={() => void refreshGithub()} disabled={ghRunning}>
+                  Actualizar
+                </Button>
+              }
+            />
           )}
         </div>
       </div>
