@@ -1,25 +1,5 @@
 /* Función «export-import»: página «Exportar e importar» (dos pestañas). Medidas y colores según el artboard «Exportar». */
 
-/* ---- Cáscara (PageShell con clase f-ei-page): cabecera de 48 px, título apagado, «‹ Configuración». ---- */
-.f-ei-page .page-head {
-  padding: 0 14px;
-}
-.f-ei-page .page-name {
-  font-weight: 400;
-  color: var(--fg-2);
-}
-.f-ei-page .page-back {
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px 0 6px;
-  color: var(--fg-2);
-}
-.f-ei-page .page-back svg {
-  flex: none;
-}
-
 .f-ei-wrap {
   max-width: 760px;
   margin: 0 auto;

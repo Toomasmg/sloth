@@ -29,12 +29,8 @@
   padding: 0;
 }
 
-/* ---------- Página (PageShell de help/page.css, debajo de la barra superior de 48 px) ---------- */
+/* ---------- Página (Vista de ui/View) ---------- */
 
-.page-shell.f-wt-shell {
-  top: 48px;
-  outline: none;
-}
 .f-wt-body {
   padding: 0;
 }

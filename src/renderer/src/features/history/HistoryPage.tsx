@@ -3,7 +3,7 @@ import { useUi } from '../host'
 import { cleanError } from '../../format'
 import { getSettings } from '../settings/store'
 import { CheckIcon, DoneIcon, IdleIcon, PermissionIcon } from '../../icons/SlothIcons'
-import { PageShell } from '../help/PageShell'
+import { View } from '../../ui/View'
 import { marks, wordsOf } from '../help/text'
 import { SessionDetail } from './SessionDetail'
 import {
@@ -276,11 +276,11 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
   }
 
   return (
-    <PageShell
-      labelId="hist-title"
+    <View
+      labelId="hist-view-title"
       title="Historial"
       onClose={onClose}
-      right={<span className="hist-head-count">{rows ? plural(total, 'sesión guardada', 'sesiones guardadas') : ''}</span>}
+      actions={<span className="hist-head-count">{rows ? plural(total, 'sesión guardada', 'sesiones guardadas') : ''}</span>}
     >
       <div className="hist-wrap">
         <div className="hist-intro">
@@ -415,7 +415,7 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
           {toast}
         </div>
       )}
-    </PageShell>
+    </View>
   )
 }
 

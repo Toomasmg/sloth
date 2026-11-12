@@ -3,8 +3,8 @@ import { useUi } from '../host'
 import { openDrawer } from '../git/store'
 import { BranchIcon, DoneIcon, PlusIcon, SearchIcon } from '../../icons/SlothIcons'
 import { Modal } from '../../Modal'
+import { View } from '../../ui/View'
 import { closeRamas, setRamasCandidates, setRamasDialog, useRamas } from './store'
-import '../help/page.css'
 
 // ---------- Tipos (los mismos que devuelve main) ----------
 
@@ -173,8 +173,6 @@ export function RamasPage(): React.JSX.Element | null {
   const [rmBusy, setRmBusy] = useState(false)
   const [toast, setToast] = useState('')
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-  const backRef = useRef<HTMLButtonElement>(null)
   /** Tamaños por ruta. Sin clave = todavía se calcula. */
   const [sizes, setSizes] = useState<Record<string, SizeVal>>({})
   const [sizeFailed, setSizeFailed] = useState(false)
@@ -203,7 +201,6 @@ export function RamasPage(): React.JSX.Element | null {
     setRmPath(null)
     setRmErr('')
     void scan()
-    setTimeout(() => panelRef.current?.focus(), 0)
   }, [open, nonce, scan])
 
   // Filtro de repo inicial: una vez por apertura, cuando hay lista (el repo del espacio, o todos).
@@ -369,16 +366,8 @@ export function RamasPage(): React.JSX.Element | null {
   const candidates = branchRows.filter(cleanable)
 
   return (
-    <div ref={panelRef} className="page-shell f-wt-shell" role="dialog" aria-modal="true" aria-labelledby="f-wt-h" tabIndex={-1}>
-      <header className="page-head">
-        <button ref={backRef} type="button" className="page-back" onClick={closeRamas} disabled={rmBusy}>
-          ‹ Espacios
-        </button>
-        <span className="page-sep" aria-hidden="true" />
-        <span className="page-name">Sloth · ramas aparte</span>
-      </header>
-
-      <div className="page-body f-wt-body">
+    <View labelId="f-wt-view-title" title="Ramas aparte" onClose={() => !rmBusy && closeRamas()} className="f-wt-view">
+      <div className="f-wt-body">
         <div className="f-wt-inner">
           <header className="f-wt-head">
             <div className="f-wt-head-text">
@@ -636,7 +625,7 @@ export function RamasPage(): React.JSX.Element | null {
             <DoneIcon size={14} /> {toast}
           </div>
         )}
-    </div>
+    </View>
   )
 }
 

@@ -3,7 +3,7 @@ import { SHORTCUTS, shortcutKeys, type Shortcut } from '../../shortcuts'
 import { SearchIcon } from '../../icons/SlothIcons'
 import { openSettings } from '../settings/bus'
 import { openReport } from '../report/bus'
-import { PageShell } from './PageShell'
+import { View } from '../../ui/View'
 import { marks, matchesAll, wordsOf } from './text'
 import './ayuda.css'
 
@@ -184,7 +184,7 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
     )
 
   return (
-    <PageShell labelId="ay-title" title="Ayuda y atajos" onClose={onClose}>
+    <View labelId="ay-view-title" title="Ayuda y atajos" onClose={onClose}>
       <div className="ay-wrap">
         <header className="ay-head">
           <h1 id="ay-title">Ayuda y atajos</h1>
@@ -425,6 +425,6 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
           <span>{note}</span>
         </div>
       )}
-    </PageShell>
+    </View>
   )
 }
