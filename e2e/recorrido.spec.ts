@@ -4,7 +4,7 @@ import type { Page, ElectronApplication } from '@playwright/test'
 /**
  * Recorrido por las pantallas principales (tema oscuro, 1280×800). Es la red de seguridad del rediseño:
  * cada captura de referencia se regenera a propósito y con explicación, nunca para que un test pase.
- * Lo de adentro de las terminales cambia de PC a PC: se tapa.
+ * Lo de adentro de las terminales cambia de PC a PC: se esconde.
  */
 
 test.use({ seed: { settings: { theme: 'oscuro' } } })
@@ -13,9 +13,10 @@ let n = 0
 async function shot(page: Page, name: string): Promise<void> {
   n++
   await page.waitForTimeout(450)
-  // Con una Vista abierta las terminales quedan tapadas: no hace falta enmascararlas y la máscara taparía la Vista.
-  const mask = (await page.locator('.ui-view').count()) > 0 ? [] : [page.locator('.terminal-host')]
-  await expect.soft(page).toHaveScreenshot(`${String(n).padStart(2, '0')}-${name}.png`, { mask })
+  // Lo de adentro de las terminales cambia de PC a PC: se esconde en vez de enmascararlo, porque la
+  // máscara se pinta encima de todo y tapaba los menús que se abren sobre un panel.
+  await page.addStyleTag({ content: '.terminal-host .xterm { visibility: hidden !important; }' })
+  await expect.soft(page).toHaveScreenshot(`${String(n).padStart(2, '0')}-${name}.png`)
 }
 
 async function esc(page: Page, veces = 3): Promise<void> {
