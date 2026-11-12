@@ -400,10 +400,7 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
     >
       <div className="tp-body">
         <aside className="tp-list" aria-label="Lista de plantillas">
-          <label className="tp-search">
-            <SearchIcon size={14} />
-            <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar plantilla" aria-label="Buscar plantilla" />
-          </label>
+          <Input prefix={<SearchIcon size={14} />} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar plantilla" aria-label="Buscar plantilla" />
 
           <Button variant="primary" className="tp-new-btn" aria-expanded={creating} onClick={() => setCreating((v) => !v)}>
             <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
@@ -467,7 +464,7 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
               <EmptyState size="sm" as="p" title={`Ninguna plantilla coincide con «${q.trim()}».`} />
             </div>
           )}
-          {list.length === 0 && <EmptyState size="sm" as="p" title="Todavía no hay plantillas" description="Creá una con «Nueva plantilla»." />}
+          {list.length === 0 && <EmptyState size="sm" as="p" title="Todavía no hay plantillas. Creá una con «Nueva plantilla»." />}
           <p className="tp-foot">Las plantillas del equipo no se editan ni se borran. Duplicalas para tener tu versión.</p>
         </aside>
 

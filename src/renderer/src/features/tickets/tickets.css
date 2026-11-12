@@ -423,8 +423,8 @@
   color: var(--fg-2);
   font-size: var(--fs-sm);
 }
-.f-tickets-prio-field select,
-.f-tickets-field select {
+.f-tickets-prio-field select:not(.ui-input),
+.f-tickets-field select:not(.ui-input) {
   appearance: none;
   background-color: var(--input-bg);
   background-image: linear-gradient(45deg, transparent 50%, var(--fg-muted) 50%),
@@ -437,7 +437,7 @@
   font: inherit;
   box-shadow: inset 0 0 0 1px var(--line-strong);
 }
-.f-tickets-prio-field select {
+.f-tickets-prio-field select:not(.ui-input) {
   height: 30px;
   min-width: 150px;
   padding-left: 10px;
@@ -699,14 +699,14 @@
   font-size: var(--fs-sm);
   color: var(--fg-2);
 }
-.f-tickets-field select {
+.f-tickets-field select:not(.ui-input) {
   height: 34px;
   min-width: 170px;
   padding-left: 10px;
   border: 0;
   border-radius: 8px;
 }
-.f-tickets-field select:disabled {
+.f-tickets-field select:not(.ui-input):disabled {
   opacity: 0.85;
   cursor: not-allowed;
 }

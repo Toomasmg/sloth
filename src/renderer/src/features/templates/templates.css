@@ -156,32 +156,6 @@
   background: var(--surface);
   box-shadow: inset -1px 0 0 var(--line);
 }
-.tp-search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 10px;
-  border-radius: 8px;
-  background: var(--card);
-  color: var(--fg-3);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-.tp-search input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  background: transparent;
-  color: var(--fg);
-  font: inherit;
-  box-shadow: none;
-}
-.tp-search input:focus {
-  outline: none;
-}
-.tp-search:focus-within {
-  box-shadow: inset 0 0 0 1px var(--accent);
-}
 .tp-new-btn {
   width: 100%;
   height: 32px;

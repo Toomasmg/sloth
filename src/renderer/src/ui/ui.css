@@ -110,6 +110,18 @@
 .ui-menu-item:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
+  /* styles.css pone un radio global en :focus-visible: cada componente fija el suyo en --ui-r */
+  border-radius: var(--ui-r, var(--r-md));
+}
+.ui-seg-item,
+.ui-tab,
+.ui-menu-item,
+.ui-switch {
+  --ui-r: var(--r-sm);
+}
+.ui-chip-main,
+.ui-chip-x {
+  --ui-r: var(--r-full);
 }
 .ui-btn:disabled,
 .ui-icon-btn:disabled,
@@ -260,7 +272,10 @@
 }
 .ui-input,
 .ui-input:hover,
-.ui-input:focus {
+.ui-input:focus,
+.ui-input:focus-visible {
+  border-radius: 0;
+  outline: none;
   box-shadow: none;
 }
 .ui-input::placeholder {
