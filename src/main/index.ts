@@ -448,9 +448,7 @@ app.whenReady().then(async () => {
 
   // Texto, rutas de archivos copiados o una imagen guardada como PNG (src/main/clipboard-paste.ts).
   ipcMain.handle('clipboard:read', () => clipboardForPaste())
-  ipcMain.handle('clipboard:write', (_e, text: string) => {
-    clipboard.writeText(String(text))
-  })
+  ipcMain.handle('clipboard:write', (_e, text: unknown) => clipboard.writeText(String(text)))
 
   // Funciones (features): cada una con sus canales feat:<nombre>:<op>.
   for (const f of FEATURES) {

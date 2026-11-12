@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Page } from '@playwright/test'
 import { test, expect } from './sloth'
-import { termText } from './terminal'
+import { hasSelection, recordInput, recorded, selectAll, shellReady, termText } from './terminal'
 
 /**
  * Pegar y soltar en la terminal: además de texto, las rutas de archivos copiados (un .zip, una foto)
@@ -15,13 +15,9 @@ import { termText } from './terminal'
 const ps = (script: string): void => {
   execFileSync('powershell.exe', ['-NoProfile', '-Sta', '-Command', `Add-Type -AssemblyName System.Windows.Forms,System.Drawing; ${script}`])
 }
+const clipboardText = (): string =>
+  execFileSync('powershell.exe', ['-NoProfile', '-Sta', '-Command', 'Add-Type -AssemblyName System.Windows.Forms; [Windows.Forms.Clipboard]::GetText()'], { encoding: 'utf8' })
 const psQuote = (s: string): string => `'${s.replace(/'/g, "''")}'`
-
-/** PowerShell ya mostró el prompt y terminó de cargar PSReadLine (si no, se come lo que llega). */
-async function shellReady(page: Page): Promise<void> {
-  await expect.poll(() => termText(page), { timeout: 30_000 }).toContain('PS ')
-  await page.waitForTimeout(1500)
-}
 
 async function pasteInTerminal(page: Page): Promise<void> {
   await page.locator('.terminal-host').click()
@@ -45,6 +41,49 @@ test.describe('pegar en la terminal', () => {
     await expect.poll(() => termText(page)).toContain('texto-pegado-123')
     await page.waitForTimeout(500)
     expect((await termText(page)).split('texto-pegado-123').length - 1).toBe(1)
+  })
+
+  test('Ctrl+V manda 2.000 caracteres a la shell en menos de 300 ms', async ({ sloth: { page } }) => {
+    await shellReady(page)
+    ps(`[Windows.Forms.Clipboard]::SetText('${'x'.repeat(1990)}FIN-PEGADO')`)
+    await page.locator('.terminal-host').click()
+    await recordInput(page)
+    await page.keyboard.press('Control+V')
+    await expect.poll(async () => (await recorded(page)).sent.some((s) => s.data.includes('FIN-PEGADO'))).toBe(true)
+    const rec = await recorded(page)
+    const sent = rec.sent.find((s) => s.data.includes('FIN-PEGADO'))
+    // Se mide de la tecla a los bytes que salen hacia la shell: lo que tarda la shell en dibujarlos no es de Sloth.
+    expect((sent?.at ?? Infinity) - rec.keyAt).toBeLessThan(300)
+    expect(rec.sent.filter((s) => s.data.includes('FIN-PEGADO'))).toHaveLength(1)
+  })
+
+  test('Ctrl+C con texto seleccionado lo copia, limpia la selección y no interrumpe', async ({ sloth: { page } }) => {
+    await shellReady(page)
+    ps(`[Windows.Forms.Clipboard]::SetText('sin-copiar')`)
+    await page.locator('.terminal-host').click()
+    await selectAll(page)
+    await recordInput(page)
+    await page.keyboard.press('Control+C')
+    await expect.poll(clipboardText).toContain('shell-lista')
+    expect(await hasSelection(page)).toBe(false)
+    expect((await recorded(page)).sent.map((s) => s.data).join('')).not.toContain('\x03')
+  })
+
+  test('Ctrl+Shift+C copia la selección', async ({ sloth: { page } }) => {
+    await shellReady(page)
+    ps(`[Windows.Forms.Clipboard]::SetText('sin-copiar')`)
+    await page.locator('.terminal-host').click()
+    await selectAll(page)
+    await page.keyboard.press('Control+Shift+C')
+    await expect.poll(clipboardText).toContain('shell-lista')
+  })
+
+  test('Ctrl+C sin selección le manda ^C a la terminal', async ({ sloth: { page } }) => {
+    await shellReady(page)
+    await page.locator('.terminal-host').click()
+    await recordInput(page)
+    await page.keyboard.press('Control+C')
+    await expect.poll(async () => (await recorded(page)).sent.map((s) => s.data).join('')).toContain('\x03')
   })
 
   test('archivos copiados en el Explorador pegan sus rutas, entre comillas si tienen espacios', async ({ sloth: { page } }) => {
@@ -73,6 +112,29 @@ test.describe('pegar en la terminal', () => {
       })
       .not.toBe('')
     expect(existsSync(pasted.replace(/^"/, ''))).toBe(true)
+  })
+
+  test('una captura de 1920×1080 se pega una sola vez y en menos de 800 ms', async ({ sloth: { page } }) => {
+    await shellReady(page)
+    // Una captura de verdad de la pantalla (no un lienzo vacío, que se comprime en nada).
+    ps(
+      `$b = New-Object System.Drawing.Bitmap 1920,1080; $g = [System.Drawing.Graphics]::FromImage($b); $g.CopyFromScreen(0, 0, 0, 0, $b.Size); [Windows.Forms.Clipboard]::SetImage($b)`
+    )
+    await page.locator('.terminal-host').click()
+    await recordInput(page)
+    await page.keyboard.press('Control+V')
+    const isImage = (d: string): boolean => /pegados\\imagen-\S+\.png/.test(d)
+    await expect.poll(async () => (await recorded(page)).sent.some((s) => isImage(s.data)), { timeout: 10_000 }).toBe(true)
+    const rec = await recorded(page)
+    const sent = rec.sent.filter((s) => isImage(s.data))
+    expect(sent).toHaveLength(1)
+    const ms = sent[0].at - rec.keyAt
+    test.info().annotations.push({ type: 'latencia', description: `${Math.round(ms)} ms` })
+    expect(ms).toBeLessThan(800)
+    const file = /[A-Za-z]:\\\S+?\.png/.exec(sent[0].data)?.[0] ?? ''
+    const png = readFileSync(file)
+    // Cabecera IHDR: ancho y alto en los bytes 16 a 23.
+    expect([png.readUInt32BE(16), png.readUInt32BE(20)]).toEqual([1920, 1080])
   })
 })
 
