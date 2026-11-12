@@ -898,7 +898,7 @@ kbd,
   background: var(--scrim);
   display: grid;
   place-items: center;
-  z-index: var(--z-sticky);
+  z-index: var(--z-modal);
   animation: fade var(--t-fast) var(--ease);
 }
 .modal {
@@ -1012,7 +1012,7 @@ kbd,
   padding: var(--s-3) var(--s-2) var(--s-3) var(--s-4);
   border-radius: var(--r-lg);
   box-shadow: var(--e-2);
-  z-index: var(--z-panel);
+  z-index: var(--z-toast);
   animation: rise var(--t-med) var(--ease);
 }
 .toast > svg {

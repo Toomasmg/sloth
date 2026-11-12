@@ -14,7 +14,8 @@
 .sl-top {
   grid-column: 1 / -1;
   position: relative;
-  z-index: var(--z-sticky);
+  /* La lista de la paleta vive acá adentro: tiene que tapar Vistas y paneles laterales (--z-panel). */
+  z-index: var(--z-menu);
   min-width: 0;
   /* Tres columnas: el buscador queda centrado en la ventana. */
   display: grid;
