@@ -160,7 +160,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       'Paneles en grilla o en pestañas (Ctrl+Tab): reordenalos arrastrando el encabezado o con Ctrl+Alt+flechas, y cambiales el tamaño arrastrando los separadores.',
       'Bienvenida nueva para arrancar, y configuración de equipo compartida en el repo (.sloth/team.json).',
       'Vista Equipo: en qué anda cada uno, con sus PR y tickets.',
-      'Chat del equipo con mensajes directos, fotos de equipo e invitaciones. Usa un Supabase propio del equipo: hay que configurarlo antes (Configuración → Equipo y datos).',
+      'Chat del equipo con mensajes directos, fotos de equipo e invitaciones. Usa un Supabase propio del equipo: hay que configurarlo antes (Configuración → Equipo y chat).',
       'Ayuda (?): atajos, novedades e invitar a alguien a Sloth.',
       'Reportá un problema desde la ayuda: el borrador sale sin datos personales y lo revisás antes de enviarlo.',
       'Renombrá un espacio con doble clic, ponele un ícono, abrilo en VS Code o en su carpeta, o soltá una carpeta en la ventana para crear uno.',
