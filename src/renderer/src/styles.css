@@ -726,7 +726,8 @@ kbd,
   border-radius: var(--r-md);
   /* Contorno de 1px como sombra interior: separa del fondo sin "caja dentro de caja". */
   box-shadow: inset 0 0 0 1px var(--divider);
-  overflow: hidden;
+  /* clip y no hidden: hidden se deja desplazar por código (el dictado de Windows corría la terminal). */
+  overflow: clip;
   transition: box-shadow var(--t-med) var(--ease);
 }
 .pane.hidden {
@@ -789,6 +790,7 @@ kbd,
   flex: 1;
   min-height: 0;
   padding: var(--s-2) var(--s-1) 0 var(--s-3);
+  overflow: clip;
 }
 /* Arrastrando archivos sobre la terminal: se van a pegar sus rutas ahí. */
 .terminal-host.drop-on {

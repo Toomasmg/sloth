@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from 'react'
+import { memo, useCallback, useEffect, useRef } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import type { PtyChunk } from '../../shared/types'
@@ -7,6 +7,7 @@ import { api, onPtyData, onPtyExit } from './api'
 import { subscribeSettings, termOptions } from './features/settings/store'
 import { usePaneVisible } from './visibility'
 import { PANES_FIT_EVENT } from './layout/store'
+import { MicDictado } from './features/dictado/MicDictado'
 
 interface Props {
   id: string
@@ -197,6 +198,15 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
     }
     el.addEventListener('contextmenu', onContext)
 
+    // El dictado de Windows (Win+H) escribe en el textarea oculto de xterm y Chromium corre en horizontal
+    // lo que lo contiene para mostrarlo: la terminal quedaba cortada a la izquierda. Nada acá se desplaza
+    // de costado, así que se vuelve a 0 (el scroll vertical de xterm no se toca).
+    const onScroll = (ev: Event): void => {
+      const t = ev.target
+      if (t instanceof HTMLElement && t.scrollLeft !== 0) t.scrollLeft = 0
+    }
+    el.addEventListener('scroll', onScroll, true)
+
     // Fit agrupado en un frame y nunca con el panel oculto (display:none mide 0 y rompería cols/rows).
     let raf = 0
     const ro = new ResizeObserver(() => {
@@ -261,6 +271,7 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
       document.removeEventListener('visibilitychange', onVis)
       offSettings()
       el.removeEventListener('contextmenu', onContext)
+      el.removeEventListener('scroll', onScroll, true)
       el.removeEventListener('dragover', onDragOver)
       el.removeEventListener('dragleave', onDragLeave)
       el.removeEventListener('drop', onDropFiles)
@@ -286,5 +297,18 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
     l.term.refresh(0, l.term.rows - 1)
   }, [shown])
 
-  return <div className="terminal-host" ref={host} />
+  // Lo dictado se pega como si se escribiera (sin Enter); el espacio separa una frase de la siguiente.
+  const pegarDictado = useCallback((texto: string): void => {
+    const l = live.current
+    if (!l) return
+    l.term.paste(`${texto} `)
+    l.term.focus()
+  }, [])
+
+  return (
+    <>
+      <div className="terminal-host" ref={host} />
+      <MicDictado paneId={id} onTexto={pegarDictado} />
+    </>
+  )
 })
