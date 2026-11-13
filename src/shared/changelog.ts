@@ -9,6 +9,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.14',
+    date: '2026-11-13',
+    title: 'El micrófono se ve',
+    items: [
+      'El micrófono de cada terminal ahora tiene el color de acento y se ve siempre, no solo al pasar el mouse.',
+      'La primera vez, al lado del micrófono aparece «Nuevo · Dictá con tu voz». Se va cuando lo usás o lo cerrás.'
+    ]
+  },
+  {
     version: '0.6.13',
     date: '2026-11-13',
     title: 'El dictado ahora funciona en todas las PCs',
