@@ -31,11 +31,16 @@
  *   leaveTeam(teamId: string)               → void
  *   removeMember(teamId: string, userId: string) → void
  *   openDm(userId: string)                  → ChatThread           (solo con gente con la que compartís un equipo)
+ *   inviteText(teamId: string)              → string              (invitación completa: servidor + clave publicable + código)
+ *   previewInvite(text: string)             → ChatInvitePreview   (valida y dice qué va a pasar; no cambia nada)
+ *   joinInvite(text: string, confirmed?: 'confirmNew'|'confirmReplace') → ChatInviteJoin
+ *   clipboardInvite()                       → string | null       (el portapapeles, solo si parece una invitación)
  *
  * Eventos (main → UI):
  *   feat:chat:snapshot (ChatSnapshot)       cada vez que cambia algo de la lista/estado
  *   feat:chat:message  (ChatMessage)        mensaje nuevo (propio o ajeno) en cualquier conversación
  *   feat:chat:open     (ChatConvRef)        el usuario tocó una notificación: abrir el drawer en esa conversación
+ *   feat:chat:invite   (ChatInviteResult)   terminó de canjearse una invitación que esperaba el login
  */
 
 /** Puertos del servidor loopback del login (el primero libre). Van en «Redirect URLs» de Supabase. */
@@ -165,3 +170,19 @@ export interface ChatConfigView {
   /** Config ofrecida por un .sloth/team.json que el usuario todavía no aceptó. */
   offered?: { supabaseUrl: string; repo: string; teamName: string }
 }
+
+export type ChatInviteDecision = 'confirmNew' | 'confirmReplace' | 'signIn' | 'redeem'
+
+/** Lo que se muestra antes de usar una invitación. Nunca trae la clave. */
+export interface ChatInvitePreview {
+  /** Host del servidor al que se va a conectar. */
+  host: string
+  teamName?: string
+  decision: ChatInviteDecision
+  /** Host de la configuración que se reemplazaría (solo con confirmReplace). */
+  currentHost?: string
+}
+
+export type ChatInviteJoin = { kind: 'joined'; team: ChatTeam } | { kind: 'signingIn' }
+
+export type ChatInviteResult = { ok: true; team: ChatTeam } | { ok: false; message: string }

@@ -78,6 +78,8 @@ export interface ChatData {
   start(): Promise<void>
   /** Al cerrar sesión, cambiar de config o cerrarse la ventana: cierra realtime y vacía cachés en memoria. */
   stop(): Promise<void>
+  /** Entra a un equipo con su código (lo usa también la invitación completa). */
+  joinByCode(code: unknown): Promise<ChatTeam>
 }
 
 export const EMPTY_PART: ChatDataPart = { connection: 'off', teams: [], threads: [], invites: [], unreadTotal: 0 }
@@ -620,7 +622,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     return r.data
   })
 
-  ctx.handle('joinByCode', async (rawCode: unknown): Promise<ChatTeam> => {
+  const joinByCode = async (rawCode: unknown): Promise<ChatTeam> => {
     const c = clientNow()
     const code = parseInviteCode(rawCode)
     const r = await c.rpc('join_team_by_code', { p_code: code })
@@ -629,7 +631,9 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     if (!teamId) throw new Error('No se pudo entrar al equipo.')
     await refreshLists(true)
     return teamNow(teamId)
-  })
+  }
+
+  ctx.handle('joinByCode', joinByCode)
 
   ctx.handle('acceptInvite', async (rawInvite: unknown): Promise<ChatTeam> => {
     const c = clientNow()
@@ -732,6 +736,8 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       const close = closeInbox
       closeInbox = undefined
       if (close) await close().catch(() => undefined)
-    }
+    },
+
+    joinByCode
   }
 }
