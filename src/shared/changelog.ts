@@ -9,6 +9,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.15',
+    date: '2026-11-13',
+    title: 'Sin barra que no se mueve',
+    items: [
+      'Con Claude Code, vim o nano abiertos, la terminal ya no muestra la barra de desplazamiento, que quedaba quieta mientras ellos movían la pantalla por su cuenta.',
+      'En la PowerShell la barra sigue, pero ahora es una línea fina al borde que no se cruza con el micrófono.'
+    ]
+  },
+  {
     version: '0.6.14',
     date: '2026-11-13',
     title: 'El micrófono se ve',
