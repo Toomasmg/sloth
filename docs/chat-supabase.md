@@ -41,7 +41,7 @@ Esto lo hace **una sola persona del equipo, una vez**. Son unos 15 minutos. Desp
 ## 4. Correr la migración, con las tablas y la seguridad
 
 1. En Supabase, andá a **SQL Editor → New query**.
-2. Copiá todo el contenido de [`supabase/migrations/0001_chat.sql`](../supabase/migrations/0001_chat.sql) de este repo, pegalo y tocá **Run**. Tiene que terminar sin errores. Después hacé lo mismo con [`supabase/migrations/0002_hardening.sql`](../supabase/migrations/0002_hardening.sql), que cierra el acceso por API a las funciones internas (responde a los avisos del Security Advisor).
+2. Copiá todo el contenido de [`supabase/migrations/0001_chat.sql`](../supabase/migrations/0001_chat.sql) de este repo, pegalo y tocá **Run**. Tiene que terminar sin errores. Después hacé lo mismo con [`supabase/migrations/0002_hardening.sql`](../supabase/migrations/0002_hardening.sql), que cierra el acceso por API a las funciones internas (responde a los avisos del Security Advisor). Por último, [`supabase/migrations/0003_realtime_broadcast.sql`](../supabase/migrations/0003_realtime_broadcast.sql): hace que los mensajes lleguen en el momento (Realtime Broadcast en canales privados). Sin ella el chat anda igual, pero cada mensaje tarda uno o dos segundos en aparecerle al otro.
 3. Comprobá que quedó bien:
    - En **Table Editor** tienen que aparecer `profiles`, `teams`, `team_members`, `team_invite_codes`, `team_invites`, `dm_threads` y `messages`. Todas tienen que tener el candado de RLS activado.
    - En **Storage** tiene que aparecer el bucket `team-photos`, **privado**.
@@ -85,7 +85,7 @@ Cuando un compañero abre Sloth con ese repo, la app le pregunta si quiere usar 
 - El usuario de GitHub sale de la identidad que guarda Supabase al iniciar sesión, y el usuario no la puede editar. Por eso nadie puede hacerse pasar por `ana` para quedarse con su invitación.
 - Las fotos van en un bucket **privado**. Las ven solo los miembros del equipo y las cambian solo los owners y los admins.
 
-La migración tiene una prueba con PGlite (Postgres en WASM), con 40 casos de acceso permitido y prohibido: `npm i --no-save @electric-sql/pglite` y después `node supabase/tests/rls.test.mjs supabase/migrations/0001_chat.sql`.
+La migración tiene una prueba con PGlite (Postgres en WASM), con 40 casos de acceso permitido y prohibido: `npm i --no-save @electric-sql/pglite` y después `node supabase/tests/rls.test.mjs supabase/migrations/0001_chat.sql supabase/migrations/0002_hardening.sql supabase/migrations/0003_realtime_broadcast.sql`.
 
 ## Costos y consumo
 
