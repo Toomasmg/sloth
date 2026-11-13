@@ -9,6 +9,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.12',
+    date: '2026-11-12',
+    title: 'Dictado por voz en la terminal',
+    items: [
+      'Cada terminal tiene su micrófono abajo a la derecha: tocalo, hablá y tocalo de nuevo. El texto aparece en el prompt de Claude sin mandarse, para que lo revises. Usa el reconocimiento de voz de Windows.',
+      'Si a Windows le falta algo para dictar (el reconocimiento de voz en línea, el micrófono o el idioma), Sloth te avisa y te lleva a la pantalla que lo arregla.',
+      'Con el dictado de Windows (Win+H), la terminal ya no se corre de costado ni queda cortada a la izquierda.',
+      'Chat: unite a un equipo pegando una invitación completa, y al invitar copiá la invitación con todo lo necesario.',
+      'Chat: los mensajes llegan más rápido.',
+      'Chat: si el inicio de sesión con GitHub no está habilitado, Sloth lo explica en vez de mostrar un error.'
+    ]
+  },
+  {
     version: '0.6.11',
     date: '2026-11-12',
     title: 'Sin ventana negra al cerrar terminales',
