@@ -9,6 +9,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.13',
+    date: '2026-11-13',
+    title: 'El dictado ahora funciona en todas las PCs',
+    items: [
+      'El micrófono de cada terminal transcribe con Whisper en tu propia PC: no depende de Windows, anda sin internet y el audio no sale de tu computadora.',
+      'Tocá el micrófono, hablá y tocalo de nuevo: en unos segundos el texto aparece en el prompt de Claude, sin mandarse.',
+      'Entiende mejor las palabras de programación (commit, staging, pull request) y el voseo.',
+      'Si no hay micrófono o Windows no deja usarlo, Sloth te avisa y te lleva a la pantalla que lo arregla.'
+    ]
+  },
+  {
     version: '0.6.12',
     date: '2026-11-12',
     title: 'Dictado por voz en la terminal',
