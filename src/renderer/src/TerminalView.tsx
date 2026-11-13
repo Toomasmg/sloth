@@ -125,6 +125,19 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
     term.onData((d) => api.ptyWrite(id, d))
     term.onResize(({ cols, rows }) => api.ptyResize(id, cols, rows))
 
+    // La barra de desplazamiento de xterm solo sirve si la ruedita mueve a xterm: en la pantalla normal y
+    // sin un programa que capture el mouse. Claude Code (con su propio scroll), vim o nano dibujan y
+    // desplazan por su cuenta, y la barra quedaba quieta mostrando el historial de antes.
+    let sinBarra = false
+    const revisarBarra = (): void => {
+      const v = !inNormalBuffer() || term.modes.mouseTrackingMode !== 'none'
+      if (v === sinBarra) return
+      sinBarra = v
+      el.classList.toggle('sin-barra', v)
+    }
+    term.onWriteParsed(revisarBarra)
+    term.buffer.onBufferChange(revisarBarra)
+
     // Pegar: texto, rutas de archivos copiados (un .zip, una carpeta) o una imagen, que main guarda
     // como PNG y pega su ruta para que Claude Code la adjunte.
     const pasteClipboard = (): void => {

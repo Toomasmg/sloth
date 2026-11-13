@@ -809,6 +809,10 @@ kbd,
   width: 6px !important;
   background: color-mix(in srgb, var(--text) 35%, transparent) !important;
 }
+/* Claude Code, vim o nano desplazan por su cuenta: la barra de xterm no se movería (TerminalView). */
+.terminal-host.sin-barra .xterm .xterm-scrollable-element > .scrollbar {
+  display: none !important;
+}
 /* Arrastrando archivos sobre la terminal: se van a pegar sus rutas ahí. */
 .terminal-host.drop-on {
   outline: 2px dashed var(--accent);
