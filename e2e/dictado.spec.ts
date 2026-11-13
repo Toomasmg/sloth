@@ -12,6 +12,16 @@ test.describe('dictado', () => {
     await expect(mic).toHaveAttribute('aria-pressed', 'false')
   })
 
+  test('la primera vez avisa que hay dictado, en un solo panel, hasta cerrarlo', async ({ sloth: { page } }) => {
+    await expect(page.locator('.xterm')).toHaveCount(1)
+    await expect(page.getByText('Dictá con tu voz')).toHaveCount(1)
+    await page.getByRole('button', { name: 'Cerrar aviso del dictado' }).click()
+    await expect(page.getByText('Dictá con tu voz')).toHaveCount(0)
+    await page.reload()
+    await expect(page.locator('.xterm')).toHaveCount(1)
+    await expect(page.getByText('Dictá con tu voz')).toHaveCount(0)
+  })
+
   test('la terminal no se corre de costado (el dictado de Windows la desplazaba)', async ({ sloth: { page } }) => {
     await expect(page.locator('.xterm')).toHaveCount(1)
     const corridos = await page.evaluate(async () => {

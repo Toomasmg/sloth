@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { MicrophoneIcon, XIcon } from '@phosphor-icons/react'
-import { abrirAjustes, cerrarAviso, empezar, soltar, terminar, useDictado } from './store'
+import { abrirAjustes, cerrarAviso, empezar, marcarConocido, montar, soltar, terminar, useDictado, useMostrarNovedad } from './store'
 import './dictado.css'
 
 /**
@@ -9,6 +9,8 @@ import './dictado.css'
  */
 export function MicDictado({ paneId, onTexto }: { paneId: string; onTexto(texto: string): void }): React.JSX.Element {
   const { estado, error, vacio } = useDictado(paneId)
+  const novedad = useMostrarNovedad(paneId)
+  useEffect(() => montar(paneId), [paneId])
   const onTextoRef = useRef(onTexto)
   onTextoRef.current = onTexto
   const pegar = (t: string): void => onTextoRef.current(t)
@@ -29,6 +31,15 @@ export function MicDictado({ paneId, onTexto }: { paneId: string; onTexto(texto:
 
   return (
     <div className="dictado" data-estado={estado}>
+      {novedad && !activo && !error && !vacio && (
+        <div className="dictado-pill dictado-novedad" role="note">
+          <span className="dictado-nuevo">Nuevo</span>
+          Dictá con tu voz
+          <button type="button" className="dictado-x" aria-label="Cerrar aviso del dictado" onClick={marcarConocido}>
+            <XIcon size={12} aria-hidden="true" />
+          </button>
+        </div>
+      )}
       {(activo || error || vacio) && (
         <div className={`dictado-pill${error ? ' is-error' : ''}`} role={error ? 'alert' : 'status'}>
           {error ? (

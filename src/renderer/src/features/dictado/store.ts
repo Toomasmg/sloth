@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 import type { ErrorDictado, EstadoDictado, ResultadoDictado } from '../../../../shared/dictado'
 import { cleanError } from '../../format'
 import { grabar, type Grabacion } from './grabador'
+import { safeStorage } from '../../layout/store'
 
 /** Estado del micrófono de cada panel. Graba uno solo a la vez: empezar en otro corta el anterior. */
 
@@ -19,7 +20,42 @@ let activa: { paneId: string; grab: Grabacion } | null = null
 
 function set(paneId: string, v: VistaDictado): void {
   vistas.set(paneId, v)
-  subs.forEach((f) => f())
+  avisar()
+}
+
+const avisar = (): void => subs.forEach((f) => f())
+
+/**
+ * Aviso de «Nuevo» la primera vez: va en un solo panel (el primero que se montó) y deja de salir
+ * cuando se usa el micrófono o se cierra el aviso. Se recuerda en este equipo.
+ */
+const CLAVE_CONOCIDO = 'sloth.dictado.conocido'
+let conocido = safeStorage()?.getItem(CLAVE_CONOCIDO) === '1'
+const montados: string[] = []
+
+export function montar(paneId: string): () => void {
+  montados.push(paneId)
+  avisar()
+  return () => {
+    const i = montados.indexOf(paneId)
+    if (i >= 0) montados.splice(i, 1)
+    avisar()
+  }
+}
+
+export function useMostrarNovedad(paneId: string): boolean {
+  return useSyncExternalStore(subscribe, () => !conocido && montados[0] === paneId)
+}
+
+export function marcarConocido(): void {
+  if (conocido) return
+  conocido = true
+  try {
+    safeStorage()?.setItem(CLAVE_CONOCIDO, '1')
+  } catch {
+    /* sin almacenamiento: el aviso vuelve a salir la próxima vez, nada más */
+  }
+  avisar()
 }
 
 const subscribe = (f: () => void): (() => void) => {
@@ -44,6 +80,7 @@ function errorDeMicrofono(e: unknown): ErrorDictado {
 
 export async function empezar(paneId: string, onTexto: (texto: string) => void): Promise<void> {
   if (activa?.paneId === paneId) return
+  marcarConocido()
   if (activa) {
     activa.grab.descartar()
     set(activa.paneId, INACTIVO)
