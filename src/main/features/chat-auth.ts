@@ -148,6 +148,20 @@ export interface GithubLoginDeps {
   path: string
   /** Abre la URL en el navegador del sistema (shell.openExternal en chat.ts). */
   openExternal(url: string): Promise<void>
+  /** Si el proyecto tiene GitHub habilitado; null cuando no se pudo saber (no frena el login). */
+  githubHabilitado?(): Promise<boolean | null>
+}
+
+export const GITHUB_DESHABILITADO =
+  'El login con GitHub no está habilitado en el Supabase del equipo. Quien administra ese proyecto tiene que activarlo en Authentication → Sign In / Providers → GitHub (con una OAuth App de GitHub) y sumar http://127.0.0.1:53682/auth/callback a las Redirect URLs.'
+
+/** Lee `external.github` de GET /auth/v1/settings; null si la respuesta no tiene esa forma. */
+export function githubEnSettings(settings: unknown): boolean | null {
+  if (!settings || typeof settings !== 'object') return null
+  const external = (settings as { external?: unknown }).external
+  if (!external || typeof external !== 'object') return null
+  const github = (external as { github?: unknown }).github
+  return typeof github === 'boolean' ? github : null
 }
 
 export type LoginResult = { kind: 'ok' } | { kind: 'cancelled' } | { kind: 'failed'; message: string }
@@ -162,6 +176,8 @@ export interface GithubLogin {
  * automática), la abre en el navegador y espera. Al recibir el code, lo canjea por sesión.
  */
 export async function startGithubLogin(deps: GithubLoginDeps): Promise<GithubLogin> {
+  // Sin esto, el navegador muestra el JSON crudo de Supabase («provider is not enabled»).
+  if ((await deps.githubHabilitado?.()) === false) throw new Error(GITHUB_DESHABILITADO)
   const server = await startCallbackServer({ ports: deps.ports, path: deps.path })
   try {
     const { data, error } = await deps.client.auth.signInWithOAuth({
