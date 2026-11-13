@@ -792,6 +792,23 @@ kbd,
   padding: var(--s-2) var(--s-1) 0 var(--s-3);
   overflow: clip;
 }
+/* Barra de desplazamiento de xterm: una línea fina al borde en vez del bloque gris de 14 px
+   (que además quedaba debajo del micrófono). Más marcada solo al pasarle el mouse. */
+.terminal-host .xterm .xterm-scrollable-element > .scrollbar.vertical {
+  width: 10px !important;
+}
+.terminal-host .xterm .xterm-scrollable-element > .scrollbar.vertical > .slider {
+  left: auto !important;
+  right: 2px;
+  width: 4px !important;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 18%, transparent) !important;
+}
+.terminal-host .xterm .xterm-scrollable-element > .scrollbar.vertical:hover > .slider,
+.terminal-host .xterm .xterm-scrollable-element > .scrollbar.vertical > .slider.active {
+  width: 6px !important;
+  background: color-mix(in srgb, var(--text) 35%, transparent) !important;
+}
 /* Arrastrando archivos sobre la terminal: se van a pegar sus rutas ahí. */
 .terminal-host.drop-on {
   outline: 2px dashed var(--accent);
