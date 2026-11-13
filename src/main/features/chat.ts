@@ -1,15 +1,16 @@
-import { app, safeStorage, shell, type BrowserWindow } from 'electron'
+import { app, clipboard, safeStorage, shell, type BrowserWindow } from 'electron'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Feature, FeatureContext } from './context'
-import type { ChatAuth, ChatConfigView, ChatProfile, ChatSnapshot } from '../../shared/chat'
+import type { ChatAuth, ChatConfigView, ChatInviteJoin, ChatInvitePreview, ChatInviteResult, ChatProfile, ChatSnapshot, ChatTeam } from '../../shared/chat'
 import { CHAT_CALLBACK_PATH, CHAT_CALLBACK_PORTS } from '../../shared/chat'
 import { keyHash, keyPreview, parseChatServerConfig, type ChatServerConfig } from './chat-config'
 import { createSessionStore, type SessionStore } from './chat-session'
 import { githubEnSettings, startGithubLogin, type GithubLogin } from './chat-auth'
 import { readTeamConfig, repoKey } from './team-config-core'
 import { registerChatData, type ChatData, type ChatCoreHandle } from './chat-data'
+import { buildInvitation, decideInvite, looksLikeInvitation, parseInvitation, type ChatInvitation } from './chat-invite'
 import { writeJsonAtomic } from './tray-settings'
 
 /**
@@ -79,6 +80,8 @@ const feature: Feature = {
     let login: GithubLogin | undefined
     let win: BrowserWindow | undefined
     let running = false
+    /** Código de una invitación que espera el login con GitHub (solo vale para la config con ese id). */
+    let pendingInvite: { code: string; configId: string } | undefined
 
     const session: SessionStore = createSessionStore({
       file: join(dir, 'chat-session.bin'),
@@ -241,6 +244,10 @@ const feature: Feature = {
       const hadActive = active !== undefined
       login?.cancel()
       login = undefined
+      if (pendingInvite) {
+        pendingInvite = undefined
+        ctx.emit('invite', { ok: false, message: 'La configuración del chat cambió mientras iniciabas sesión. Pegá la invitación de nuevo.' } satisfies ChatInviteResult)
+      }
       stopRuntime()
       client?.auth.stopAutoRefresh().catch(() => {})
       client = undefined
@@ -320,6 +327,7 @@ const feature: Feature = {
         }
         emit()
         updateRuntime()
+        await finishPendingInvite(res.kind === 'cancelled')
       })
     }
 
@@ -330,11 +338,87 @@ const feature: Feature = {
       l?.cancel()
       auth = { status: 'signedOut' }
       emit()
+      void finishPendingInvite(true)
+    }
+
+    const inviteFailed = (message: string): void => ctx.emit('invite', { ok: false, message } satisfies ChatInviteResult)
+
+    /** El RPC dice «no existe o ya lo cambiaron»: para quien recibió la invitación, eso es que venció. */
+    const redeemError = (e: unknown): string => {
+      const m = msg(e)
+      return /no existe o ya lo cambiaron/.test(m)
+        ? 'El código de esta invitación ya no anda: lo cambiaron o el equipo ya no existe. Pedí una invitación nueva.'
+        : m
+    }
+
+    async function redeem(code: string): Promise<ChatTeam> {
+      try {
+        return await data.joinByCode(code)
+      } catch (e) {
+        throw new Error(redeemError(e))
+      }
+    }
+
+    /** Después del login: si había una invitación esperando, se canjea y se avisa a la UI. */
+    async function finishPendingInvite(cancelled: boolean): Promise<void> {
+      const p = pendingInvite
+      if (!p) return
+      pendingInvite = undefined
+      if (cancelled) return inviteFailed('Cancelaste el inicio de sesión. El chat quedó configurado: pegá la invitación de nuevo para entrar al equipo.')
+      if (auth.status !== 'signedIn') return inviteFailed(auth.status === 'error' ? auth.message : 'No se pudo iniciar sesión con GitHub. Probá de nuevo.')
+      if (active?.id !== p.configId) return inviteFailed('La configuración del chat cambió mientras iniciabas sesión. Pegá la invitación de nuevo.')
+      try {
+        const team = await redeem(p.code)
+        ctx.emit('invite', { ok: true, team } satisfies ChatInviteResult)
+      } catch (e) {
+        inviteFailed(msg(e))
+      }
+    }
+
+    function inviteState(inv: ChatInvitation): ChatInvitePreview {
+      refresh()
+      const decision = decideInvite(inv, {
+        active: active ? { supabaseUrl: active.cfg.supabaseUrl, keyHash: keyHash(active.cfg.anonKey) } : undefined,
+        signedIn: auth.status === 'signedIn'
+      })
+      return {
+        host: new URL(inv.cfg.supabaseUrl).host,
+        ...(inv.teamName ? { teamName: inv.teamName } : {}),
+        decision,
+        ...(decision === 'confirmReplace' && active ? { currentHost: new URL(active.cfg.supabaseUrl).host } : {})
+      }
+    }
+
+    /**
+     * Si hay que cambiar la config, `confirmed` tiene que ser la misma decisión que vio el usuario:
+     * así una config que apareció en el medio no se pisa con la confirmación de otra cosa.
+     */
+    async function joinInvite(text: unknown, confirmed: unknown): Promise<ChatInviteJoin> {
+      const inv = parseInvitation(text)
+      const { decision, host } = inviteState(inv)
+      if (decision === 'confirmNew' || decision === 'confirmReplace') {
+        if (confirmed !== decision) throw new Error(`Confirmá que querés conectarte a ${host} antes de seguir.`)
+        saved.config = inv.cfg
+        persist()
+        refresh()
+      }
+      if (decision === 'redeem') return { kind: 'joined', team: await redeem(inv.code) }
+      if (!active) throw new Error('No se pudo guardar la configuración del chat.')
+      pendingInvite = { code: inv.code, configId: active.id }
+      await signIn()
+      // signIn no tira: si no pudo abrir el navegador, deja el error en auth.
+      const now = auth as ChatAuth
+      if (now.status === 'error') {
+        pendingInvite = undefined
+        throw new Error(now.message)
+      }
+      return { kind: 'signingIn' }
     }
 
     async function signOut(): Promise<void> {
       login?.cancel()
       login = undefined
+      pendingInvite = undefined
       stopRuntime()
       await client?.auth.signOut({ scope: 'local' }).catch(() => {})
       session.clear()
@@ -416,6 +500,23 @@ const feature: Feature = {
     }
 
     ctx.handle('test', (): Promise<ChatTestResult> => testConnection())
+    ctx.handle('previewInvite', (text: unknown): ChatInvitePreview => inviteState(parseInvitation(text)))
+    ctx.handle('joinInvite', (text: unknown, confirmed: unknown): Promise<ChatInviteJoin> => joinInvite(text, confirmed))
+    ctx.handle('clipboardInvite', (): string | null => {
+      const t = clipboard.readText()
+      return looksLikeInvitation(t) ? t : null
+    })
+    // El código llega de la UI porque al cambiarlo la lista de equipos tarda en refrescarse; se valida igual.
+    ctx.handle('inviteText', (rawTeam: unknown, rawCode: unknown): string => {
+      refresh()
+      if (!active) throw new Error('El chat no está configurado.')
+      const team = typeof rawTeam === 'string' ? data.part().teams.find((t) => t.id === rawTeam) : undefined
+      if (!team) throw new Error('No encontré ese equipo.')
+      if (team.role !== 'owner' && team.role !== 'admin') throw new Error('Solo el owner o un admin puede invitar.')
+      const code = rawCode ?? team.inviteCode
+      if (!code) throw new Error('Este equipo todavía no tiene código de invitación. Generalo primero.')
+      return buildInvitation(active.cfg, String(code), team.name)
+    })
     ctx.handle('signIn', (): Promise<void> => signIn())
     ctx.handle('cancelSignIn', (): void => cancelSignIn())
     ctx.handle('signOut', (): Promise<void> => signOut())

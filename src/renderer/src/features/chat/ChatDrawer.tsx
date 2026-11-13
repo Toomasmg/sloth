@@ -1,6 +1,6 @@
 import { SidePanel } from '../../ui/SidePanel'
 import { useEffect, useState, type KeyboardEvent } from 'react'
-import { ArrowsClockwise, CheckCircle, CircleNotch, Key, Plus, SignIn, SignOut, WarningCircle } from '@phosphor-icons/react'
+import { ArrowsClockwise, CheckCircle, CircleNotch, Key, Plus, SignIn, SignOut, Ticket, WarningCircle } from '@phosphor-icons/react'
 import type { ChatConnection, ChatSnapshot, ChatTeam, ChatThread } from '../../../../shared/chat'
 import { convKey } from '../../../../shared/chat'
 import { useUi, type UiCtx } from '../host'
@@ -11,6 +11,7 @@ import {
   closeChat,
   errText,
   openChat,
+  openJoinInvite,
   sendView,
   showChatList,
   teamOf,
@@ -167,18 +168,21 @@ function ListBody({ snap, onModal, ui }: { snap: ChatSnapshot; onModal(k: Modal)
   if (a.status === 'unconfigured') {
     return (
       <div className="f-chat-block">
-        <p>
-          Para usar el chat, cargá la URL y la clave publicable del proyecto de Supabase de tu equipo en Configuración → Equipo y chat.
-        </p>
+        <p>¿Te mandaron una invitación? Pegala y entrás al equipo en un paso.</p>
+        <button type="button" className="btn primary sm" onClick={() => openJoinInvite()}>
+          <Ticket size={14} aria-hidden="true" />
+          Unirme con una invitación
+        </button>
+        <p className="hint">Si armás el chat de tu equipo, cargá la URL y la clave publicable del proyecto de Supabase.</p>
         <button
           type="button"
-          className="btn primary sm"
+          className="btn sm ghost"
           onClick={() => {
             closeChat()
             openSettings('equipo')
           }}
         >
-          Configurar
+          Configurar a mano
         </button>
       </div>
     )
@@ -190,6 +194,10 @@ function ListBody({ snap, onModal, ui }: { snap: ChatSnapshot; onModal(k: Modal)
         <button type="button" className="btn primary" onClick={() => run(ui, 'feat:chat:signIn')}>
           <SignIn size={14} aria-hidden="true" />
           Iniciar sesión con GitHub
+        </button>
+        <button type="button" className="btn sm ghost" onClick={() => openJoinInvite()}>
+          <Ticket size={14} aria-hidden="true" />
+          Unirme con una invitación
         </button>
       </div>
     )
