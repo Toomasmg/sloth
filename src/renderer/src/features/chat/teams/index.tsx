@@ -3,6 +3,7 @@
  *   TeamEditor({ team?, onClose, onSaved })        crear o editar nombre, descripción y foto (owner/admin)
  *   InviteDialog({ team, onClose })                invitar por usuario y código (owner/admin)
  *   JoinByCode({ onClose, onJoined })              entrar con código
+ *   JoinInvite()                                   unirse con una invitación completa (lo monta ChatGlobal)
  *   InvitesList({ invites, onJoined })             aceptar / rechazar (null si no hay)
  *   MembersPanel({ team, onClose, onOpenDm, onLeft })  miembros, DM, sacar y salir
  */
@@ -11,5 +12,6 @@ import './teams.css'
 export { TeamEditor } from './TeamEditor'
 export { InviteDialog } from './InviteDialog'
 export { JoinByCode } from './JoinByCode'
+export { JoinInvite } from './JoinInvite'
 export { InvitesList } from './InvitesList'
 export { MembersPanel } from './MembersPanel'

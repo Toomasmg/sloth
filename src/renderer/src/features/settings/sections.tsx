@@ -11,6 +11,7 @@ import { openReport } from '../report/bus'
 import { request as requestExportImport } from '../export-import/bus'
 import { openHelp } from '../help/bus'
 import { openPermissionDecisions } from '../permissions/store'
+import { openJoinInvite } from '../chat/store'
 import { runFeatureCommand } from '../palette'
 import { setPhase } from '../updater/phase'
 import { useUpdateDot } from '../updater/useUpdateStatus'
@@ -913,6 +914,20 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
           <Button variant="primary" size="sm" disabled={busy} onClick={() => void act(() => ui.invoke('feat:chat:acceptTeamConfig', offered.repo), 'Usando la configuración del repo.')}>
             Usar
           </Button>
+        </div>
+      )}
+
+      {!signedIn && (
+        <div className="f-set-card f-set-row">
+          <div className="f-set-row-text">
+            <span className="f-set-row-title">¿Te mandaron una invitación?</span>
+            <span className="f-set-hint">Pegala y Sloth configura el servidor, te pide iniciar sesión y te suma al equipo.</span>
+          </div>
+          <div className="f-set-row-ctl">
+            <Button variant={auth?.status === 'unconfigured' ? 'primary' : 'secondary'} size="sm" onClick={() => openJoinInvite()}>
+              Unirme con una invitación
+            </Button>
+          </div>
         </div>
       )}
 

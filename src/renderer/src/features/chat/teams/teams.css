@@ -285,3 +285,57 @@
 .f-chat-team-confirm .f-chat-team-actions {
   justify-content: flex-end;
 }
+
+/* Invitación completa (servidor + código) */
+.f-chat-team-full {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--divider);
+}
+
+/* Unirse con una invitación */
+.f-chat-join {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+.f-chat-join p {
+  margin: 0;
+}
+.f-chat-join-lead {
+  font-size: var(--fs-13);
+  color: var(--text);
+}
+.f-chat-join-label {
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.f-chat-join textarea {
+  font-family: var(--font-mono);
+  font-size: var(--fs-12);
+  word-break: break-all;
+}
+.f-chat-join-host {
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-sm);
+  background: var(--raised);
+  color: var(--text);
+  font-size: var(--fs-15);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.f-chat-join-note {
+  font-size: var(--fs-12);
+  color: var(--text-2);
+}
+.f-chat-join-wait {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-13);
+  color: var(--text);
+}

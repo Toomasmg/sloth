@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { ArrowsClockwise, Check, Copy, UserPlus } from '@phosphor-icons/react'
+import { ArrowsClockwise, Check, Copy, Ticket, UserPlus } from '@phosphor-icons/react'
 import type { ChatInviteSent, ChatTeam } from '../../../../../shared/chat'
 import { useUi } from '../../host'
 import { cleanError } from '../../../format'
@@ -18,10 +18,10 @@ export function InviteDialog({ team, onClose }: { team: ChatTeam; onClose(): voi
 
   const [login, setLogin] = useState('')
   const [code, setCode] = useState(team.inviteCode ?? '')
-  const [busy, setBusy] = useState<'invite' | 'code' | null>(null)
+  const [busy, setBusy] = useState<'invite' | 'code' | 'full' | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState<'code' | 'full' | null>(null)
   const [confirmCode, setConfirmCode] = useState(false)
 
   useEffect(() => () => window.clearTimeout(copyTimer.current), [])
@@ -46,17 +46,38 @@ export function InviteDialog({ team, onClose }: { team: ChatTeam; onClose(): voi
     }
   }
 
+  const markCopied = (what: 'code' | 'full'): void => {
+    setErr(null)
+    setCopied(what)
+    window.clearTimeout(copyTimer.current)
+    copyTimer.current = window.setTimeout(() => setCopied(null), 2000)
+  }
+
   const copyCode = (): void => {
     if (!code) return
     window.sloth
       .clipboardWrite(`Entrá a Sloth → Chat → Entrar con código: ${code}`)
-      .then(() => {
-        setErr(null)
-        setCopied(true)
-        window.clearTimeout(copyTimer.current)
-        copyTimer.current = window.setTimeout(() => setCopied(false), 2000)
-      })
+      .then(() => markCopied('code'))
       .catch((e) => setErr(`No se pudo copiar: ${cleanError(e)}`))
+  }
+
+  const copyFull = async (): Promise<void> => {
+    if (!code) return
+    setErr(null)
+    setStatus(null)
+    setBusy('full')
+    try {
+      const token = await ui.invoke<string>('feat:chat:inviteText', team.id, code)
+      await window.sloth.clipboardWrite(`Sumate al chat de «${team.name}» en Sloth: abrí el Chat, tocá «Unirme con una invitación» y pegá este texto entero.
+
+${token}`)
+      markCopied('full')
+      setStatus('Invitación copiada. Quien la tenga puede entrar al equipo: mandala por privado.')
+    } catch (e) {
+      setErr(`No se pudo copiar: ${cleanError(e)}`)
+    } finally {
+      setBusy(null)
+    }
   }
 
   const regenerate = async (): Promise<void> => {
@@ -133,14 +154,21 @@ export function InviteDialog({ team, onClose }: { team: ChatTeam; onClose(): voi
               )}
               <div className="f-chat-team-actions">
                 <button type="button" className="btn sm" onClick={copyCode} disabled={!code || busy !== null}>
-                  {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-                  {copied ? 'Copiado' : 'Copiar'}
+                  {copied === 'code' ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                  {copied === 'code' ? 'Copiado' : 'Copiar'}
                 </button>
                 <button type="button" className="btn sm" onClick={askRegenerate} disabled={busy !== null || confirmCode}>
                   <ArrowsClockwise size={14} aria-hidden="true" />
                   {busy === 'code' ? 'Cambiando…' : code ? 'Cambiar código' : 'Generar código'}
                 </button>
               </div>
+            </div>
+            <div className="f-chat-team-full">
+              <p className="field-help">Para alguien que todavía no tiene el chat: trae el servidor y el código, y entra en un solo paso.</p>
+              <button type="button" className="btn sm primary" onClick={() => void copyFull()} disabled={!code || busy !== null || confirmCode}>
+                {copied === 'full' ? <Check size={14} aria-hidden="true" /> : <Ticket size={14} aria-hidden="true" />}
+                {busy === 'full' ? 'Copiando…' : copied === 'full' ? 'Copiado' : 'Copiar invitación completa'}
+              </button>
             </div>
             {confirmCode && (
               <ConfirmInline

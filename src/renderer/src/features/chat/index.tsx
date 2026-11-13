@@ -1,8 +1,9 @@
-import { ChatsCircle } from '@phosphor-icons/react'
-import type { FeatureUi } from '../host'
+import { ChatsCircle, Ticket } from '@phosphor-icons/react'
+import type { Command, FeatureUi } from '../host'
 import { useUi } from '../host'
 import { ChatDrawer } from './ChatDrawer'
-import { openChat, useChatAttach, useChatSnapshot, useDrawer } from './store'
+import { JoinInvite } from './teams'
+import { openChat, openJoinInvite, useChatAttach, useChatSnapshot, useDrawer, useJoinInviteOpen } from './store'
 import './chat.css'
 
 /** Botón «Chat» de la barra de título, con el total de no leídos. */
@@ -31,18 +32,35 @@ function ChatChip(): React.JSX.Element {
   )
 }
 
-/** Drawer del chat: solo existe en el árbol mientras está abierto. */
-function ChatGlobal(): React.JSX.Element | null {
+/** Drawer del chat y diálogo de invitación: solo existen en el árbol mientras están abiertos. */
+function ChatGlobal(): React.JSX.Element {
   const ui = useUi()
   useChatAttach(ui)
   const d = useDrawer()
-  return d.open ? <ChatDrawer /> : null
+  const join = useJoinInviteOpen()
+  return (
+    <>
+      {d.open && <ChatDrawer />}
+      {join && <JoinInvite />}
+    </>
+  )
 }
 
 const feature: FeatureUi = {
   name: 'chat',
   Titlebar: ChatChip,
-  Global: ChatGlobal
+  Global: ChatGlobal,
+  commands: (): Command[] => [
+    {
+      id: 'chat:join-invite',
+      title: 'Unirme con una invitación',
+      subtitle: 'Pegar la invitación del chat del equipo',
+      group: 'Equipo',
+      keywords: 'chat invitación unirme sumarme equipo código pegar supabase',
+      icon: <Ticket size={16} aria-hidden="true" />,
+      run: () => openJoinInvite()
+    }
+  ]
 }
 
 export default feature
