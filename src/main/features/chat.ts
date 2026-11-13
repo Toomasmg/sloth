@@ -506,13 +506,16 @@ const feature: Feature = {
       const t = clipboard.readText()
       return looksLikeInvitation(t) ? t : null
     })
-    ctx.handle('inviteText', (rawTeam: unknown): string => {
+    // El código llega de la UI porque al cambiarlo la lista de equipos tarda en refrescarse; se valida igual.
+    ctx.handle('inviteText', (rawTeam: unknown, rawCode: unknown): string => {
       refresh()
       if (!active) throw new Error('El chat no está configurado.')
       const team = typeof rawTeam === 'string' ? data.part().teams.find((t) => t.id === rawTeam) : undefined
       if (!team) throw new Error('No encontré ese equipo.')
-      if (!team.inviteCode) throw new Error('Este equipo todavía no tiene código de invitación. Generalo primero.')
-      return buildInvitation(active.cfg, team.inviteCode, team.name)
+      if (team.role !== 'owner' && team.role !== 'admin') throw new Error('Solo el owner o un admin puede invitar.')
+      const code = rawCode ?? team.inviteCode
+      if (!code) throw new Error('Este equipo todavía no tiene código de invitación. Generalo primero.')
+      return buildInvitation(active.cfg, String(code), team.name)
     })
     ctx.handle('signIn', (): Promise<void> => signIn())
     ctx.handle('cancelSignIn', (): void => cancelSignIn())

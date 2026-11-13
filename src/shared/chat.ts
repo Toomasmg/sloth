@@ -31,7 +31,7 @@
  *   leaveTeam(teamId: string)               → void
  *   removeMember(teamId: string, userId: string) → void
  *   openDm(userId: string)                  → ChatThread           (solo con gente con la que compartís un equipo)
- *   inviteText(teamId: string)              → string              (invitación completa: servidor + clave publicable + código)
+ *   inviteText(teamId: string, code?: string) → string              (invitación completa: servidor + clave publicable + código)
  *   previewInvite(text: string)             → ChatInvitePreview   (valida y dice qué va a pasar; no cambia nada)
  *   joinInvite(text: string, confirmed?: 'confirmNew'|'confirmReplace') → ChatInviteJoin
  *   clipboardInvite()                       → string | null       (el portapapeles, solo si parece una invitación)

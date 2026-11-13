@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import type {
   ChatConvRef,
+  ChatInviteResult,
   ChatMessage,
   ChatSnapshot,
   ChatTeam,
@@ -9,6 +10,7 @@ import type {
 } from '../../../../shared/chat'
 import { convKey } from '../../../../shared/chat'
 import type { UiCtx } from '../host'
+import { toast } from '../../ui/Toast'
 
 /**
  * Estado del chat en la interfaz: espejo del snapshot de main, caché de mensajes por conversación,
@@ -37,6 +39,9 @@ let wired = false
 let snap: ChatSnapshot | null = null
 let drawer: DrawerState = { open: false }
 let announcement = ''
+let joinOpen = false
+/** Error de una invitación que esperaba el login, para mostrarlo en el diálogo si sigue abierto. */
+let inviteError: string | null = null
 const msgs = new Map<string, ChatMessage[]>()
 const meta = new Map<string, ConvMeta>()
 const drafts = new Map<string, string>()
@@ -128,6 +133,7 @@ export function attachChat(ui: UiCtx): void {
   ui.on('feat:chat:snapshot', (s: ChatSnapshot) => setSnap(s))
   ui.on('feat:chat:message', (m: ChatMessage) => onRealtime(m))
   ui.on('feat:chat:open', (conv: ChatConvRef) => openChat(conv))
+  ui.on('feat:chat:invite', (r: ChatInviteResult) => onInviteResult(r))
   void call<ChatSnapshot>('state')
     .then(setSnap)
     .catch(() => undefined)
@@ -186,6 +192,52 @@ export function closeChat(): void {
 export function showChatList(): void {
   drawer = { open: true }
   notify()
+}
+
+// ---------- invitación completa ----------
+
+export function openJoinInvite(): void {
+  closeChat()
+  joinOpen = true
+  inviteError = null
+  notify()
+}
+
+export function closeJoinInvite(): void {
+  if (!joinOpen) return
+  joinOpen = false
+  inviteError = null
+  notify()
+}
+
+export function useJoinInviteOpen(): boolean {
+  return useSyncExternalStore(subscribe, () => joinOpen)
+}
+
+export function useInviteError(): string | null {
+  return useSyncExternalStore(subscribe, () => inviteError)
+}
+
+export function clearInviteError(): void {
+  if (inviteError === null) return
+  inviteError = null
+  notify()
+}
+
+/** Entró al equipo: se abre su conversación. */
+export function joinedTeam(team: ChatTeam): void {
+  closeJoinInvite()
+  openChat({ kind: 'team', id: team.id })
+  toast({ tone: 'success', message: `Entraste a «${team.name}».` })
+}
+
+/** El canje que esperaba el login terminó. Con el diálogo cerrado, el error va como aviso. */
+function onInviteResult(r: ChatInviteResult): void {
+  if (r.ok) return joinedTeam(r.team)
+  if (joinOpen) {
+    inviteError = r.message
+    notify()
+  } else api?.notifyError(r.message)
 }
 
 export function getDraft(conv: ChatConvRef): string {
