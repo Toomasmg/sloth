@@ -7,7 +7,7 @@ import type { ChatAuth, ChatConfigView, ChatProfile, ChatSnapshot } from '../../
 import { CHAT_CALLBACK_PATH, CHAT_CALLBACK_PORTS } from '../../shared/chat'
 import { keyHash, keyPreview, parseChatServerConfig, type ChatServerConfig } from './chat-config'
 import { createSessionStore, type SessionStore } from './chat-session'
-import { startGithubLogin, type GithubLogin } from './chat-auth'
+import { githubEnSettings, startGithubLogin, type GithubLogin } from './chat-auth'
 import { readTeamConfig, repoKey } from './team-config-core'
 import { registerChatData, type ChatData, type ChatCoreHandle } from './chat-data'
 import { writeJsonAtomic } from './tray-settings'
@@ -273,19 +273,32 @@ const feature: Feature = {
     })
 
     async function signIn(): Promise<void> {
-      if (!active || !client) throw new Error('Primero configurá el chat en Configuración → Equipo y datos.')
+      if (!active || !client) throw new Error('Primero configurá el chat en Configuración → Equipo y chat.')
       if (auth.status === 'signedIn' || auth.status === 'signingIn') return
       const c = client
+      const { supabaseUrl, anonKey } = active.cfg
       auth = { status: 'signingIn', startedAt: Date.now() }
       emit()
       let l: GithubLogin
       try {
         l = await startGithubLogin({
           client: c,
-          host: new URL(active.cfg.supabaseUrl).hostname,
+          host: new URL(supabaseUrl).hostname,
           ports: CHAT_CALLBACK_PORTS,
           path: CHAT_CALLBACK_PATH,
-          openExternal: (u) => shell.openExternal(u)
+          openExternal: (u) => shell.openExternal(u),
+          githubHabilitado: async () => {
+            try {
+              const res = await fetch(`${supabaseUrl}/auth/v1/settings`, {
+                headers: { apikey: anonKey },
+                redirect: 'error',
+                signal: AbortSignal.timeout(TEST_TIMEOUT_MS)
+              })
+              return res.ok ? githubEnSettings(await res.json()) : null
+            } catch {
+              return null // sin red o sin respuesta: que lo diga el propio login
+            }
+          }
         })
       } catch (e) {
         auth = { status: 'error', message: msg(e) }
