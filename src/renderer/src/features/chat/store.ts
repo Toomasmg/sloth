@@ -194,8 +194,6 @@ export function showChatList(): void {
   notify()
 }
 
-// ---------- invitación completa ----------
-
 export function openJoinInvite(): void {
   closeChat()
   joinOpen = true
