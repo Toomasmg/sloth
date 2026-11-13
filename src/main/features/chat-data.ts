@@ -49,15 +49,17 @@ import {
   type ThreadRow
 } from './chat-map'
 import { decodePhotoBase64, downloadTeamPhoto, PhotoCache, removeTeamPhoto, uploadTeamPhoto, type Photo } from './chat-photos'
-import { openInbox } from './chat-realtime'
+import { openInbox, openTopic } from './chat-realtime'
+import { BROADCAST_EVENT, convOfTopic, diffTopics, rowFromBroadcast, SeenIds, wantedTopics } from './chat-topics'
 import { currentSettings } from './settings'
 
 /**
  * Datos del chat (equipos, DMs, mensajes, no leídos, realtime, fotos, avisos). Contrato entre
  * chat.ts (T2: config + login) y este archivo (T8).
  *
- * Reglas: todo Supabase corre en main; una sola conexión realtime (canal «sloth-inbox») mientras
- * hay sesión y ventana; sin timers: las listas se refrescan al arrancar, al reconectar y al enfocar
+ * Reglas: todo Supabase corre en main; una sola conexión realtime mientras hay sesión y ventana, con
+ * el canal «sloth-inbox» (postgres_changes, respaldo) y uno privado de Broadcast por conversación
+ * (entrega rápida; si la migración 0003 no está, se cae a «sloth-inbox» solo); sin timers: las listas se refrescan al arrancar, al reconectar y al enfocar
  * la ventana (mínimo 30 s entre refrescos). Nunca se loguea el cuerpo de un mensaje ni un token.
  */
 
@@ -148,6 +150,11 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
   const photoLoading = new Set<string>()
   const photoFailed = new Set<string>()
   const lastNotify = new Map<string, number>()
+  // El mismo mensaje llega por broadcast y por postgres_changes: se procesa (emite, no leído, aviso) una vez.
+  const seen = new SeenIds()
+  const topics = new Map<string, () => Promise<void>>()
+  const failedTopics = new Set<string>()
+  let broadcastWarned = false
 
   const clientNow = (): SupabaseClient => {
     const c = core.client() as SupabaseClient | null
@@ -340,6 +347,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       const r = await loadLists(c, me)
       if (g !== gen) return
       lists = r.lists
+      syncTopics(g)
       teamPhotoPath.clear()
       for (const [k, v] of r.photoPaths) teamPhotoPath.set(k, v)
       photoFailed.clear()
@@ -394,8 +402,12 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     if (g !== gen) return
     if (st === 'SUBSCRIBED') {
       connection = 'live'
-      // Reconexión: las listas y los no leídos no vienen por realtime, se piden una vez.
-      if (subscribedOnce) void refreshLists(true)
+      // Reconexión: las listas y los no leídos no vienen por realtime, se piden una vez. Los canales
+      // rápidos que se cayeron con la conexión se vuelven a probar al recargar las listas.
+      if (subscribedOnce) {
+        failedTopics.clear()
+        void refreshLists(true)
+      }
       subscribedOnce = true
     } else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') {
       connection = 'retrying'
@@ -415,7 +427,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     const c = core.client() as SupabaseClient | null
     if (!isRow(raw) || !me || !c) return
     const conv = convOfRow(raw)
-    if (!conv) return
+    if (!conv || !seen.first(s(raw.id))) return
     const authorId = s(raw.author_id)
     await loadProfiles(c, [authorId])
     if (g !== gen) return
@@ -442,6 +454,49 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     // Avisos del sistema: solo con «notify.team» activo y fuera de «No molestar» (Configuración).
     const st = currentSettings()
     if (!focused && st.notify.team && !st.noMolestar) void notify(conv, msg.author, msg.body).catch(() => undefined)
+  }
+
+  function closeTopic(topic: string): void {
+    const close = topics.get(topic)
+    topics.delete(topic)
+    if (close) close().catch(() => ctx.log('chat: no se pudo cerrar un canal rápido.'))
+  }
+
+  /** Abre o cierra los canales de Broadcast según las conversaciones conocidas. */
+  function syncTopics(g: number): void {
+    const c = core.client() as SupabaseClient | null
+    if (!c || !running || g !== gen) return
+    const wanted = wantedTopics(lists.teams, lists.threads).filter((t) => !failedTopics.has(t))
+    const { add, remove } = diffTopics(topics.keys(), wanted)
+    for (const t of remove) closeTopic(t)
+    for (const t of add) {
+      const conv = convOfTopic(t)
+      if (!conv) continue
+      topics.set(
+        t,
+        openTopic(c, t, BROADCAST_EVENT, {
+          onMessage: (payload) => {
+            if (g !== gen) return
+            const row = rowFromBroadcast(payload, conv)
+            if (row) onInsertRow(g, row).catch(() => ctx.log('chat: no se pudo procesar un mensaje nuevo.'))
+          },
+          onStatus: (st) => onTopicStatus(g, t, st)
+        })
+      )
+    }
+  }
+
+  /**
+   * Si un canal privado no entra (sin la migración 0003 la RLS lo rechaza) se cierra y esa conversación
+   * sigue solo con «sloth-inbox». Sin aviso en la UI: el chat anda igual, un poco más lento.
+   */
+  function onTopicStatus(g: number, topic: string, st: string): void {
+    if (g !== gen || (st !== 'CHANNEL_ERROR' && st !== 'TIMED_OUT')) return
+    failedTopics.add(topic)
+    closeTopic(topic)
+    if (broadcastWarned) return
+    broadcastWarned = true
+    ctx.log('chat: el canal rápido (Broadcast) no está disponible; sigue con postgres_changes. ¿Falta aplicar 0003_realtime_broadcast.sql?')
   }
 
   /** Aviso del sistema para un mensaje ajeno con la ventana sin foco. Como mucho uno cada 5 s por conversación. */
@@ -733,6 +788,11 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       photoFailed.clear()
       profiles.clear()
       lastNotify.clear()
+      seen.clear()
+      failedTopics.clear()
+      broadcastWarned = false
+      // removeAllChannels (al cerrar «sloth-inbox») cierra también los canales rápidos.
+      topics.clear()
       const close = closeInbox
       closeInbox = undefined
       if (close) await close().catch(() => undefined)
