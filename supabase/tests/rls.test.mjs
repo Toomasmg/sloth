@@ -1,5 +1,6 @@
-// Prueba de la migración supabase/migrations/0001_chat.sql sobre PGlite (Postgres en WASM) con
-// stubs de auth/storage/roles de Supabase. Uso: node test.mjs <ruta a 0001_chat.sql>
+// Prueba de las migraciones de supabase/migrations sobre PGlite (Postgres en WASM) con stubs de
+// auth/storage/realtime/roles de Supabase. Uso: node rls.test.mjs <0001_chat.sql> [0002…] [0003…]
+// Las pruebas de Broadcast corren solo si se pasa 0003_realtime_broadcast.sql.
 import { PGlite } from '@electric-sql/pglite'
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
 import { readFileSync } from 'node:fs'
@@ -21,10 +22,23 @@ grant all on storage.objects to authenticated;
 create function storage.foldername(name text) returns text[] language sql immutable as $$ select (string_to_array(name,'/'))[1:array_length(string_to_array(name,'/'),1)-1] $$;
 grant execute on function storage.foldername(text) to authenticated;
 create publication supabase_realtime;
+create schema realtime;
+grant usage on schema realtime to anon, authenticated;
+create table realtime.messages (id bigserial primary key, topic text not null, extension text not null,
+  payload jsonb, event text, private boolean default false, inserted_at timestamptz default now());
+alter table realtime.messages enable row level security;
+grant select, insert on realtime.messages to anon, authenticated;
+grant usage on sequence realtime.messages_id_seq to anon, authenticated;
+create function realtime.topic() returns text language sql stable as $$ select nullif(current_setting('realtime.topic', true), '') $$;
+grant execute on function realtime.topic() to anon, authenticated;
+create function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void
+language sql security definer as $$ insert into realtime.messages(topic, extension, payload, event, private) values (topic, 'broadcast', payload, event, private) $$;
 `
 await db.exec(stub)
-await db.exec(readFileSync(process.argv[2], 'utf8'))
-console.log('migración OK')
+const files = process.argv.slice(2)
+for (const f of files) await db.exec(readFileSync(f, 'utf8'))
+const withBroadcast = files.some((f) => f.includes('0003_realtime_broadcast'))
+console.log('migraciones OK')
 
 const U = {
   ana: '00000000-0000-0000-0000-000000000001',
@@ -42,9 +56,10 @@ for (const [login, id] of Object.entries(U)) {
   else await db.query("insert into auth.identities(user_id, provider, identity_data) values ($1,'email',$2)", [id, { user_name: 'bruno' }])
 }
 
-async function as(user, sql, params = []) {
+async function as(user, sql, params = [], topic = '') {
   await db.exec('reset role')
   await db.query(`select set_config('request.jwt.claim.sub', $1, false)`, [user ?? ''])
+  await db.query(`select set_config('realtime.topic', $1, false)`, [topic])
   await db.exec(user ? 'set role authenticated' : 'set role anon')
   try {
     return (await db.query(sql, params)).rows
@@ -146,6 +161,29 @@ await throws(as(U.bruno, "insert into storage.objects(bucket_id, name) values ('
 ok((await as(U.bruno, 'select * from storage.objects')).length === 1, 'member ve la foto')
 ok((await as(U.evil, 'select * from storage.objects')).length === 0, 'ajeno no ve la foto')
 await throws(as(U.ana, "insert into storage.objects(bucket_id, name) values ('team-photos', 'basura/a.webp')"), 'ruta sin uuid rechazada')
+
+if (withBroadcast) {
+  // Realtime pregunta así al entrar a un canal privado: SELECT sobre realtime.messages con el tópico seteado.
+  const reads = async (user, topic) => (await as(user, 'select payload from realtime.messages where topic = realtime.topic()', [], topic)).length
+  const tTeam = `team:${team}`
+  const tDm = `thread:${dm}`
+  const sent = await as(U.bruno, "select payload from realtime.messages where topic = $1 and event = 'message' order by id desc limit 1", [tTeam], tTeam)
+  ok(sent[0]?.payload?.team_id === team && sent[0]?.payload?.thread_id === null, 'el trigger publica en el tópico del equipo')
+  ok((await reads(U.ana, tTeam)) > 0, 'miembro lee el tópico de su equipo')
+  ok((await reads(U.evil, tTeam)) === 0, 'expulsado/no miembro no lee el tópico del equipo')
+  ok((await reads(U.ana, tDm)) > 0 && (await reads(U.bruno, tDm)) > 0, 'participantes leen el tópico del DM')
+  ok((await reads(U.evil, tDm)) === 0, 'tercero no lee el tópico del DM')
+  ok((await as(U.evil, 'select * from realtime.messages', [], tTeam)).length === 0, 'tercero no ve nada aunque no filtre por tópico')
+  ok((await as(U.evil, 'select * from realtime.messages', [], `TEAM:${team}`)).length === 0, 'tópico con otro formato no abre nada')
+  ok((await as(U.ana, 'select * from realtime.messages', [], `team:${team}x`)).length === 0, 'tópico con basura al final no abre nada')
+  await throws(as(U.evil, "insert into realtime.messages(topic, extension, payload, event, private) values ($1, 'broadcast', '{}', 'message', true)", [tTeam], tTeam), 'no miembro no publica en el tópico')
+  await throws(as(U.ana, "insert into realtime.messages(topic, extension, payload, event, private) values ($1, 'broadcast', '{\"author_id\":\"x\"}', 'message', true)", [tTeam], tTeam), 'tampoco un miembro: solo publica la base (no se falsea autor)')
+  ok((await as(null, 'select * from realtime.messages', [], tTeam)).length === 0, 'anon no lee el tópico')
+  const before = (await as(U.ana, 'select count(*)::int as n from public.messages where team_id=$1', [team]))[0].n
+  await db.exec("create or replace function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void language plpgsql as $$ begin raise exception 'realtime caído'; end $$")
+  await as(U.ana, "insert into public.messages(team_id, client_id, body) values ($1, gen_random_uuid(), 'sin broadcast')", [team])
+  ok((await as(U.ana, 'select count(*)::int as n from public.messages where team_id=$1', [team]))[0].n === before + 1, 'si Broadcast falla el mensaje se guarda igual')
+}
 
 await throws(as(null, 'select * from public.messages'), 'anon sin acceso a messages')
 await throws(as(null, 'select public.unread_counts()'), 'anon no ejecuta RPC')
