@@ -1,9 +1,9 @@
-/** Dictado por voz en la terminal: lo que main le avisa a la UI. */
+/** Dictado por voz en la terminal: tipos que comparten main y la UI. */
 
 export type EstadoDictado = 'inactivo' | 'escuchando' | 'transcribiendo'
 
 /** Qué falló, para elegir el mensaje y si hay ajustes de Windows para abrir. */
-export type TipoErrorDictado = 'privacidad' | 'microfono' | 'idioma' | 'red' | 'sistema' | 'otro'
+export type TipoErrorDictado = 'microfono' | 'sin-microfono' | 'sin-motor' | 'sistema' | 'otro'
 
 export interface ErrorDictado {
   tipo: TipoErrorDictado
@@ -12,13 +12,5 @@ export interface ErrorDictado {
   ajustes: boolean
 }
 
-export interface EventoEstadoDictado {
-  paneId: string
-  estado: EstadoDictado
-  error?: ErrorDictado
-}
-
-export interface EventoTextoDictado {
-  paneId: string
-  texto: string
-}
+/** Respuesta de `feat:dictado:transcribir`. */
+export type ResultadoDictado = { ok: true; texto: string } | { ok: false; error: ErrorDictado }

@@ -1,133 +1,72 @@
-import { shell } from 'electron'
-import { spawn, type ChildProcessByStdio } from 'node:child_process'
-import { rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import type { Readable } from 'node:stream'
+import { app, shell } from 'electron'
+import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import { existsSync } from 'node:fs'
+import { rm, writeFile } from 'node:fs/promises'
+import { availableParallelism, tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
-import { AJUSTES_DICTADO, dictadoArgs, errorDictado, parseLinea } from '../dictado-core'
-import type { ErrorDictado, EstadoDictado, EventoEstadoDictado, EventoTextoDictado, TipoErrorDictado } from '../../shared/dictado'
+import { AJUSTES_DICTADO, WHISPER_MODEL, errorDictado, hilos, textoDeSalida, wavValido, whisperArgs } from '../dictado-core'
+import type { ResultadoDictado, TipoErrorDictado } from '../../shared/dictado'
 
 /**
- * Función «dictado»: micrófono de cada terminal. Una sola sesión a la vez (un micrófono): empezar en
- * otro panel corta la anterior. Ops: start(paneId), stop(paneId), ajustes(tipo).
- * Eventos: estado (EventoEstadoDictado) y texto (EventoTextoDictado).
+ * Función «dictado»: el micrófono de cada terminal. La UI graba y manda el WAV; acá se transcribe
+ * con whisper-cli (vendor/whisper, en el instalador) y se devuelve el texto. Ops: transcribir(wav),
+ * ajustes(tipo). Una transcripción a la vez: la que llega mientras otra corre espera su turno.
  */
 
-interface Sesion {
-  paneId: string
-  proc: ChildProcessByStdio<null, Readable, Readable>
-  /** Si existe, el script termina la frase en curso y sale. */
-  stopFile: string
-  error?: ErrorDictado
-  matar?: ReturnType<typeof setTimeout>
+const TIMEOUT_MS = 120_000
+
+function carpetaWhisper(): string {
+  return app.isPackaged ? join(process.resourcesPath, 'whisper') : join(app.getAppPath(), 'vendor', 'whisper')
 }
 
-let sesion: Sesion | null = null
+let cola: Promise<unknown> = Promise.resolve()
 
-const paneIdValido = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 128
-
-function powershell(): string {
-  const root = process.env.SystemRoot ?? 'C:\\Windows'
-  return join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
-}
-
-function cortar(s: Sesion): void {
-  if (s.matar) clearTimeout(s.matar)
-  if (s.proc.exitCode === null) s.proc.kill()
-  borrar(s.stopFile)
-}
-
-function borrar(file: string): void {
+async function transcribir(c: FeatureContext, wav: Uint8Array): Promise<ResultadoDictado> {
+  if (process.platform !== 'win32') return { ok: false, error: errorDictado('sistema') }
+  const dir = carpetaWhisper()
+  const exe = join(dir, 'whisper-cli.exe')
+  const model = join(dir, WHISPER_MODEL)
+  if (!existsSync(exe) || !existsSync(model)) {
+    c.log('[dictado] falta whisper en', dir)
+    return { ok: false, error: errorDictado('sin-motor') }
+  }
+  const file = join(tmpdir(), `sloth-dictado-${randomUUID()}.wav`)
+  await writeFile(file, wav)
   try {
-    rmSync(file, { force: true })
+    const stdout = await new Promise<string>((resolve, reject) => {
+      execFile(
+        exe,
+        whisperArgs({ model, wav: file, threads: hilos(availableParallelism()) }),
+        { cwd: dir, windowsHide: true, timeout: TIMEOUT_MS, maxBuffer: 1024 * 1024, encoding: 'utf8' },
+        (err, out) => (err ? reject(err) : resolve(out))
+      )
+    })
+    return { ok: true, texto: textoDeSalida(stdout) }
   } catch (err) {
-    // Un archivo vacío en %TEMP%: si no se pudo borrar, no molesta.
-    void err
+    const msg = err instanceof Error ? err.message : String(err)
+    c.log('[dictado] whisper falló:', msg)
+    return { ok: false, error: errorDictado('otro', /timed out|ETIMEDOUT|SIGTERM/i.test(msg) ? 'tardó demasiado' : undefined) }
+  } finally {
+    await rm(file, { force: true }).catch((e: unknown) => c.log('[dictado] no se pudo borrar', file, e))
   }
-}
-
-function iniciar(c: FeatureContext, paneId: string): void {
-  const estado = (e: EstadoDictado, error?: ErrorDictado): void => {
-    const ev: EventoEstadoDictado = error ? { paneId, estado: e, error } : { paneId, estado: e }
-    c.emit('estado', ev)
-  }
-  if (process.platform !== 'win32') {
-    estado('inactivo', errorDictado('sistema'))
-    return
-  }
-  const stopFile = join(tmpdir(), `sloth-dictado-${randomUUID()}.stop`)
-  const proc = spawn(powershell(), dictadoArgs(), {
-    windowsHide: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, SLOTH_DICTADO_STOP: stopFile }
-  })
-  const s: Sesion = { paneId, proc, stopFile }
-  sesion = s
-  let resto = ''
-  proc.stdout.setEncoding('utf8')
-  proc.stdout.on('data', (chunk: string) => {
-    resto += chunk
-    const lineas = resto.split(/\r?\n/)
-    resto = lineas.pop() ?? ''
-    for (const l of lineas) {
-      const ev = parseLinea(l)
-      if (!ev || sesion !== s) continue
-      if (ev.e === 'texto') {
-        const t: EventoTextoDictado = { paneId, texto: ev.t }
-        c.emit('texto', t)
-      } else if (ev.e === 'error') s.error = errorDictado(ev.code)
-      else if (ev.e === 'escuchando' || ev.e === 'transcribiendo') estado(ev.e)
-    }
-  })
-  // El stderr de PowerShell es ruido (CLIXML de progreso); los errores reales llegan por stdout.
-  proc.stderr.resume()
-  proc.on('error', (err) => {
-    c.log('[dictado] no arrancó PowerShell:', err.message)
-    s.error = { tipo: 'otro', mensaje: 'No se pudo abrir el dictado de Windows.', ajustes: false }
-  })
-  proc.on('close', () => {
-    if (s.matar) clearTimeout(s.matar)
-    borrar(stopFile)
-    if (sesion !== s) return
-    sesion = null
-    estado('inactivo', s.error)
-  })
-  estado('escuchando')
 }
 
 const feature: Feature = {
   name: 'dictado',
   register(c: FeatureContext) {
-    c.handle('start', (paneId: unknown) => {
-      if (!paneIdValido(paneId)) throw new Error('Panel inválido.')
-      if (sesion?.paneId === paneId) return
-      if (sesion) {
-        const vieja = sesion
-        sesion = null
-        cortar(vieja)
-        c.emit('estado', { paneId: vieja.paneId, estado: 'inactivo' } satisfies EventoEstadoDictado)
-      }
-      iniciar(c, paneId)
-    })
-    c.handle('stop', (paneId: unknown) => {
-      if (!paneIdValido(paneId) || sesion?.paneId !== paneId) return
-      const s = sesion
-      if (s.matar) return
-      // La frase en curso todavía puede llegar; si PowerShell no termina, se corta igual.
-      writeFileSync(s.stopFile, '')
-      s.matar = setTimeout(() => cortar(s), 8000)
+    c.handle('transcribir', (raw: unknown) => {
+      const wav = raw instanceof Uint8Array ? raw : null
+      if (!wav || !wavValido(wav)) throw new Error('Audio inválido.')
+      const turno = cola.then(() => transcribir(c, wav))
+      cola = turno.catch(() => undefined)
+      return turno
     })
     c.handle('ajustes', (tipo: unknown) => {
-      const url = typeof tipo === 'string' ? AJUSTES_DICTADO[tipo as TipoErrorDictado] : undefined
-      if (!url || !Object.hasOwn(AJUSTES_DICTADO, tipo as string)) throw new Error('Ajuste desconocido.')
-      return shell.openExternal(url)
+      if (typeof tipo !== 'string' || !Object.hasOwn(AJUSTES_DICTADO, tipo)) throw new Error('Ajuste desconocido.')
+      return shell.openExternal(AJUSTES_DICTADO[tipo as TipoErrorDictado] as string)
     })
-  },
-  dispose() {
-    if (sesion) cortar(sesion)
-    sesion = null
   }
 }
 

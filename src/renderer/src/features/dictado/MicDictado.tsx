@@ -1,48 +1,50 @@
 import { useEffect, useRef } from 'react'
 import { MicrophoneIcon, XIcon } from '@phosphor-icons/react'
-import { cleanError } from '../../format'
-import { abrirAjustes, empezar, mostrarError, parar, recibirTexto, useDictado } from './store'
+import { abrirAjustes, cerrarAviso, empezar, soltar, terminar, useDictado } from './store'
 import './dictado.css'
 
 /**
- * Micrófono de la terminal: un toque empieza a escuchar y otro termina. El texto cae en el prompt de
- * Claude sin Enter, para revisarlo antes de mandarlo.
+ * Micrófono de la terminal: un toque empieza a grabar y otro termina. Whisper lo transcribe en la PC
+ * y el texto cae en el prompt de Claude sin Enter, para revisarlo antes de mandarlo.
  */
 export function MicDictado({ paneId, onTexto }: { paneId: string; onTexto(texto: string): void }): React.JSX.Element {
-  const ev = useDictado(paneId)
+  const { estado, error, vacio } = useDictado(paneId)
   const onTextoRef = useRef(onTexto)
   onTextoRef.current = onTexto
-  useEffect(() => recibirTexto(paneId, (t) => onTextoRef.current(t)), [paneId])
-  // Si el panel se cierra mientras escucha, se suelta el micrófono.
-  useEffect(() => () => void parar(paneId).catch(() => undefined), [paneId])
+  const pegar = (t: string): void => onTextoRef.current(t)
+  useEffect(() => () => soltar(paneId), [paneId])
+  // «No se escuchó nada» se va solo.
+  useEffect(() => {
+    if (!vacio) return
+    const t = setTimeout(() => cerrarAviso(paneId), 2500)
+    return () => clearTimeout(t)
+  }, [vacio, paneId])
 
-  const estado = ev?.estado ?? 'inactivo'
-  const error = ev?.error
   const activo = estado !== 'inactivo'
-  const fallar = (e: unknown): void => mostrarError(paneId, { tipo: 'otro', mensaje: cleanError(e), ajustes: false })
-
   const tocar = (): void => {
     if (estado === 'transcribiendo') return
-    if (activo) void parar(paneId).catch(fallar)
-    else void empezar(paneId).catch(fallar)
+    if (estado === 'escuchando') void terminar(paneId, pegar)
+    else void empezar(paneId, pegar)
   }
 
   return (
     <div className="dictado" data-estado={estado}>
-      {(activo || error) && (
+      {(activo || error || vacio) && (
         <div className={`dictado-pill${error ? ' is-error' : ''}`} role={error ? 'alert' : 'status'}>
           {error ? (
             <>
               <span className="dictado-msg">{error.mensaje}</span>
               {error.ajustes && (
-                <button type="button" className="dictado-link" onClick={() => void abrirAjustes(error.tipo).catch(fallar)}>
+                <button type="button" className="dictado-link" onClick={() => void abrirAjustes(error.tipo)}>
                   Abrir Configuración
                 </button>
               )}
-              <button type="button" className="dictado-x" aria-label="Cerrar aviso" onClick={() => mostrarError(paneId)}>
+              <button type="button" className="dictado-x" aria-label="Cerrar aviso" onClick={() => cerrarAviso(paneId)}>
                 <XIcon size={12} aria-hidden="true" />
               </button>
             </>
+          ) : vacio ? (
+            'No se escuchó nada'
           ) : (
             <>
               <span className="dictado-dot" aria-hidden="true" />
@@ -55,8 +57,8 @@ export function MicDictado({ paneId, onTexto }: { paneId: string; onTexto(texto:
         type="button"
         className="dictado-mic"
         aria-pressed={activo}
-        aria-label={activo ? 'Terminar de dictar' : 'Dictar con el micrófono'}
-        title={activo ? 'Terminar de dictar' : 'Dictar: hablá y el texto aparece en la terminal, sin mandarse'}
+        aria-label={estado === 'escuchando' ? 'Terminar de dictar' : 'Dictar con el micrófono'}
+        title={estado === 'escuchando' ? 'Terminar de dictar' : 'Dictar: hablá y el texto aparece en la terminal, sin mandarse'}
         disabled={estado === 'transcribiendo'}
         // Sin robarle el foco a la terminal: se puede seguir escribiendo mientras se dicta.
         onMouseDown={(e) => e.preventDefault()}

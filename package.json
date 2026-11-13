@@ -10,7 +10,8 @@
   },
   "scripts": {
     "dev": "npm run build:daemon && electron-vite dev",
-    "build": "electron-vite build && npm run build:daemon",
+    "build": "electron-vite build && npm run build:daemon && npm run build:whisper",
+    "build:whisper": "node scripts/fetch-whisper.mjs",
     "build:daemon": "node scripts/build-daemon.mjs",
     "postinstall": "node scripts/patch-node-pty.mjs",
     "start": "electron-vite preview",
@@ -74,6 +75,10 @@
       {
         "from": "out/daemon/sloth-daemon.cjs",
         "to": "daemon/sloth-daemon.cjs"
+      },
+      {
+        "from": "vendor/whisper",
+        "to": "whisper"
       }
     ],
     "win": {

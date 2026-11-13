@@ -21,6 +21,8 @@ export interface Seed {
   settings?: Record<string, unknown>
   /** Deja el asistente de bienvenida sin completar (por defecto se saltea). */
   onboarding?: boolean
+  /** Flags de Chromium de más (p. ej. un micrófono falso que lee un .wav). */
+  chromiumArgs?: string[]
 }
 
 export const ACCOUNT_ID = 'acc-e2e'
@@ -68,7 +70,7 @@ export async function launchSloth(seed: Seed = {}): Promise<{ app: ElectronAppli
   const userData = mkdtempSync(join(tmpdir(), USERDATA_PREFIX))
   seedUserData(userData, seed)
   const app = await electron.launch({
-    args: ['--force-device-scale-factor=1', '.'],
+    args: ['--force-device-scale-factor=1', ...(seed.chromiumArgs ?? []), '.'],
     env: { ...process.env, SLOTH_USER_DATA: userData, SLOTH_INPROCESS: '1', ELECTRON_RENDERER_URL: '' }
   })
   procs.set(app, app.process())
