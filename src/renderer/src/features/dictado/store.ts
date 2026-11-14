@@ -63,6 +63,32 @@ const subscribe = (f: () => void): (() => void) => {
   return () => subs.delete(f)
 }
 
+/** Cómo pegar lo dictado en la terminal de cada panel: lo registra la terminal al montarse. */
+const pegadores = new Map<string, (texto: string) => void>()
+
+export function registrarPegador(paneId: string, pegar: (texto: string) => void): () => void {
+  pegadores.set(paneId, pegar)
+  avisar()
+  return () => {
+    if (pegadores.get(paneId) === pegar) pegadores.delete(paneId)
+    avisar()
+  }
+}
+
+/** Solo los paneles con terminal viva (no los dormidos) pueden dictar. */
+export function useDictadoDisponible(paneId: string): boolean {
+  return useSyncExternalStore(subscribe, () => pegadores.has(paneId))
+}
+
+/** Un toque empieza a grabar y otro termina; mientras transcribe no hace nada. */
+export function alternar(paneId: string): void {
+  const pegar = pegadores.get(paneId)
+  const estado = vistas.get(paneId)?.estado ?? 'inactivo'
+  if (!pegar || estado === 'transcribiendo') return
+  if (estado === 'escuchando') void terminar(paneId, pegar)
+  else void empezar(paneId, pegar)
+}
+
 export function useDictado(paneId: string): VistaDictado {
   return useSyncExternalStore(subscribe, () => vistas.get(paneId) ?? INACTIVO)
 }
