@@ -626,7 +626,13 @@ async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: n
   if (def.via === 'gh') return refreshGh(def)
   const requested = typeof rawAccount === 'string' && rawAccount ? rawAccount : undefined
   const run = ejecucion(def.nombre, requested ?? state.config.queryAccountId ?? (await pickAccount(def)))
-  chequearCuenta(def, run)
+  try {
+    chequearCuenta(def, run)
+  } catch (e) {
+    state.lastError = (e as Error).message
+    changed()
+    throw e
+  }
   const d = defPara(def, run.accountId)
   const ac = new AbortController()
   running = ac
