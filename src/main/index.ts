@@ -16,6 +16,7 @@ import { normTicketId, TEMPLATE_COLOR_KEYS, validBranch } from '../shared/templa
 import { baseSettingsFor, syncSharedSetup, unshareSetup } from './setup'
 import { UsageScanner } from './usage'
 import { FEATURES } from './features'
+import { APP_ID } from '../shared/app-id'
 import { currentSettings, initialChrome } from './features/settings'
 import { validateWorkspacePatch } from './workspace-patch'
 import { loadWindowState, trackWindowState } from './window-state'
@@ -50,6 +51,8 @@ function setAgent(wsId: string, status: AgentStatus): void {
 }
 
 app.setName('Sloth')
+// Sin el AUMID del acceso directo, Windows descarta las notificaciones del sistema en silencio.
+if (process.platform === 'win32') app.setAppUserModelId(APP_ID)
 // Instancia de prueba al lado de la instalada: otra carpeta de datos = otro lock, otro daemon, otras cuentas.
 if (process.env.SLOTH_USER_DATA) app.setPath('userData', process.env.SLOTH_USER_DATA)
 if (!app.requestSingleInstanceLock()) app.quit()

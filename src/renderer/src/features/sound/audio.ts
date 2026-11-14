@@ -4,7 +4,7 @@
  * - Se cierra (ctx.close) IDLE_CLOSE_MS después de que termina el último sonido, para no dejar vivo el audio.
  * - El timer solo existe mientras hay un sonido reciente: no hay timers permanentes.
  */
-import { SOUND_VARIANTS, type Chime, type SoundName } from './logic'
+import { SOUND_VARIANTS, chatChimeSpec, type ChatChime, type Chime, type ChimeSpec, type SoundName } from './logic'
 
 /** Tiempo sin sonar (desde que termina el último sonido) antes de cerrar el AudioContext. */
 export const IDLE_CLOSE_MS = 3000
@@ -41,12 +41,20 @@ function closeContext(): void {
 
 /** Suena «done» o «attention» con el sonido elegido. No comprueba el ajuste ni el intervalo mínimo (eso lo decide quien llama). */
 export function playChime(kind: Chime, name: SoundName = 'Gota'): void {
+  playSpec(SOUND_VARIANTS[name][kind])
+}
+
+/** Sonido de un mensaje del chat: «receive» al llegar uno ajeno, «send» (más suave y corto) al mandar el propio. */
+export function playChatChime(kind: ChatChime, name: SoundName = 'Gota'): void {
+  playSpec(chatChimeSpec(name, kind))
+}
+
+function playSpec(spec: ChimeSpec): void {
   const c = getContext()
   if (!c) return
   clearTimeout(closeTimer)
   if (c.state === 'suspended') void c.resume().catch(() => undefined)
 
-  const spec = SOUND_VARIANTS[name][kind]
   const t0 = c.currentTime + 0.02
   for (const n of spec.notes) {
     const osc = c.createOscillator()

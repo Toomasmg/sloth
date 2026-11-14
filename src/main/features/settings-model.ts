@@ -35,6 +35,10 @@ export interface NotifySettings {
   perm: boolean
   /** Mensajes directos y menciones del chat del equipo. */
   team: boolean
+  /** Suena al llegar un mensaje ajeno del chat. */
+  soundIn: boolean
+  /** Suena (más suave) al enviar un mensaje propio del chat. */
+  soundOut: boolean
 }
 
 /** Opciones de «Dormir espacios inactivos» (minutos; 0 = nunca). */
@@ -163,7 +167,7 @@ export const DEFAULT_SETTINGS: SlothSettings = {
   sounds: false,
   soundName: 'Gota',
   noMolestar: false,
-  notify: { done: true, perm: true, team: true },
+  notify: { done: true, perm: true, team: true, soundIn: true, soundOut: true },
   updateChannel: 'estable',
   lightMode: false,
   shortcuts: {}
@@ -322,10 +326,12 @@ export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOp
   if ('notify' in patch) {
     const n = patch.notify
     if (!isObj(n)) throw new Error('notify tiene que ser un objeto.')
-    checkKeys(n, ['done', 'perm', 'team'], 'notify.')
+    checkKeys(n, ['done', 'perm', 'team', 'soundIn', 'soundOut'], 'notify.')
     if ('done' in n) next.notify.done = bool(n.done, '«Claude termina una tarea»')
     if ('perm' in n) next.notify.perm = bool(n.perm, '«Claude pide permiso»')
     if ('team' in n) next.notify.team = bool(n.team, '«Mensajes del equipo»')
+    if ('soundIn' in n) next.notify.soundIn = bool(n.soundIn, '«Sonido al recibir mensajes»')
+    if ('soundOut' in n) next.notify.soundOut = bool(n.soundOut, '«Sonido al enviar mensajes»')
   }
   if ('accountColors' in patch) {
     const c = patch.accountColors

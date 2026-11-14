@@ -142,7 +142,8 @@ const feature: Feature = {
     /** Aviso de Windows con Permitir / Ver (las acciones dependen del sistema; el clic abre el espacio). */
     function notifyRequest(req: PendingPermission): void {
       const ws = ctx.store.workspace(req.ws)
-      if (!ws || !Notification.isSupported()) return
+      if (!ws) return
+      if (!Notification.isSupported()) return ctx.log('notificaciones: el sistema no las soporta (permiso).')
       const win = ctx.window()
       if (!currentSettings().notify.perm) return
       if (!shouldNotify({ dnd: isDnd(), windowFocused: !!win && !win.isDestroyed() && win.isFocused(), focusedSpace, wsId: ws.id })) return
@@ -155,6 +156,7 @@ const feature: Feature = {
         ]
       })
       n.on('click', () => showWindow(ws.id))
+      n.on('failed', (_e, error) => ctx.log('notificaciones: falló el aviso de permiso:', error))
       // Electron manda el índice en el evento (actionIndex); el segundo argumento es el formato viejo.
       n.on('action', (event: { actionIndex?: number }, legacyIndex?: number) => {
         const index = event.actionIndex ?? legacyIndex
@@ -173,12 +175,14 @@ const feature: Feature = {
     /** Aviso de un espacio (terminó o te espera): lo gobierna «notify.done». */
     function notifyText(wsId: string, title: string, body: string): void {
       const ws = ctx.store.workspace(wsId)
-      if (!ws || !Notification.isSupported()) return
+      if (!ws) return
+      if (!Notification.isSupported()) return ctx.log('notificaciones: el sistema no las soporta.')
       if (!currentSettings().notify.done) return
       const win = ctx.window()
       if (!shouldNotify({ dnd: isDnd(), windowFocused: !!win && !win.isDestroyed() && win.isFocused(), focusedSpace, wsId })) return
       const n = new Notification({ title: `${ws.name} ${title}`, body })
       n.on('click', () => showWindow(wsId))
+      n.on('failed', (_e, error) => ctx.log('notificaciones: falló el aviso:', error))
       n.show()
     }
 
