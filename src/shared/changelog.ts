@@ -9,6 +9,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.16',
+    date: '2026-11-14',
+    title: 'Pegar, conectores por cuenta y micrófono a mano',
+    items: [
+      'Ctrl+V pega siempre una sola vez y al instante, también dentro de Claude Code, tanto texto como imágenes.',
+      'Tickets: en los ajustes del tablero ves qué conectores tiene cada cuenta y elegís con cuál trabajar. Si un conector no está conectado, Sloth te dice qué hacer en vez de mostrar el tablero vacío.',
+      'El micrófono para dictar pasó a la barra de arriba de cada panel y ya no tapa la terminal. Ctrl+Shift+D empieza o corta el dictado.',
+      'Chat: suena al recibir y al enviar mensajes, avisa cuando estás en otra conversación y el ícono muestra cuántos mensajes no leíste. Cada cosa se apaga por separado en Configuración → Notificaciones.',
+      'Las notificaciones de Windows vuelven a aparecer.'
+    ]
+  },
+  {
     version: '0.6.15',
     date: '2026-11-13',
     title: 'Sin barra que no se mueve',
