@@ -189,6 +189,14 @@
   background: var(--team);
   color: var(--team-on);
 }
+.sl-chat-badge .ui-badge {
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  background: none;
+  color: inherit;
+  font-weight: inherit;
+}
 
 /* ---------- Riel de navegación ---------- */
 .sl-rail {

@@ -715,7 +715,7 @@ export function NotificationsSection({ onClose }: { onClose(): void }): React.JS
       <Group id="g-av" title="Avisarme cuando…">
         <ToggleRow title="Claude termina una tarea" hint="Aviso de Windows y el estado «Listo» en la barra." checked={s.notify.done} onChange={(done) => save({ notify: { done } })} />
         <ToggleRow title="Claude pide permiso" hint="Te recomendamos dejarlo prendido: si no, Claude queda esperando." checked={s.notify.perm} onChange={(perm) => save({ notify: { perm } })} />
-        <ToggleRow title="Me escriben en el chat del equipo" hint="Mensajes directos y menciones." checked={s.notify.team} onChange={(team) => save({ notify: { team } })} />
+        <ToggleRow title="Avisos del chat" hint="Un aviso cuando te escriben en el chat del equipo y no lo estás mirando." checked={s.notify.team} onChange={(team) => save({ notify: { team } })} />
         <ToggleRow title="No molestar" hint="Silencia todo hasta que lo apagues." checked={s.noMolestar} onChange={(noMolestar) => save({ noMolestar })} />
       </Group>
       {s.noMolestar && <SectionHint>«No molestar» está activo: no suena nada ni avisa.</SectionHint>}
@@ -739,6 +739,10 @@ export function NotificationsSection({ onClose }: { onClose(): void }): React.JS
           </Select>
           <SoundTest name={s.soundName} disabled={!s.sounds} />
         </Row>
+      </Group>
+      <Group id="g-ch" title="Sonido del chat">
+        <ToggleRow title="Sonido al recibir mensajes" hint="Suena una vez por cada mensaje de otra persona. Con «Sin sonido» no suena." checked={s.notify.soundIn} onChange={(soundIn) => save({ notify: { soundIn } })} />
+        <ToggleRow title="Sonido al enviar mensajes" hint="Un toque más corto y suave cuando mandás el tuyo." checked={s.notify.soundOut} onChange={(soundOut) => save({ notify: { soundOut } })} />
       </Group>
     </>
   )

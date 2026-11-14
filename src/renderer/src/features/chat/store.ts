@@ -11,6 +11,9 @@ import type {
 import { convKey } from '../../../../shared/chat'
 import type { UiCtx } from '../host'
 import { toast } from '../../ui/Toast'
+import { getSettings } from '../settings/store'
+import { playChatChime } from '../sound/audio'
+import { planIncoming, planSent, RecentIds, sameConv, toastText } from './alerts'
 
 /**
  * Estado del chat en la interfaz: espejo del snapshot de main, caché de mensajes por conversación,
@@ -113,8 +116,31 @@ function meId(): string | undefined {
   return snap?.auth.status === 'signedIn' ? snap.auth.me.id : undefined
 }
 
+const alerted = new RecentIds()
+
+function alertIncoming(m: ChatMessage): void {
+  const { settings } = getSettings()
+  const plan = planIncoming({
+    mine: m.author.id === meId(),
+    alreadySeen: alerted.seen(m.id),
+    windowFocused: document.hasFocus(),
+    viewing: drawer.open && sameConv(drawer.conv, m.conv),
+    settings
+  })
+  if (plan.sound) playChatChime(plan.sound, settings.soundName)
+  if (!plan.toast) return
+  const convName = m.conv.kind === 'team' ? teamOf(snap, m.conv.id)?.name : undefined
+  toast({
+    tone: 'info',
+    message: toastText(m.author.login, convName, m.body),
+    actionLabel: 'Abrir',
+    onAction: () => openChat(m.conv)
+  })
+}
+
 function onRealtime(m: ChatMessage): void {
   mergeInto(m.conv, [m], 'oldest')
+  alertIncoming(m)
   if (m.author.id === meId()) return
   if (drawer.open && drawer.conv && convKey(drawer.conv) === convKey(m.conv)) {
     announcement = `${m.author.login}: ${m.body.slice(0, ANNOUNCE_CHARS)}`
@@ -282,6 +308,9 @@ async function transmit(m: ChatMessage): Promise<void> {
   try {
     const sent = await call<ChatMessage>('send', m.conv, m.body, m.clientId)
     mergeInto(m.conv, [{ ...sent, status: 'sent' }], 'oldest')
+    const { settings } = getSettings()
+    const plan = planSent(settings, alerted.seen(`sent:${m.clientId}`))
+    if (plan.sound) playChatChime(plan.sound, settings.soundName)
   } catch (e) {
     // Si el mensaje ya llegó por realtime, no se lo marca como fallido.
     const cur = msgs.get(convKey(m.conv)) ?? []

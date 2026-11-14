@@ -150,3 +150,14 @@ export const SOUND_VARIANTS: Record<SoundName, Record<Chime, ChimeSpec>> = {
     }
   }
 }
+
+/** Sonidos del chat: «receive» es el de «done» de la variante; «send» es su primera nota, más corta y baja. */
+export type ChatChime = 'receive' | 'send'
+
+export function chatChimeSpec(name: SoundName, kind: ChatChime): ChimeSpec {
+  const base = SOUND_VARIANTS[name].done
+  if (kind === 'receive') return base
+  const note = base.notes[0]
+  const dur = Math.min(note.dur, 0.12)
+  return { notes: [{ ...note, dur }], total: dur, peak: base.peak * 0.6, attack: Math.min(base.attack, dur / 2) }
+}
