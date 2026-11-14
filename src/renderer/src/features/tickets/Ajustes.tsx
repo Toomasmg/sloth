@@ -4,6 +4,7 @@ import { cleanError } from '../../format'
 import { CloseIcon } from '../../icons/SlothIcons'
 import { SIN_CONECTOR, type ConectorPropioVista, type ConectorResumen } from '../../../../shared/tickets'
 import { setSnapshot, type Snapshot } from './model'
+import { CuentasConectores, textoDisponibilidad } from './CuentasConectores'
 import { aceptarYUsar, AvisoHerramientas, deDondeViene, etiquetaOrigen, Propios } from './Propios'
 import { Button, Select } from '../../ui'
 
@@ -17,6 +18,12 @@ function grupos(cs: readonly ConectorResumen[]): { etiqueta: string; conectores:
     else out.push({ etiqueta, conectores: [c] })
   }
   return out
+}
+
+const ningunaLoTiene = (snap: Snapshot, c: ConectorResumen): boolean => {
+  if (c.via !== 'mcp') return false
+  const revisadas = Object.values(snap.cuentas).filter((v) => v.revisadaEn)
+  return revisadas.length > 0 && revisadas.every((v) => v.conectores[c.id]?.tipo === 'falta')
 }
 
 /** De qué sistema salen los tickets y, según la vía, con qué cuenta de Claude o qué repo de GitHub. */
@@ -100,6 +107,7 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => voi
                 {g.conectores.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.nombre}
+                    {ningunaLoTiene(snap, c) ? ' (ninguna cuenta lo tiene)' : ''}
                     {c.origen.tipo === 'equipo' && !c.aceptado ? ' (sin aceptar)' : c.verificado || c.origen.tipo !== 'incluido' ? '' : ' (sin probar: solo lectura)'}
                   </option>
                 ))}
@@ -114,12 +122,16 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => voi
               <span>Cuenta para consultar</span>
               <Select value={snap.config.queryAccountId ?? ''} onChange={(e) => set({ queryAccountId: e.target.value })}>
                 <option value="">La de menos uso</option>
-                {ui.accounts.map((a) => (
-                  <option key={a.id} value={a.id} disabled={!ui.statuses[a.id]?.loggedIn}>
-                    {a.label}
-                    {ui.statuses[a.id]?.loggedIn ? '' : ' (sin sesión)'}
-                  </option>
-                ))}
+                {ui.accounts.map((a) => {
+                  const logueada = !!ui.statuses[a.id]?.loggedIn
+                  const d = snap.cuentas[a.id]?.conectores[snap.config.conectorId]
+                  return (
+                    <option key={a.id} value={a.id} disabled={!logueada || d?.tipo === 'falta'}>
+                      {a.label}
+                      {logueada ? ` · ${textoDisponibilidad(snap.conector.nombre, d)}` : ' (sin sesión)'}
+                    </option>
+                  )
+                })}
               </Select>
             </label>
             <label className="field f-tickets-ajustes-campo">
@@ -155,6 +167,8 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => voi
           </Button>
         )}
       </div>
+
+      {via === 'mcp' && <CuentasConectores snap={snap} />}
 
       <details className="f-tickets-propios" onToggle={(e) => e.currentTarget.open && setPropiosVistos(true)}>
         <summary>Conectores propios</summary>

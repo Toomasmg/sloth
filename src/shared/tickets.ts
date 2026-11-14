@@ -75,6 +75,41 @@ export interface TicketsConfig {
   defaultRepo?: string
   projectRepos: Record<string, string>
   confirmRefresh: boolean
+  /** cuentaId → conectorId → prefijo elegido cuando hay más de un servidor posible. */
+  servidores?: Record<string, Record<string, string>>
+}
+
+export type EstadoMcp = 'connected' | 'needs-auth' | 'failed' | 'pending' | 'otro'
+
+export interface ServidorMcp {
+  /** Como lo muestra Claude Code: «claude.ai Gruv», «gruv-tomy». */
+  nombre: string
+  prefijo: string
+  estado: EstadoMcp
+  /** Nombres cortos. undefined = no se supo (servidor pending o sin listar). */
+  herramientas?: string[]
+}
+
+export interface CuentaRevisada {
+  revisadaEn: number
+  servidores: ServidorMcp[]
+  error?: string
+}
+
+/** Si una cuenta puede usar un conector MCP y con qué servidor. */
+export type Disponibilidad =
+  | { tipo: 'sin_revisar' }
+  | { tipo: 'falta' }
+  | { tipo: 'elegir'; opciones: { nombre: string; prefijo: string; estado: EstadoMcp }[] }
+  /** adaptado: el servidor tiene otro prefijo que el del conector. verificado: se vieron sus herramientas. */
+  | { tipo: 'tiene'; nombre: string; prefijo: string; estado: EstadoMcp; adaptado: boolean; verificado: boolean }
+
+export interface CuentaVista {
+  revisadaEn?: number
+  error?: string
+  servidores: { nombre: string; estado: EstadoMcp }[]
+  /** conectorId → disponibilidad, solo de los conectores MCP que se pueden usar. */
+  conectores: Record<string, Disponibilidad>
 }
 
 /** Cómo habla Sloth con el sistema: Claude con un conector MCP, o GitHub CLI directo. */
@@ -176,6 +211,10 @@ export interface TicketsSnapshot {
   avisosPropios?: string[]
   /** El id del conector del equipo elegido que cambió en el repo y hay que volver a aceptar. */
   pendienteAceptar?: string
+  /** Por id de cuenta: sus servidores MCP y qué conector puede usar. */
+  cuentas: Record<string, CuentaVista>
+  /** Se están revisando los conectores de las cuentas. */
+  revisando: boolean
 }
 
 /** La primera lista que tenga la clave gana; si ninguna la tiene, 'pendiente'. */
