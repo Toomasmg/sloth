@@ -88,7 +88,7 @@ export const EMPTY_PART: ChatDataPart = { connection: 'off', teams: [], threads:
 
 /** Dependencias inyectables (las pruebas no cargan Electron). */
 export interface NoticeLike {
-  on(event: 'click', cb: () => void): unknown
+  on(event: 'click' | 'failed', cb: (...args: unknown[]) => void): unknown
   show(): void
 }
 export interface NotifierCtor {
@@ -509,7 +509,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     const w = ctx.window()
     if (!w || w.isDestroyed()) return
     const N = await loadNotifier().catch(() => undefined)
-    if (!N || !N.isSupported()) return
+    if (!N || !N.isSupported()) return ctx.log('chat: el sistema no soporta notificaciones.')
     const where = conv.kind === 'team' ? (lists.teams.find((x) => x.id === conv.id)?.name ?? 'Equipo') : 'Mensaje directo'
     const n = new N({ title: `${author.login} · ${where}`, body: firstChars(body, NOTICE_CHARS), silent: false })
     n.on('click', () => {
@@ -518,7 +518,12 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       w.focus()
       ctx.emit('open', conv)
     })
-    n.show()
+    n.on('failed', (_e, error) => ctx.log('chat: falló la notificación del sistema:', error))
+    try {
+      n.show()
+    } catch (e) {
+      ctx.log('chat: no se pudo mostrar la notificación del sistema:', e)
+    }
   }
 
   // ---------- canales ----------

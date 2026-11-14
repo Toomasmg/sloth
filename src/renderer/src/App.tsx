@@ -18,6 +18,8 @@ import { UiContext, type NewWorkspacePreset, type PaneGuard, type UiCtx } from '
 import { FEATURE_UIS } from './features/registry'
 import { resolveAccountColor, useSettings } from './features/settings/store'
 import { openChat, useChatAttach, useChatSnapshot } from './features/chat/store'
+import { chatButtonLabel } from './features/chat/alerts'
+import { Badge } from './ui'
 import { openSettings } from './features/settings/bus'
 import { openHelp } from './features/help/bus'
 import { colorHex } from './features/templates/catalog'
@@ -938,11 +940,11 @@ export function App(): React.JSX.Element {
               <TitlebarOnly name="updater" />
             </div>
             <Tooltip text="Chat del equipo" shortcut={comboLabel('chat')}>
-              <button type="button" className="sl-chat" onClick={() => openChat()} aria-label={chatUnread > 0 ? `Chat del equipo, ${chatUnread} sin leer` : 'Chat del equipo'}>
+              <button type="button" className="sl-chat" onClick={() => openChat()} aria-label={chatButtonLabel(chatUnread)}>
                 <ChatIcon size={17} aria-hidden="true" />
                 {chatUnread > 0 && (
                   <span className="sl-chat-badge" aria-hidden="true">
-                    {chatUnread > 99 ? '99+' : chatUnread}
+                    <Badge count={chatUnread} tone="team" />
                   </span>
                 )}
               </button>
