@@ -43,6 +43,23 @@ test.describe('pegar en la terminal', () => {
     expect((await termText(page)).split('texto-pegado-123').length - 1).toBe(1)
   })
 
+  test('en la pantalla alternativa (como Claude Code) Ctrl+V pega una vez y no manda ^V', async ({ sloth: { page } }) => {
+    await shellReady(page)
+    // Pasa a la pantalla alternativa y se queda leyendo, como hace Claude Code al dibujar su interfaz.
+    await page.keyboard.type("[Console]::Write([char]27 + '[?1049h'); $null = Read-Host")
+    await page.keyboard.press('Enter')
+    ps(`[Windows.Forms.Clipboard]::SetText('alt-pegado-456')`)
+    await page.locator('.terminal-host').click()
+    await recordInput(page)
+    await page.keyboard.press('Control+V')
+    await expect.poll(async () => (await recorded(page)).sent.some((s) => s.data.includes('alt-pegado-456'))).toBe(true)
+    await page.waitForTimeout(500)
+    const rec = await recorded(page)
+    expect(rec.sent.filter((s) => s.data.includes('alt-pegado-456'))).toHaveLength(1)
+    expect(rec.sent.some((s) => s.data.includes('\x16'))).toBe(false)
+    expect((rec.sent.find((s) => s.data.includes('alt-pegado-456'))?.at ?? Infinity) - rec.keyAt).toBeLessThan(300)
+  })
+
   test('Ctrl+V manda 2.000 caracteres a la shell en menos de 300 ms', async ({ sloth: { page } }) => {
     await shellReady(page)
     ps(`[Windows.Forms.Clipboard]::SetText('${'x'.repeat(1990)}FIN-PEGADO')`)
