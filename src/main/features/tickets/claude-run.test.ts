@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { runClaude } from './claude-run.ts'
+import { runClaude } from './claude-run'
 
 class Propio extends Error {}
 
