@@ -801,7 +801,7 @@ kbd,
   left: auto !important;
   right: 2px;
   width: 4px !important;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   background: color-mix(in srgb, var(--text) 18%, transparent) !important;
 }
 .terminal-host .xterm .xterm-scrollable-element > .scrollbar.vertical:hover > .slider,
