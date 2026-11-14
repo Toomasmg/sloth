@@ -38,6 +38,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: [['Ctrl', '3']], what: 'Ir al panel 3', group: 'Paneles', id: 'focus3' },
   { keys: [['Ctrl', '4']], what: 'Ir al panel 4', group: 'Paneles', id: 'focus4' },
   { keys: [['Ctrl', 'Shift', 'Enter']], what: 'Enviar a varios espacios, con el mensaje enfocado', group: 'General', id: 'broadcastNow' },
+  { keys: [['Ctrl', 'Shift', 'D']], what: 'Dictar con la voz en el panel activo (otra vez para terminar)', group: 'Terminal', id: 'dictado' },
   { keys: [['Ctrl', 'Tab'], ['Ctrl', 'Shift', 'Tab']], what: 'Cambiar de panel (siguiente o anterior, en pestañas)', group: 'Paneles' },
   { keys: [['Ctrl', 'Alt', '←']], what: 'Mover el panel a la izquierda', group: 'Paneles' },
   { keys: [['Ctrl', 'Alt', '→']], what: 'Mover el panel a la derecha', group: 'Paneles' },
@@ -72,7 +73,8 @@ export const SHORTCUT_ACTIONS: readonly ShortcutAction[] = [
   { id: 'focus2', name: 'Ir al panel 2', def: 'Ctrl 2' },
   { id: 'focus3', name: 'Ir al panel 3', def: 'Ctrl 3' },
   { id: 'focus4', name: 'Ir al panel 4', def: 'Ctrl 4' },
-  { id: 'broadcastNow', name: 'Enviar a varios espacios, con el mensaje enfocado', def: 'Ctrl Shift Enter' }
+  { id: 'broadcastNow', name: 'Enviar a varios espacios, con el mensaje enfocado', def: 'Ctrl Shift Enter' },
+  { id: 'dictado', name: 'Dictar con la voz en el panel activo', def: 'Ctrl Shift D' }
 ]
 
 /** Combinaciones de una fila de la hoja: las personalizadas si la acción se puede cambiar. */

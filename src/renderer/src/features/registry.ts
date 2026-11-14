@@ -19,6 +19,7 @@ import report from './report'
 import sound from './sound'
 import moveAccount from './move-account'
 import permissions from './permissions'
+import dictado from './dictado'
 
 /** Todas las funciones de la interfaz, en el orden en que aparecen en cada lugar. */
-export const FEATURE_UIS: FeatureUi[] = [history, git, worktrees, palette, broadcast, templates, updater, exportImport, tickets, settings, onboarding, teamConfig, team, layout, chat, help, report, sound, moveAccount, permissions]
+export const FEATURE_UIS: FeatureUi[] = [history, git, worktrees, palette, broadcast, templates, updater, exportImport, tickets, settings, onboarding, teamConfig, team, layout, chat, help, report, sound, moveAccount, permissions, dictado]
