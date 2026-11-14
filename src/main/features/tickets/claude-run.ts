@@ -114,6 +114,8 @@ export function runClaude<T>(o: RunOptions<T>): Promise<T> {
       try {
         finish(undefined, o.parse(out))
       } catch (e) {
+        // Un error propio (conector o herramienta que falta) se devuelve tal cual: quien llama lo distingue por clase.
+        if (e instanceof Error && e.constructor !== Error) return finish(e)
         const extra = code ? ` (salió con código ${code}${err.trim() ? `: ${err.trim().slice(0, 300)}` : ''})` : ''
         finish(new Error(`${(e as Error).message}${extra}`))
       }

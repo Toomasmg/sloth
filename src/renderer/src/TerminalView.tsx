@@ -152,15 +152,16 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
         .then(() => term.clearSelection())
         .catch(() => undefined)
     }
-    // Ctrl+V y Ctrl+Shift+V pegan. Ctrl+C copia si hay algo seleccionado y si no interrumpe (^C), como
-    // Windows Terminal; Ctrl+Shift+C siempre copia. En la pantalla alternativa (vim, nano) Ctrl+V solo
-    // llega como ^V: allá es bloque visual o «literal siguiente».
+    // Ctrl+V y Ctrl+Shift+V pegan siempre, también en la pantalla alternativa, como Windows Terminal. Claude
+    // Code dibuja ahí: si el ^V le llegaba crudo, Claude leía el portapapeles por su cuenta (lento y solo
+    // imágenes) y el «paste» del navegador pegaba el texto otra vez. En vim, el bloque visual es Ctrl+Q.
+    // Ctrl+C copia si hay algo seleccionado y si no interrumpe (^C); Ctrl+Shift+C siempre copia.
     term.attachCustomKeyEventHandler((ev) => {
       if (ev.type !== 'keydown' || !ev.ctrlKey || ev.altKey || ev.metaKey) return true
-      if (ev.code === 'KeyV' && (ev.shiftKey || inNormalBuffer())) {
+      if (ev.code === 'KeyV') {
         // Sin preventDefault el navegador también dispararía su «paste» (solo texto) y pegaría dos veces.
         ev.preventDefault()
-        pasteClipboard()
+        if (!ev.repeat) pasteClipboard()
         return false
       }
       if (ev.code === 'KeyC' && (ev.shiftKey || term.hasSelection())) {

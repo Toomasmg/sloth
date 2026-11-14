@@ -5,7 +5,7 @@
  * properties, y los tipos se importan con `type`.
  */
 import { MODELOS, SIN_CONECTOR, type Corrida, type EstadoBase, type Modelo, type Ticket, type TicketsConfig, type Yo } from '../../../shared/tickets'
-import { ID_CONECTOR_RE, ID_MAX, ID_SEGURO_RE, regexDePersona, type ConectorDef } from './conector'
+import { ID_CONECTOR_RE, ID_MAX, ID_SEGURO_RE, PREFIJO_RE, regexDePersona, type ConectorDef } from './conector'
 import { CONECTOR_LEGADO } from './conectores'
 import { idValido, normalizeEstados, normEstado, normYo } from './motor'
 
@@ -87,6 +87,23 @@ function sanearPrevios(raw: unknown, buscar: Buscar): Record<string, string> | u
   return n ? out : undefined
 }
 
+const SERVIDORES_CUENTAS_MAX = 50
+
+/** cuentaId → conectorId → prefijo; vacío da undefined. */
+function sanearServidores(raw: unknown): Record<string, Record<string, string>> | undefined {
+  if (!esObjeto(raw)) return undefined
+  const out: Record<string, Record<string, string>> = {}
+  for (const [cuenta, porConector] of Object.entries(raw).slice(0, SERVIDORES_CUENTAS_MAX)) {
+    if (!cuenta || cuenta.length > 64 || cuenta === '__proto__' || !esObjeto(porConector)) continue
+    const elegidos: Record<string, string> = {}
+    for (const [id, prefijo] of Object.entries(porConector)) {
+      if (ID_CONECTOR_RE.test(id) && typeof prefijo === 'string' && prefijo.length <= 64 && PREFIJO_RE.test(prefijo)) elegidos[id] = prefijo
+    }
+    if (Object.keys(elegidos).length) out[cuenta] = elegidos
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
 function sanearConfig(raw: unknown, buscar: Buscar): TicketsConfig {
   const c = esObjeto(raw) ? raw : {}
   const repos = esObjeto(c.projectRepos) ? c.projectRepos : {}
@@ -100,7 +117,8 @@ function sanearConfig(raw: unknown, buscar: Buscar): TicketsConfig {
     assigneePrevios: sanearPrevios(c.assigneePrevios, buscar),
     defaultRepo: noVacio(c.defaultRepo),
     projectRepos: Object.fromEntries(Object.entries(repos).filter((e): e is [string, string] => typeof e[1] === 'string')),
-    confirmRefresh: c.confirmRefresh !== false
+    confirmRefresh: c.confirmRefresh !== false,
+    servidores: sanearServidores(c.servidores)
   })
 }
 
