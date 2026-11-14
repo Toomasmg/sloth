@@ -20,7 +20,7 @@ export interface Descubiertas {
   bloqueadas: number
 }
 
-export function buildDescubrirArgs(): string[] {
+export function buildDescubrirArgs(schema: object = DESCUBRIR_SCHEMA): string[] {
   return [
     '-p',
     '--output-format',
@@ -47,7 +47,7 @@ export function buildDescubrirArgs(): string[] {
     '--settings',
     JSON.stringify({ disableAllHooks: true }),
     '--json-schema',
-    JSON.stringify(DESCUBRIR_SCHEMA)
+    JSON.stringify(schema)
   ]
 }
 

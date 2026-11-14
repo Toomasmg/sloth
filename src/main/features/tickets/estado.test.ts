@@ -281,3 +281,18 @@ test('conConector: un id como «constructor» no recupera nada del prototipo', (
   const despues = conConector(antes, 'constructor')
   assert.notEqual(typeof despues.config.assigneeId, 'function')
 })
+
+test('los servidores elegidos por cuenta se sanean: queda solo lo válido', () => {
+  const con = (servidores: unknown): unknown => sanearEstado({ ...TICKETS_V2, config: { ...TICKETS_V2.config, servidores } }, conectorPorId)?.config.servidores
+  assert.equal(con('no'), undefined)
+  assert.equal(con({ 'acc-1': { 'ID MAL': 'mcp__x__' } }), undefined)
+  assert.deepEqual(
+    con({
+      'acc-1': { jira: 'mcp__atlassian__', gruv: 'mcp__x y__', linear: 7 },
+      'acc-2': 'basura',
+      ['a'.repeat(65)]: { jira: 'mcp__atlassian__' },
+      'acc-3': {}
+    }),
+    { 'acc-1': { jira: 'mcp__atlassian__' } }
+  )
+})

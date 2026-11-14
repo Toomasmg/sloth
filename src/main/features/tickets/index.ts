@@ -7,10 +7,14 @@ import {
   SIN_CONECTOR,
   type Accion,
   type ConectorPropioVista,
+  type CuentaRevisada,
+  type CuentaVista,
   type Detalle,
+  type Disponibilidad,
   type Estado,
   type EstadoBase,
   type Modelo,
+  type ServidorMcp,
   type Ticket,
   type TicketsConfig,
   type TicketsSnapshot
@@ -26,6 +30,19 @@ import type { ConectorDef, ConectorGh, ConectorMcp } from './conector'
 import { crearAlmacen, type Almacen, type ConfigCruda, type FsTickets } from './almacen'
 import { CONECTORES } from './conectores'
 import { buildDescubrirArgs, buildDescubrirPrompt, parseDescubrir, type Descubiertas } from './descubrir'
+import {
+  buildRevisarPrompt,
+  candidatos,
+  conPrefijo,
+  disponibilidad,
+  mensajeCuenta,
+  problemaEnSesion,
+  REVISAR_SCHEMA,
+  revisarCuenta,
+  sanearCache,
+  servidoresDeSalida,
+  usable
+} from './cuentas'
 import {
   armarRegistro,
   clavesAceptadas,
@@ -67,7 +84,8 @@ import {
   parseAccion,
   parseClaudeOutput,
   parseDetalle,
-  usaComandoTicket
+  usaComandoTicket,
+  type ResultadoLista
 } from './motor'
 
 /**
@@ -100,9 +118,12 @@ let avisosPropios: string[] = []
 /** Si tickets-conectores.json no se pudo leer ni respaldar, o es de una versión más nueva, no se pisa. */
 let propiosIlegible = false
 let descubriendo = false
+/** Qué servidores MCP tiene cada cuenta (tickets-cuentas.json): de «Volver a revisar» y de cada consulta. */
+let cuentasCache: Record<string, CuentaRevisada> = {}
 
 const carpeta = (): string => join(app.getPath('userData'), 'features')
 const propiosFile = (): string => join(carpeta(), 'tickets-conectores.json')
+const cuentasFile = (): string => join(carpeta(), 'tickets-cuentas.json')
 const hashCorto = (t: string): string => createHash('sha256').update(t).digest('hex').slice(0, 16)
 const noEsta = (id: string): string => `El conector «${id}» no está en esta versión de Sloth.`
 const sinConector = (def: ConectorDef): string => `Esta cuenta no tiene el conector de ${def.nombre}. Hacelo desde ${def.nombre}.`
@@ -225,6 +246,100 @@ function activo(): ConectorDef {
   return def
 }
 
+function cargarCuentas(): void {
+  const file = cuentasFile()
+  let texto: string
+  try {
+    texto = readFileSync(file, 'utf8')
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') ctx.log(`tickets: no pude leer las cuentas revisadas: ${(e as Error).message}`)
+    cuentasCache = {}
+    return
+  }
+  let r: Record<string, CuentaRevisada> | null = null
+  try {
+    r = sanearCache(JSON.parse(texto.replace(/^\uFEFF/, '')))
+  } catch (e) {
+    ctx.log(`tickets: las cuentas revisadas no son un JSON: ${(e as Error).message}`)
+  }
+  if (r) {
+    cuentasCache = r
+    return
+  }
+  cuentasCache = {}
+  try {
+    renameSync(file, `${file}.corrupto-${Date.now()}`)
+  } catch (e) {
+    ctx.log(`tickets: no pude apartar las cuentas revisadas dañadas: ${(e as Error).message}`)
+  }
+}
+
+function guardarCuentas(): void {
+  const ids = new Set(ctx.store.accounts.map((a) => a.id))
+  const cuentas = Object.fromEntries(Object.entries(cuentasCache).filter(([id]) => ids.has(id)))
+  const file = cuentasFile()
+  const tmp = `${file}.${process.pid}.tmp`
+  try {
+    mkdirSync(carpeta(), { recursive: true })
+    writeFileSync(tmp, JSON.stringify({ version: 1, cuentas }, null, 2), 'utf8')
+    renameSync(tmp, file)
+  } catch (e) {
+    ctx.log(`tickets: no pude guardar las cuentas revisadas: ${(e as Error).message}`)
+    rmSync(tmp, { force: true })
+  }
+}
+
+const elegidoEn = (def: ConectorMcp, cuentaId: string): string | undefined => state.config.servidores?.[cuentaId]?.[def.id]
+
+const dispEn = (def: ConectorMcp, cuentaId: string): Disponibilidad => disponibilidad(def, cuentasCache[cuentaId], elegidoEn(def, cuentaId))
+
+/** El conector con el prefijo del servidor que tiene esa cuenta; las herramientas cortas son siempre las del conector. */
+function defPara(def: ConectorMcp, cuentaId: string): ConectorMcp {
+  const d = dispEn(def, cuentaId)
+  return d.tipo === 'tiene' && d.adaptado ? conPrefijo(def, d.prefijo) : def
+}
+
+const logueadas = (): { id: string; label: string }[] => ctx.store.accounts.filter((a) => accountStatus(a).loggedIn)
+
+/** Las otras cuentas que sí pueden usar el conector, para decir dónde está. */
+const otrasCon = (def: ConectorMcp, cuentaId: string): string[] =>
+  logueadas()
+    .filter((a) => a.id !== cuentaId && usable(dispEn(def, a.id)))
+    .map((a) => a.label)
+
+const textoCuenta = (def: ConectorMcp, d: Disponibilidad, run: { accountId: string; label: string }): string | undefined =>
+  mensajeCuenta(def, d, run.label, otrasCon(def, run.accountId))
+
+/** Corta antes de gastar una consulta cuando ya se sabe que la cuenta no puede leer el conector. Sin revisar o pending, se prueba. */
+function chequearCuenta(def: ConectorMcp, run: { accountId: string; label: string }): void {
+  const d = dispEn(def, run.accountId)
+  const corta = d.tipo === 'falta' || d.tipo === 'elegir' || (d.tipo === 'tiene' && (d.estado === 'needs-auth' || d.estado === 'failed'))
+  const msg = corta ? textoCuenta(def, d, run) : undefined
+  if (msg) throw new Error(msg)
+}
+
+/** Lo que dijo el system/init de una consulta pisa lo revisado: es lo más nuevo que se sabe de esa cuenta. */
+function actualizarDesdeInit(cuentaId: string, sesion: ServidorMcp[]): void {
+  const previa = cuentasCache[cuentaId]
+  cuentasCache = { ...cuentasCache, [cuentaId]: { revisadaEn: previa?.revisadaEn ?? Date.now(), servidores: sesion } }
+  guardarCuentas()
+}
+
+function vistaCuentas(): Record<string, CuentaVista> {
+  const mcps = registro.flatMap((r) => (r.def.via === 'mcp' && aceptado(r) ? [r.def] : []))
+  const out: Record<string, CuentaVista> = {}
+  for (const a of ctx.store.accounts) {
+    const c = cuentasCache[a.id]
+    out[a.id] = {
+      revisadaEn: c?.revisadaEn,
+      error: c?.error,
+      servidores: (c?.servidores ?? []).map((s) => ({ nombre: s.nombre, estado: s.estado })),
+      conectores: Object.fromEntries(mcps.map((def) => [def.id, dispEn(def, a.id)]))
+    }
+  }
+  return out
+}
+
 /** Columnas del flujo (si la última consulta no trajo, las del conector). */
 const estados = (def: ConectorDef): EstadoBase[] => (state.estados?.length ? [...state.estados] : estadosPorDefecto(def))
 
@@ -255,7 +370,9 @@ function snapshot(): TicketsSnapshot {
     noDisponible,
     lastRepo: lastRepo(),
     carpetas: def?.via === 'gh' ? carpetasDe() : undefined,
-    avisosPropios: avisosPropios.length ? avisosPropios : undefined
+    avisosPropios: avisosPropios.length ? avisosPropios : undefined,
+    cuentas: vistaCuentas(),
+    revisando: descubriendo
   }
 }
 
@@ -355,13 +472,15 @@ function repoFor(t: Ticket | undefined): string | undefined {
 const tot = (u?: { input: number; output: number; cacheWrite: number; cacheRead: number }): number =>
   u ? u.input + u.output + u.cacheWrite + u.cacheRead : 0
 
-/** Cuenta con sesión iniciada y menos uso en las últimas 5 h. */
-async function pickAccount(): Promise<string> {
+/** Cuenta con sesión iniciada y menos uso en las últimas 5 h; con un conector MCP, entre las que lo tienen (si se sabe de alguna). */
+async function pickAccount(def?: ConectorDef): Promise<string> {
   const logged = ctx.store.accounts.filter((a) => accountStatus(a).loggedIn)
   if (!logged.length) throw new Error('No hay ninguna cuenta con sesión iniciada.')
+  const conConector = def?.via === 'mcp' ? logged.filter((a) => usable(dispEn(def, a.id))) : []
+  const entre = conConector.length ? conConector : logged
   let usage = ctx.usage.latest
   if (!Object.keys(usage).length) usage = await ctx.usage.scan(ctx.store.accounts)
-  return [...logged].sort((a, b) => tot(usage[a.id]?.last5h) - tot(usage[b.id]?.last5h))[0].id
+  return [...entre].sort((a, b) => tot(usage[a.id]?.last5h) - tot(usage[b.id]?.last5h))[0].id
 }
 
 /** ¿Hay una carpeta de repo para crear el espacio de este ticket? (sin crear nada). */
@@ -480,25 +599,49 @@ async function refreshGh(def: ConectorGh): Promise<{ count: number }> {
   }
 }
 
+/**
+ * runClaude convierte en Error común lo que tire parse: el texto para la persona se arma acá.
+ * Una lista vacía sin el servidor (o sin sus herramientas) en la sesión no es «no hay tickets».
+ */
+function leerLista(def: ConectorMcp, d: ConectorMcp, run: Ejecucion, s: string): ResultadoLista {
+  const sesion = servidoresDeSalida(s)
+  if (sesion) actualizarDesdeInit(run.accountId, sesion)
+  let r: ResultadoLista
+  try {
+    r = parseClaudeOutput(d, s)
+  } catch (e) {
+    if (e instanceof ConectorFaltaError) throw new Error(textoCuenta(def, problemaEnSesion(def, d.herramientas.prefijo, sesion) ?? { tipo: 'falta' }, run) ?? e.message)
+    throw e
+  }
+  if (!r.tickets.length) {
+    const p = problemaEnSesion(def, d.herramientas.prefijo, sesion)
+    if (p) throw new Error(textoCuenta(def, p, run) ?? `«${run.label}» no pudo leer ${def.nombre}. Tocá «Volver a revisar».`)
+  }
+  return r
+}
+
 async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: number }> {
   if (running) throw new Error('Ya hay una consulta en curso.')
   const def = activo()
   if (def.via === 'gh') return refreshGh(def)
   const requested = typeof rawAccount === 'string' && rawAccount ? rawAccount : undefined
-  const run = ejecucion(def.nombre, requested ?? state.config.queryAccountId ?? (await pickAccount()))
+  const run = ejecucion(def.nombre, requested ?? state.config.queryAccountId ?? (await pickAccount(def)))
+  chequearCuenta(def, run)
+  const d = defPara(def, run.accountId)
   const ac = new AbortController()
   running = ac
   avisar()
   try {
     const r = await runClaude({
       exe: run.exe,
-      args: buildListaArgs(def, state.config.model),
-      prompt: buildPrompt(def, state.config.assigneeId),
+      // --verbose trae el system/init: de ahí sale qué servidores tenía la sesión de verdad.
+      args: [...buildListaArgs(d, state.config.model), '--verbose'],
+      prompt: buildPrompt(d, state.config.assigneeId),
       cwd: run.cwd,
       env: run.env,
       quien: def.nombre,
       signal: ac.signal,
-      parse: (s) => parseClaudeOutput(def, s)
+      parse: (s) => leerLista(def, d, run, s)
     })
     state.tickets = r.tickets
     if (r.estados?.length) state.estados = r.estados
@@ -511,7 +654,7 @@ async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: n
     state.config.queryAccountId = run.accountId
     return { count: r.tickets.length, tokens: r.tokens }
   } catch (e) {
-    const msg = e instanceof ConectorFaltaError ? `«${run.label}»: ${e.message}` : (e as Error).message
+    const msg = e instanceof ConectorFaltaError ? (textoCuenta(def, { tipo: 'falta' }, run) ?? e.message) : (e as Error).message
     state.lastError = msg
     throw new Error(msg)
   } finally {
@@ -536,6 +679,30 @@ function conectorNuevo(v: unknown): string | undefined {
   return def.id
 }
 
+/** Elige (o con prefijo '' olvida) qué servidor de una cuenta usa un conector. Devuelve el mapa nuevo. */
+function servidorElegido(raw: unknown, previos: TicketsConfig['servidores'], nuevo: string | undefined): TicketsConfig['servidores'] {
+  const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const { cuenta: cuentaId, conector, prefijo } = o
+  if (typeof cuentaId !== 'string' || typeof conector !== 'string' || typeof prefijo !== 'string') throw new Error('Servidor inválido.')
+  if (!ctx.store.account(cuentaId)) throw new Error('Esa cuenta no existe.')
+  const def = buscar(conector)
+  if (!def || def.via !== 'mcp') throw new Error(noEsta(conector))
+  const porCuenta = { ...previos?.[cuentaId] }
+  if (prefijo === '') delete porCuenta[conector]
+  else {
+    const cs = candidatos(def, cuentasCache[cuentaId]?.servidores ?? [])
+    if (!cs.some((s) => s.prefijo === prefijo)) throw new Error('Ese servidor no está en esa cuenta. Tocá «Volver a revisar».')
+    porCuenta[conector] = prefijo
+  }
+  // Cambiar el servidor del conector activo en la cuenta que consulta deja de lado lo leído con el otro.
+  const enUso = conector === (nuevo ?? state.config.conectorId) && cuentaId === state.config.queryAccountId
+  if (enUso && (running || escribiendo.size)) throw new Error('Esperá a que termine lo que está en curso para cambiar de servidor.')
+  const out = { ...previos }
+  if (Object.keys(porCuenta).length) out[cuentaId] = porCuenta
+  else delete out[cuentaId]
+  return Object.keys(out).length ? out : undefined
+}
+
 /** Todo se valida sobre una copia: si algo falla, no queda nada aplicado a medias. */
 function setConfig(raw: unknown): TicketsSnapshot {
   if (!raw || typeof raw !== 'object') throw new Error('Configuración inválida.')
@@ -546,8 +713,17 @@ function setConfig(raw: unknown): TicketsSnapshot {
     const id = p.queryAccountId
     if (id === undefined || id === null || id === '') delete c.queryAccountId
     else if (typeof id !== 'string' || !ctx.store.account(id)) throw new Error('Esa cuenta no existe.')
-    else c.queryAccountId = id
+    else {
+      const def = buscar(nuevo ?? state.config.conectorId)
+      const acc = ctx.store.account(id)
+      if (def?.via === 'mcp' && acc && id !== state.config.queryAccountId && dispEn(def, id).tipo === 'falta') {
+        const msg = textoCuenta(def, { tipo: 'falta' }, { accountId: id, label: acc.label })
+        if (msg) throw new Error(msg)
+      }
+      c.queryAccountId = id
+    }
   }
+  if ('servidor' in p) c.servidores = servidorElegido(p.servidor, c.servidores, nuevo)
   if ('model' in p) {
     if (!MODELOS.includes(p.model as Modelo)) throw new Error('Modelo inválido.')
     c.model = p.model as Modelo
@@ -611,16 +787,17 @@ async function detalle(rawId: unknown): Promise<Detalle> {
     return d
   }
   const c = cuenta(def)
+  const dc = defPara(def, c.accountId)
   try {
     const d = await runClaude({
       exe: c.exe,
-      args: buildDetalleArgs(def, state.config.model),
-      prompt: buildDetallePrompt(def, id),
+      args: buildDetalleArgs(dc, state.config.model),
+      prompt: buildDetallePrompt(dc, id),
       cwd: c.cwd,
       env: c.env,
       quien: def.nombre,
       timeoutMs: DETALLE_TIMEOUT_MS,
-      parse: (s) => parseDetalle(def, s)
+      parse: (s) => parseDetalle(dc, s)
     })
     // Si mientras tanto cambió la lista (otro conector u otra carpeta), este detalle ya no es de ella.
     if (state.tickets.includes(t)) detalles.set(id, d)
@@ -658,15 +835,16 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
     let minutosTotal: number | undefined
     if (def.via === 'gh') await ghAccion(ghRunCon(), t, a, input, state.me)
     else if (c) {
+      const dc = defPara(def, c.accountId)
       const r = await runClaude({
         exe: c.exe,
-        args: buildAccionArgs(def, state.config.model, a),
-        prompt: buildAccionPrompt(def, a, input),
+        args: buildAccionArgs(dc, state.config.model, a),
+        prompt: buildAccionPrompt(dc, a, input),
         cwd: c.cwd,
         env: c.env,
         quien: def.nombre,
         timeoutMs: DETALLE_TIMEOUT_MS,
-        parse: (s) => parseAccion(def, s, a)
+        parse: (s) => parseAccion(dc, s, a)
       })
       minutosTotal = r.minutosTotal
     }
@@ -725,6 +903,46 @@ async function descubrir(rawPrefijo: unknown, rawAccount: unknown): Promise<Desc
   } finally {
     descubriendo = false
   }
+}
+
+/** «Volver a revisar»: una consulta por cuenta, en serie, que no llama a ninguna herramienta y solo lee system/init. */
+async function revisarCuentas(raw: unknown): Promise<TicketsSnapshot> {
+  let ids: string[]
+  if (raw === undefined || raw === null || raw === '') ids = logueadas().map((a) => a.id)
+  else if (typeof raw === 'string' && ctx.store.account(raw)) ids = [raw]
+  else throw new Error('Esa cuenta no existe.')
+  if (descubriendo) throw new Error('Ya se están revisando las cuentas. Esperá a que termine.')
+  if (running) throw new Error('Esperá a que termine la consulta en curso.')
+  descubriendo = true
+  avisar()
+  try {
+    for (const id of ids) {
+      const previa = cuentasCache[id]
+      try {
+        const run = ejecucion('los conectores', id)
+        const r = await runClaude({
+          exe: run.exe,
+          args: buildDescubrirArgs(REVISAR_SCHEMA),
+          prompt: buildRevisarPrompt(),
+          cwd: run.cwd,
+          env: run.env,
+          quien: 'Claude',
+          timeoutMs: 90_000,
+          parse: (s) => revisarCuenta(s, Date.now())
+        })
+        cuentasCache = { ...cuentasCache, [id]: r }
+        ctx.log(`tickets: revisar: ${r.servidores.length} servidores`)
+      } catch (e) {
+        cuentasCache = { ...cuentasCache, [id]: { revisadaEn: Date.now(), servidores: previa?.servidores ?? [], error: (e as Error).message.slice(0, 500) } }
+        ctx.log('tickets: revisar: error')
+      }
+    }
+  } finally {
+    descubriendo = false
+    guardarCuentas()
+    changed()
+  }
+  return snapshot()
 }
 
 function idOpcional(v: unknown): string | undefined {
@@ -839,6 +1057,7 @@ const feature: Feature = {
     recargarPropios(almacen.configCruda())
     state = almacen.cargar()
     recargarPropios(state.config)
+    cargarCuentas()
     c.handle('state', () => snapshot())
     c.handle('refresh', (acc: unknown) => refresh(acc))
     c.handle('cancel', () => {
@@ -853,6 +1072,7 @@ const feature: Feature = {
     c.handle('propios', () => propios())
     c.handle('propio', (id: unknown) => structuredClone(noIncluido(id).def))
     c.handle('descubrir', (prefijo: unknown, acc: unknown) => descubrir(prefijo, acc))
+    c.handle('revisarCuentas', (acc: unknown) => revisarCuentas(acc))
     c.handle('guardarPropio', (raw: unknown, anterior: unknown) => guardarPropio(raw, anterior))
     c.handle('borrarPropio', (id: unknown) => borrarPropio(id))
     c.handle('aceptar', (id: unknown, hash: unknown) => aceptar(id, hash))
