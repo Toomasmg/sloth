@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { ArrowBendUpLeft, ArrowClockwise, CircleNotch, Copy, DotsThree, PencilSimple, Smiley, Trash, WarningCircle } from '@phosphor-icons/react'
 import { CHAT_REACTIONS, type ChatMessage, type ChatReactionEmoji } from '../../../../shared/chat'
 import { ContextMenu, IconButton, Menu, Tooltip, toast, type MenuItem } from '../../ui'
