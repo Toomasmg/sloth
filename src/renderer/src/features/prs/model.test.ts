@@ -13,6 +13,7 @@ const row = (over: Partial<PrRow> = {}): PrRow => ({
   base: 'main',
   head: 'f',
   crossRepo: false,
+  maintainerCanModify: false,
   headSha: 'abc',
   updatedAt: '',
   checks: 'ok',
@@ -26,7 +27,7 @@ const row = (over: Partial<PrRow> = {}): PrRow => ({
   ...over
 })
 
-const repo = (name: string, prs: PrRow[], error: string | null = null): RepoPrs => ({ repo: name, repoPaths: [], mergeMethods: ['squash'], prs, error })
+const repo = (name: string, prs: PrRow[], error: string | null = null): RepoPrs => ({ repo: name, repoPaths: [], defaultBranch: 'main', mergeMethods: ['squash'], prs, error })
 
 const repos = [
   repo('a/b', [row({ number: 1, mine: true }), row({ number: 2, reviewRequestedFromMe: true })]),
@@ -58,5 +59,6 @@ test('checksLabel con plurales', () => {
   assert.equal(checksLabel(row({ checks: 'fail', checkCounts: { ok: 0, fail: 1, pending: 0 } })), '1 check fallando')
   assert.equal(checksLabel(row({ checks: 'fail', checkCounts: { ok: 0, fail: 2, pending: 0 } })), '2 checks fallando')
   assert.equal(checksLabel(row({ checks: 'pending', checkCounts: { ok: 0, fail: 0, pending: 3 } })), '3 checks pendientes')
+  assert.equal(checksLabel(row({ checks: 'fail', checkCounts: { ok: 50, fail: 0, pending: 0 } })), 'Checks fallando')
   assert.equal(checksLabel(row({ checks: 'none' })), 'Sin checks')
 })

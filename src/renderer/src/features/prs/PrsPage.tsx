@@ -4,8 +4,9 @@ import { Button, EmptyState, IconButton, InlineAlert, Menu, Segmented, Tag, Tool
 import { CheckCircleIcon, ErrorIcon, MoreIcon, PullRequestIcon, RefreshIcon, SpinnerIcon } from '../../icons/SlothIcons'
 import { useVisiblePolling } from '../../visibility'
 import { useUi } from '../host'
-import type { PrRow, PrsProblem, PrsSnapshot, PrTarget, RepoPrs } from '../../../../shared/prs'
-import { MergeDialog, RebaseDialog } from './MergeDialog'
+import { rebaseBlocker } from '../../../../shared/prs'
+import type { OpenBranchMode, OpenBranchResult, PrRow, PrsProblem, PrsSnapshot, PrTarget, RepoPrs } from '../../../../shared/prs'
+import { DivergedDialog, MergeDialog, RebaseDialog } from './MergeDialog'
 import { ago, checksLabel, counts, filterPrs, reviewLabel, type PrFilter } from './model'
 import { closePrs } from './store'
 
@@ -24,7 +25,10 @@ function readFilter(): PrFilter {
 
 const msg = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
-type Dialog = { kind: 'merge' | 'rebase'; repo: RepoPrs; pr: PrRow } | null
+type Dialog =
+  | { kind: 'merge' | 'rebase'; repo: RepoPrs; pr: PrRow }
+  | { kind: 'diverged'; repo: RepoPrs; pr: PrRow; info: Extract<OpenBranchResult, { kind: 'diverged' }> }
+  | null
 
 export function PrsPage(): React.JSX.Element {
   const ui = useUi()
@@ -82,12 +86,16 @@ export function PrsPage(): React.JSX.Element {
   const shown = filterPrs(snap.repos, filter)
   const loading = snap.at === 0 && snap.refreshing && !snap.problem
 
-  const openBranch = async (repo: RepoPrs, pr: PrRow): Promise<void> => {
+  // El main abre el panel del espacio (open-pane); acá solo se cierra la vista.
+  const openBranch = async (repo: RepoPrs, pr: PrRow, mode?: OpenBranchMode): Promise<void> => {
     setOpening(`${repo.repo}#${pr.number}`)
     try {
-      const r = await ui.invoke<{ id: string; created: boolean }>('feat:prs:openBranch', { repo: repo.repo, number: pr.number })
-      if (r.created) await ui.reload()
-      else ui.openPane(r.id)
+      const r = await ui.invoke<OpenBranchResult>('feat:prs:openBranch', { repo: repo.repo, number: pr.number }, mode)
+      if (r.kind === 'diverged') {
+        setDialog({ kind: 'diverged', repo, pr, info: r })
+        return
+      }
+      setDialog(null)
       closePrs()
     } catch (e) {
       toast({ tone: 'danger', message: msg(e) })
@@ -95,6 +103,9 @@ export function PrsPage(): React.JSX.Element {
       setOpening(null)
     }
   }
+
+  const live = dialog ? (snap.repos.find((r) => r.repo === dialog.repo.repo)?.prs.find((p) => p.number === dialog.pr.number) ?? null) : null
+  const liveRepo = (repo: RepoPrs): RepoPrs => snap.repos.find((r) => r.repo === repo.repo) ?? repo
 
   const openUrl = (t: PrTarget, url: string): void => {
     ui.invoke('feat:prs:openUrl', t, url).catch((e) => toast({ tone: 'danger', message: msg(e) }))
@@ -157,6 +168,8 @@ export function PrsPage(): React.JSX.Element {
                         <PrItem
                           key={pr.number}
                           pr={pr}
+                          rebaseBlocked={rebaseBlocker(pr, liveRepo(repo))}
+                          canMerge={repo.mergeMethods.length > 0}
                           loading={opening === `${repo.repo}#${pr.number}`}
                           onUrl={(url) => openUrl({ repo: repo.repo, number: pr.number }, url)}
                           onBranch={() => void openBranch(repo, pr)}
@@ -173,26 +186,10 @@ export function PrsPage(): React.JSX.Element {
           </>
         )}
       </div>
-      {dialog?.kind === 'merge' && (
-        <MergeDialog
-          repo={dialog.repo}
-          pr={dialog.pr}
-          onClose={() => setDialog(null)}
-          onDone={() => {
-            setDialog(null)
-            void refresh()
-          }}
-        />
-      )}
-      {dialog?.kind === 'rebase' && (
-        <RebaseDialog
-          repo={dialog.repo}
-          pr={dialog.pr}
-          onClose={() => {
-            setDialog(null)
-            void refresh()
-          }}
-        />
+      {dialog?.kind === 'merge' && <MergeDialog repo={dialog.repo} pr={dialog.pr} live={live} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'rebase' && <RebaseDialog repo={dialog.repo} pr={dialog.pr} live={live} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'diverged' && (
+        <DivergedDialog info={dialog.info} onPick={(mode) => openBranch(dialog.repo, dialog.pr, mode)} onClose={() => setDialog(null)} />
       )}
     </View>
   )
@@ -238,6 +235,8 @@ function ChecksGlyph({ pr }: { pr: PrRow }): React.JSX.Element | null {
 
 interface PrItemProps {
   pr: PrRow
+  rebaseBlocked: string | null
+  canMerge: boolean
   loading: boolean
   onUrl: (url: string) => void
   onBranch: () => void
@@ -246,7 +245,7 @@ interface PrItemProps {
   onRefresh: () => void
 }
 
-function PrItem({ pr, loading, onUrl, onBranch, onRebase, onMerge, onRefresh }: PrItemProps): React.JSX.Element {
+function PrItem({ pr, rebaseBlocked, canMerge, loading, onUrl, onBranch, onRebase, onMerge, onRefresh }: PrItemProps): React.JSX.Element {
   const review = reviewLabel(pr.review)
   const failUrl = pr.failing[0]?.url ?? null
   return (
@@ -293,8 +292,15 @@ function PrItem({ pr, loading, onUrl, onBranch, onRebase, onMerge, onRefresh }: 
           items={[
             { id: 'url', label: 'Abrir en GitHub', onSelect: () => onUrl(pr.url) },
             { id: 'branch', label: 'Abrir espacio en esta rama', hint: pr.crossRepo ? 'PR de un fork' : undefined, disabled: pr.crossRepo || loading, onSelect: onBranch },
-            { id: 'rebase', label: `Rebase sobre ${pr.base}`, onSelect: onRebase },
-            { id: 'merge', label: 'Mergear…', danger: true, onSelect: onMerge },
+            { id: 'rebase', label: `Rebase sobre ${pr.base}`, hint: rebaseBlocked ?? undefined, disabled: !!rebaseBlocked, onSelect: onRebase },
+            {
+              id: 'merge',
+              label: 'Mergear…',
+              danger: true,
+              hint: pr.isDraft ? 'Es un borrador' : canMerge ? undefined : 'El repo no tiene métodos de merge habilitados',
+              disabled: pr.isDraft || !canMerge,
+              onSelect: onMerge
+            },
             { id: 'refresh', label: 'Refrescar', onSelect: onRefresh }
           ]}
         />

@@ -22,8 +22,8 @@ export function counts(repos: RepoPrs[]): Record<PrFilter, number> {
 export function checksLabel(r: PrRow): string {
   const { fail, pending } = r.checkCounts
   if (r.checks === 'ok') return 'Checks pasando'
-  if (r.checks === 'fail') return fail === 1 ? '1 check fallando' : `${fail} checks fallando`
-  if (r.checks === 'pending') return pending === 1 ? '1 check pendiente' : `${pending} checks pendientes`
+  if (r.checks === 'fail') return fail === 0 ? 'Checks fallando' : fail === 1 ? '1 check fallando' : `${fail} checks fallando`
+  if (r.checks === 'pending') return pending === 0 ? 'Checks pendientes' : pending === 1 ? '1 check pendiente' : `${pending} checks pendientes`
   return 'Sin checks'
 }
 
@@ -55,4 +55,9 @@ export function methodLabel(m: MergeMethod): string {
   if (m === 'squash') return 'Squash'
   if (m === 'merge') return 'Merge commit'
   return 'Rebase'
+}
+
+export function samePath(a: string, b: string): boolean {
+  const n = (p: string): string => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+  return n(a) === n(b)
 }
