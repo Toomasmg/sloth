@@ -259,6 +259,7 @@ const feature: Feature = {
     }
 
     ctx.onHook((p: HookEventPayload) => {
+      if (p.enFondo) return
       if (p.event === 'Stop') ntfyEnFondo('termino', p.ws)
       else if (p.event === 'Notification' && p.notificationType !== 'permission_prompt') ntfyEnFondo('teNecesita', p.ws, p.message)
     })
