@@ -5,6 +5,7 @@ import { canManageConv, dropExpired, noticeText, retentionLabel } from '../../..
 import { EmptyState, IconButton, Menu, type MenuItem } from '../../ui'
 import { Composer, type ComposerHandle } from './Composer'
 import { MessageItem } from './MessageItem'
+import { activeReduce, scrolledFar } from './active-msg'
 import { SearchBar } from './SearchBar'
 import { seenUpTo, startsGroup, typingText } from './message-ops'
 import { Av, dayLabel, sameDay } from './view-utils'
@@ -70,6 +71,8 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [searching, setSearching] = useState(false)
   const [flashId, setFlashId] = useState<string>()
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const openTop = useRef(0)
   const scrollRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<ComposerHandle>(null)
   const searchBtnRef = useRef<HTMLButtonElement>(null)
@@ -123,8 +126,38 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
 
   const onScroll = (): void => {
     const el = scrollRef.current
-    if (el) pinRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    if (!el) return
+    pinRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    if (activeId && scrolledFar(openTop.current, el.scrollTop)) setActiveId(null)
   }
+
+  const toggleBar = (id: string): void => {
+    openTop.current = scrollRef.current?.scrollTop ?? 0
+    setActiveId((cur) => activeReduce(cur, { type: 'toggle', id }))
+  }
+
+  useEffect(() => {
+    setActiveId(null)
+  }, [conv.id])
+
+  useEffect(() => {
+    if (!activeId) return
+    const onDown = (e: PointerEvent): void => {
+      if (!(e.target as Element).closest('.f-chat-bar, .f-chat-bubble, [role="menu"]')) setActiveId(null)
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return
+      const li = scrollRef.current?.querySelector<HTMLElement>(`[data-mid="${CSS.escape(activeId)}"]`)
+      if (li?.contains(document.activeElement)) li.focus()
+      setActiveId(null)
+    }
+    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [activeId])
 
   const older = async (): Promise<void> => {
     const el = scrollRef.current
@@ -224,6 +257,9 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
         extras={extras}
         seen={msg.id === seenId}
         flash={msg.id === flashId}
+        active={msg.id === activeId}
+        onToggle={toggleBar}
+        onCloseBar={() => setActiveId(null)}
         onReply={(m) => composerRef.current?.startReply(m)}
         onEdit={(m) => composerRef.current?.startEdit(m)}
         onJump={(mid) => void jump(mid)}
@@ -321,9 +357,7 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
       <div className="sr-only" role="status" aria-live="polite">
         {announce}
       </div>
-      <p className="f-chat-typing">
-        {extras ? typingText(typing) : ''}
-      </p>
+      <p className="f-chat-typing">{extras ? typingText(typing) : ''}</p>
 
       <Composer
         ref={composerRef}
