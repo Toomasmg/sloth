@@ -163,6 +163,9 @@ export function porHerramientas(def: ConectorMcp, servidores: readonly ServidorM
   return servidores.filter((s) => s.prefijo !== def.herramientas.prefijo && s.herramientas && !comparteNombre(ps, s) && lista.every((t) => s.herramientas?.includes(t)))
 }
 
+/** Lo que se puede elegir para el conector en una cuenta: los del mismo nombre y los que tienen sus herramientas. */
+export const elegibles = (def: ConectorMcp, servidores: readonly ServidorMcp[]): ServidorMcp[] => [...candidatos(def, servidores), ...porHerramientas(def, servidores)]
+
 const faltantes = (def: ConectorMcp, s: ServidorMcp): string[] => def.herramientas.lista.filter((t) => !s.herramientas?.includes(t)).sort().slice(0, FALTAN_MAX)
 
 function parecido(def: ConectorMcp, servidores: readonly ServidorMcp[]): { nombre: string; faltan: string[] } | undefined {
@@ -171,7 +174,7 @@ function parecido(def: ConectorMcp, servidores: readonly ServidorMcp[]): { nombr
   for (const s of servidores) {
     if (!s.herramientas || !comparteNombre(ps, s)) continue
     const n = def.herramientas.lista.filter((t) => !s.herramientas?.includes(t)).length
-    if (n > 0 && (!mejor || n < mejor.n)) mejor = { nombre: s.nombre, faltan: faltantes(def, s), n }
+    if (n > 0 && n < def.herramientas.lista.length && (!mejor || n < mejor.n)) mejor = { nombre: s.nombre, faltan: faltantes(def, s), n }
   }
   return mejor && { nombre: mejor.nombre, faltan: mejor.faltan }
 }
@@ -198,10 +201,14 @@ export function disponibilidad(def: ConectorMcp, cuenta: CuentaRevisada | undefi
   const exacto = cs.find((s) => s.prefijo === def.herramientas.prefijo)
   if (exacto && usable(tiene(def, exacto))) return tiene(def, exacto)
   const otros = cs.filter((s) => s !== exacto)
+  const anda = (s: ServidorMcp): boolean => Boolean(s.herramientas) && usable(tiene(def, s))
   // El exacto pide autorización o falló pero hay otro con el mismo sistema andando: se usa ese.
-  const andando = otros.filter((s) => s.herramientas && usable(tiene(def, s)))
+  const andando = otros.filter(anda)
   if (andando.length === 1) return tiene(def, andando[0])
-  if (exacto) return tiene(def, exacto)
+  if (exacto) {
+    const alternativas = [...andando, ...ph.filter(anda)]
+    return alternativas.length ? { tipo: 'elegir', opciones: [exacto, ...alternativas].map(opcion) } : tiene(def, exacto)
+  }
   const verificados = otros.filter((s) => s.herramientas)
   if (verificados.length === 1) return tiene(def, verificados[0])
   if (otros.length === 1) return tiene(def, otros[0])

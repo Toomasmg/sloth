@@ -88,7 +88,11 @@ export function CuentasConectores({ snap }: { snap: Snapshot }): React.JSX.Eleme
                 )}
                 {d?.tipo === 'elegir' && (
                   <label className="field f-tickets-cuentas-elegir">
-                    <span>Esta cuenta tiene más de un servidor posible. ¿Cuál usa Sloth?</span>
+                    <span>
+                      {d.opciones.length === 1
+                        ? `«${d.opciones[0].nombre}» tiene las herramientas de ${nombre} con otro nombre. ¿Sloth lo usa como ${nombre}?`
+                        : 'Esta cuenta tiene más de un servidor posible. ¿Cuál usa Sloth?'}
+                    </span>
                     <Select value={snap.config.servidores?.[a.id]?.[cid] ?? ''} onChange={(e) => elegirServidor(a.id, e.target.value)} disabled={ocupado}>
                       <option value="">Elegí un servidor…</option>
                       {d.opciones.map((o) => (

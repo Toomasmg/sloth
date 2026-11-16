@@ -10,6 +10,7 @@ import {
   candidatos,
   conPrefijo,
   disponibilidad,
+  elegibles,
   mensajeCuenta,
   prefijoDeServidor,
   porHerramientas,
@@ -329,6 +330,40 @@ test('revisar usa los args de descubrir con su propio schema', () => {
   const a = buildDescubrirArgs(REVISAR_SCHEMA)
   assert.equal(a[a.indexOf('--json-schema') + 1], JSON.stringify(REVISAR_SCHEMA))
   assert.equal(a[a.indexOf('--allowedTools') + 1], '')
+})
+
+test('elegibles: lo que se ofrece para elegir se puede guardar, sea por nombre o por herramientas', () => {
+  const c = cuenta([srv('mis-tickets', 'connected', GRUV_TOOLS), srv('gruv-tomy', 'pending'), srv('context7', 'connected')])
+  const d = disponibilidad(GRUV, cuenta([srv('mis-tickets', 'connected', GRUV_TOOLS)]))
+  assert.ok(d.tipo === 'elegir')
+  for (const o of d.opciones) assert.ok(elegibles(GRUV, c.servidores).some((s) => s.prefijo === o.prefijo))
+  assert.deepEqual(elegibles(GRUV, c.servidores).map((s) => s.nombre), ['gruv-tomy', 'mis-tickets'])
+})
+
+test('disponibilidad: con el exacto caído y un servidor de otro nombre andando, se ofrece elegir', () => {
+  const c = cuenta([srv('claude.ai Gruv', 'needs-auth'), srv('mis-tickets', 'connected', GRUV_TOOLS)])
+  assert.deepEqual(disponibilidad(GRUV, c), {
+    tipo: 'elegir',
+    opciones: [
+      { nombre: 'claude.ai Gruv', prefijo: 'mcp__claude_ai_Gruv__', estado: 'needs-auth' },
+      { nombre: 'mis-tickets', prefijo: 'mcp__mis-tickets__', estado: 'connected' }
+    ]
+  })
+  const elegido = disponibilidad(GRUV, c, 'mcp__claude_ai_Gruv__')
+  assert.equal(elegido.tipo === 'tiene' && elegido.estado, 'needs-auth')
+  const caido = disponibilidad(GRUV, cuenta([srv('claude.ai Gruv', 'needs-auth'), srv('mis-tickets', 'failed', GRUV_TOOLS)]))
+  assert.equal(caido.tipo === 'tiene' && caido.prefijo, 'mcp__claude_ai_Gruv__')
+})
+
+test('disponibilidad: con el exacto caído y dos del mismo nombre andando, se elige entre los tres', () => {
+  const c = cuenta([srv('claude.ai Gruv', 'failed'), srv('gruv-a', 'connected', GRUV_TOOLS), srv('gruv-b', 'connected', GRUV_TOOLS)])
+  const d = disponibilidad(GRUV, c)
+  assert.deepEqual(d.tipo === 'elegir' && d.opciones.map((o) => o.nombre), ['claude.ai Gruv', 'gruv-a', 'gruv-b'])
+})
+
+test('disponibilidad: un parecido sin ninguna herramienta en común no cuenta', () => {
+  const d = disponibilidad(GRUV, cuenta([srv('gruv-viejo', 'connected', ['ver_reloj']), srv('plugin:gruv', 'connected', [])]))
+  assert.deepEqual(d, { tipo: 'falta' })
 })
 
 test('servidorDeLaLista: solo con el mismo servidor con que se leyó la lista', () => {

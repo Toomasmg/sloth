@@ -33,9 +33,9 @@ import { deA } from './concurrencia'
 import { buildDescubrirArgs, buildDescubrirPrompt, parseDescubrir, type Descubiertas } from './descubrir'
 import {
   buildRevisarPrompt,
-  candidatos,
   conPrefijo,
   disponibilidad,
+  elegibles,
   mensajeCuenta,
   problemaEnSesion,
   REVISAR_SCHEMA,
@@ -716,7 +716,7 @@ function servidorElegido(raw: unknown, previos: TicketsConfig['servidores'], nue
   const porCuenta = { ...previos?.[cuentaId] }
   if (prefijo === '') delete porCuenta[conector]
   else {
-    const cs = candidatos(def, cuentasCache[cuentaId]?.servidores ?? [])
+    const cs = elegibles(def, cuentasCache[cuentaId]?.servidores ?? [])
     if (!cs.some((s) => s.prefijo === prefijo)) throw new Error('Ese servidor no está en esa cuenta. Tocá «Volver a revisar».')
     porCuenta[conector] = prefijo
   }
