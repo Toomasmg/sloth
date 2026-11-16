@@ -155,7 +155,7 @@
   gap: 12px;
   padding: 10px 14px;
   cursor: pointer;
-  transition: background var(--t-fast, 0.12s);
+  transition: background var(--t-fast, var(--t-fast) var(--ease));
 }
 .f-broadcast-row:hover {
   background: var(--hover);

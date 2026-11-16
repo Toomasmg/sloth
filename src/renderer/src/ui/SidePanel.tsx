@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { captureOpener } from '../return-focus'
+import { useExit } from './useExit'
 import './SidePanel.css'
 
 // Paneles laterales abiertos y su ancho: la grilla (y la Vista) se corren a la izquierda para no quedar tapadas.
@@ -31,6 +32,7 @@ export function SidePanel({ labelId, title, onClose, actions, width = 400, class
   const rootRef = useRef<HTMLElement>(null)
   const closeRef = useRef(onClose)
   closeRef.current = onClose
+  const [closing, leave] = useExit(() => closeRef.current())
 
   useEffect(() => {
     const key = Symbol('side-panel')
@@ -50,7 +52,7 @@ export function SidePanel({ labelId, title, onClose, actions, width = 400, class
       if (e.key !== 'Escape' || e.defaultPrevented) return
       if (!rootRef.current?.contains(document.activeElement)) return
       e.preventDefault()
-      closeRef.current()
+      leave()
     }
     window.addEventListener('keydown', onKey)
     return () => {
@@ -60,14 +62,14 @@ export function SidePanel({ labelId, title, onClose, actions, width = 400, class
   }, [])
 
   return (
-    <aside ref={rootRef} className={`ui-side ${className ?? ''}`} style={{ width }} role="dialog" aria-modal="false" aria-labelledby={labelId}>
+    <aside ref={rootRef} className={`ui-side${closing ? ' is-closing' : ''} ${className ?? ''}`} style={{ width }} role="dialog" aria-modal="false" aria-labelledby={labelId}>
       <header className="ui-side-head">
         <h2 className="ui-side-title" id={labelId}>
           {title}
         </h2>
         <span className="ui-side-grow" />
         {actions}
-        <button type="button" className="ui-side-x" aria-label="Cerrar panel" title="Cerrar (Esc)" onClick={onClose}>
+        <button type="button" className="ui-side-x" aria-label="Cerrar panel" title="Cerrar (Esc)" onClick={leave}>
           <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>

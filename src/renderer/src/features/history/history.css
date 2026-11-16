@@ -557,7 +557,7 @@
   flex: none;
   color: var(--text-3);
   transform: rotate(-90deg);
-  transition: transform 0.15s;
+  transition: transform var(--t-fast) var(--ease);
 }
 .hd-chev.on {
   transform: rotate(0deg);

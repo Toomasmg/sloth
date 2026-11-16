@@ -360,7 +360,7 @@
   white-space: nowrap;
   text-decoration: none;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s, filter 0.12s;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease), filter var(--t-fast) var(--ease);
 }
 .f-wt-btn:hover:not(:disabled) {
   background: var(--surface-hover);
@@ -620,7 +620,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .f-wt-toast {
-    animation: f-wt-in 0.18s ease-out;
+    animation: f-wt-in var(--t-med) var(--ease);
   }
 }
 @keyframes f-wt-in {
