@@ -40,6 +40,10 @@ export interface FeatureContext {
   removeWorkspace(id: string): Promise<void>
   /** Settings, hooks y setup compartido de la cuenta, antes de abrir Claude con ella. */
   prepareAccount(acc: Account): void
+  /** Si hay alguna terminal abierta con la cuenta: Claude puede estar escribiendo su .claude.json. */
+  accountBusy(accountId: string): boolean
+  /** Se llama cada vez que se prepara una cuenta, después de instalar settings y hooks. */
+  onPrepareAccount(cb: (acc: Account) => void): void
   /** Mata la terminal del panel; la UI la vuelve a abrir (con el spec actual del espacio). */
   restartTerminal(id: string): Promise<void>
   /**
