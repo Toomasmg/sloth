@@ -32,7 +32,13 @@ export function useExit(done: () => void): [closing: boolean, leave: () => void]
       return
     }
     setClosing(true)
-    timer.current = window.setTimeout(() => doneRef.current(), ms)
+    timer.current = window.setTimeout(() => {
+      doneRef.current()
+      // Si quien lo usa no cerró (un `onClose` que se niega mientras hay algo en curso), vuelve a verse
+      // en vez de quedar montado, invisible y sin poder cerrarse. Si cerró, esto ya no tiene efecto.
+      timer.current = null
+      setClosing(false)
+    }, ms)
   }, [])
   return [closing, leave]
 }
