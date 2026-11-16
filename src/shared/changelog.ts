@@ -9,6 +9,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.18',
+    date: '2026-11-16',
+    title: 'Panel de PRs y chat completo',
+    items: [
+      'Panel de PRs (Ctrl+Shift+6): tus PRs y los de tu equipo, con checks, revisiones y conflictos. Desde ahí abrís el PR, abrís una terminal en su rama, hacés rebase o mergeás con confirmación.',
+      'Chat: editá y borrá tus mensajes, respondé citando, reaccioná con emojis, mencioná con @, buscá en el historial y mirá quién está escribiendo.',
+      'Chat: la conversación que abriste queda abierta hasta que tocás la flecha de volver, y podés empezar a escribir sin hacer clic en el cuadro.',
+      'Chat: cada equipo puede activar el borrado automático de mensajes (de 24 horas a 90 días) y vaciar una conversación. Hace falta aplicar la migración 0004 en Supabase.'
+    ]
+  },
+  {
     version: '0.6.17',
     date: '2026-11-16',
     title: 'Más fluido y tickets más rápidos',
