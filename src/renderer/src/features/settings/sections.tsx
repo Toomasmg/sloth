@@ -20,6 +20,7 @@ import { resolveAccountColor, pickProjectsDir, projectsDirOf, updateSettings, us
 import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, EDITORS, LINE_HEIGHT, PLAN_SUGGESTIONS, SCROLLBACK, SHELLS, SLEEP_MINUTES, TERM_FONTS, TERM_FONT, UI_FONT, UPDATE_CHANNELS, type AccentChoice, type CursorShape, type Density, type EditorChoice, type ShellChoice, type ShortcutId, type SleepMinutes, type SoundName, type TermFont, type ThemeChoice, type UpdateChannel } from '../../../../main/features/settings-model'
 import { errText, Group, Row, Slider, ToggleRow, useSave, SectionHint } from './ui'
 import { Button, EmptyState, IconButton, Input, Segmented, Select, Tag } from '../../ui'
+import { ChatClaudeGroup } from './ChatClaude'
 import { Ajustes as TicketsAjustes } from '../tickets/Ajustes'
 import { setBoardOpen, useSnapshot } from '../tickets/model'
 import { openDialog, useTemplates, usesTicket } from '../templates/store'
@@ -1014,6 +1015,8 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
           {msg.text}
         </p>
       )}
+
+      <ChatClaudeGroup />
 
       <Group id="g-tc" title="Plantillas del equipo">
         <ToggleLikeButton
