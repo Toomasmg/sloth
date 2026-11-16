@@ -6,6 +6,7 @@ import { convKey } from '../../../../shared/chat'
 import { useUi, type UiCtx } from '../host'
 import { openSettings } from '../settings/bus'
 import { Conversation, type ChatModalKind } from './Conversation'
+import { ClearDialog, RetentionDialog } from './ConvSettings'
 import { composeIntent } from './type-to-compose'
 import { InvitesList, InviteDialog, JoinByCode, MembersPanel, TeamEditor } from './teams'
 import {
@@ -93,6 +94,7 @@ export function ChatDrawer(): React.JSX.Element {
             role={team?.role}
             me={snap?.auth.status === 'signedIn' ? { id: snap.auth.me.id, login: snap.auth.me.login } : undefined}
             otherReadAt={thread?.otherReadAt}
+            retentionHours={team?.retentionHours}
             onBack={() => showChatList()}
             onModal={(k) => setModal(k)}
           />
@@ -120,6 +122,10 @@ export function ChatDrawer(): React.JSX.Element {
           />
         )}
         {modal === 'invite' && team && <InviteDialog team={team} onClose={close} />}
+        {modal === 'retention' && team && <RetentionDialog team={team} onClose={close} />}
+        {modal === 'clear' && d.conv && (team || thread) && (
+          <ClearDialog conv={d.conv} title={team ? team.name : `@${thread!.other.login}`} onClose={close} />
+        )}
         {modal === 'members' && team && (
           <MembersPanel
             team={team}

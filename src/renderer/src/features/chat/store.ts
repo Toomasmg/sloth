@@ -8,6 +8,7 @@ import type {
   ChatReactionEmoji,
   ChatReactionEvent,
   ChatReplyRef,
+  ChatRetentionHours,
   ChatSnapshot,
   ChatTeam,
   ChatThread,
@@ -21,7 +22,7 @@ import { toast } from '../../ui/Toast'
 import { getSettings } from '../settings/store'
 import { playChatChime } from '../sound/audio'
 import { planIncoming, planSent, RecentIds, sameConv, toastText } from './alerts'
-import { applyReaction, mergeUpdate } from './message-ops'
+import { applyReaction, clearBefore, mergeUpdate } from './message-ops'
 import { availableConv, loadLastConv, navReduce, saveLastConv, type KeyValueStore, type NavAction, type NavState } from './nav'
 
 /**
@@ -216,6 +217,13 @@ function onRealtime(m: ChatMessage): void {
   }
   mergeInto(m.conv, [mergeUpdate(undefined, m)], 'oldest')
   clearTyping(key, m.author.id)
+  if (m.notice) {
+    if (m.notice.kind === 'clear') {
+      msgs.set(key, clearBefore(msgs.get(key) ?? [], m))
+      notify()
+    }
+    return
+  }
   if (m.deletedAt !== undefined) return
   alertIncoming(m)
   if (m.author.id === meId()) return
@@ -491,6 +499,24 @@ export async function retrySend(m: ChatMessage): Promise<void> {
 function putUpdate(m: ChatMessage): void {
   const prev = (msgs.get(convKey(m.conv)) ?? []).find((x) => x.id === m.id)
   mergeInto(m.conv, [mergeUpdate(prev, m)], 'oldest')
+}
+
+/**
+ * Vacía la conversación para todos. Lo de la caché se va ya; el aviso llega por realtime y, por si
+ * no llega, se vuelve a pedir la última página. Los errores los muestra quien llama.
+ */
+export async function clearConversation(conv: ChatConvRef): Promise<void> {
+  await call('clear', conv)
+  const key = convKey(conv)
+  msgs.set(key, (msgs.get(key) ?? []).filter((m) => m.status !== 'sent'))
+  meta.set(key, { more: false })
+  notify()
+  await loadMessages(conv)
+}
+
+/** Borrado automático del equipo (null = apagado). El snapshot nuevo llega solo. */
+export async function setRetention(teamId: string, hours: ChatRetentionHours | null): Promise<void> {
+  await call<ChatTeam>('setRetention', teamId, hours)
 }
 
 /** Edita el cuerpo de un mensaje propio. Los errores los muestra quien llama. */

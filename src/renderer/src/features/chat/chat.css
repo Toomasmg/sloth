@@ -61,6 +61,22 @@
   padding: 6px 14px;
   border-bottom: 1px solid var(--divider);
 }
+.f-chat-retention {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: var(--fs-11);
+}
+.f-chat-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.f-chat-settings p {
+  margin: 0;
+}
 .f-chat-body {
   flex: 1;
   min-height: 0;
@@ -234,6 +250,19 @@
   flex: 1;
   height: 1px;
   background: var(--divider-strong);
+}
+
+/* Avisos de la conversación (vació, borrado automático): una línea centrada, sin burbuja. */
+.f-chat-notice {
+  align-self: center;
+  max-width: 90%;
+  margin: var(--s-1) 0;
+  padding: 2px var(--s-2);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--text-3);
+  font-size: var(--fs-11);
+  text-align: center;
 }
 
 /* Mensaje: los ajenos a la izquierda con avatar, los propios a la derecha; los seguidos del mismo autor se juntan. */

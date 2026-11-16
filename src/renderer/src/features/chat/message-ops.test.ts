@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { ChatMessage, ChatReactionEvent } from '../../../../shared/chat'
-import { applyReaction, composerKey, lastEditable, matchParts, mergeUpdate, seenUpTo, snippet, startsGroup, typingText } from './message-ops'
+import { applyReaction, clearBefore, composerKey, lastEditable, matchParts, mergeUpdate, seenUpTo, snippet, startsGroup, typingText } from './message-ops'
 
 const conv = { kind: 'dm', id: 'c1' } as const
 const msg = (over: Partial<ChatMessage> = {}): ChatMessage => ({
@@ -138,4 +138,25 @@ test('snippet corta alrededor de la coincidencia', () => {
   const out = snippet(long, 'aguja', 60)
   assert.ok(out.includes('aguja') && out.startsWith('…') && out.endsWith('…'))
   assert.equal(snippet('corto', 'co'), 'corto')
+})
+
+test('vaciar: quedan el aviso, lo posterior y los envíos que no salieron', () => {
+  const clear = msg({ id: 'c', createdAt: 200, notice: { kind: 'clear' } })
+  const list = [
+    msg({ id: 'a', createdAt: 100 }),
+    msg({ id: 'b', createdAt: 200 }),
+    msg({ id: 'local:x', createdAt: 150, status: 'sending' }),
+    msg({ id: 'local:y', createdAt: 120, status: 'failed' }),
+    clear,
+    msg({ id: 'd', createdAt: 300 })
+  ]
+  assert.deepEqual(clearBefore(list, clear).map((m) => m.id), ['local:x', 'local:y', 'c', 'd'])
+  assert.deepEqual(clearBefore([], clear), [])
+})
+
+test('avisos: no se editan, no llevan «Visto» y no agrupan al siguiente', () => {
+  const notice = msg({ id: 'n', createdAt: 150, notice: { kind: 'retention', hours: 24 } })
+  assert.equal(lastEditable([msg(), notice], 'me')?.id, 'm1')
+  assert.equal(seenUpTo([msg(), notice], 'me', 500), 'm1')
+  assert.equal(startsGroup(notice, msg({ id: 'm2', createdAt: 160 })), true)
 })

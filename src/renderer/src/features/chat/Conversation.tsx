@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowLeft, ChatsCircle, MagnifyingGlass, PencilSimple, UserPlus, UsersThree } from '@phosphor-icons/react'
-import { type ChatConvRef, type ChatRole } from '../../../../shared/chat'
-import { EmptyState, IconButton } from '../../ui'
+import { ArrowLeft, Broom, ChatsCircle, DotsThree, MagnifyingGlass, PencilSimple, Timer, UserPlus, UsersThree } from '@phosphor-icons/react'
+import { type ChatConvRef, type ChatRetentionHours, type ChatRole } from '../../../../shared/chat'
+import { canManageConv, dropExpired, noticeText, retentionLabel } from '../../../../shared/chat-retention'
+import { EmptyState, IconButton, Menu, type MenuItem } from '../../ui'
 import { Composer, type ComposerHandle } from './Composer'
 import { MessageItem } from './MessageItem'
 import { SearchBar } from './SearchBar'
@@ -19,7 +20,7 @@ import {
   useTyping
 } from './store'
 
-export type ChatModalKind = 'members' | 'invite' | 'editTeam'
+export type ChatModalKind = 'members' | 'invite' | 'editTeam' | 'retention' | 'clear'
 
 interface Props {
   conv: ChatConvRef
@@ -32,6 +33,8 @@ interface Props {
   me?: { id: string; login: string }
   /** Solo directos: hasta cuándo leyó el otro. */
   otherReadAt?: number
+  /** Solo equipos: borrado automático, en horas. */
+  retentionHours?: ChatRetentionHours
   onBack(): void
   onModal(kind: ChatModalKind): void
 }
@@ -46,8 +49,11 @@ let updateHintShown = false
  * Una conversación (equipo o DM). Se monta con `key` por conversación, así el borrador y la carga
  * inicial son por conversación. Los mensajes nuevos llegan por el store.
  */
-export function Conversation({ conv, title, photo, initial, role, me, otherReadAt, onBack, onModal }: Props): React.JSX.Element {
-  const list = useConvMessages(conv)
+export function Conversation({ conv, title, photo, initial, role, me, otherReadAt, retentionHours, onBack, onModal }: Props): React.JSX.Element {
+  const stored = useConvMessages(conv)
+  const isTeam = conv.kind === 'team'
+  // La RLS ya no devuelve los vencidos; esto saca los que vencen con la conversación abierta.
+  const list = dropExpired(stored, isTeam ? retentionHours : undefined, Date.now())
   const info = useConvMeta(conv)
   const announce = useAnnouncement()
   const extras = useExtras()
@@ -66,10 +72,9 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
   const listRef = useRef(list)
   const infoRef = useRef(info)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
+  const canManage = isTeam && (role === 'owner' || role === 'admin')
   listRef.current = list
   infoRef.current = info
-  const isTeam = conv.kind === 'team'
-  const canManage = isTeam && (role === 'owner' || role === 'admin')
 
   // Al abrir: pedir los mensajes y marcar leído. Cada conversación tiene su propio montaje (key).
   useEffect(() => {
@@ -97,7 +102,7 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
       return
     }
     if (pinRef.current) el.scrollTop = el.scrollHeight
-  }, [list])
+  }, [stored])
 
   const later = (fn: () => void, ms: number): void => {
     timers.current.push(setTimeout(fn, ms))
@@ -146,6 +151,31 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
     requestAnimationFrame(() => searchBtnRef.current?.focus())
   }
 
+  const allowedClear = canManageConv(conv.kind, role)
+  const menuItems: MenuItem[] = [
+    ...(isTeam
+      ? [
+          {
+            id: 'retention',
+            label: 'Borrar mensajes automáticamente…',
+            icon: <Timer size={14} />,
+            hint: retentionLabel(retentionHours),
+            onSelect: () => onModal('retention')
+          },
+          { type: 'separator' as const }
+        ]
+      : []),
+    {
+      id: 'clear',
+      label: 'Vaciar conversación…',
+      icon: <Broom size={14} />,
+      danger: true,
+      disabled: !allowedClear,
+      hint: allowedClear ? undefined : 'Solo owner o admin',
+      onSelect: () => onModal('clear')
+    }
+  ]
+
   const items: React.ReactNode[] = []
   const now = Date.now()
   const seenId = me && conv.kind === 'dm' && extras ? seenUpTo(list, me.id, otherReadAt) : undefined
@@ -157,6 +187,14 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
           <span>{dayLabel(msg.createdAt, now)}</span>
         </li>
       )
+    }
+    if (msg.notice) {
+      items.push(
+        <li key={msg.id} className="f-chat-notice" data-mid={msg.id}>
+          {noticeText(msg.notice, msg.author.login)}
+        </li>
+      )
+      return
     }
     items.push(
       <MessageItem
@@ -191,6 +229,14 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
           pressed={searching}
           onClick={() => (searching ? closeSearch() : setSearching(true))}
         />
+        {extras && (
+          <Menu
+            aria-label="Opciones de la conversación"
+            align="end"
+            items={menuItems}
+            trigger={(p) => <IconButton {...p} label="Opciones de la conversación" size="sm" icon={<DotsThree size={16} weight="bold" />} />}
+          />
+        )}
       </header>
       {isTeam && (
         <div className="f-chat-subbar">
@@ -209,6 +255,12 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
               <PencilSimple size={14} aria-hidden="true" />
               Editar
             </button>
+          )}
+          {extras && retentionHours !== undefined && (
+            <span className="f-chat-retention">
+              <Timer size={14} aria-hidden="true" />
+              Los mensajes se borran a los {retentionLabel(retentionHours)}
+            </span>
           )}
         </div>
       )}

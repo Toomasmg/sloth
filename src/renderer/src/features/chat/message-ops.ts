@@ -42,7 +42,7 @@ export function applyReaction(m: ChatMessage, ev: ChatReactionEvent): ChatMessag
 export function lastEditable(list: readonly ChatMessage[], meId: string): ChatMessage | undefined {
   for (let i = list.length - 1; i >= 0; i--) {
     const m = list[i]
-    if (m.author.id === meId && m.status === 'sent' && m.deletedAt === undefined) return m
+    if (m.author.id === meId && m.status === 'sent' && m.deletedAt === undefined && !m.notice) return m
   }
   return undefined
 }
@@ -52,7 +52,7 @@ export function seenUpTo(list: readonly ChatMessage[], meId: string, otherReadAt
   if (otherReadAt === undefined) return undefined
   for (let i = list.length - 1; i >= 0; i--) {
     const m = list[i]
-    if (m.author.id === meId && m.status === 'sent' && m.deletedAt === undefined && m.createdAt <= otherReadAt) return m.id
+    if (m.author.id === meId && m.status === 'sent' && m.deletedAt === undefined && !m.notice && m.createdAt <= otherReadAt) return m.id
   }
   return undefined
 }
@@ -76,7 +76,7 @@ const GROUP_GAP_MS = 5 * 60_000
 
 /** Un mensaje abre grupo (con avatar y nombre) si cambia el autor, pasan más de 5 minutos o cambia el día. */
 export function startsGroup(prev: ChatMessage | undefined, m: ChatMessage): boolean {
-  if (!prev || prev.deletedAt !== undefined || m.deletedAt !== undefined) return true
+  if (!prev || prev.deletedAt !== undefined || m.deletedAt !== undefined || prev.notice) return true
   if (prev.author.id !== m.author.id || m.replyTo) return true
   if (m.createdAt - prev.createdAt > GROUP_GAP_MS) return true
   return new Date(prev.createdAt).toDateString() !== new Date(m.createdAt).toDateString()
@@ -118,4 +118,9 @@ export function snippet(text: string, query: string, max = 140): string {
   const start = Math.max(0, Math.min(i < 0 ? 0 : i - 30, flat.length - max))
   const end = Math.min(flat.length, start + max)
   return `${start > 0 ? '…' : ''}${flat.slice(start, end)}${end < flat.length ? '…' : ''}`
+}
+
+/** Aviso de «vació la conversación»: se van los mensajes anteriores; quedan los envíos que no salieron. */
+export function clearBefore(list: ChatMessage[], clear: ChatMessage): ChatMessage[] {
+  return list.filter((m) => m.id === clear.id || m.createdAt > clear.createdAt || m.status !== 'sent')
 }
