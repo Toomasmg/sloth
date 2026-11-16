@@ -1,0 +1,117 @@
+/* Panel «Celular»: secciones apiladas; el QR manda arriba porque es lo que se viene a buscar. */
+.f-cel-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  padding: var(--s-4);
+}
+.f-cel-intro {
+  margin: 0;
+  color: var(--text-2);
+  line-height: var(--lh-body);
+}
+.f-cel-sec {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-3);
+}
+.f-cel-h {
+  margin: 0;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.f-cel-sec > .ui-alert {
+  align-self: stretch;
+}
+.f-cel-nota,
+.f-cel-aviso {
+  margin: 0;
+  font-size: var(--fs-12);
+  line-height: var(--lh-body);
+  color: var(--text-3);
+}
+.f-cel-aviso {
+  color: var(--warn-fg);
+}
+.f-cel-ok {
+  margin: 0;
+  color: var(--ok-fg);
+  font-weight: 600;
+}
+.f-cel-mono {
+  font-family: var(--font-mono);
+}
+.f-cel-qrbox {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: var(--s-3);
+  align-items: start;
+  padding: var(--s-3);
+  border-radius: var(--r-lg);
+  background: var(--raised);
+}
+.f-cel-qr {
+  width: 148px;
+  height: 148px;
+  border-radius: var(--r-md);
+}
+.f-cel-qrtexto {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+  min-width: 0;
+}
+.f-cel-fila {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--s-2);
+  align-items: start;
+}
+.f-cel-label {
+  line-height: var(--h-sm);
+  color: var(--text-2);
+  font-size: var(--fs-12);
+}
+.f-cel-confirm {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border-radius: var(--r-lg);
+  background: var(--danger-soft);
+}
+.f-cel-confirm p {
+  margin: 0;
+  font-size: var(--fs-12);
+}
+.f-cel-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+}
+.f-cel-izq {
+  justify-content: flex-start;
+}
+.f-cel-limites {
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+.f-cel-limites summary {
+  cursor: pointer;
+  color: var(--text-2);
+}
+.f-cel-limites ul {
+  margin: var(--s-2) 0 0;
+  padding-left: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
