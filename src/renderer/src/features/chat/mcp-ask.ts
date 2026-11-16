@@ -11,3 +11,6 @@ export function ordenarGrants(grants: ChatMcpGrant[]): ChatMcpGrant[] {
     .map((g) => ({ ...g, ops: ORDEN.filter((o) => g.ops.includes(o)) }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es') || a.conv.id.localeCompare(b.conv.id))
 }
+
+export const alternarCuenta = (ids: readonly string[], id: string, on: boolean): string[] =>
+  on ? (ids.includes(id) ? [...ids] : [...ids, id]) : ids.filter((x) => x !== id)

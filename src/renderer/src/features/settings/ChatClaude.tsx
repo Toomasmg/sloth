@@ -3,13 +3,13 @@ import { convKey } from '../../../../shared/chat'
 import type { ChatMcpAccountReg, ChatMcpView } from '../../../../shared/chat-mcp'
 import { Button, InlineAlert, Tag } from '../../ui'
 import { useUi } from '../host'
-import { ordenarGrants } from '../chat/mcp-ask'
+import { alternarCuenta, ordenarGrants } from '../chat/mcp-ask'
 import { errText, Group, Row, ToggleRow } from './ui'
 
-function estado(a: ChatMcpAccountReg): string {
+function estado(a: ChatMcpAccountReg, elegida: boolean): string {
   switch (a.state) {
     case 'ok':
-      return 'Listo'
+      return elegida ? 'Listo' : 'Sin acceso'
     case 'pendiente':
       return 'Se aplica al cerrar Claude en esta cuenta'
     case 'conflicto':
@@ -63,26 +63,43 @@ export function ChatClaudeGroup(): React.JSX.Element {
     <Group id="g-chat-claude" title="Claude en el chat">
       <ToggleRow
         title="Dejar que Claude use el chat"
-        hint="Claude Code podrá listar, leer y mandar mensajes desde las terminales de Sloth. Cada conversación te pide permiso la primera vez. Apagado por defecto."
+        hint="Claude Code podrá listar, leer y mandar mensajes desde las cuentas que marques abajo. Cada conversación te pide permiso la primera vez. Apagado por defecto."
         checked={view?.enabled ?? false}
         disabled={!view || busy}
         onChange={(on) => void run('feat:chat:mcpSetEnabled', on)}
       />
       {err && <InlineAlert tone="danger">{err}</InlineAlert>}
+      {view && view.accounts.length > 0 && (
+        <Row
+          title="Cuentas"
+          hint="Claude solo puede usar el chat desde las cuentas que marques."
+          stack
+        >
+          {view.enabled && view.cuentas.length === 0 && <InlineAlert tone="warning">Elegí al menos una cuenta.</InlineAlert>}
+          <ul className="f-set-chatclaude-list">
+            {view.accounts.map((a) => {
+              const elegida = view.cuentas.includes(a.accountId)
+              const ok = a.state === 'ok'
+              return (
+                <li key={a.accountId}>
+                  <label className="f-set-chatclaude-check">
+                    <input
+                      type="checkbox"
+                      checked={elegida}
+                      disabled={!view.enabled || busy}
+                      onChange={(e) => void run('feat:chat:mcpSetAccounts', alternarCuenta(view.cuentas, a.accountId, e.target.checked))}
+                    />
+                    <strong>{a.label}</strong>
+                  </label>
+                  {(view.enabled || !ok) && <span className={ok && elegida ? 'f-set-ok' : 'f-set-hint'}>{estado(a, elegida)}</span>}
+                </li>
+              )
+            })}
+          </ul>
+        </Row>
+      )}
       {view?.enabled && (
         <>
-          {view.accounts.length > 0 && (
-            <Row title="Cuentas" stack>
-              <ul className="f-set-chatclaude-list">
-                {view.accounts.map((a) => (
-                  <li key={a.accountId}>
-                    <strong>{a.label}</strong>
-                    <span className={a.state === 'ok' ? 'f-set-ok' : 'f-set-hint'}>{estado(a)}</span>
-                  </li>
-                ))}
-              </ul>
-            </Row>
-          )}
           <Row
             title="Conversaciones con permiso permanente"
             hint={grants.length === 0 ? 'Ninguna conversación tiene permiso permanente.' : undefined}

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ordenarGrants, segundosRestantes, vigentes } from './mcp-ask'
+import { alternarCuenta, ordenarGrants, segundosRestantes, vigentes } from './mcp-ask'
 import type { ChatMcpAsk, ChatMcpGrant } from '../../../../shared/chat-mcp'
 
 test('segundosRestantes no baja de 0 y redondea hacia arriba', () => {
@@ -21,4 +21,11 @@ test('ordenarGrants es estable: por nombre y con ops en orden fijo', () => {
   const r = ordenarGrants([g('2', 'beta', ['enviar', 'leer']), g('1', 'alfa', ['leer'])])
   assert.deepEqual(r.map((x) => x.nombre), ['alfa', 'beta'])
   assert.deepEqual(r[1].ops, ['leer', 'enviar'])
+})
+
+test('alternarCuenta suma sin repetir y saca', () => {
+  assert.deepEqual(alternarCuenta(['a'], 'b', true), ['a', 'b'])
+  assert.deepEqual(alternarCuenta(['a'], 'a', true), ['a'])
+  assert.deepEqual(alternarCuenta(['a', 'b'], 'a', false), ['b'])
+  assert.deepEqual(alternarCuenta([], 'a', false), [])
 })
