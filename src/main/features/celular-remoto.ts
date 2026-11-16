@@ -44,6 +44,7 @@ interface Canal {
 
 const TICK_MS = 1000
 const REINTENTO_MS = 30_000
+const LOG_HOLA_MS = 60_000
 const ERROR_CANAL = 'No pude conectar con el canal del celu. ¿Corriste la migración 0006_celu_remoto.sql?'
 const APROBAR_APAGADO = 'Aprobar desde fuera de casa está apagado en Sloth.'
 
@@ -66,6 +67,7 @@ export function crearFuenteRemota(o: OpcionesRemota): FuenteDeEstado {
   let n = 0
   let ocupado = false
   let avisado: CambioRemoto | null = null
+  let ultimoLogHola = 0
   const nonces = new Nonces()
 
   function avisar(): void {
@@ -101,7 +103,14 @@ export function crearFuenteRemota(o: OpcionesRemota): FuenteDeEstado {
   async function alHola(c: Canal, payload: unknown): Promise<void> {
     if (canal !== c) return
     const d = validarHola(await abrir(await c.clave, c.topic, EVENTOS.hola, payload), Date.now())
-    if (!d || canal !== c) return o.log('celu remoto: hola inválido, se descarta')
+    if (!d || canal !== c) {
+      // Un celu con el código viejo o con el reloj corrido manda uno cada 30 s: basta con un aviso por minuto.
+      if (canal === c && Date.now() - ultimoLogHola >= LOG_HOLA_MS) {
+        ultimoLogHola = Date.now()
+        o.log('celu remoto: hola inválido (¿código viejo o reloj del celu corrido?), se descarta')
+      }
+      return
+    }
     ultimoHola = Date.now()
     holaNuevo = true
   }
