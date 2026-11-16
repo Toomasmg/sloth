@@ -6,7 +6,7 @@ export const onOpenAbout = (cb: () => void): (() => void) => {
 }
 export const openAbout = (): void => listeners.forEach((l) => l())
 
-/** Aviso chico abajo a la derecha (lo pinta el Global de updater, que sobrevive al cierre del diálogo). */
+/** Confirmación breve del actualizador (la pinta la píldora de la barra superior, ver useUpdateNote). */
 const toastListeners = new Set<(m: string) => void>()
 export const onUpdateToast = (cb: (m: string) => void): (() => void) => {
   toastListeners.add(cb)
