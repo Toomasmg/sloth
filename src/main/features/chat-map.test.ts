@@ -7,7 +7,8 @@ import {
   parseOptionalUuid,
   parseSearch,
   reactionsByMessage,
-  replyRefFrom
+  replyRefFrom,
+  teamFromRow
 } from './chat-map'
 
 const T = '11111111-1111-4111-8111-111111111111'
@@ -26,6 +27,16 @@ test('mensaje editado y borrado', () => {
   assert.equal(d?.deletedAt, Date.parse(AT))
   assert.equal(d?.body, '')
   assert.equal('editedAt' in (messageFromRow(row, author) ?? {}), false)
+})
+
+test('avisos de la conversación y borrado automático del equipo', () => {
+  assert.deepEqual(messageFromRow({ ...row, body: 'clear', kind: 'clear' }, author)?.notice, { kind: 'clear' })
+  assert.deepEqual(messageFromRow({ ...row, body: '720', kind: 'retention' }, author)?.notice, { kind: 'retention', hours: 720 })
+  assert.equal('notice' in (messageFromRow({ ...row, kind: 'text' }, author) ?? {}), false)
+  const info = { role: 'member' as const, memberCount: 2, unread: 0 }
+  assert.equal(teamFromRow({ id: T, name: 'Equipo', retention_hours: 168 }, info)?.retentionHours, 168)
+  assert.equal('retentionHours' in (teamFromRow({ id: T, name: 'Equipo', retention_hours: null }, info) ?? {}), false)
+  assert.equal('retentionHours' in (teamFromRow({ id: T, name: 'Equipo', retention_hours: 5 }, info) ?? {}), false)
 })
 
 test('validación de reacción, búsqueda e id opcional', () => {

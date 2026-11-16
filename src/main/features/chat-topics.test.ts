@@ -67,6 +67,14 @@ test('payload de otra conversación o con forma rara: se descarta', () => {
   assert.equal(rowFromBroadcast({ ...teamRow, created_at: 'ayer' }, team), undefined)
 })
 
+test('payload: tipo de mensaje', () => {
+  const team = { kind: 'team' as const, id: T }
+  assert.equal(rowFromBroadcast({ ...teamRow, body: 'clear', kind: 'clear' }, team)?.kind, 'clear')
+  assert.equal(rowFromBroadcast({ ...teamRow, body: '168', kind: 'retention' }, team)?.kind, 'retention')
+  assert.equal('kind' in (rowFromBroadcast({ ...teamRow, kind: 'text' }, team) ?? {}), false)
+  assert.equal(rowFromBroadcast({ ...teamRow, kind: 'admin' }, team), undefined)
+})
+
 test('payload: no se copian claves de más', () => {
   const r = rowFromBroadcast({ ...teamRow, extra: '<script>', __proto__x: 1 }, { kind: 'team', id: T })
   assert.deepEqual(Object.keys(r ?? {}).sort(), ['author_id', 'body', 'client_id', 'created_at', 'id', 'team_id'])

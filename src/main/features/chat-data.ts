@@ -79,6 +79,7 @@ import {
   wantedTopics
 } from './chat-topics'
 import { escapeLike, mentionsLogin } from '../../shared/chat-text'
+import { canManageConv, parseRetention } from '../../shared/chat-retention'
 import { currentSettings } from './settings'
 
 /**
@@ -87,8 +88,8 @@ import { currentSettings } from './settings'
  *
  * Reglas: todo Supabase corre en main; una sola conexión realtime mientras hay sesión y ventana, con
  * el canal «sloth-inbox» (postgres_changes, respaldo) y uno privado de Broadcast por conversación
- * (entrega rápida; si la migración 0003 no está, se cae a «sloth-inbox» solo); sin timers: las listas se refrescan al arrancar, al reconectar y al enfocar
- * la ventana (mínimo 30 s entre refrescos). Nunca se loguea el cuerpo de un mensaje ni un token.
+ * (entrega rápida; si la migración 0003 no está, se cae a «sloth-inbox» solo). Las listas se refrescan al arrancar, al reconectar y al enfocar
+ * la ventana (mínimo 30 s entre refrescos); el único timer es la purga horaria del borrado automático. Nunca se loguea el cuerpo de un mensaje ni un token.
  */
 
 /** Lo que chat.ts (T2) le da a la parte de datos. */
@@ -134,6 +135,7 @@ const PROFILE_CACHE_MAX = 500
 const PHOTO_CACHE_MAX = 50
 const UNREAD_CAP = 99
 const NOTICE_CHARS = 120
+const PURGE_EVERY_MS = 3_600_000
 
 const defaultNotifier = async (): Promise<NotifierCtor | undefined> => {
   const el = await import('electron')
@@ -184,6 +186,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
   let broadcastWarned = false
   let extras = false
   const typingThrottle = new Throttle()
+  let purgeTimer: ReturnType<typeof setInterval> | undefined
 
   const cols = (): string => (extras ? MSG_COLS_EXTRAS : MSG_COLS_BASE)
 
@@ -232,11 +235,12 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
 
   /** El servidor tiene la 0004 si existen sus columnas y la tabla de reacciones. */
   async function detectExtras(c: SupabaseClient): Promise<void> {
-    const [a, b] = await Promise.all([
-      c.from('messages').select('id, edited_at, deleted_at, reply_to').limit(1),
-      c.from('message_reactions').select('message_id').limit(1)
+    const [a, b, t] = await Promise.all([
+      c.from('messages').select('id, edited_at, deleted_at, reply_to, kind').limit(1),
+      c.from('message_reactions').select('message_id').limit(1),
+      c.from('teams').select('id, retention_hours').limit(1)
     ])
-    const next = !a.error && !b.error
+    const next = !a.error && !b.error && !t.error
     if (next === extras) return
     extras = next
     onChange()
@@ -340,7 +344,9 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
 
     const none = Promise.resolve({ data: [] as unknown[], error: null })
     const [teamsRes, countRes, codesRes] = await Promise.all([
-      allTeamIds.length ? c.from('teams').select('id, name, description, photo_path').in('id', allTeamIds) : none,
+      allTeamIds.length
+        ? c.from('teams').select(extras ? 'id, name, description, photo_path, retention_hours' : 'id, name, description, photo_path').in('id', allTeamIds)
+        : none,
       memberTeamIds.length ? c.from('team_members').select('team_id').in('team_id', memberTeamIds) : none,
       adminTeamIds.length ? c.from('team_invite_codes').select('team_id, code').in('team_id', adminTeamIds) : none
     ])
@@ -514,6 +520,10 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     if (g !== gen) return
     // Propio o ajeno: la UI reemplaza su «enviando…» por clientId, así que no se duplica.
     ctx.emit('message', msg)
+    if (msg.notice) {
+      if (msg.notice.kind === 'retention') await refreshLists(true)
+      return
+    }
     if (authorId === me.id) return
 
     const focused = isFocused()
@@ -821,6 +831,35 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     if (res.error) ctx.log('chat: no se pudo avisar que estás escribiendo.')
   })
 
+  ctx.handle('clear', async (rawConv: unknown): Promise<void> => {
+    if (!extras) throw new Error('Para vaciar, el servidor del chat necesita la actualización 0004.')
+    const c = clientNow()
+    const ref = parseConvRef(rawConv)
+    const role = ref.kind === 'team' ? lists.teams.find((t) => t.id === ref.id)?.role : undefined
+    if (!canManageConv(ref.kind, role)) throw new Error('Solo owner o admin pueden vaciar la conversación del equipo.')
+    const res = await c.rpc('chat_clear', ref.kind === 'team' ? { p_team: ref.id } : { p_thread: ref.id })
+    check(res, 'No se pudo vaciar la conversación.')
+  })
+
+  ctx.handle('setRetention', async (rawTeam: unknown, rawHours: unknown): Promise<ChatTeam> => {
+    if (!extras) throw new Error('Para el borrado automático, el servidor del chat necesita la actualización 0004.')
+    const c = clientNow()
+    const teamId = parseUuid(rawTeam, 'Equipo inválido.')
+    const hours = parseRetention(rawHours)
+    const res = await c.rpc('chat_set_retention', { p_team: teamId, p_hours: hours })
+    check(res, 'No se pudo cambiar el borrado automático.')
+    await refreshLists(true)
+    purgeExpired(c)
+    return teamNow(teamId)
+  })
+
+  /** Borra de verdad lo vencido; la RLS ya lo oculta, así que si falla no se nota en la UI. */
+  function purgeExpired(c: SupabaseClient): void {
+    if (!extras) return
+    const fail = (): void => ctx.log('chat: no se pudo purgar los mensajes vencidos.')
+    c.rpc('chat_purge_expired').then((res) => (res.error ? fail() : undefined), fail)
+  }
+
   ctx.handle('markRead', async (rawConv: unknown): Promise<void> => {
     clientNow()
     await markReadRemote(parseConvRef(rawConv))
@@ -1002,11 +1041,19 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       onChange()
       await detectExtras(c).catch(() => ctx.log('chat: no se pudo comprobar la actualización 0004.'))
       await refreshLists(true)
+      if (g !== gen) return
+      purgeExpired(c)
+      purgeTimer = setInterval(() => {
+        const cl = core.client() as SupabaseClient | null
+        if (cl && running && g === gen) purgeExpired(cl)
+      }, PURGE_EVERY_MS)
     },
 
     stop: async (): Promise<void> => {
       gen++
       running = false
+      if (purgeTimer) clearInterval(purgeTimer)
+      purgeTimer = undefined
       connection = 'off'
       lists = EMPTY_LISTS
       view = { open: false }

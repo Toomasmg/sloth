@@ -63,13 +63,14 @@ export function diffTopics(current: Iterable<string>, wanted: readonly string[])
  */
 export function rowFromBroadcast(payload: unknown, conv: ChatConvRef): MessageRow | undefined {
   if (!isObj(payload)) return undefined
-  const { id, client_id, team_id, thread_id, author_id, body, created_at, edited_at, deleted_at, reply_to } = payload
+  const { id, client_id, team_id, thread_id, author_id, body, created_at, edited_at, deleted_at, reply_to, kind } = payload
   if (!isUuid(id) || !isUuid(client_id) || !isUuid(author_id)) return undefined
   if (typeof body !== 'string') return undefined
   if (!isDate(created_at)) return undefined
   if (edited_at != null && !isDate(edited_at)) return undefined
   if (deleted_at != null && !isDate(deleted_at)) return undefined
   if (reply_to != null && !isUuid(reply_to)) return undefined
+  if (kind != null && kind !== 'text' && kind !== 'retention' && kind !== 'clear') return undefined
   if (deleted_at != null) {
     if (body !== '') return undefined
   } else {
@@ -83,6 +84,7 @@ export function rowFromBroadcast(payload: unknown, conv: ChatConvRef): MessageRo
   if (edited_at != null) row.edited_at = edited_at
   if (deleted_at != null) row.deleted_at = deleted_at
   if (reply_to != null) row.reply_to = reply_to
+  if (kind != null && kind !== 'text') row.kind = kind
   return row
 }
 

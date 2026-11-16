@@ -25,6 +25,8 @@
  *   search(conv: ChatConvRef, query: string) → ChatMessage[]     (nuevo→viejo, hasta 50)
  *   typing(conv: ChatConvRef)               → void                («escribiendo…» para los demás)
  *   markRead(conv: ChatConvRef)             → void
+ *   clear(conv: ChatConvRef)                → void                (vacía la conversación para todos; owner/admin en equipos)
+ *   setRetention(teamId: string, hours: ChatRetentionHours | null) → ChatTeam  (borrado automático; null = apagado)
  *   createTeam(input: ChatTeamInput)        → ChatTeam
  *   updateTeam(teamId: string, patch: Partial<ChatTeamInput>) → ChatTeam
  *   members(teamId: string)                 → ChatMember[]
@@ -72,6 +74,13 @@ export const CHAT_LIMITS = {
 export const CHAT_REACTIONS = ['👍', '❤️', '😂', '🎉', '😮', '😢', '🙏', '👀'] as const
 export type ChatReactionEmoji = (typeof CHAT_REACTIONS)[number]
 
+/** Plazos del borrado automático, en horas. Tienen que coincidir con el check de 0004_chat_completo.sql. */
+export const CHAT_RETENTION_HOURS = [24, 168, 720, 2160] as const
+export type ChatRetentionHours = (typeof CHAT_RETENTION_HOURS)[number]
+
+/** Aviso de la conversación que deja el servidor a nombre de quien hizo el cambio. */
+export type ChatNotice = { kind: 'retention'; hours: ChatRetentionHours | null } | { kind: 'clear' }
+
 export type ChatConvRef = { kind: 'team'; id: string } | { kind: 'dm'; id: string }
 
 export const convKey = (c: ChatConvRef): string => `${c.kind}:${c.id}`
@@ -102,6 +111,8 @@ export interface ChatTeam {
   memberCount: number
   unread: number
   lastMessageAt?: number
+  /** Borrado automático de los mensajes, en horas. Sin definir = apagado. */
+  retentionHours?: ChatRetentionHours
 }
 
 export interface ChatThread {
@@ -151,6 +162,8 @@ export interface ChatMessage {
   deletedAt?: number
   replyTo?: ChatReplyRef
   reactions?: ChatReaction[]
+  /** Si viene, no es un mensaje sino un aviso (body no se muestra). */
+  notice?: ChatNotice
 }
 
 export interface ChatReaction {
@@ -210,7 +223,7 @@ export interface ChatSnapshot {
   threads: ChatThread[]
   invites: ChatInvite[]
   unreadTotal: number
-  /** El servidor tiene la 0004: editar, borrar, responder, reaccionar, «escribiendo…» y «visto». */
+  /** El servidor tiene la 0004: editar, borrar, responder, reaccionar, «escribiendo…», «visto», borrado automático y vaciar. */
   extras: boolean
 }
 

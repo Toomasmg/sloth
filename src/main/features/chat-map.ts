@@ -21,6 +21,7 @@ import {
   type ChatThread,
   type ChatView
 } from '../../shared/chat'
+import { noticeFromRow, retentionOf } from '../../shared/chat-retention'
 
 export const EX_MEMBER_LOGIN = 'ex-miembro'
 export const DEFAULT_PAGE = 50
@@ -206,11 +207,12 @@ export interface MessageRow {
   edited_at?: unknown
   deleted_at?: unknown
   reply_to?: unknown
+  kind?: unknown
 }
 
 export const MSG_COLS_BASE = 'id, client_id, team_id, thread_id, author_id, body, created_at'
 /** Solo con la 0004 aplicada: pedir columnas que no existen hace fallar toda la consulta. */
-export const MSG_COLS_EXTRAS = `${MSG_COLS_BASE}, edited_at, deleted_at, reply_to`
+export const MSG_COLS_EXTRAS = `${MSG_COLS_BASE}, edited_at, deleted_at, reply_to, kind`
 
 export function convOfRow(row: { team_id?: unknown; thread_id?: unknown }): ChatConvRef | undefined {
   if (typeof row.team_id === 'string' && row.team_id) return { kind: 'team', id: row.team_id }
@@ -235,6 +237,8 @@ export function messageFromRow(row: MessageRow, author: ChatProfile, status: Cha
   }
   if (editedAt !== undefined) msg.editedAt = editedAt
   if (deletedAt !== undefined) msg.deletedAt = deletedAt
+  const notice = noticeFromRow(row.kind, row.body)
+  if (notice) msg.notice = notice
   return msg
 }
 
@@ -291,6 +295,7 @@ export interface TeamRow {
   name: unknown
   description?: unknown
   photo_path?: unknown
+  retention_hours?: unknown
 }
 
 export interface TeamInfo {
@@ -315,6 +320,8 @@ export function teamFromRow(row: TeamRow, info: TeamInfo): ChatTeam | undefined 
     unread: info.unread
   }
   if (info.lastMessageAt !== undefined) team.lastMessageAt = info.lastMessageAt
+  const retention = retentionOf(row.retention_hours)
+  if (retention !== undefined) team.retentionHours = retention
   if (info.inviteCode && (info.role === 'owner' || info.role === 'admin')) team.inviteCode = info.inviteCode
   return team
 }
