@@ -1,4 +1,5 @@
 import { app } from 'electron'
+import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { AgentState } from '../shared/types'
@@ -19,6 +20,21 @@ const PERMISSION_HOOK_TIMEOUT_S = 130
 /** Ruta del script de hook (userData/sloth-hook.cjs). */
 export function hookScriptPath(): string {
   return join(app.getPath('userData'), 'sloth-hook.cjs')
+}
+
+let nodeEnPath: boolean | undefined
+
+/** Una sola vez por arranque: el envoltorio corre con node y, sin node, la statusline quedaría vacía. */
+function hayNode(): boolean {
+  if (nodeEnPath === undefined) {
+    try {
+      execFileSync(process.platform === 'win32' ? 'where.exe' : 'which', ['node'], { stdio: 'ignore', windowsHide: true, timeout: 5000 })
+      nodeEnPath = true
+    } catch {
+      nodeEnPath = false
+    }
+  }
+  return nodeEnPath
 }
 
 /** Ruta del envoltorio de la statusline (userData/sloth-statusline.cjs). */
@@ -102,7 +118,7 @@ export function installInto(configDir: string, base?: Record<string, unknown>): 
   }
   settings.hooks = hooks
   // El % real de los límites solo llega en la entrada de la statusline: se envuelve para leerlo (función «celular»).
-  settings.statusLine = envolverStatusline(settings.statusLine, statuslineScriptPath())
+  if (hayNode()) settings.statusLine = envolverStatusline(settings.statusLine, statuslineScriptPath())
   const tmp = `${file}.tmp`
   writeFileSync(tmp, JSON.stringify(settings, null, 2), 'utf8')
   renameSync(tmp, file)
