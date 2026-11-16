@@ -9,6 +9,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.22',
+    date: '2026-11-16',
+    title: '«Te necesita» solo cuando de verdad',
+    items: [
+      'Si Claude termina el turno con un shell corriendo en segundo plano (por ejemplo, una verificación), el espacio sigue en «trabajando · Shell en segundo plano» y no te avisa «terminó» ni «te necesita», ni en Windows ni en el celu. El aviso llega cuando termina el shell.',
+      'Los pedidos de permiso y las preguntas de Claude te siguen llegando aunque haya un shell corriendo.'
+    ]
+  },
+  {
     version: '0.6.21',
     date: '2026-11-16',
     title: 'Acciones del chat a mano',
