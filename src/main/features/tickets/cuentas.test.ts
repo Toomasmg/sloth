@@ -372,3 +372,11 @@ test('servidorDeLaLista: solo con el mismo servidor con que se leyó la lista', 
   assert.throws(() => servidorDeLaLista(GRUV.herramientas.prefijo, adaptado), /cambió desde que se leyó la lista\. Actualizá Gruv/)
   assert.throws(() => servidorDeLaLista(undefined, GRUV), /Actualizá Gruv/)
 })
+
+test('mensajeCuenta: el pending de claude.ai no habla de servidores propios', () => {
+  const base = { tipo: 'tiene' as const, adaptado: false, verificado: false, estado: 'pending' as const }
+  const ai = mensajeCuenta(GRUV, { ...base, nombre: 'claude.ai Gruv', prefijo: 'mcp__claude_ai_Gruv__' }, 'Cosmos', []) ?? ''
+  assert.doesNotMatch(ai, /\/mcp|tarda en arrancar/)
+  const propio = mensajeCuenta(GRUV, { ...base, nombre: 'mis-tickets', prefijo: 'mcp__mis-tickets__' }, 'Cosmos', []) ?? ''
+  assert.match(propio, /tarda en arrancar/)
+})

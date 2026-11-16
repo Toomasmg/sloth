@@ -548,7 +548,7 @@ function ejecucion(nombre: string, accountId: string, mcp?: ConectorMcp): Ejecuc
   const cwd = join(carpeta(), 'tickets-run')
   mkdirSync(cwd, { recursive: true })
   // Un MCP propio lento puede tardar más que el tope por defecto de Claude Code en arrancar.
-  const env = { ...baseEnv(), MCP_TIMEOUT: process.env.MCP_TIMEOUT ?? '30000', CLAUDE_CONFIG_DIR: acc.configDir }
+  const env = { MCP_TIMEOUT: '30000', ...baseEnv(), CLAUDE_CONFIG_DIR: acc.configDir }
   const run: Ejecucion = { accountId: acc.id, label: acc.label, exe, cwd, env }
   if (!mcp || defPara(mcp, acc.id).herramientas.prefijo.startsWith('mcp__claude_ai_')) return run
   // Conectar todos los de claude.ai solo para no usarlos demora cada consulta. Si la variable no existe en esta

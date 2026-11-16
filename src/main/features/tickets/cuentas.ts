@@ -273,9 +273,9 @@ export function mensajeCuenta(def: ConectorMcp, d: Disponibilidad, cuenta: strin
       : `Abrí una terminal con la cuenta «${cuenta}», corré /mcp y autenticá «${d.nombre}».`
   if (d.estado === 'failed') return `El servidor «${d.nombre}» de la cuenta «${cuenta}» no arrancó. Revisalo con /mcp en una terminal de esa cuenta.`
   if (usable(d) && d.verificado && d.estado !== 'pending') return undefined
-  // Un MCP propio que queda pending suele estar esperando que lo autentiquen.
-  const auth = deClaudeAi ? '' : ' Si pide autenticarse, abrí una terminal con esa cuenta y corré /mcp.'
-  return `«${d.nombre}» no respondió a tiempo en la cuenta «${cuenta}».${auth} Podés probar igual o tocar «Volver a revisar». Si tu servidor tarda en arrancar, volvé a probar: Sloth ya le da hasta 30 s.`
+  // Un MCP propio que queda pending suele estar esperando que lo autentiquen o tarda en arrancar.
+  const propio = deClaudeAi ? '' : ' Si pide autenticarse, abrí una terminal con esa cuenta y corré /mcp. Si tarda en arrancar, volvé a probar.'
+  return `«${d.nombre}» no respondió a tiempo en la cuenta «${cuenta}».${propio} Podés probar igual o tocar «Volver a revisar».`
 }
 
 function sanearServidor(v: unknown): ServidorMcp | undefined {
