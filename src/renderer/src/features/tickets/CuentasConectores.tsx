@@ -7,7 +7,7 @@ import { Button, Select } from '../../ui'
 
 export function textoDisponibilidad(nombreConector: string, d: Disponibilidad | undefined): string {
   if (!d || d.tipo === 'sin_revisar') return 'sin revisar'
-  if (d.tipo === 'falta') return `sin ${nombreConector}`
+  if (d.tipo === 'falta') return d.parecido ? `${nombreConector}: «${d.parecido.nombre}» sin todas sus herramientas` : `sin ${nombreConector}`
   if (d.tipo === 'elegir') return `${nombreConector}: elegí el servidor`
   if (d.estado === 'needs-auth') return `${nombreConector}: falta autenticar`
   if (d.estado === 'failed') return `${nombreConector}: no arranca`
