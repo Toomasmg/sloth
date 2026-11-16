@@ -1064,6 +1064,26 @@ kbd,
     transform: translateY(6px);
   }
 }
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes sink {
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* Salida de un diálogo (la marca useExit): el fondo se apaga y la tarjeta baja apenas. */
+.modal-backdrop.is-closing {
+  animation: fade-out var(--t-exit) var(--ease-in) forwards;
+  pointer-events: none;
+}
+.modal-backdrop.is-closing > * {
+  animation: sink var(--t-exit) var(--ease-in) forwards;
+}
 
 /* Scrollbars oscuras y finas */
 ::-webkit-scrollbar {

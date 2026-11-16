@@ -4,6 +4,7 @@ import { captureOpener } from './return-focus'
 import { FOCUSABLE, nextFocusIndex } from './focus-trap'
 import { Button } from './ui/Button'
 import { IconButton } from './ui/IconButton'
+import { useExit } from './ui/useExit'
 
 export interface ModalProps {
   title: ReactNode
@@ -58,11 +59,12 @@ export function Modal(p: ModalProps): React.JSX.Element {
   askingRef.current = asking
   dirtyRef.current = !!dirty
   closeRef.current = onClose
+  const [closing, leave] = useExit(() => closeRef.current())
 
   const requestClose = (): void => {
     if (lockedRef.current) return
     if (dirtyRef.current) setAsking(true)
-    else closeRef.current()
+    else leave()
   }
   const requestRef = useRef(requestClose)
   requestRef.current = requestClose
@@ -145,7 +147,7 @@ export function Modal(p: ModalProps): React.JSX.Element {
   }
 
   return (
-    <div className={backdropClassName ?? 'modal-backdrop'} onMouseDown={backdropClose ? requestClose : undefined}>
+    <div className={`${backdropClassName ?? 'modal-backdrop'}${closing ? ' is-closing' : ''}`} inert={closing} onMouseDown={backdropClose ? requestClose : undefined}>
       {onSubmit ? (
         <form {...common} noValidate ref={rootRef as React.RefObject<HTMLFormElement>} onSubmit={onSubmit}>
           {head}
@@ -173,7 +175,7 @@ export function Modal(p: ModalProps): React.JSX.Element {
             ¿Descartar lo que escribiste?
           </h2>
           <div className="modal-actions">
-            <Button variant="ghost" onClick={() => closeRef.current()}>
+            <Button variant="ghost" onClick={leave}>
               Descartar
             </Button>
             <Button variant="primary" ref={keepRef} onClick={() => setAsking(false)}>

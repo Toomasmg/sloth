@@ -11,6 +11,24 @@
     transform: translateY(var(--s-1));
   }
 }
+@keyframes ui-sink {
+  to {
+    opacity: 0;
+    transform: translateY(var(--s-1));
+  }
+}
+/* Menús y tooltips: aparecen en el lugar, sin viajar; un salto seco se siente como un parpadeo. */
+@keyframes ui-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+@keyframes ui-fade {
+  from {
+    opacity: 0;
+  }
+}
 
 .ui-spinner {
   width: 1em;
@@ -202,6 +220,7 @@
   font-size: var(--fs-12);
   line-height: var(--lh-body);
   pointer-events: none;
+  animation: ui-fade var(--t-fast) var(--ease);
 }
 .ui-tooltip-kbd {
   padding: 0 var(--s-1);
@@ -635,6 +654,10 @@
   font-size: var(--fs-13);
   animation: ui-rise var(--t-med) var(--ease);
 }
+.ui-toast.is-closing {
+  animation: ui-sink var(--t-exit) var(--ease-in) forwards;
+  pointer-events: none;
+}
 .ui-toast--success {
   border-left-color: var(--done);
 }
@@ -690,6 +713,8 @@
   border-radius: var(--r-lg);
   background: var(--overlay);
   box-shadow: var(--e-2);
+  transform-origin: top;
+  animation: ui-pop var(--t-fast) var(--ease);
 }
 .ui-menu-item {
   display: flex;

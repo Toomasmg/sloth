@@ -222,7 +222,7 @@
 .g-seg button {
   font: inherit;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s, filter 0.12s;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease), filter var(--t-fast) var(--ease);
 }
 .g-btn-solid,
 .g-btn-plain,
@@ -696,7 +696,7 @@
   flex: none;
   color: var(--text-3);
   transform: rotate(-90deg);
-  transition: transform 0.15s;
+  transition: transform var(--t-fast) var(--ease);
 }
 .g-chev.up {
   transform: none;
@@ -1068,7 +1068,7 @@
   color: var(--text);
   border-radius: var(--r-lg);
   box-shadow: var(--e-3);
-  animation: f-git-slide var(--t-mid, 0.18s) var(--ease);
+  animation: rise var(--t-med) var(--ease);
 }
 .f-git-sub.wide {
   width: min(640px, calc(100vw - 32px));

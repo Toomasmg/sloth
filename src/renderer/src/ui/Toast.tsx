@@ -3,6 +3,7 @@ import { CloseIcon, WarningIcon } from '../icons/SlothIcons'
 import { Button } from './Button'
 import { IconButton } from './IconButton'
 import { addToast, dismissToast, type ToastInput, type ToastItem, type ToastTone } from './toast-queue'
+import { useExit } from './useExit'
 import './ui.css'
 
 let list: ToastItem[] = []
@@ -32,13 +33,14 @@ const subscribe = (f: () => void): (() => void) => {
 const snapshot = (): ToastItem[] => list
 
 function ToastCard({ t }: { t: ToastItem }): React.JSX.Element {
+  const [closing, leave] = useExit(() => dismissToastById(t.id))
   useEffect(() => {
     if (!t.duration) return
-    const h = window.setTimeout(() => dismissToastById(t.id), t.duration)
+    const h = window.setTimeout(leave, t.duration)
     return () => window.clearTimeout(h)
-  }, [t.id, t.duration])
+  }, [t.duration, leave])
   return (
-    <div className={`ui-toast ui-toast--${t.tone}`} role={t.tone === 'danger' ? 'alert' : 'status'}>
+    <div className={`ui-toast ui-toast--${t.tone}${closing ? ' is-closing' : ''}`} inert={closing} role={t.tone === 'danger' ? 'alert' : 'status'}>
       {(t.tone === 'danger' || t.tone === 'warning') && <WarningIcon size={16} />}
       <span className="ui-toast-msg">{t.message}</span>
       {t.actionLabel && (
@@ -47,13 +49,13 @@ function ToastCard({ t }: { t: ToastItem }): React.JSX.Element {
           variant="ghost"
           onClick={() => {
             t.onAction?.()
-            dismissToastById(t.id)
+            leave()
           }}
         >
           {t.actionLabel}
         </Button>
       )}
-      <IconButton label="Cerrar aviso" size="sm" icon={<CloseIcon size={14} />} onClick={() => dismissToastById(t.id)} />
+      <IconButton label="Cerrar aviso" size="sm" icon={<CloseIcon size={14} />} onClick={leave} />
     </div>
   )
 }
