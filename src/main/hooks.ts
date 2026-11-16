@@ -1,9 +1,11 @@
 import { app } from 'electron'
+import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { AgentState } from '../shared/types'
 import { HOOK_EVENTS, type HookEventPayload } from '../shared/daemon-protocol'
 import { HOOK_MARKER, HOOK_SCRIPT, LEGACY_HOOK_MARKERS } from '../daemon/hook-script'
+import { envolverStatusline, STATUSLINE_SCRIPT } from './statusline-core'
 
 export type { HookEventPayload }
 
@@ -20,21 +22,45 @@ export function hookScriptPath(): string {
   return join(app.getPath('userData'), 'sloth-hook.cjs')
 }
 
-/** Escribe (o actualiza) el script de hook. Llamar una vez al arrancar, antes de installInto. */
-export function writeHookScript(): string {
-  const file = hookScriptPath()
+let nodeEnPath: boolean | undefined
+
+/** Una sola vez por arranque: el envoltorio corre con node y, sin node, la statusline quedaría vacía. */
+function hayNode(): boolean {
+  if (nodeEnPath === undefined) {
+    try {
+      execFileSync(process.platform === 'win32' ? 'where.exe' : 'which', ['node'], { stdio: 'ignore', windowsHide: true, timeout: 5000 })
+      nodeEnPath = true
+    } catch {
+      nodeEnPath = false
+    }
+  }
+  return nodeEnPath
+}
+
+/** Ruta del envoltorio de la statusline (userData/sloth-statusline.cjs). */
+export function statuslineScriptPath(): string {
+  return join(app.getPath('userData'), 'sloth-statusline.cjs')
+}
+
+function writeIfChanged(file: string, content: string): void {
   let current = ''
   try {
     current = readFileSync(file, 'utf8')
   } catch {
     /* no existe */
   }
-  if (current !== HOOK_SCRIPT) {
-    mkdirSync(app.getPath('userData'), { recursive: true })
-    const tmp = `${file}.tmp`
-    writeFileSync(tmp, HOOK_SCRIPT, 'utf8')
-    renameSync(tmp, file)
-  }
+  if (current === content) return
+  mkdirSync(app.getPath('userData'), { recursive: true })
+  const tmp = `${file}.tmp`
+  writeFileSync(tmp, content, 'utf8')
+  renameSync(tmp, file)
+}
+
+/** Escribe (o actualiza) el script de hook y el de la statusline. Llamar una vez al arrancar, antes de installInto. */
+export function writeHookScript(): string {
+  const file = hookScriptPath()
+  writeIfChanged(file, HOOK_SCRIPT)
+  writeIfChanged(statuslineScriptPath(), STATUSLINE_SCRIPT)
   return file
 }
 
@@ -91,6 +117,8 @@ export function installInto(configDir: string, base?: Record<string, unknown>): 
     hooks[event] = [...others, ours]
   }
   settings.hooks = hooks
+  // El % real de los límites solo llega en la entrada de la statusline: se envuelve para leerlo (función «celular»).
+  if (hayNode()) settings.statusLine = envolverStatusline(settings.statusLine, statuslineScriptPath())
   const tmp = `${file}.tmp`
   writeFileSync(tmp, JSON.stringify(settings, null, 2), 'utf8')
   renameSync(tmp, file)
