@@ -21,7 +21,7 @@ export function RemotoSeccion({ v, hacer, copiar }: Props): React.JSX.Element | 
         Desde cualquier red
       </h3>
       <Switch checked={r.encendido} onChange={(on) => void hacer('remoto', { encendido: on })}>
-        Ver Sloth en el celu aunque no estés en tu Wi-Fi
+        Verlo también fuera de tu Wi-Fi
       </Switch>
       <p className="f-cel-nota">Va por el Supabase del chat, cifrado. Nunca viaja lo que pasa en las terminales.</p>
 
