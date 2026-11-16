@@ -11,10 +11,10 @@ const key = (code: string, mods: Partial<{ ctrlKey: boolean; shiftKey: boolean; 
   ...mods
 })
 
-test('Ctrl+Shift+1…5 lleva a cada destino del riel, en orden', () => {
+test('Ctrl+Shift+1…6 lleva a cada destino del riel, en orden', () => {
   assert.deepEqual(
-    ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'].map((c) => navDestForKey(key(c))),
-    ['espacios', 'tickets', 'equipo', 'historial', 'ramas']
+    ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6'].map((c) => navDestForKey(key(c))),
+    ['espacios', 'tickets', 'equipo', 'historial', 'ramas', 'prs']
   )
   // Ctrl+Shift+Numpad2 con NumLock es Ctrl+Shift+↓, que la terminal tiene que recibir.
   assert.equal(navDestForKey(key('Numpad2')), null)
@@ -23,13 +23,14 @@ test('Ctrl+Shift+1…5 lleva a cada destino del riel, en orden', () => {
 test('no pisa Ctrl+1…4 (ir al panel) ni Ctrl+Alt+1…4 (distribución)', () => {
   assert.equal(navDestForKey(key('Digit1', { shiftKey: false })), null)
   assert.equal(navDestForKey(key('Digit1', { altKey: true })), null)
-  assert.equal(navDestForKey(key('Digit6')), null)
+  assert.equal(navDestForKey(key('Digit7')), null)
   assert.equal(navDestForKey(key('Digit1', { metaKey: true })), null)
 })
 
 test('la Vista de arriba define el destino; Reportar y Exportar marcan a su madre', () => {
   assert.equal(destOf(null), 'espacios')
   assert.equal(destOf('f-tickets-view-title'), 'tickets')
+  assert.equal(destOf('f-prs-view-title'), 'prs')
   assert.equal(destOf('rp-view-title'), 'ayuda')
   assert.equal(destOf('fr-view-title'), 'ayuda')
   assert.equal(destOf('f-ei-view-title'), 'ajustes')
