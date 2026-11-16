@@ -20,6 +20,9 @@
 alter table public.messages add column if not exists edited_at timestamptz;
 alter table public.messages add column if not exists deleted_at timestamptz;
 alter table public.messages add column if not exists reply_to uuid references public.messages (id) on delete set null;
+-- Sin este índice, cada fila borrada (vaciar, purgar, cascada de un equipo) recorre toda la tabla
+-- buscando quién le respondía para el `on delete set null`.
+create index if not exists messages_reply_to_idx on public.messages (reply_to) where reply_to is not null;
 -- 'text' es un mensaje común; 'retention' y 'clear' son avisos que solo dejan las RPC de abajo.
 alter table public.messages add column if not exists kind text not null default 'text';
 alter table public.messages drop constraint if exists messages_kind_ok;
@@ -77,6 +80,10 @@ begin
   end if;
   if old.kind <> 'text' then
     raise exception 'Los avisos de la conversación no se editan.';
+  end if;
+  if (select count(*) from public.messages
+      where author_id = old.author_id and edited_at > now() - interval '1 minute') >= 30 then
+    raise exception 'Demasiadas ediciones seguidas: esperá un minuto.';
   end if;
   new.id := old.id;
   new.kind := old.kind;
@@ -151,6 +158,7 @@ language sql stable security definer set search_path = '' as $$
     select 1 from public.messages m
     where m.id = p_id
       and m.deleted_at is null
+      and m.kind = 'text'
       and ((m.team_id is not null and public.is_team_member(m.team_id) and public.team_message_alive(m.team_id, m.created_at))
            or (m.thread_id is not null and public.is_thread_participant(m.thread_id)))
   )
@@ -293,6 +301,15 @@ drop trigger if exists thread_read_broadcast on public.dm_threads;
 create trigger thread_read_broadcast after update of last_read_a, last_read_b on public.dm_threads
   for each row execute function public.broadcast_read();
 
+-- Última vez que cada uno avisó «escribiendo…»: tope de uno cada 2 s aunque el cliente no lo respete.
+-- Sin políticas: solo la toca chat_typing.
+create table if not exists public.chat_typing_last (
+  user_id uuid primary key references public.profiles (id) on delete cascade,
+  at      timestamptz not null
+);
+alter table public.chat_typing_last enable row level security;
+revoke all on public.chat_typing_last from anon, authenticated;
+
 -- «Escribiendo…»: lo publica la base después de chequear que el usuario está en la conversación.
 create or replace function public.chat_typing(p_team uuid default null, p_thread uuid default null) returns void
 language plpgsql security definer set search_path = '' as $$
@@ -307,11 +324,20 @@ begin
     if not public.is_team_member(p_team) then
       raise exception 'No sos miembro de ese equipo.';
     end if;
-    perform realtime.send(jsonb_build_object('user_id', auth.uid()), 'typing', 'team:' || p_team::text, true);
   else
     if not public.is_thread_participant(p_thread) then
       raise exception 'No participás de esa conversación.';
     end if;
+  end if;
+  insert into public.chat_typing_last (user_id, at) values (auth.uid(), now())
+    on conflict (user_id) do update set at = excluded.at
+    where public.chat_typing_last.at <= now() - interval '2 seconds';
+  if not found then
+    return;
+  end if;
+  if p_team is not null then
+    perform realtime.send(jsonb_build_object('user_id', auth.uid()), 'typing', 'team:' || p_team::text, true);
+  else
     perform realtime.send(jsonb_build_object('user_id', auth.uid()), 'typing', 'thread:' || p_thread::text, true);
   end if;
 end
@@ -329,7 +355,7 @@ revoke execute on function
   from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------
--- No leídos: los borrados no cuentan.
+-- No leídos: los borrados y los avisos no cuentan.
 -- ---------------------------------------------------------------------
 
 create or replace function public.unread_counts()
@@ -338,7 +364,7 @@ language sql stable security definer set search_path = '' as $$
   select 'team'::text, m.team_id,
          (select count(*)::int from (select 1 from public.messages x
             where x.team_id = m.team_id and x.created_at > m.last_read_at and x.author_id <> auth.uid()
-              and x.deleted_at is null and public.team_message_alive(x.team_id, x.created_at) limit 99) s),
+              and x.deleted_at is null and x.kind = 'text' and public.team_message_alive(x.team_id, x.created_at) limit 99) s),
          (select max(x.created_at) from public.messages x
             where x.team_id = m.team_id and public.team_message_alive(x.team_id, x.created_at))
     from public.team_members m where m.user_id = auth.uid()
@@ -347,7 +373,7 @@ language sql stable security definer set search_path = '' as $$
          (select count(*)::int from (select 1 from public.messages x
             where x.thread_id = t.id
               and x.created_at > case when t.user_a = auth.uid() then t.last_read_a else t.last_read_b end
-              and x.author_id <> auth.uid() and x.deleted_at is null limit 99) s),
+              and x.author_id <> auth.uid() and x.deleted_at is null and x.kind = 'text' limit 99) s),
          (select max(x.created_at) from public.messages x where x.thread_id = t.id)
     from public.dm_threads t where auth.uid() in (t.user_a, t.user_b)
 $$;
@@ -467,6 +493,7 @@ $$;
 revoke execute on function public.chat_purge_expired_all() from public, anon, authenticated;
 
 -- Con pg_cron la purga corre sola cada hora; sin él alcanza con la que piden los clientes.
+-- Si pg_cron se activa después, hay que volver a correr este bloque (o toda la 0004) para agendarla.
 do $$
 begin
   if exists (select 1 from pg_catalog.pg_extension where extname = 'pg_cron') then
