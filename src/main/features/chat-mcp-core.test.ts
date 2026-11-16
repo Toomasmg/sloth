@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   conGrant,
+  debeRegistrar,
   envolverContenido,
   parsearConfig,
   parsearPedido,
@@ -9,6 +10,7 @@ import {
   resolverConversacion,
   sinGrant,
   Tope,
+  validarCuentas,
   validarN,
   validarTexto,
   type ConvCandidata
@@ -102,7 +104,13 @@ test('envolverContenido no deja cerrar el bloque desde un cuerpo', () => {
 
 test('parsearPedido acepta uno bien formado', () => {
   const p = parsearPedido(JSON.stringify({ token: TOKEN, ws: 'w1', pedido: { op: 'leer', conversacion: 'x', n: 3 } }))
-  assert.deepEqual(p, { token: TOKEN, ws: 'w1', pedido: { op: 'leer', conversacion: 'x', n: 3 } })
+  assert.deepEqual(p, { token: TOKEN, ws: 'w1', cuenta: '', pedido: { op: 'leer', conversacion: 'x', n: 3 } })
+  assert.equal(parsearPedido(JSON.stringify({ token: TOKEN, cuenta: 'a1', pedido: { op: 'listar' } })).cuenta, 'a1')
+})
+
+test('parsearPedido rechaza una cuenta que no es string o es larguísima', () => {
+  assert.throws(() => parsearPedido(JSON.stringify({ token: TOKEN, cuenta: 3, pedido: { op: 'listar' } })), /Cuenta/)
+  assert.throws(() => parsearPedido(JSON.stringify({ token: TOKEN, cuenta: 'x'.repeat(65), pedido: { op: 'listar' } })), /Cuenta/)
 })
 
 test('parsearPedido rechaza token corto', () => {
@@ -130,8 +138,8 @@ test('conGrant y sinGrant son idempotentes', () => {
 })
 
 test('parsearConfig con basura queda apagado', () => {
-  assert.deepEqual(parsearConfig('x'), { enabled: false, grants: [] })
-  assert.deepEqual(parsearConfig({ enabled: 'true', grants: 'no' }), { enabled: false, grants: [] })
+  assert.deepEqual(parsearConfig('x'), { enabled: false, cuentas: [], grants: [] })
+  assert.deepEqual(parsearConfig({ enabled: 'true', grants: 'no' }), { enabled: false, cuentas: [], grants: [] })
   const ok = parsearConfig({
     enabled: true,
     grants: [
@@ -141,5 +149,29 @@ test('parsearConfig con basura queda apagado', () => {
       null
     ]
   })
-  assert.deepEqual(ok, { enabled: true, grants: [{ conv: { kind: 'team', id: T1 }, nombre: 'A', ops: ['leer'], at: 5 }] })
+  assert.deepEqual(ok, { enabled: true, cuentas: [], grants: [{ conv: { kind: 'team', id: T1 }, nombre: 'A', ops: ['leer'], at: 5 }] })
+})
+
+test('parsearConfig limpia la lista de cuentas', () => {
+  const c = parsearConfig({ enabled: true, cuentas: ['a', 'a', 3, '', 'x'.repeat(65), 'b'], grants: [] })
+  assert.deepEqual(c.cuentas, ['a', 'b'])
+  assert.deepEqual(parsearConfig({ enabled: true, cuentas: 'a' }).cuentas, [])
+})
+
+test('debeRegistrar pide interruptor, cuenta marcada y cuenta existente', () => {
+  const s = { enabled: true, cuentas: ['a', 'borrada'] }
+  assert.equal(debeRegistrar(s, 'a', ['a', 'b']), true)
+  assert.equal(debeRegistrar(s, 'b', ['a', 'b']), false)
+  assert.equal(debeRegistrar(s, 'borrada', ['a', 'b']), false)
+  assert.equal(debeRegistrar({ ...s, enabled: false }, 'a', ['a', 'b']), false)
+  assert.equal(debeRegistrar({ enabled: true, cuentas: [] }, 'a', ['a']), false)
+})
+
+test('validarCuentas acepta ids existentes sin repetir y rechaza el resto', () => {
+  assert.deepEqual(validarCuentas(['a', 'b', 'a'], ['a', 'b']), ['a', 'b'])
+  assert.deepEqual(validarCuentas([], ['a']), [])
+  assert.throws(() => validarCuentas('a', ['a']), /inválida/)
+  assert.throws(() => validarCuentas(['z'], ['a']), /no existe/)
+  assert.throws(() => validarCuentas([1], ['a']), /no existe/)
+  assert.throws(() => validarCuentas(Array.from({ length: 101 }, () => 'a'), ['a']), /inválida/)
 })

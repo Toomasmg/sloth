@@ -2,11 +2,11 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { aplicarRegistro, entradaMcp, esNuestra } from './chat-mcp-registro'
 
-const E = entradaMcp('C:\\Users\\x\\AppData\\Roaming\\Sloth\\sloth-chat-mcp.cjs')
+const E = entradaMcp('C:\\Users\\x\\AppData\\Roaming\\Sloth\\sloth-chat-mcp.cjs', 'acc-1')
 const otro = { type: 'stdio', command: 'npx', args: ['otro-mcp'], env: {} }
 
-test('entradaMcp usa barras normales', () => {
-  assert.deepEqual(E, { type: 'stdio', command: 'node', args: ['C:/Users/x/AppData/Roaming/Sloth/sloth-chat-mcp.cjs'], env: {} })
+test('entradaMcp usa barras normales y fija la cuenta', () => {
+  assert.deepEqual(E, { type: 'stdio', command: 'node', args: ['C:/Users/x/AppData/Roaming/Sloth/sloth-chat-mcp.cjs', '--cuenta', 'acc-1'], env: {} })
   assert.equal(esNuestra(E), true)
   assert.equal(esNuestra(otro), false)
 })
@@ -30,9 +30,16 @@ test('alta conserva otros servidores y claves sin mutar la entrada', () => {
 })
 
 test('actualiza una ruta vieja nuestra', () => {
-  const vieja = entradaMcp('D:/viejo/sloth-chat-mcp.cjs')
+  const vieja = entradaMcp('D:/viejo/sloth-chat-mcp.cjs', 'acc-1')
   const r = aplicarRegistro({ mcpServers: { sloth: vieja } }, E)
   assert.deepEqual(r, { state: 'ok', json: { mcpServers: { sloth: E } } })
+})
+
+test('la entrada de E1 sin cuenta, o con otra cuenta, se reescribe', () => {
+  const sinCuenta = { type: 'stdio', command: 'node', args: ['C:/Users/x/AppData/Roaming/Sloth/sloth-chat-mcp.cjs'], env: {} }
+  assert.deepEqual(aplicarRegistro({ mcpServers: { sloth: sinCuenta } }, E), { state: 'ok', json: { mcpServers: { sloth: E } } })
+  const otraCuenta = entradaMcp('C:/Users/x/AppData/Roaming/Sloth/sloth-chat-mcp.cjs', 'acc-2')
+  assert.deepEqual(aplicarRegistro({ mcpServers: { sloth: otraCuenta } }, E), { state: 'ok', json: { mcpServers: { sloth: E } } })
 })
 
 test('un sloth ajeno es conflicto y no se toca', () => {

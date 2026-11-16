@@ -17,6 +17,8 @@ export const MCP_LIMITS = {
 }
 
 const MAX_GRANTS = 200
+const MAX_CUENTAS = 100
+const MAX_ID_CUENTA = 64
 const MAX_NOMBRE = 200
 const MAX_CONVERSACION = 200
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -120,7 +122,7 @@ export type McpPedido =
   | { op: 'leer'; conversacion: unknown; n?: unknown }
   | { op: 'enviar'; conversacion: unknown; texto: unknown }
 
-export function parsearPedido(linea: string): { token: string; ws: string; pedido: McpPedido } {
+export function parsearPedido(linea: string): { token: string; ws: string; cuenta: string; pedido: McpPedido } {
   let v: unknown
   try {
     v = JSON.parse(linea)
@@ -131,6 +133,8 @@ export function parsearPedido(linea: string): { token: string; ws: string; pedid
   if (typeof v.token !== 'string' || !TOKEN_RE.test(v.token)) throw new Error('Token inválido.')
   const ws = v.ws === undefined || v.ws === null ? '' : v.ws
   if (typeof ws !== 'string' || ws.length > 64) throw new Error('Espacio inválido.')
+  const cuenta = v.cuenta === undefined || v.cuenta === null ? '' : v.cuenta
+  if (typeof cuenta !== 'string' || cuenta.length > MAX_ID_CUENTA) throw new Error('Cuenta inválida.')
   const p = v.pedido
   if (!isObj(p)) throw new Error('Pedido inválido.')
   let pedido: McpPedido
@@ -138,7 +142,7 @@ export function parsearPedido(linea: string): { token: string; ws: string; pedid
   else if (p.op === 'leer') pedido = { op: 'leer', conversacion: p.conversacion, n: p.n }
   else if (p.op === 'enviar') pedido = { op: 'enviar', conversacion: p.conversacion, texto: p.texto }
   else throw new Error('Operación desconocida.')
-  return { token: v.token, ws, pedido }
+  return { token: v.token, ws, cuenta, pedido }
 }
 
 export interface McpGrantsState {
@@ -185,9 +189,36 @@ function grantDe(v: unknown): ChatMcpGrant | undefined {
   return { conv: { kind, id }, nombre, ops, at }
 }
 
-/** Tolerante: lo que no se entiende queda apagado y sin permisos. */
-export function parsearConfig(raw: unknown): { enabled: boolean; grants: ChatMcpGrant[] } {
-  if (!isObj(raw)) return { enabled: false, grants: [] }
+export interface McpCuentasState {
+  enabled: boolean
+  cuentas: string[]
+}
+
+/** Una cuenta lleva el MCP solo con el interruptor prendido, marcada y todavía existente. */
+export function debeRegistrar(s: McpCuentasState, accountId: string, existentes: readonly string[]): boolean {
+  return s.enabled && s.cuentas.includes(accountId) && existentes.includes(accountId)
+}
+
+/** Para el IPC: tira con cualquier cosa que no sea una lista de ids de cuentas existentes. */
+export function validarCuentas(raw: unknown, existentes: readonly string[]): string[] {
+  if (!Array.isArray(raw) || raw.length > MAX_CUENTAS) throw new Error('Lista de cuentas inválida.')
+  const out: string[] = []
+  for (const id of raw) {
+    if (typeof id !== 'string' || !existentes.includes(id)) throw new Error('Esa cuenta no existe.')
+    if (!out.includes(id)) out.push(id)
+  }
+  return out
+}
+
+function cuentasDe(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  const ids = raw.filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length <= MAX_ID_CUENTA)
+  return [...new Set(ids)].slice(0, MAX_CUENTAS)
+}
+
+/** Tolerante: lo que no se entiende queda apagado, sin cuentas y sin permisos. */
+export function parsearConfig(raw: unknown): { enabled: boolean; cuentas: string[]; grants: ChatMcpGrant[] } {
+  if (!isObj(raw)) return { enabled: false, cuentas: [], grants: [] }
   const grants: ChatMcpGrant[] = []
   const seen = new Set<string>()
   for (const v of Array.isArray(raw.grants) ? raw.grants : []) {
@@ -197,5 +228,5 @@ export function parsearConfig(raw: unknown): { enabled: boolean; grants: ChatMcp
     grants.push(g)
     if (grants.length >= MAX_GRANTS) break
   }
-  return { enabled: raw.enabled === true, grants }
+  return { enabled: raw.enabled === true, cuentas: cuentasDe(raw.cuentas), grants }
 }

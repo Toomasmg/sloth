@@ -14,8 +14,11 @@ export interface McpEntry {
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
-export function entradaMcp(scriptPath: string): McpEntry {
-  return { type: 'stdio', command: 'node', args: [scriptPath.replace(/\\/g, '/')], env: {} }
+export const CUENTA_ARG = '--cuenta'
+
+/** El id de la cuenta va fijo en los args: el pipe lo usa para rechazar pedidos de cuentas no habilitadas. */
+export function entradaMcp(scriptPath: string, accountId: string): McpEntry {
+  return { type: 'stdio', command: 'node', args: [scriptPath.replace(/\\/g, '/'), CUENTA_ARG, accountId], env: {} }
 }
 
 export function esNuestra(v: unknown): boolean {
