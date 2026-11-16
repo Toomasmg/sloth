@@ -231,7 +231,6 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     }
   }
 
-  // ---------- mensajes enriquecidos ----------
 
   /** El servidor tiene la 0004 si existen sus columnas y la tabla de reacciones. */
   async function detectExtras(c: SupabaseClient): Promise<void> {
