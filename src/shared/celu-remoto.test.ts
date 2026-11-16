@@ -7,14 +7,18 @@ import {
   claveCelu,
   DECISION_VENTANA_MS,
   enlaceCelu,
+  estadoMasNuevo,
   EVENTOS,
   leerEmparejamiento,
+  mismoDestino,
   MAX_SOBRE,
   sellar,
   secretoValido,
   topicCelu,
   validarDecision,
-  validarHola
+  validarDestino,
+  validarHola,
+  VIEJO_MS
 } from './celu-remoto'
 
 const ID = '3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b'
@@ -112,4 +116,28 @@ test('validarDecision acepta lo válido y rechaza lo viejo, lo futuro, lo raro y
   assert.equal(validarDecision({ ...ok, id: '' }, ahora), null)
   assert.equal(validarDecision({ ...ok, id: 'x'.repeat(101) }, ahora), null)
   assert.equal(validarDecision(null, ahora), null)
+})
+
+test('validarDestino: lo guardado sin el secreto, con el id en minúsculas', () => {
+  const d = { u: 'https://abc.supabase.co', k: 'anon', id: ID.toUpperCase() }
+  assert.deepEqual(validarDestino(d), { ...d, id: ID })
+  assert.equal(validarDestino({ ...d, u: 'http://abc.supabase.co' }), null)
+  assert.equal(validarDestino({ ...d, id: 'x' }), null)
+  assert.equal(validarDestino('basura'), null)
+})
+
+test('mismoDestino: otro proyecto u otra cuenta es otro destino; la anon key no cuenta', () => {
+  const d = { u: 'https://abc.supabase.co', k: 'anon', id: ID }
+  assert.ok(mismoDestino(d, { ...d, k: 'otra', id: ID.toUpperCase() }))
+  assert.ok(!mismoDestino(d, { ...d, u: 'https://otro.supabase.co' }))
+  assert.ok(!mismoDestino(d, { ...d, id: '00000000-0000-4000-8000-000000000000' }))
+})
+
+test('estadoMasNuevo descarta sobres reenviados salvo que el último ya haya vencido', () => {
+  assert.ok(estadoMasNuevo(null, 5, 1000))
+  const ultimo = { ahora: 500, recibido: 1000 }
+  assert.ok(estadoMasNuevo(ultimo, 501, 1100))
+  assert.ok(!estadoMasNuevo(ultimo, 500, 1100))
+  assert.ok(!estadoMasNuevo(ultimo, 100, 1100))
+  assert.ok(estadoMasNuevo(ultimo, 100, 1000 + VIEJO_MS + 1))
 })

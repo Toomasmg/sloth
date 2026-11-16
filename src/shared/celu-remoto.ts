@@ -35,6 +35,9 @@ export interface Emparejamiento {
   id: string
 }
 
+/** Lo que el celu guarda a la vista: todo menos el secreto, que queda solo como clave no exportable. */
+export type Destino = Omit<Emparejamiento, 's'>
+
 export interface DatoEstado {
   estado: EstadoCelular
   n: number
@@ -99,16 +102,34 @@ export function leerEmparejamiento(hash: string): Emparejamiento | null {
   } catch {
     return null
   }
+  const d = validarDestino(raw)
+  if (!d || !isObj(raw) || !secretoValido(raw.s)) return null
+  return { ...d, s: raw.s }
+}
+
+export function validarDestino(raw: unknown): Destino | null {
   if (!isObj(raw)) return null
-  const { u, k, s, id } = raw
+  const { u, k, id } = raw
   if (typeof u !== 'string' || typeof k !== 'string' || typeof id !== 'string') return null
   try {
     if (new URL(u).protocol !== 'https:') return null
   } catch {
     return null
   }
-  if (!k || k.length > 2000 || !secretoValido(s) || !UUID.test(id)) return null
-  return { u, k, s, id }
+  if (!k || k.length > 2000 || !UUID.test(id)) return null
+  return { u, k, id: id.toLowerCase() }
+}
+
+/** Mismo proyecto y misma cuenta: un enlace así reemplaza al guardado sin preguntar. */
+export const mismoDestino = (a: Destino, b: Destino): boolean => a.u === b.u && a.id.toLowerCase() === b.id.toLowerCase()
+
+/**
+ * El celu descarta un estado más viejo que el último (un sobre reenviado). Si el último ya venció, acepta
+ * cualquiera: así se recupera si el reloj de la PC volvió para atrás.
+ */
+export function estadoMasNuevo(ultimo: { ahora: number; recibido: number } | null, ahoraPc: number, ahoraCelu: number): boolean {
+  if (!ultimo || ahoraCelu - ultimo.recibido > VIEJO_MS) return true
+  return ahoraPc > ultimo.ahora
 }
 
 /** HKDF-SHA-256 del secreto, con el userId de sal: el mismo secreto con otra cuenta da otra clave. */
