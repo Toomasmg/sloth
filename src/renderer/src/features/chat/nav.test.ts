@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { availableConv, loadLastConv, navReduce, parseConv, saveLastConv, type KeyValueStore } from './nav'
+import { availableConv, loadLastConv, navReduce, parseConv, restoreTarget, saveLastConv, type KeyValueStore } from './nav'
 
 const team = { kind: 'team', id: 't1' } as const
 const dm = { kind: 'dm', id: 'd1' } as const
@@ -57,4 +57,11 @@ test('parseConv rechaza lo que no es una conversación', () => {
   assert.equal(parseConv('{"kind":"team","id":"../x"}'), undefined)
   assert.equal(parseConv('{"kind":"team","id":5}'), undefined)
   assert.deepEqual(parseConv('{"kind":"dm","id":"abc-1","extra":1}'), { kind: 'dm', id: 'abc-1' })
+})
+
+test('restoreTarget espera las listas antes de decidir que la conversación ya no está', () => {
+  const saved = { kind: 'team' as const, id: 't1' }
+  assert.deepEqual(restoreTarget(saved, { loaded: false, teamIds: [], threadIds: [] }), { ready: false })
+  assert.deepEqual(restoreTarget(saved, { loaded: true, teamIds: ['t1'], threadIds: [] }), { ready: true, conv: saved })
+  assert.deepEqual(restoreTarget(saved, { loaded: true, teamIds: [], threadIds: [] }), { ready: true, conv: undefined })
 })

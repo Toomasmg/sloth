@@ -26,6 +26,17 @@ export function availableConv(conv: ChatConvRef | undefined, teamIds: readonly s
   return (conv.kind === 'team' ? teamIds : threadIds).includes(conv.id) ? conv : undefined
 }
 
+export type RestoreTarget = { ready: false } | { ready: true; conv?: ChatConvRef }
+
+/** Adónde volver al abrir la app. Hasta que lleguen las listas no se sabe si la conversación sigue existiendo. */
+export function restoreTarget(
+  saved: ChatConvRef | undefined,
+  lists: { loaded: boolean; teamIds: readonly string[]; threadIds: readonly string[] }
+): RestoreTarget {
+  if (!lists.loaded) return { ready: false }
+  return { ready: true, conv: availableConv(saved, lists.teamIds, lists.threadIds) }
+}
+
 export interface KeyValueStore {
   getItem(key: string): string | null
   setItem(key: string, value: string): void

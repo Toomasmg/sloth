@@ -23,7 +23,7 @@ import { getSettings } from '../settings/store'
 import { playChatChime } from '../sound/audio'
 import { planIncoming, planSent, RecentIds, sameConv, toastText } from './alerts'
 import { applyReaction, clearBefore, mergeUpdate } from './message-ops'
-import { availableConv, loadLastConv, navReduce, saveLastConv, type KeyValueStore, type NavAction, type NavState } from './nav'
+import { loadLastConv, navReduce, restoreTarget, saveLastConv, type KeyValueStore, type NavAction, type NavState } from './nav'
 
 /**
  * Estado del chat en la interfaz: espejo del snapshot de main, caché de mensajes por conversación,
@@ -56,6 +56,8 @@ let nav: NavState = { open: false }
 let navUser: string | undefined
 /** El usuario ya eligió dónde estar en esta sesión: no se le pisa con lo guardado. */
 let navTouched = false
+/** Falta volver a la conversación guardada: se espera a que lleguen las listas. */
+let restorePending = false
 let announcement = ''
 let joinOpen = false
 /** Error de una invitación que esperaba el login, para mostrarlo en el diálogo si sigue abierto. */
@@ -131,9 +133,14 @@ const storage = (): KeyValueStore | null => {
 
 function setNav(a: NavAction): void {
   nav = navReduce(nav, a)
-  if (a.type !== 'close') navTouched = true
+  // Solo cuenta (y se guarda) si eligió una conversación o volvió a la lista; abrir el panel sin más no.
+  const chose = a.type === 'back' || (a.type === 'open' && a.conv !== undefined)
+  if (chose) {
+    navTouched = true
+    restorePending = false
+  }
   const store = storage()
-  if (navUser && store && a.type !== 'close') {
+  if (navUser && store && chose) {
     try {
       saveLastConv(store, navUser, nav.conv)
     } catch (e) {
@@ -143,27 +150,38 @@ function setNav(a: NavAction): void {
   notify()
 }
 
-/** Al conocer al usuario, vuelve a la conversación en la que se había quedado (si sigue existiendo). */
+/**
+ * Al conocer al usuario, vuelve a la conversación en la que se había quedado (si sigue existiendo).
+ * El primer snapshot con sesión llega con las listas vacías: hasta que lleguen no se decide nada.
+ */
 function syncNavUser(next: ChatSnapshot): void {
   const id = next.auth.status === 'signedIn' ? next.auth.me.id : undefined
-  if (id === navUser) return
-  navUser = id
-  if (!id) {
+  if (id !== navUser) {
+    navUser = id
+    navTouched = false
+    restorePending = !!id
     nav = { open: nav.open }
+    membersCache.clear()
+    clearAllTyping()
+  }
+  if (!id || !restorePending || navTouched) return
+  const store = storage()
+  if (!store) {
+    restorePending = false
     return
   }
-  const store = storage()
-  if (!store || navTouched) return
   try {
-    const last = availableConv(
-      loadLastConv(store, id),
-      next.teams.map((t) => t.id),
-      next.threads.map((t) => t.id)
-    )
-    nav = { open: nav.open, conv: last }
-    if (!last) saveLastConv(store, id, undefined)
-  } catch {
-    nav = { open: nav.open }
+    const target = restoreTarget(loadLastConv(store, id), {
+      loaded: next.listsLoaded === true,
+      teamIds: next.teams.map((t) => t.id),
+      threadIds: next.threads.map((t) => t.id)
+    })
+    if (!target.ready) return
+    restorePending = false
+    nav = { open: nav.open, conv: target.conv }
+  } catch (e) {
+    restorePending = false
+    api?.notifyError(`No se pudo volver a la última conversación: ${errText(e)}`)
   }
 }
 
@@ -268,6 +286,14 @@ function refreshTyping(key: string): void {
     const soonest = Math.min(...[...room.values()].map((t) => t.until))
     typingTimers.set(key, setTimeout(() => refreshTyping(key), Math.max(50, soonest - now)))
   } else typingTimers.delete(key)
+}
+
+function clearAllTyping(): void {
+  typingTimers.forEach((t) => clearTimeout(t))
+  typingTimers.clear()
+  typingBy.clear()
+  typingLogins.clear()
+  lastPing.clear()
 }
 
 function clearTyping(key: string, userId: string): void {
@@ -546,24 +572,22 @@ export function toggleReaction(m: ChatMessage, emoji: ChatReactionEmoji, me: { i
   })
 }
 
-const membersCache = new Map<string, ChatProfile[]>()
+/** Miembros por equipo, con la cantidad que tenía al pedirlos: si cambia, se vuelven a pedir. */
+const membersCache = new Map<string, { count: number; list: ChatProfile[] }>()
 
 /** A quién se puede mencionar en la conversación (sin vos): los miembros del equipo, o el otro en un directo. */
 export async function mentionCandidates(conv: ChatConvRef): Promise<ChatProfile[]> {
-  const key = convKey(conv)
-  const hit = membersCache.get(key)
-  if (hit) return hit
   const me = meId()
-  let list: ChatProfile[]
   if (conv.kind === 'dm') {
     const other = threadOf(snap, conv.id)?.other
-    list = other ? [other] : []
-  } else {
-    list = (await call<ChatMember[]>('members', conv.id)).map((m) => m.profile)
+    return other && other.id !== me ? [other] : []
   }
-  const out = list.filter((p) => p.id !== me)
-  membersCache.set(key, out)
-  return out
+  const count = teamOf(snap, conv.id)?.memberCount ?? -1
+  const hit = membersCache.get(conv.id)
+  if (hit && hit.count === count) return hit.list
+  const list = (await call<ChatMember[]>('members', conv.id)).map((m) => m.profile).filter((p) => p.id !== me)
+  if (me === meId()) membersCache.set(conv.id, { count, list })
+  return list
 }
 
 export function searchMessages(conv: ChatConvRef, query: string): Promise<ChatMessage[]> {

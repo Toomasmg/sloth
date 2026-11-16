@@ -225,6 +225,8 @@ export interface ChatSnapshot {
   unreadTotal: number
   /** El servidor tiene la 0004: editar, borrar, responder, reaccionar, «escribiendo…», «visto», borrado automático y vaciar. */
   extras: boolean
+  /** Ya llegaron las listas del servidor al menos una vez en esta sesión (hasta entonces vienen vacías). */
+  listsLoaded: boolean
 }
 
 export interface ChatConfigInput {

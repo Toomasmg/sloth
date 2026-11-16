@@ -113,7 +113,7 @@ export interface ChatData {
   joinByCode(code: unknown): Promise<ChatTeam>
 }
 
-export const EMPTY_PART: ChatDataPart = { connection: 'off', teams: [], threads: [], invites: [], unreadTotal: 0, extras: false }
+export const EMPTY_PART: ChatDataPart = { connection: 'off', teams: [], threads: [], invites: [], unreadTotal: 0, extras: false, listsLoaded: false }
 
 /** Dependencias inyectables (las pruebas no cargan Electron). */
 export interface NoticeLike {
@@ -170,6 +170,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
   let running = false
   let connection: ChatConnection = 'off'
   let lists: Lists = EMPTY_LISTS
+  let listsLoaded = false
   let view: ChatView = { open: false }
   let closeInbox: (() => Promise<void>) | undefined
   let subscribedOnce = false
@@ -445,6 +446,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       const r = await loadLists(c, me)
       if (g !== gen) return
       lists = r.lists
+      listsLoaded = true
       syncTopics(g)
       teamPhotoPath.clear()
       for (const [k, v] of r.photoPaths) teamPhotoPath.set(k, v)
@@ -1041,7 +1043,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     part: (): ChatDataPart => {
       const teams = lists.teams.map(withPhoto)
       const unreadTotal = teams.reduce((n, t) => n + t.unread, 0) + lists.threads.reduce((n, t) => n + t.unread, 0)
-      return { connection, teams, threads: lists.threads, invites: lists.invites, unreadTotal, extras }
+      return { connection, teams, threads: lists.threads, invites: lists.invites, unreadTotal, extras, listsLoaded }
     },
 
     start: async (): Promise<void> => {
@@ -1078,6 +1080,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       purgeTimer = undefined
       connection = 'off'
       lists = EMPTY_LISTS
+      listsLoaded = false
       view = { open: false }
       subscribedOnce = false
       lastRefresh = 0
