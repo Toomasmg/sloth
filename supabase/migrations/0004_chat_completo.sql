@@ -1,5 +1,6 @@
 -- =====================================================================
--- Sloth · Chat del equipo — editar, borrar, responder, reaccionar, «escribiendo…» y «visto»
+-- Sloth · Chat del equipo — editar, borrar, responder, reaccionar, «escribiendo…», «visto»,
+-- borrado automático por equipo y vaciar una conversación
 -- Correr en el SQL Editor DESPUÉS de 0001, 0002 y 0003. Es idempotente. Se aplica a mano: la app
 -- detecta si está y, si no, sigue andando como antes.
 --
@@ -11,11 +12,23 @@
 --  * Lo que se publica por Broadcast lo manda la base desde triggers o desde chat_typing, que chequea
 --    la membresía; ningún cliente publica directo en los tópicos del chat.
 --  * Los clientes viejos siguen andando: el evento 'message' trae claves de más que ignoran.
+--  * Borrado automático y vaciar: solo por RPC (chat_set_retention, chat_clear), que chequean el rol y
+--    dejan un aviso en la conversación. La API no puede escribir `teams.retention_hours` ni `messages.kind`.
+--    Los mensajes vencidos los oculta la RLS al instante; chat_purge_expired los borra de verdad.
 -- =====================================================================
 
 alter table public.messages add column if not exists edited_at timestamptz;
 alter table public.messages add column if not exists deleted_at timestamptz;
 alter table public.messages add column if not exists reply_to uuid references public.messages (id) on delete set null;
+-- 'text' es un mensaje común; 'retention' y 'clear' son avisos que solo dejan las RPC de abajo.
+alter table public.messages add column if not exists kind text not null default 'text';
+alter table public.messages drop constraint if exists messages_kind_ok;
+alter table public.messages add constraint messages_kind_ok check (kind in ('text', 'retention', 'clear'));
+
+-- Borrado automático del equipo, en horas. null = apagado.
+alter table public.teams add column if not exists retention_hours integer;
+alter table public.teams drop constraint if exists teams_retention_ok;
+alter table public.teams add constraint teams_retention_ok check (retention_hours is null or retention_hours in (24, 168, 720, 2160));
 
 alter table public.messages drop constraint if exists messages_body_check;
 alter table public.messages drop constraint if exists messages_body_ok;
@@ -62,7 +75,11 @@ begin
   if old.deleted_at is not null then
     raise exception 'Ese mensaje ya se eliminó.';
   end if;
+  if old.kind <> 'text' then
+    raise exception 'Los avisos de la conversación no se editan.';
+  end if;
   new.id := old.id;
+  new.kind := old.kind;
   new.author_id := old.author_id;
   new.client_id := old.client_id;
   new.team_id := old.team_id;
@@ -92,6 +109,28 @@ create policy messages_update on public.messages for update to authenticated
   with check (author_id = auth.uid());
 revoke update, delete on public.messages from authenticated;
 grant update (body, deleted_at) on public.messages to authenticated;
+-- Alta por columnas: `kind` queda en 'text' para todo lo que llega por la API.
+revoke insert on public.messages from authenticated;
+grant insert (team_id, thread_id, client_id, body, reply_to) on public.messages to authenticated;
+-- El borrado automático se cambia solo con chat_set_retention, que deja el aviso.
+revoke update on public.teams from authenticated;
+grant update (name, description, photo_path) on public.teams to authenticated;
+
+-- ¿Sigue vivo un mensaje de equipo según su borrado automático? (true si está apagado)
+create or replace function public.team_message_alive(p_team uuid, p_at timestamptz) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select coalesce(
+    (select p_at > now() - make_interval(hours => t.retention_hours) from public.teams t where t.id = p_team),
+    true)
+$$;
+revoke execute on function public.team_message_alive(uuid, timestamptz) from public, anon;
+grant execute on function public.team_message_alive(uuid, timestamptz) to authenticated;
+
+-- Los vencidos desaparecen para todos al instante, aunque todavía no se hayan purgado.
+drop policy if exists messages_select on public.messages;
+create policy messages_select on public.messages for select to authenticated
+  using ((team_id is not null and public.is_team_member(team_id) and public.team_message_alive(team_id, created_at))
+         or (thread_id is not null and public.is_thread_participant(thread_id)));
 
 -- ---------------------------------------------------------------------
 -- Reacciones
@@ -112,7 +151,7 @@ language sql stable security definer set search_path = '' as $$
     select 1 from public.messages m
     where m.id = p_id
       and m.deleted_at is null
-      and ((m.team_id is not null and public.is_team_member(m.team_id))
+      and ((m.team_id is not null and public.is_team_member(m.team_id) and public.team_message_alive(m.team_id, m.created_at))
            or (m.thread_id is not null and public.is_thread_participant(m.thread_id)))
   )
 $$;
@@ -173,7 +212,8 @@ begin
         'created_at', new.created_at,
         'edited_at', new.edited_at,
         'deleted_at', new.deleted_at,
-        'reply_to', new.reply_to
+        'reply_to', new.reply_to,
+        'kind', new.kind
       ),
       case when tg_op = 'UPDATE' then 'message_update' else 'message' end,
       case when new.team_id is not null then 'team:' || new.team_id::text else 'thread:' || new.thread_id::text end,
@@ -298,8 +338,9 @@ language sql stable security definer set search_path = '' as $$
   select 'team'::text, m.team_id,
          (select count(*)::int from (select 1 from public.messages x
             where x.team_id = m.team_id and x.created_at > m.last_read_at and x.author_id <> auth.uid()
-              and x.deleted_at is null limit 99) s),
-         (select max(x.created_at) from public.messages x where x.team_id = m.team_id)
+              and x.deleted_at is null and public.team_message_alive(x.team_id, x.created_at) limit 99) s),
+         (select max(x.created_at) from public.messages x
+            where x.team_id = m.team_id and public.team_message_alive(x.team_id, x.created_at))
     from public.team_members m where m.user_id = auth.uid()
   union all
   select 'dm'::text, t.id,
@@ -309,4 +350,129 @@ language sql stable security definer set search_path = '' as $$
               and x.author_id <> auth.uid() and x.deleted_at is null limit 99) s),
          (select max(x.created_at) from public.messages x where x.thread_id = t.id)
     from public.dm_threads t where auth.uid() in (t.user_a, t.user_b)
+$$;
+
+-- ---------------------------------------------------------------------
+-- Borrado automático y vaciar una conversación
+-- En un equipo los cambian owner o admin; en un DM, cualquiera de los dos. Queda un aviso en la
+-- conversación (kind 'retention' o 'clear') a nombre de quien lo hizo, que llega a todos por Realtime.
+-- ---------------------------------------------------------------------
+
+create or replace function public.can_manage_conversation(p_team uuid, p_thread uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select case
+    when num_nonnulls(p_team, p_thread) <> 1 then false
+    when p_team is not null then coalesce(public.team_role(p_team) in ('owner', 'admin'), false)
+    else public.is_thread_participant(p_thread)
+  end
+$$;
+revoke execute on function public.can_manage_conversation(uuid, uuid) from public, anon;
+grant execute on function public.can_manage_conversation(uuid, uuid) to authenticated;
+
+create or replace function public.chat_set_retention(p_team uuid, p_hours integer) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Iniciá sesión.';
+  end if;
+  if p_hours is not null and p_hours not in (24, 168, 720, 2160) then
+    raise exception 'Plazo inválido.';
+  end if;
+  if p_team is null or not public.is_team_member(p_team) then
+    raise exception 'No sos miembro de ese equipo.';
+  end if;
+  if not public.can_manage_conversation(p_team, null) then
+    raise exception 'Solo owner o admin pueden cambiar el borrado automático.';
+  end if;
+  update public.teams set retention_hours = p_hours
+    where id = p_team and retention_hours is distinct from p_hours;
+  if not found then
+    return;
+  end if;
+  insert into public.messages (team_id, client_id, body, kind)
+    values (p_team, gen_random_uuid(), coalesce(p_hours, 0)::text, 'retention');
+end
+$$;
+revoke execute on function public.chat_set_retention(uuid, integer) from public, anon;
+grant execute on function public.chat_set_retention(uuid, integer) to authenticated;
+
+-- Borra de verdad todos los mensajes (las reacciones caen en cascada) y deja el aviso.
+create or replace function public.chat_clear(p_team uuid default null, p_thread uuid default null) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Iniciá sesión.';
+  end if;
+  if num_nonnulls(p_team, p_thread) <> 1 then
+    raise exception 'Conversación inválida.';
+  end if;
+  if p_team is not null and not public.is_team_member(p_team) then
+    raise exception 'No sos miembro de ese equipo.';
+  end if;
+  if p_thread is not null and not public.is_thread_participant(p_thread) then
+    raise exception 'No participás de esa conversación.';
+  end if;
+  if not public.can_manage_conversation(p_team, p_thread) then
+    raise exception 'Solo owner o admin pueden vaciar la conversación del equipo.';
+  end if;
+  if p_team is not null then
+    delete from public.messages where team_id = p_team;
+    insert into public.messages (team_id, client_id, body, kind) values (p_team, gen_random_uuid(), 'clear', 'clear');
+  else
+    delete from public.messages where thread_id = p_thread;
+    insert into public.messages (thread_id, client_id, body, kind) values (p_thread, gen_random_uuid(), 'clear', 'clear');
+  end if;
+end
+$$;
+revoke execute on function public.chat_clear(uuid, uuid) from public, anon;
+grant execute on function public.chat_clear(uuid, uuid) to authenticated;
+
+-- Purga de los vencidos en los equipos de quien llama. La app la corre al conectarse y cada hora.
+create or replace function public.chat_purge_expired() returns integer
+language plpgsql security definer set search_path = '' as $$
+declare
+  n integer;
+begin
+  if auth.uid() is null then
+    raise exception 'Iniciá sesión.';
+  end if;
+  delete from public.messages m
+    using public.teams t, public.team_members tm
+    where m.team_id = t.id
+      and tm.team_id = t.id and tm.user_id = auth.uid()
+      and t.retention_hours is not null
+      and m.created_at <= now() - make_interval(hours => t.retention_hours);
+  get diagnostics n = row_count;
+  return n;
+end
+$$;
+revoke execute on function public.chat_purge_expired() from public, anon;
+grant execute on function public.chat_purge_expired() to authenticated;
+
+-- La misma purga para todos los equipos: es para pg_cron, nadie la llama por la API.
+create or replace function public.chat_purge_expired_all() returns integer
+language plpgsql security definer set search_path = '' as $$
+declare
+  n integer;
+begin
+  delete from public.messages m
+    using public.teams t
+    where m.team_id = t.id
+      and t.retention_hours is not null
+      and m.created_at <= now() - make_interval(hours => t.retention_hours);
+  get diagnostics n = row_count;
+  return n;
+end
+$$;
+revoke execute on function public.chat_purge_expired_all() from public, anon, authenticated;
+
+-- Con pg_cron la purga corre sola cada hora; sin él alcanza con la que piden los clientes.
+do $$
+begin
+  if exists (select 1 from pg_catalog.pg_extension where extname = 'pg_cron') then
+    perform cron.schedule('sloth-chat-purge', '17 * * * *', 'select public.chat_purge_expired_all()');
+  end if;
+exception when others then
+  raise warning 'sloth: no se pudo agendar la purga con pg_cron (%)', sqlstate;
+end
 $$;
