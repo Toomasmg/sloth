@@ -558,6 +558,7 @@ export async function editMessage(conv: ChatConvRef, id: string, body: string): 
 
 /** Borra un mensaje: los que no llegaron a salir solo se sacan de la caché. */
 export async function removeMessage(m: ChatMessage): Promise<void> {
+  if (m.status === 'sending') throw new Error('Esperá a que termine de enviarse para eliminarlo.')
   if (isLocal(m) || m.status === 'failed') {
     const key = convKey(m.conv)
     msgs.set(key, (msgs.get(key) ?? []).filter((x) => x.clientId !== m.clientId))

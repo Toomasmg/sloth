@@ -3,10 +3,15 @@ import { CHAT_REACTIONS } from '../../../../shared/chat'
 
 const emojiOrder = (e: string): number => CHAT_REACTIONS.indexOf(e as (typeof CHAT_REACTIONS)[number])
 
-/** Un mensaje que llega de nuevo (edición, borrado) conserva lo que el evento no trae: reacciones y cita. */
+/**
+ * Un mensaje que llega de nuevo (edición, borrado) conserva lo que el evento no trae: reacciones y cita.
+ * Las versiones llegan por HTTP y por realtime sin orden garantizado: una vieja no pisa a una nueva.
+ */
 export function mergeUpdate(prev: ChatMessage | undefined, next: ChatMessage): ChatMessage {
+  if (prev?.deletedAt !== undefined && next.deletedAt === undefined) return prev
   if (next.deletedAt !== undefined) return { ...next, reactions: [] }
   if (!prev) return next
+  if (prev.editedAt !== undefined && (next.editedAt === undefined || next.editedAt < prev.editedAt)) return prev
   return {
     ...next,
     reactions: next.reactions ?? prev.reactions,

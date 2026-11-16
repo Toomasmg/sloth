@@ -43,6 +43,7 @@ export function MessageItem({ msg, mine, me, head, extras, seen, flash, onReply,
   const sent = msg.status === 'sent'
   const name = msg.author.login === 'ex-miembro' ? 'Ex miembro' : msg.author.login
   const canAct = extras && sent && !deleted && !!me
+  const quote = deleted ? undefined : msg.replyTo
 
   const copy = (): void => {
     window.sloth.clipboardWrite(msg.body).then(
@@ -74,7 +75,8 @@ export function MessageItem({ msg, mine, me, head, extras, seen, flash, onReply,
     }
     items.push({ id: 'copy', label: 'Copiar texto', icon: <Copy size={14} />, onSelect: copy })
     if (canAct && mine) items.push({ id: 'edit', label: 'Editar', icon: <PencilSimple size={14} />, onSelect: () => onEdit(msg) })
-    if (mine && (canAct || !sent)) {
+    // Mientras dice «Enviando…» no se ofrece: el envío ya salió y el mensaje llegaría igual a todos.
+    if (mine && (canAct || msg.status === 'failed')) {
       items.push({ id: 'delete', label: 'Eliminar', icon: <Trash size={14} />, danger: true, onSelect: () => setConfirming(true) })
     }
     return items
@@ -109,10 +111,10 @@ export function MessageItem({ msg, mine, me, head, extras, seen, flash, onReply,
         )}
         <div className="f-chat-bubble">
           {(!head || mine) && <span className="sr-only">{name}: </span>}
-          {msg.replyTo && !deleted && (
-            <button type="button" className="f-chat-quote" onClick={() => onJump(msg.replyTo!.id)} aria-label={`Ir al mensaje citado de ${msg.replyTo.authorLogin}`}>
-              <strong>@{msg.replyTo.authorLogin}</strong>
-              <span>{msg.replyTo.deleted ? 'Mensaje eliminado' : msg.replyTo.excerpt}</span>
+          {quote && (
+            <button type="button" className="f-chat-quote" onClick={() => onJump(quote.id)} aria-label={`Ir al mensaje citado de ${quote.authorLogin}`}>
+              <strong>@{quote.authorLogin}</strong>
+              <span>{quote.deleted ? 'Mensaje eliminado' : quote.excerpt}</span>
             </button>
           )}
           {deleted ? (

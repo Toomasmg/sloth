@@ -58,6 +58,15 @@ test('mergeUpdate de una edición conserva reacciones y cita', () => {
   assert.equal(out.replyTo?.id, 'x')
 })
 
+test('mergeUpdate no deja que una versión vieja pise a una nueva', () => {
+  const gone = msg({ body: '', deletedAt: 300 })
+  assert.equal(mergeUpdate(gone, msg({ body: 'editado', editedAt: 200 })), gone, 'no se des-borra')
+  const v2 = msg({ body: 'v2', editedAt: 250 })
+  assert.equal(mergeUpdate(v2, msg({ body: 'v1', editedAt: 200 })), v2)
+  assert.equal(mergeUpdate(v2, msg({ body: 'original' })), v2)
+  assert.equal(mergeUpdate(v2, msg({ body: 'v3', editedAt: 300 })).body, 'v3')
+})
+
 test('mergeUpdate de un borrado limpia las reacciones', () => {
   const prev = msg({ reactions: [{ emoji: '🎉', userIds: ['u1'], logins: ['ana'] }] })
   assert.deepEqual(mergeUpdate(prev, msg({ body: '', deletedAt: 300 })).reactions, [])
