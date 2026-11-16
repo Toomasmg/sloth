@@ -23,6 +23,7 @@ import {
   isObj,
   compareMembers,
   messageFromRow,
+  MSG_COLS_BASE,
   memberFromRow,
   oldestFirst,
   otherOf,
@@ -84,7 +85,7 @@ export interface ChatData {
   joinByCode(code: unknown): Promise<ChatTeam>
 }
 
-export const EMPTY_PART: ChatDataPart = { connection: 'off', teams: [], threads: [], invites: [], unreadTotal: 0 }
+export const EMPTY_PART: ChatDataPart = { connection: 'off', teams: [], threads: [], invites: [], unreadTotal: 0, extras: false }
 
 /** Dependencias inyectables (las pruebas no cargan Electron). */
 export interface NoticeLike {
@@ -129,7 +130,6 @@ const uniq = (a: string[]): string[] => [...new Set(a)].filter((x) => x !== '')
 const msgOf = (e: unknown): string => (e instanceof Error ? e.message : 'Algo salió mal.')
 const isMsg = (m: ChatMessage | undefined): m is ChatMessage => m !== undefined
 
-const MSG_COLS = 'id, client_id, team_id, thread_id, author_id, body, created_at'
 
 export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onChange: () => void, deps: ChatDataDeps = {}): ChatData {
   const loadNotifier = deps.loadNotifier ?? defaultNotifier
@@ -547,7 +547,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     const limit = parseLimit(rawLimit)
     let q = c
       .from('messages')
-      .select(MSG_COLS)
+      .select(MSG_COLS_BASE)
       .eq(ref.kind === 'team' ? 'team_id' : 'thread_id', ref.id)
     if (rawBefore !== undefined && rawBefore !== null) {
       const beforeId = parseUuid(rawBefore, 'Mensaje inválido.')
@@ -575,7 +575,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     const res = await c
       .from('messages')
       .insert({ [col]: ref.id, client_id: clientId, body })
-      .select(MSG_COLS)
+      .select(MSG_COLS_BASE)
     if (!res.error) {
       const row = ((res.data ?? []) as MessageRow[])[0]
       const msg = row ? messageFromRow(row, me) : undefined
@@ -586,7 +586,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       // clientId repetido: es un reintento. Se devuelve el mensaje que ya estaba guardado.
       const ex = await c
         .from('messages')
-        .select(MSG_COLS)
+        .select(MSG_COLS_BASE)
         .eq('author_id', me.id)
         .eq('client_id', clientId)
         .eq(col, ref.id)
@@ -759,7 +759,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     part: (): ChatDataPart => {
       const teams = lists.teams.map(withPhoto)
       const unreadTotal = teams.reduce((n, t) => n + t.unread, 0) + lists.threads.reduce((n, t) => n + t.unread, 0)
-      return { connection, teams, threads: lists.threads, invites: lists.invites, unreadTotal }
+      return { connection, teams, threads: lists.threads, invites: lists.invites, unreadTotal, extras: false }
     },
 
     start: async (): Promise<void> => {
