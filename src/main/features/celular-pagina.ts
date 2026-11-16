@@ -206,6 +206,7 @@ export const PAGINA_JS = `(function () {
   var $ = function (id) { return document.getElementById(id); };
   var guardar = function (k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } };
   var leer = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  var pedir = window.slothFetch || function (u, o) { return fetch(u, o); };
 
   var token = new URLSearchParams(location.search).get('t');
   if (token) guardar('sloth-token', token); else token = leer('sloth-token');
@@ -329,7 +330,7 @@ export const PAGINA_JS = `(function () {
     enviando = true;
     errorPedido = '';
     pintar();
-    fetch('/api/permiso', { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json', 'x-sloth-token': token }, body: JSON.stringify({ id: id, decision: decision }) })
+    pedir('/api/permiso', { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json', 'x-sloth-token': token }, body: JSON.stringify({ id: id, decision: decision }) })
       .then(function (r) {
         if (r.ok) return null;
         return r.json().then(function (j) { return j && j.error ? j.error : 'No se pudo responder.'; }, function () { return 'No se pudo responder.'; });
@@ -435,7 +436,7 @@ export const PAGINA_JS = `(function () {
   function consultar() {
     clearTimeout(timer);
     if (!token) return sinToken();
-    fetch('/api/estado', { cache: 'no-store', headers: { 'x-sloth-token': token } })
+    pedir('/api/estado', { cache: 'no-store', headers: { 'x-sloth-token': token } })
       .then(function (r) {
         if (r.status === 401) {
           guardar('sloth-token', null);

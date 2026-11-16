@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { EstadoCelular } from '../../shared/celular'
 import { crearFuenteWifi, type ProveedorDeEstado } from './celular-servidor'
+import { PAGINA_JS } from './celular-pagina'
 
 const TOKEN = 'x'.repeat(43)
 const ESTADO: EstadoCelular = { ahora: 1, aprobar: false, cuentas: [], sesiones: [], pedidos: [] }
@@ -89,4 +90,9 @@ test('la página se sirve sin token, con CSP y sin referer; lo desconocido es 40
     assert.equal((await fetch(`${base}/icono.png`)).status, 404)
     assert.equal((await fetch(`${base}/.env`)).status, 404)
   })
+})
+
+test('la página pide por window.slothFetch si existe (gancho de la versión remota)', () => {
+  assert.ok(PAGINA_JS.includes('window.slothFetch'))
+  assert.ok(!PAGINA_JS.includes("fetch('/api/"))
 })
