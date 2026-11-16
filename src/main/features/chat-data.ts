@@ -131,11 +131,13 @@ export interface ChatDataDeps {
 
 const REFRESH_MIN_MS = 30_000
 const NOTIFY_MIN_MS = 5_000
+const MENTION_MIN_MS = 2_000
 const PROFILE_CACHE_MAX = 500
 const PHOTO_CACHE_MAX = 50
 const UNREAD_CAP = 99
 const NOTICE_CHARS = 120
 const PURGE_EVERY_MS = 3_600_000
+const EXTRAS_RETRY_MS = 30_000
 
 const defaultNotifier = async (): Promise<NotifierCtor | undefined> => {
   const el = await import('electron')
@@ -146,6 +148,7 @@ type Lists = { teams: ChatTeam[]; threads: ChatThread[]; invites: ChatInvite[] }
 const EMPTY_LISTS: Lists = { teams: [], threads: [], invites: [] }
 
 type PgError = { code?: string; message?: string }
+const MISSING_SCHEMA = new Set(['42703', '42P01', 'PGRST204', 'PGRST205'])
 
 /** Error de PostgREST → mensaje para mostrar. Solo pasan los RAISE de nuestras funciones (P0001). */
 function check(res: { error: PgError | null }, fallback: string): void {
@@ -158,7 +161,6 @@ const s = (v: unknown): string => (typeof v === 'string' ? v : '')
 const uniq = (a: string[]): string[] => [...new Set(a)].filter((x) => x !== '')
 const msgOf = (e: unknown): string => (e instanceof Error ? e.message : 'Algo salió mal.')
 const isMsg = (m: ChatMessage | undefined): m is ChatMessage => m !== undefined
-
 
 export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onChange: () => void, deps: ChatDataDeps = {}): ChatData {
   const loadNotifier = deps.loadNotifier ?? defaultNotifier
@@ -231,7 +233,6 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     }
   }
 
-
   /** El servidor tiene la 0004 si existen sus columnas y la tabla de reacciones. */
   async function detectExtras(c: SupabaseClient): Promise<void> {
     const [a, b, t] = await Promise.all([
@@ -239,10 +240,27 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       c.from('message_reactions').select('message_id').limit(1),
       c.from('teams').select('id, retention_hours').limit(1)
     ])
-    const next = !a.error && !b.error && !t.error
+    const errors: PgError[] = [a.error, b.error, t.error].filter((e) => e !== null)
+    // Solo «no existe la columna o la tabla» dice que falta la 0004; un corte o un 5xx no cambia nada.
+    if (errors.some((e) => !MISSING_SCHEMA.has(e.code ?? ''))) {
+      throw new Error(`chat: no se pudo comprobar la 0004 (${errors.map((e) => e.code ?? '?').join(', ')})`)
+    }
+    const next = errors.length === 0
     if (next === extras) return
     extras = next
     onChange()
+  }
+
+  /** Si el chequeo falla por la red, se queda con lo que sabía y reintenta; sin conexión, reintenta la reconexión. */
+  function checkExtras(c: SupabaseClient, g: number): Promise<void> {
+    return detectExtras(c).catch((e: unknown) => {
+      ctx.log('chat: no se pudo comprobar la actualización 0004:', msgOf(e))
+      setTimeout(() => {
+        const cl = core.client() as SupabaseClient | null
+        if (!cl || !running || g !== gen || connection !== 'live') return
+        void checkExtras(cl, g).then(() => (g === gen ? refreshLists(true) : undefined))
+      }, EXTRAS_RETRY_MS)
+    })
   }
 
   /** Suma reacciones (si `withReactions`) y el mensaje al que responde cada uno. Sin la 0004 no hace nada. */
@@ -487,7 +505,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       if (subscribedOnce) {
         failedTopics.clear()
         const cl = core.client() as SupabaseClient | null
-        const check0 = cl ? detectExtras(cl).catch(() => ctx.log('chat: no se pudo comprobar la actualización 0004.')) : Promise.resolve()
+        const check0 = cl ? checkExtras(cl, g) : Promise.resolve()
         void check0.then(() => (g === gen ? refreshLists(true) : undefined))
       }
       subscribedOnce = true
@@ -539,10 +557,11 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     }
     changeUnread(conv, (n) => Math.min(UNREAD_CAP, n + 1))
     onChange()
-    // Avisos del sistema: solo con «notify.team» activo y fuera de «No molestar» (Configuración).
+    // Avisos del sistema: con «notify.team» activo o si lo mencionan, y fuera de «No molestar». Misma regla que alerts.ts.
     const st = currentSettings()
-    if (!focused && st.notify.team && !st.noMolestar) {
-      void notify(conv, msg.author, msg.body, mentionsLogin(msg.body, me.login)).catch(() => undefined)
+    const mention = mentionsLogin(msg.body, me.login)
+    if (!focused && (st.notify.team || mention) && !st.noMolestar) {
+      void notify(conv, msg.author, msg.body, mention).catch(() => undefined)
     }
   }
 
@@ -653,12 +672,12 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     ctx.log('chat: el canal rápido (Broadcast) no está disponible; sigue con postgres_changes. ¿Falta aplicar 0003_realtime_broadcast.sql?')
   }
 
-  /** Aviso del sistema para un mensaje ajeno con la ventana sin foco. Como mucho uno cada 5 s por conversación, salvo que mencionen al usuario. */
+  /** Aviso del sistema para un mensaje ajeno con la ventana sin foco. Como mucho uno cada 5 s por conversación, o cada 2 s si mencionan al usuario. */
   async function notify(conv: ChatConvRef, author: ChatProfile, body: string, mention = false): Promise<void> {
     const t = now()
     const key = convKey(conv)
     const last = lastNotify.get(key)
-    if (!mention && last !== undefined && t - last < NOTIFY_MIN_MS) return
+    if (last !== undefined && t - last < (mention ? MENTION_MIN_MS : NOTIFY_MIN_MS)) return
     lastNotify.set(key, t)
     const w = ctx.window()
     if (!w || w.isDestroyed()) return
@@ -856,8 +875,11 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
   /** Borra de verdad lo vencido; la RLS ya lo oculta, así que si falla no se nota en la UI. */
   function purgeExpired(c: SupabaseClient): void {
     if (!extras) return
-    const fail = (): void => ctx.log('chat: no se pudo purgar los mensajes vencidos.')
-    c.rpc('chat_purge_expired').then((res) => (res.error ? fail() : undefined), fail)
+    const fail = (why: unknown): void => ctx.log('chat: no se pudo purgar los mensajes vencidos:', why)
+    c.rpc('chat_purge_expired').then(
+      (res) => (res.error ? fail(`${res.error.code ?? '?'} ${res.error.message ?? ''}`.trim()) : undefined),
+      fail
+    )
   }
 
   ctx.handle('markRead', async (rawConv: unknown): Promise<void> => {
@@ -1039,7 +1061,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
         onStatus: (st) => onStatus(g, st)
       })
       onChange()
-      await detectExtras(c).catch(() => ctx.log('chat: no se pudo comprobar la actualización 0004.'))
+      await checkExtras(c, g)
       await refreshLists(true)
       if (g !== gen) return
       purgeExpired(c)
