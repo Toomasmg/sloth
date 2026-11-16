@@ -354,7 +354,7 @@ button.f-set-toggle:disabled {
   border-radius: var(--r-lg);
   background: var(--track-off);
   position: relative;
-  transition: background 0.15s;
+  transition: background var(--t-fast) var(--ease);
 }
 .f-set-track.on {
   background: var(--accent);
@@ -368,7 +368,7 @@ button.f-set-toggle:disabled {
   border-radius: 50%;
   background: var(--knob);
   box-shadow: var(--knob-shadow);
-  transition: left 0.15s;
+  transition: left var(--t-fast) var(--ease);
 }
 .f-set-track.on .f-set-knob {
   left: 17px;

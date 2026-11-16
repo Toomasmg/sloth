@@ -47,7 +47,11 @@
   /* ---------- Movimiento ---------- */
   --t-fast: 120ms;
   --t-med: 200ms;
+  /* Salir es más corto que entrar: lo que se cierra ya no le interesa a nadie. La lee useExit. */
+  --t-exit: 140ms;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Para salir: arranca lento y se va rápido, al revés que --ease. */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
 
   /* ---------- Capas ---------- */
   --z-pane: 1;

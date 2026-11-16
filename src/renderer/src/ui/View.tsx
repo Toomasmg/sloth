@@ -3,6 +3,7 @@ import { DiscardConfirm } from '../Modal'
 import { captureOpener } from '../return-focus'
 import { FOCUSABLE, nextFocusIndex } from '../focus-trap'
 import { isTopView, pushView, type ViewEntry } from './view-stack'
+import { useExit } from './useExit'
 import './View.css'
 
 export interface ViewProps {
@@ -34,9 +35,10 @@ export function View({ labelId, title, onClose, actions, backLabel = 'Espacios',
   const dirtyRef = useRef(false)
   dirtyRef.current = !!dirty
   const [asking, setAsking] = useState(false)
+  const [closing, leave] = useExit(() => closeRef.current())
   const request = (): void => {
     if (dirtyRef.current) setAsking(true)
-    else closeRef.current()
+    else leave()
   }
   const requestRef = useRef(request)
   requestRef.current = request
@@ -79,7 +81,7 @@ export function View({ labelId, title, onClose, actions, backLabel = 'Espacios',
   }, [restore])
 
   return (
-    <div ref={rootRef} className={`ui-view ${className ?? ''}`} role="dialog" aria-modal="true" aria-labelledby={labelId} onKeyDown={trapTab}>
+    <div ref={rootRef} className={`ui-view${closing ? ' is-closing' : ''} ${className ?? ''}`} inert={closing} role="dialog" aria-modal="true" aria-labelledby={labelId} onKeyDown={trapTab}>
       <header className="ui-view-head">
         <button ref={backRef} type="button" className="ui-view-back" title="Volver (Esc)" aria-label={backLabel === 'Espacios' ? 'Volver a los espacios' : `Volver a ${backLabel}`} onClick={request}>
           <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -95,7 +97,7 @@ export function View({ labelId, title, onClose, actions, backLabel = 'Espacios',
         {actions && <div className="ui-view-actions">{actions}</div>}
       </header>
       <div className={`ui-view-body ${flush ? 'flush' : ''}`}>{children}</div>
-      {asking && <DiscardConfirm onKeep={() => setAsking(false)} onDiscard={() => closeRef.current()} />}
+      {asking && <DiscardConfirm onKeep={() => setAsking(false)} onDiscard={leave} />}
     </div>
   )
 }

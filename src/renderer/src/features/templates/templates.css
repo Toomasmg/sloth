@@ -530,7 +530,7 @@
   border-radius: 50%;
   background: var(--knob);
   box-shadow: var(--knob-shadow);
-  transition: left 0.15s;
+  transition: left var(--t-fast) var(--ease);
 }
 .switch-btn.on > span {
   left: 17px;

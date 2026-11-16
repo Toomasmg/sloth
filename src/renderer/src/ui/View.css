@@ -90,3 +90,8 @@
     animation: none;
   }
 }
+
+.ui-view.is-closing {
+  animation: fade-out var(--t-exit) var(--ease-in) forwards;
+  pointer-events: none;
+}

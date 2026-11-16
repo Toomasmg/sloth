@@ -20,6 +20,16 @@
     opacity: 0;
   }
 }
+@keyframes ui-side-out {
+  to {
+    transform: translateX(var(--s-5));
+    opacity: 0;
+  }
+}
+.ui-side.is-closing {
+  animation: ui-side-out var(--t-exit) var(--ease-in) forwards;
+  pointer-events: none;
+}
 
 .ui-side-head {
   flex: none;
