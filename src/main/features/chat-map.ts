@@ -208,6 +208,7 @@ export interface MessageRow {
   deleted_at?: unknown
   reply_to?: unknown
   kind?: unknown
+  via?: unknown
 }
 
 export const MSG_COLS_BASE = 'id, client_id, team_id, thread_id, author_id, body, created_at'
@@ -239,6 +240,7 @@ export function messageFromRow(row: MessageRow, author: ChatProfile, status: Cha
   if (deletedAt !== undefined) msg.deletedAt = deletedAt
   const notice = noticeFromRow(row.kind, row.body)
   if (notice) msg.notice = notice
+  if (row.via === 'claude') msg.via = 'claude'
   return msg
 }
 

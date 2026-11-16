@@ -164,6 +164,8 @@ export interface ChatMessage {
   reactions?: ChatReaction[]
   /** Si viene, no es un mensaje sino un aviso (body no se muestra). */
   notice?: ChatNotice
+  /** Lo mandó Claude por el MCP del chat. Informativa: la pone el cliente del autor. */
+  via?: 'claude'
 }
 
 export interface ChatReaction {
