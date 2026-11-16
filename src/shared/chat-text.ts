@@ -43,7 +43,14 @@ export function applyMention(text: string, start: number, caret: number, login: 
   return { text: text.slice(0, start) + inserted + rest, caret: start + inserted.length + (spaced ? 1 : 0) }
 }
 
-/** Escapa los comodines de LIKE/ILIKE para buscar el texto tal cual. */
+/**
+ * Escapa los comodines de LIKE/ILIKE. PostgREST convierte todo `*` en `%` aunque vaya escapado, así que
+ * pasa a `_` (un carácter cualquiera) y el resultado hay que filtrarlo después con `containsText`.
+ */
 export function escapeLike(q: string): string {
-  return q.replace(/[\\%_]/g, '\\$&')
+  return q.replace(/[\\%_]/g, '\\$&').replace(/\*/g, '_')
+}
+
+export function containsText(body: string, q: string): boolean {
+  return body.toLowerCase().includes(q.toLowerCase())
 }

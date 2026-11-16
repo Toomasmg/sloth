@@ -78,7 +78,7 @@ import {
   versionKey,
   wantedTopics
 } from './chat-topics'
-import { escapeLike, mentionsLogin } from '../../shared/chat-text'
+import { containsText, escapeLike, mentionsLogin } from '../../shared/chat-text'
 import { canManageConv, parseRetention } from '../../shared/chat-retention'
 import { currentSettings } from './settings'
 
@@ -815,7 +815,8 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     if (extras) query = query.is('deleted_at', null).eq('kind', 'text')
     const res = await query.order('created_at', { ascending: false }).limit(50)
     check(res, 'No se pudo buscar.')
-    const rows = (res.data ?? []) as unknown as MessageRow[]
+    const all = (res.data ?? []) as unknown as MessageRow[]
+    const rows = q.includes('*') ? all.filter((r) => containsText(s(r.body), q)) : all
     await loadProfiles(c, rows.map((r) => s(r.author_id)))
     const msgs = rows.map((r) => messageFromRow(r, profileFor(s(r.author_id)))).filter(isMsg)
     return enrich(c, rows, msgs)

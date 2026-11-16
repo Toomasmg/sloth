@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { applyMention, escapeLike, mentionQueryAt, mentionsLogin, splitMentions } from './chat-text'
+import { applyMention, containsText, escapeLike, mentionQueryAt, mentionsLogin, splitMentions } from './chat-text'
 
 test('menciones: separa texto y logins', () => {
   assert.deepEqual(splitMentions('hola @Tomy, ¿venís?'), [
@@ -42,4 +42,7 @@ test('aplicar mención deja un espacio después', () => {
 test('escapar comodines de LIKE', () => {
   assert.equal(escapeLike('50%_\\'), '50\\%\\_\\\\')
   assert.equal(escapeLike('hola'), 'hola')
+  assert.equal(escapeLike('a*b'), 'a_b')
+  assert.equal(containsText('Hola A*B chau', 'a*b'), true)
+  assert.equal(containsText('axb', 'a*b'), false)
 })
