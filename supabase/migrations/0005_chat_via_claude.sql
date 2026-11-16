@@ -7,8 +7,8 @@
 --  * La marca es INFORMATIVA. La pone el cliente del autor al enviar, y cualquier miembro podría
 --    mandarla por la API en un mensaje escrito a mano. No prueba que lo haya escrito un agente.
 --  * El autor real lo sigue fijando la RLS (author_id = auth.uid()).
---  * Solo se puede poner al crear el mensaje: el permiso de update sigue siendo (body, deleted_at)
---    y guard_message_update repone el resto desde la fila vieja, así que nadie la cambia después.
+--  * Solo se puede poner al crear el mensaje: el permiso de update sigue siendo solo sobre las
+--    columnas (body, deleted_at), así que nadie la cambia después.
 --  * Los clientes viejos siguen andando: el evento 'message' trae una clave de más que ignoran.
 -- =====================================================================
 
