@@ -77,6 +77,19 @@ Cuando un compañero abre Sloth con ese repo, la app le pregunta si quiere usar 
 - **Mensaje directo:** desde la lista de miembros de un equipo, tocá **Escribirle**. Solo podés abrir un DM con gente con la que compartís un equipo.
 - **No leídos y avisos:** el botón Chat muestra cuántos mensajes tenés sin leer. Si la ventana de Sloth no tiene el foco, te llega una notificación de Windows.
 
+## 7. Celular desde cualquier red
+
+En **Celular → Desde cualquier red**, Sloth publica la misma vista que en el Wi-Fi de casa, pero por el Supabase del chat. Hace falta tener sesión iniciada en el chat. Viene apagado.
+
+1. Corré `supabase/migrations/0006_celu_remoto.sql` en el SQL Editor. Es idempotente.
+2. En **Auth → URL Configuration → Redirect URLs**, sumá `https://toomasmg.github.io/sloth/celu/**`: el celu entra con GitHub desde esa página.
+3. Escaneá el QR del panel con el celu y entrá con la **misma** cuenta de GitHub que en Sloth.
+
+- **Qué ve el admin de Supabase:** nada útil. Todo va cifrado (AES-256-GCM) con una clave que sale del secreto del QR, y ese secreto viaja en el `#` del enlace, que el navegador nunca manda a ningún servidor. Nunca se publica el contenido de las terminales ni los prompts: solo el estado de las sesiones, el uso y los pedidos de permiso.
+- **Aprobar permisos desde afuera** tiene su propio interruptor, apagado, que solo se prende con «Aprobar desde el celu» prendido. Cada decisión vale para un pedido, vence al minuto y no se puede repetir.
+- **Regenerar el secreto** deja afuera a todos los celus emparejados.
+- **Costo:** Sloth publica solo mientras un celu tiene la página abierta (latido cada 15 s y cambios cada 2 s como mucho). Con 2 h por día son unos 80 k mensajes por mes por usuario; el plan gratis trae 2 M.
+
 ## Qué protege la migración (RLS)
 
 - Un equipo, sus miembros y sus mensajes los leen **solo sus miembros**. Un DM lo leen **solo sus dos participantes**.
@@ -84,6 +97,7 @@ Cuando un compañero abre Sloth con ese repo, la app le pregunta si quiere usar 
 - Entrar a un equipo, abrir un DM y marcar como leído pasan solo por funciones que revisan permisos; no se puede insertar directo. El código de invitación lo ven solo los owners y los admins.
 - El usuario de GitHub sale de la identidad que guarda Supabase al iniciar sesión, y el usuario no la puede editar. Por eso nadie puede hacerse pasar por `ana` para quedarse con su invitación.
 - Las fotos van en un bucket **privado**. Las ven solo los miembros del equipo y las cambian solo los owners y los admins.
+- El canal del celu (`celu:<uid>`, migración 0006) lo leen y escriben **solo** su dueño. Es la única política de escritura en Realtime y no abre los canales del chat.
 
 La migración tiene una prueba con PGlite (Postgres en WASM), con 40 casos de acceso permitido y prohibido: `npm i --no-save @electric-sql/pglite` y después `node supabase/tests/rls.test.mjs supabase/migrations/0001_chat.sql supabase/migrations/0002_hardening.sql supabase/migrations/0003_realtime_broadcast.sql`.
 
