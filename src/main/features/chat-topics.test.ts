@@ -125,13 +125,14 @@ test('reacción por broadcast', () => {
   assert.equal(reactionFromBroadcast({ ...ok, emoji: '❤' }), undefined, 'sin el selector de variación')
   assert.equal(reactionFromBroadcast({ ...ok, op: 'toggle' }), undefined)
   assert.equal(reactionFromBroadcast({ ...ok, user_id: 'x' }), undefined)
-  assert.equal(reactionFromBroadcast({ ...ok, extra: 1 }), undefined)
+  assert.deepEqual(reactionFromBroadcast({ ...ok, extra: 1 }), { messageId: ID, userId: AUTH, emoji: '❤️', op: 'add' }, 'una clave nueva del servidor no la rompe')
 })
 
 test('escribiendo y visto por broadcast', () => {
   assert.deepEqual(typingFromBroadcast({ user_id: AUTH }), { userId: AUTH })
   assert.equal(typingFromBroadcast({ user_id: 'x' }), undefined)
   assert.equal(typingFromBroadcast(null), undefined)
+  assert.deepEqual(typingFromBroadcast({ user_id: AUTH, id: 1 }), { userId: AUTH })
   assert.deepEqual(readFromBroadcast({ user_id: AUTH, at: AT }), { userId: AUTH, at: Date.parse(AT) })
   assert.equal(readFromBroadcast({ user_id: AUTH, at: 'ayer' }), undefined)
   assert.equal(readFromBroadcast({ user_id: AUTH }), undefined)

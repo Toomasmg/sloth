@@ -92,13 +92,10 @@ export function rowFromBroadcast(payload: unknown, conv: ChatConvRef): MessageRo
 export const versionKey = (row: MessageRow): string =>
   `${String(row.id)}:${typeof row.edited_at === 'string' ? row.edited_at : ''}:${typeof row.deleted_at === 'string' ? row.deleted_at : ''}`
 
-const hasOnlyKeys = (o: Record<string, unknown>, keys: readonly string[]): boolean =>
-  Object.keys(o).length === keys.length && keys.every((k) => Object.hasOwn(o, k))
-
 export function reactionFromBroadcast(
   p: unknown
 ): { messageId: string; userId: string; emoji: ChatReactionEmoji; op: 'add' | 'remove' } | undefined {
-  if (!isObj(p) || !hasOnlyKeys(p, ['message_id', 'user_id', 'emoji', 'op'])) return undefined
+  if (!isObj(p)) return undefined
   const { message_id, user_id, emoji, op } = p
   if (!isUuid(message_id) || !isUuid(user_id) || !isReactionEmoji(emoji)) return undefined
   if (op !== 'add' && op !== 'remove') return undefined
@@ -106,12 +103,12 @@ export function reactionFromBroadcast(
 }
 
 export function typingFromBroadcast(p: unknown): { userId: string } | undefined {
-  if (!isObj(p) || !hasOnlyKeys(p, ['user_id']) || !isUuid(p.user_id)) return undefined
+  if (!isObj(p) || !isUuid(p.user_id)) return undefined
   return { userId: p.user_id }
 }
 
 export function readFromBroadcast(p: unknown): { userId: string; at: number } | undefined {
-  if (!isObj(p) || !hasOnlyKeys(p, ['user_id', 'at']) || !isUuid(p.user_id) || !isDate(p.at)) return undefined
+  if (!isObj(p) || !isUuid(p.user_id) || !isDate(p.at)) return undefined
   return { userId: p.user_id, at: Date.parse(p.at) }
 }
 
