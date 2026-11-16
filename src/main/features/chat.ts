@@ -38,6 +38,21 @@ export interface ChatTestResult {
 /** Cierre al salir de la app (lo arma register). */
 let teardown: (() => void) | undefined
 
+/** La sesión del chat que reusa «celular» para el canal remoto. userId es el uuid de auth. */
+export interface SesionChat {
+  client: SupabaseClient
+  userId: string
+  supabaseUrl: string
+  anonKey: string
+}
+
+let leerSesion: (() => SesionChat | null) | null = null
+
+/** Se lee en cada uso porque la sesión cambia sin aviso (login, logout, otra config). */
+export function sesionChat(): SesionChat | null {
+  return leerSesion?.() ?? null
+}
+
 interface SavedFile {
   config?: ChatServerConfig
   accepted?: { repo: string; supabaseUrl: string; keyHash: string }
@@ -537,9 +552,15 @@ const feature: Feature = {
     ctx.handle('cancelSignIn', (): void => cancelSignIn())
     ctx.handle('signOut', (): Promise<void> => signOut())
 
+    leerSesion = () =>
+      client && active && auth.status === 'signedIn' && me
+        ? { client, userId: me.id, supabaseUrl: active.cfg.supabaseUrl, anonKey: active.cfg.anonKey }
+        : null
+
     refresh()
 
     teardown = () => {
+      leerSesion = null
       login?.cancel()
       login = undefined
       stopRuntime()
