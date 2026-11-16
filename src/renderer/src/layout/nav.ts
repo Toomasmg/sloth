@@ -4,6 +4,7 @@ import { setBoardOpen } from '../features/tickets/model'
 import { setTeamOpen } from '../features/team/model'
 import { openHistory } from '../features/history/index'
 import { openRamas } from '../features/worktrees/store'
+import { openPrs } from '../features/prs/store'
 import { openHelp } from '../features/help/bus'
 import { dropAlVolver, openSettings } from '../features/settings/bus'
 import { destOf, type NavDest } from './nav-model'
@@ -25,6 +26,7 @@ export function goTo(dest: NavDest): void {
   else if (dest === 'equipo') setTeamOpen(true)
   else if (dest === 'historial') openHistory()
   else if (dest === 'ramas') openRamas()
+  else if (dest === 'prs') openPrs()
   else if (dest === 'ayuda') openHelp('ayuda')
   else if (dest === 'ajustes') openSettings()
 }

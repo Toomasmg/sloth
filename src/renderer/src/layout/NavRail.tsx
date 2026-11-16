@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
-import { HelpIcon, HistoryIcon, SettingsIcon, TeamIcon, TerminalIcon, TicketIcon, WorktreeIcon } from '../icons/SlothIcons'
+import { HelpIcon, HistoryIcon, SettingsIcon, TeamIcon, TerminalIcon, PullRequestIcon, TicketIcon, WorktreeIcon } from '../icons/SlothIcons'
 import { Tooltip } from '../ui'
 import { comboLabel, isCapturingShortcut } from '../shortcuts'
 import { isMine, useSnapshot } from '../features/tickets/model'
@@ -12,6 +12,7 @@ const ICON: Record<NavDest, ReactNode> = {
   equipo: <TeamIcon size={18} />,
   historial: <HistoryIcon size={18} />,
   ramas: <WorktreeIcon size={18} />,
+  prs: <PullRequestIcon size={18} />,
   ayuda: <HelpIcon size={18} />,
   ajustes: <SettingsIcon size={18} />
 }
@@ -41,7 +42,7 @@ function RailButton({ dest, active, shortcut, badge }: { dest: NavDest; active: 
 }
 
 /**
- * Riel de navegación: un destino por función y siempre se ve dónde estás. Ctrl+Shift+1…5 va a cada
+ * Riel de navegación: un destino por función y siempre se ve dónde estás. Ctrl+Shift+1…6 va a cada
  * destino desde cualquier lado, también con el foco en la terminal (no son teclas de la shell).
  */
 export function NavRail(): React.JSX.Element {

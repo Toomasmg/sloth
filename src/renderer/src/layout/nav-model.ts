@@ -1,7 +1,7 @@
-/** Destinos del riel de navegación. Los cinco primeros tienen atajo (Ctrl+Shift+1…5); Ayuda y Configuración van al pie. */
-export type NavDest = 'espacios' | 'tickets' | 'equipo' | 'historial' | 'ramas' | 'ayuda' | 'ajustes'
+/** Destinos del riel de navegación. Los seis primeros tienen atajo (Ctrl+Shift+1…6); Ayuda y Configuración van al pie. */
+export type NavDest = 'espacios' | 'tickets' | 'equipo' | 'historial' | 'ramas' | 'prs' | 'ayuda' | 'ajustes'
 
-export const NAV_MAIN: readonly NavDest[] = ['espacios', 'tickets', 'equipo', 'historial', 'ramas']
+export const NAV_MAIN: readonly NavDest[] = ['espacios', 'tickets', 'equipo', 'historial', 'ramas', 'prs']
 export const NAV_FOOT: readonly NavDest[] = ['ayuda', 'ajustes']
 
 export const NAV_LABEL: Record<NavDest, string> = {
@@ -10,6 +10,7 @@ export const NAV_LABEL: Record<NavDest, string> = {
   equipo: 'Equipo',
   historial: 'Historial',
   ramas: 'Ramas aparte',
+  prs: 'PRs',
   ayuda: 'Ayuda',
   ajustes: 'Configuración'
 }
@@ -23,6 +24,7 @@ const VIEW_DEST: Record<string, NavDest> = {
   'f-team-title': 'equipo',
   'hist-view-title': 'historial',
   'f-wt-view-title': 'ramas',
+  'f-prs-view-title': 'prs',
   'ay-view-title': 'ayuda',
   'rp-view-title': 'ayuda',
   'fr-view-title': 'ayuda',
@@ -33,9 +35,9 @@ const VIEW_DEST: Record<string, NavDest> = {
 /** Destino activo según la Vista de arriba; sin Vista (o una que no es destino) se está en Espacios. */
 export const destOf = (viewId: string | null): NavDest => (viewId ? (VIEW_DEST[viewId] ?? 'espacios') : 'espacios')
 
-/** Ctrl+Shift+1…5 → destino. `code` es el de la tecla (Digit1…), así no depende de lo que escribe Shift. */
+/** Ctrl+Shift+1…6 → destino. `code` es el de la tecla (Digit1…), así no depende de lo que escribe Shift. */
 export function navDestForKey(e: { code: string; ctrlKey: boolean; shiftKey: boolean; altKey: boolean; metaKey: boolean }): NavDest | null {
   if (!e.ctrlKey || !e.shiftKey || e.altKey || e.metaKey) return null
-  const m = /^Digit([1-5])$/.exec(e.code)
+  const m = /^Digit([1-6])$/.exec(e.code)
   return m ? NAV_MAIN[Number(m[1]) - 1] : null
 }
