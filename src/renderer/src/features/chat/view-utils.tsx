@@ -1,4 +1,5 @@
 import { Fragment } from 'react'
+import { splitMentions } from '../../../../shared/chat-text'
 import { useSettings } from '../settings/store'
 
 /** Avatares solo de GitHub (la CSP también lo exige). */
@@ -21,14 +22,34 @@ export function Av({ src, initial, size = 22 }: { src?: string; initial: string;
 
 const URL_RE = /https:\/\/[^\s<>"']*[^\s<>"'.,;:!?)\]]/g
 
-/** Cuerpo del mensaje como TEXTO (nunca HTML). Los https:// se vuelven links que abre el navegador. */
-export function LinkedText({ text }: { text: string }): React.JSX.Element {
+/** Texto suelto con las menciones @login resaltadas (la del propio usuario con más fuerza). */
+function Mentions({ text, meLogin, prefix }: { text: string; meLogin?: string; prefix: string }): React.JSX.Element {
+  return (
+    <>
+      {splitMentions(text).map((p, i) =>
+        p.kind === 'text' ? (
+          <Fragment key={`${prefix}${i}`}>{p.text}</Fragment>
+        ) : (
+          <span key={`${prefix}${i}`} className={p.login.toLowerCase() === meLogin?.toLowerCase() ? 'f-chat-mention me' : 'f-chat-mention'}>
+            @{p.login}
+          </span>
+        )
+      )}
+    </>
+  )
+}
+
+/**
+ * Cuerpo del mensaje como TEXTO (nunca HTML). Los https:// se vuelven links que abre el navegador y las
+ * @menciones se resaltan; los links se buscan primero para no partir una URL con un «@» adentro.
+ */
+export function LinkedText({ text, meLogin }: { text: string; meLogin?: string }): React.JSX.Element {
   const out: React.ReactNode[] = []
   let last = 0
   let i = 0
   for (const m of text.matchAll(URL_RE)) {
     const at = m.index ?? 0
-    if (at > last) out.push(<Fragment key={`t${i}`}>{text.slice(last, at)}</Fragment>)
+    if (at > last) out.push(<Mentions key={`t${i}`} prefix={`t${i}-`} text={text.slice(last, at)} meLogin={meLogin} />)
     out.push(
       <a key={`a${i}`} href={m[0]} target="_blank" rel="noopener noreferrer">
         {m[0]}
@@ -37,7 +58,7 @@ export function LinkedText({ text }: { text: string }): React.JSX.Element {
     last = at + m[0].length
     i++
   }
-  if (last < text.length) out.push(<Fragment key={`t${i}`}>{text.slice(last)}</Fragment>)
+  if (last < text.length) out.push(<Mentions key={`t${i}`} prefix={`t${i}-`} text={text.slice(last)} meLogin={meLogin} />)
   return <>{out}</>
 }
 

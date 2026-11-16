@@ -5,6 +5,7 @@
  */
 import {
   CHAT_LIMITS,
+  CHAT_REACTIONS,
   convKey,
   type ChatConvRef,
   type ChatInvite,
@@ -12,11 +13,15 @@ import {
   type ChatMessage,
   type ChatMessageStatus,
   type ChatProfile,
+  type ChatReaction,
+  type ChatReactionEmoji,
+  type ChatReplyRef,
   type ChatRole,
   type ChatTeam,
   type ChatThread,
   type ChatView
 } from '../../shared/chat'
+import { noticeFromRow, retentionOf } from '../../shared/chat-retention'
 
 export const EX_MEMBER_LOGIN = 'ex-miembro'
 export const DEFAULT_PAGE = 50
@@ -79,6 +84,29 @@ export function parseView(raw: unknown): ChatView {
   if (!raw.open) return { open: false }
   if (raw.conv === undefined || raw.conv === null) return { open: true }
   return { open: true, conv: parseConvRef(raw.conv) }
+}
+
+/** Id opcional (por ejemplo, el mensaje al que se responde): null o ausente → undefined. */
+export function parseOptionalUuid(raw: unknown): string | undefined {
+  if (raw === undefined || raw === null) return undefined
+  return parseUuid(raw)
+}
+
+export const isReactionEmoji = (v: unknown): v is ChatReactionEmoji =>
+  typeof v === 'string' && (CHAT_REACTIONS as readonly string[]).includes(v)
+
+export function parseEmoji(raw: unknown): ChatReactionEmoji {
+  if (!isReactionEmoji(raw)) throw new Error('Reacción inválida.')
+  return raw
+}
+
+export function parseSearch(raw: unknown): string {
+  if (typeof raw !== 'string') throw new Error('Escribí al menos 2 letras.')
+  const t = raw.trim()
+  const n = codepoints(t)
+  if (n < 2) throw new Error('Escribí al menos 2 letras.')
+  if (n > CHAT_LIMITS.searchQuery) throw new Error(`La búsqueda tiene más de ${CHAT_LIMITS.searchQuery} caracteres.`)
+  return t
 }
 
 /** Tamaño de página: por defecto 50, entre 1 y 100. */
@@ -176,7 +204,15 @@ export interface MessageRow {
   author_id: unknown
   body: unknown
   created_at: unknown
+  edited_at?: unknown
+  deleted_at?: unknown
+  reply_to?: unknown
+  kind?: unknown
 }
+
+export const MSG_COLS_BASE = 'id, client_id, team_id, thread_id, author_id, body, created_at'
+/** Solo con la 0004 aplicada: pedir columnas que no existen hace fallar toda la consulta. */
+export const MSG_COLS_EXTRAS = `${MSG_COLS_BASE}, edited_at, deleted_at, reply_to, kind`
 
 export function convOfRow(row: { team_id?: unknown; thread_id?: unknown }): ChatConvRef | undefined {
   if (typeof row.team_id === 'string' && row.team_id) return { kind: 'team', id: row.team_id }
@@ -188,15 +224,65 @@ export function messageFromRow(row: MessageRow, author: ChatProfile, status: Cha
   const conv = convOfRow(row)
   const id = str(row.id)
   if (!conv || !id) return undefined
-  return {
+  const deletedAt = toMs(row.deleted_at)
+  const editedAt = toMs(row.edited_at)
+  const msg: ChatMessage = {
     id,
     clientId: str(row.client_id),
     conv,
     author,
-    body: str(row.body),
+    body: deletedAt === undefined ? str(row.body) : '',
     createdAt: toMs(row.created_at) ?? 0,
     status
   }
+  if (editedAt !== undefined) msg.editedAt = editedAt
+  if (deletedAt !== undefined) msg.deletedAt = deletedAt
+  const notice = noticeFromRow(row.kind, row.body)
+  if (notice) msg.notice = notice
+  return msg
+}
+
+/** Referencia al mensaje respondido: un extracto de una línea, vacío si se borró. */
+export function replyRefFrom(
+  row: { id: unknown; author_id: unknown; body: unknown; deleted_at?: unknown },
+  login: string
+): ChatReplyRef | undefined {
+  const id = str(row.id)
+  if (!id) return undefined
+  const deleted = toMs(row.deleted_at) !== undefined
+  const flat = str(row.body).replace(/\s+/g, ' ').trim()
+  return { id, authorLogin: login, excerpt: deleted ? '' : firstChars(flat, CHAT_LIMITS.replyExcerpt), deleted }
+}
+
+/** Filas de message_reactions → reacciones por mensaje, en el orden de CHAT_REACTIONS. */
+export function reactionsByMessage(
+  rows: ReadonlyArray<{ message_id: unknown; user_id: unknown; emoji: unknown }>,
+  loginOf: (id: string) => string
+): Map<string, ChatReaction[]> {
+  const grouped = new Map<string, Map<ChatReactionEmoji, string[]>>()
+  for (const r of rows) {
+    const mid = str(r.message_id)
+    const uid = str(r.user_id)
+    if (!mid || !uid || !isReactionEmoji(r.emoji)) continue
+    let byEmoji = grouped.get(mid)
+    if (!byEmoji) {
+      byEmoji = new Map()
+      grouped.set(mid, byEmoji)
+    }
+    const users = byEmoji.get(r.emoji) ?? []
+    if (!users.includes(uid)) users.push(uid)
+    byEmoji.set(r.emoji, users)
+  }
+  const out = new Map<string, ChatReaction[]>()
+  for (const [mid, byEmoji] of grouped) {
+    const list: ChatReaction[] = []
+    for (const emoji of CHAT_REACTIONS) {
+      const userIds = byEmoji.get(emoji)
+      if (userIds) list.push({ emoji, userIds, logins: userIds.map(loginOf) })
+    }
+    out.set(mid, list)
+  }
+  return out
 }
 
 /** Postgres devuelve «más nuevo primero» (order desc + limit). La UI quiere viejo → nuevo. */
@@ -209,6 +295,7 @@ export interface TeamRow {
   name: unknown
   description?: unknown
   photo_path?: unknown
+  retention_hours?: unknown
 }
 
 export interface TeamInfo {
@@ -233,6 +320,8 @@ export function teamFromRow(row: TeamRow, info: TeamInfo): ChatTeam | undefined 
     unread: info.unread
   }
   if (info.lastMessageAt !== undefined) team.lastMessageAt = info.lastMessageAt
+  const retention = retentionOf(row.retention_hours)
+  if (retention !== undefined) team.retentionHours = retention
   if (info.inviteCode && (info.role === 'owner' || info.role === 'admin')) team.inviteCode = info.inviteCode
   return team
 }
@@ -247,6 +336,15 @@ export interface ThreadRow {
   id: unknown
   user_a: unknown
   user_b: unknown
+  last_read_a?: unknown
+  last_read_b?: unknown
+}
+
+/** Hasta cuándo leyó el otro participante del DM. */
+export function otherReadAt(row: ThreadRow, meId: string): number | undefined {
+  if (str(row.user_a) === meId) return toMs(row.last_read_b)
+  if (str(row.user_b) === meId) return toMs(row.last_read_a)
+  return undefined
 }
 
 /** El otro participante de un DM, o undefined si el usuario no es participante. */
@@ -258,11 +356,12 @@ export function otherOf(row: ThreadRow, meId: string): string | undefined {
   return undefined
 }
 
-export function threadFromRow(row: ThreadRow, other: ChatProfile, info: { unread: number; lastMessageAt?: number }): ChatThread | undefined {
+export function threadFromRow(row: ThreadRow, other: ChatProfile, info: { unread: number; lastMessageAt?: number; otherReadAt?: number }): ChatThread | undefined {
   const id = str(row.id)
   if (!id) return undefined
   const t: ChatThread = { id, other, unread: info.unread }
   if (info.lastMessageAt !== undefined) t.lastMessageAt = info.lastMessageAt
+  if (info.otherReadAt !== undefined) t.otherReadAt = info.otherReadAt
   return t
 }
 

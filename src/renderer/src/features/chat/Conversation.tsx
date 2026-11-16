@@ -1,21 +1,28 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { ArrowClockwise, ArrowLeft, CircleNotch, PaperPlaneRight, PencilSimple, UserPlus, UsersThree, WarningCircle } from '@phosphor-icons/react'
-import { CHAT_LIMITS, type ChatConvRef, type ChatMessage, type ChatRole } from '../../../../shared/chat'
-import { Av, dayLabel, LinkedText, sameDay, timeLabel } from './view-utils'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { ArrowLeft, Broom, ChatsCircle, DotsThree, MagnifyingGlass, PencilSimple, Timer, UserPlus, UsersThree } from '@phosphor-icons/react'
+import { type ChatConvRef, type ChatRetentionHours, type ChatRole } from '../../../../shared/chat'
+import { canManageConv, dropExpired, noticeText, retentionLabel } from '../../../../shared/chat-retention'
+import { EmptyState, IconButton, Menu, type MenuItem } from '../../ui'
+import { Composer, type ComposerHandle } from './Composer'
+import { MessageItem } from './MessageItem'
+import { SearchBar } from './SearchBar'
+import { seenUpTo, startsGroup, typingText } from './message-ops'
+import { Av, dayLabel, sameDay } from './view-utils'
 import {
-  errText,
-  getDraft,
   loadMessages,
   markRead,
-  retrySend,
-  sendMessage,
-  setDraft,
+  MAX_CACHED,
+  PAGE,
+  peekConv,
   useAnnouncement,
   useConvMessages,
-  useConvMeta
+  useConvMeta,
+  useExtras,
+  useExtrasMissing,
+  useTyping
 } from './store'
 
-export type ChatModalKind = 'members' | 'invite' | 'editTeam'
+export type ChatModalKind = 'members' | 'invite' | 'editTeam' | 'retention' | 'clear'
 
 interface Props {
   conv: ChatConvRef
@@ -25,38 +32,78 @@ interface Props {
   initial: string
   /** Solo equipos: rol del usuario (define qué botones se muestran). */
   role?: ChatRole
-  meId?: string
+  me?: { id: string; login: string }
+  /** Solo directos: hasta cuándo leyó el otro. */
+  otherReadAt?: number
+  /** Solo equipos: borrado automático, en horas. */
+  retentionHours?: ChatRetentionHours
   onBack(): void
   onModal(kind: ChatModalKind): void
 }
 
+const NEEDS_UPDATE = 'Editar, borrar, responder y reaccionar necesitan que el admin del servidor aplique la actualización 0004 del chat.'
+const TOO_OLD = 'Ese mensaje es muy viejo para mostrarlo acá.'
+const FLASH_MS = 1600
+const MAX_JUMP_PAGES = Math.ceil(MAX_CACHED / PAGE)
+const NOTICE_MS = 6000
+const EXPIRY_TICK_MS = 60_000
+let updateHintShown = false
+
 /**
  * Una conversación (equipo o DM). Se monta con `key` por conversación, así el borrador y la carga
- * inicial son por conversación. Sin timers: los mensajes nuevos llegan por el store.
+ * inicial son por conversación. Los mensajes nuevos llegan por el store.
  */
-export function Conversation({ conv, title, photo, initial, role, meId, onBack, onModal }: Props): React.JSX.Element {
-  const list = useConvMessages(conv)
+export function Conversation({ conv, title, photo, initial, role, me, otherReadAt, retentionHours, onBack, onModal }: Props): React.JSX.Element {
+  const stored = useConvMessages(conv)
+  const isTeam = conv.kind === 'team'
+  // La RLS ya no devuelve los vencidos; esto saca los que vencen con la conversación abierta (el tick
+  // vuelve a renderizar aunque no llegue nada).
+  const [, setTick] = useState(0)
+  const list = dropExpired(stored, isTeam ? retentionHours : undefined, Date.now())
   const info = useConvMeta(conv)
   const announce = useAnnouncement()
-  const [text, setText] = useState(() => getDraft(conv))
-  const [err, setErr] = useState<string>()
+  const extras = useExtras()
+  const extrasMissing = useExtrasMissing()
+  const typing = useTyping(conv)
+  const [loadErr, setLoadErr] = useState<string>()
+  const [notice, setNotice] = useState<string>()
   const [loadingOlder, setLoadingOlder] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const [flashId, setFlashId] = useState<string>()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const composerRef = useRef<ComposerHandle>(null)
+  const searchBtnRef = useRef<HTMLButtonElement>(null)
   const pinRef = useRef(true)
   const prependRef = useRef<number | null>(null)
-  const taId = useId()
-  const countId = useId()
-  const isTeam = conv.kind === 'team'
+  const aliveRef = useRef(true)
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([])
   const canManage = isTeam && (role === 'owner' || role === 'admin')
-  const over = text.length > CHAT_LIMITS.body
-  const near = text.length > CHAT_LIMITS.body - 300
 
   // Al abrir: pedir los mensajes y marcar leído. Cada conversación tiene su propio montaje (key).
   useEffect(() => {
+    aliveRef.current = true
     markRead(conv)
-    void loadMessages(conv).then((e) => e && setErr(e))
+    void loadMessages(conv).then((e) => e && setLoadErr(e))
+    const pending = timers.current
+    return () => {
+      aliveRef.current = false
+      pending.forEach(clearTimeout)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conv.kind, conv.id])
+
+  useEffect(() => {
+    if (!isTeam || retentionHours === undefined) return
+    const t = setInterval(() => setTick((n) => n + 1), EXPIRY_TICK_MS)
+    return () => clearInterval(t)
+  }, [isTeam, retentionHours])
+
+  // El aviso de la actualización 0004 sale una sola vez por sesión.
+  useEffect(() => {
+    if (!extrasMissing || updateHintShown) return
+    updateHintShown = true
+    setNotice(NEEDS_UPDATE)
+  }, [extrasMissing])
 
   // Scroll: al fondo si estabas abajo o mandaste algo; al cargar anteriores, mantené la posición.
   useLayoutEffect(() => {
@@ -68,7 +115,11 @@ export function Conversation({ conv, title, photo, initial, role, meId, onBack, 
       return
     }
     if (pinRef.current) el.scrollTop = el.scrollHeight
-  }, [list])
+  }, [stored])
+
+  const later = (fn: () => void, ms: number): void => {
+    timers.current.push(setTimeout(fn, ms))
+  }
 
   const onScroll = (): void => {
     const el = scrollRef.current
@@ -81,33 +132,71 @@ export function Conversation({ conv, title, photo, initial, role, meId, onBack, 
     setLoadingOlder(true)
     const e = await loadMessages(conv, true)
     setLoadingOlder(false)
-    if (e) setErr(e)
+    if (e) setLoadErr(e)
   }
 
-  const submit = async (e?: FormEvent): Promise<void> => {
-    e?.preventDefault()
-    const body = text.trim()
-    if (!body || over) return
-    setText('')
-    setDraft(conv, '')
-    setErr(undefined)
-    pinRef.current = true
-    try {
-      await sendMessage(conv, body)
-    } catch (ex) {
-      setErr(errText(ex))
+  const find = (id: string): HTMLElement | null =>
+    [...(scrollRef.current?.querySelectorAll<HTMLElement>('[data-mid]') ?? [])].find((n) => n.dataset.mid === id) ?? null
+
+  const jump = async (id: string): Promise<void> => {
+    pinRef.current = false
+    const has = (): boolean => peekConv(conv).list.some((m) => m.id === id)
+    for (let i = 0; i < MAX_JUMP_PAGES && !has(); i++) {
+      const before = peekConv(conv)
+      if (!before.more || before.list.length >= MAX_CACHED) break
+      const e = await loadMessages(conv, true)
+      if (!aliveRef.current) return
+      if (e) {
+        setLoadErr(e)
+        return
+      }
+      if (peekConv(conv).list.length === before.list.length) break
     }
+    if (!has()) {
+      setNotice(TOO_OLD)
+      later(() => setNotice(undefined), NOTICE_MS)
+      return
+    }
+    requestAnimationFrame(() => {
+      find(id)?.scrollIntoView({ block: 'center' })
+      setFlashId(id)
+      later(() => setFlashId(undefined), FLASH_MS)
+    })
   }
 
-  const onKey = (e: KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-      e.preventDefault()
-      void submit()
-    }
+  const closeSearch = (): void => {
+    setSearching(false)
+    requestAnimationFrame(() => searchBtnRef.current?.focus())
   }
+
+  const allowedClear = canManageConv(conv.kind, role)
+  const menuItems: MenuItem[] = [
+    ...(isTeam
+      ? [
+          {
+            id: 'retention',
+            label: 'Borrar mensajes automáticamente…',
+            icon: <Timer size={14} />,
+            hint: retentionLabel(retentionHours),
+            onSelect: () => onModal('retention')
+          },
+          { type: 'separator' as const }
+        ]
+      : []),
+    {
+      id: 'clear',
+      label: 'Vaciar conversación…',
+      icon: <Broom size={14} />,
+      danger: true,
+      disabled: !allowedClear,
+      hint: allowedClear ? undefined : 'Solo owner o admin',
+      onSelect: () => onModal('clear')
+    }
+  ]
 
   const items: React.ReactNode[] = []
   const now = Date.now()
+  const seenId = me && conv.kind === 'dm' && extras ? seenUpTo(list, me.id, otherReadAt) : undefined
   list.forEach((msg, i) => {
     const prev = list[i - 1]
     if (!prev || !sameDay(prev.createdAt, msg.createdAt)) {
@@ -117,19 +206,55 @@ export function Conversation({ conv, title, photo, initial, role, meId, onBack, 
         </li>
       )
     }
-    items.push(<MessageItem key={msg.id} msg={msg} mine={!!meId && msg.author.id === meId} />)
+    if (msg.notice) {
+      items.push(
+        <li key={msg.id} className="f-chat-notice" data-mid={msg.id}>
+          {noticeText(msg.notice, msg.author.login)}
+        </li>
+      )
+      return
+    }
+    items.push(
+      <MessageItem
+        key={msg.id}
+        msg={msg}
+        mine={!!me && msg.author.id === me.id}
+        me={me}
+        head={startsGroup(prev, msg)}
+        extras={extras}
+        seen={msg.id === seenId}
+        flash={msg.id === flashId}
+        onReply={(m) => composerRef.current?.startReply(m)}
+        onEdit={(m) => composerRef.current?.startEdit(m)}
+        onJump={(mid) => void jump(mid)}
+      />
+    )
   })
 
   return (
     <>
       <header className="f-chat-head">
-        <button type="button" className="icon-btn" onClick={onBack} aria-label="Volver a la lista">
-          <ArrowLeft size={16} aria-hidden="true" />
-        </button>
-        <Av src={photo} initial={initial} size={24} />
+        <IconButton label="Volver a la lista" size="sm" icon={<ArrowLeft size={16} />} onClick={onBack} />
+        <Av src={photo} initial={initial} size={28} />
         <h3 className="f-chat-title" title={title}>
           {title}
         </h3>
+        <IconButton
+          ref={searchBtnRef}
+          label="Buscar en la conversación"
+          size="sm"
+          icon={<MagnifyingGlass size={16} />}
+          pressed={searching}
+          onClick={() => (searching ? closeSearch() : setSearching(true))}
+        />
+        {extras && (
+          <Menu
+            aria-label="Opciones de la conversación"
+            align="end"
+            items={menuItems}
+            trigger={(p) => <IconButton {...p} label="Opciones de la conversación" size="sm" icon={<DotsThree size={16} weight="bold" />} />}
+          />
+        )}
       </header>
       {isTeam && (
         <div className="f-chat-subbar">
@@ -149,12 +274,25 @@ export function Conversation({ conv, title, photo, initial, role, meId, onBack, 
               Editar
             </button>
           )}
+          {extras && retentionHours !== undefined && (
+            <span className="f-chat-retention">
+              <Timer size={14} aria-hidden="true" />
+              Los mensajes se borran a los {retentionLabel(retentionHours)}
+            </span>
+          )}
         </div>
       )}
 
-      {err && (
-        <p className="f-chat-err" role="alert">
-          {err}
+      {searching && <SearchBar conv={conv} onJump={(id) => void jump(id)} onClose={closeSearch} />}
+
+      {loadErr && (
+        <p className="f-chat-err f-chat-banner" role="alert">
+          {loadErr}
+        </p>
+      )}
+      {notice && (
+        <p className="hint f-chat-banner" role="status">
+          {notice}
         </p>
       )}
 
@@ -167,7 +305,15 @@ export function Conversation({ conv, title, photo, initial, role, meId, onBack, 
           </div>
         )}
         {!info && <p className="hint f-chat-empty">Cargando mensajes…</p>}
-        {info && list.length === 0 && <p className="hint f-chat-empty">Todavía no hay mensajes. Escribí el primero.</p>}
+        {info && list.length === 0 && (
+          <EmptyState
+            size="sm"
+            as="h3"
+            icon={<ChatsCircle size={28} />}
+            title="Todavía no hay mensajes"
+            description={isTeam ? 'Escribí el primero: lo ve todo el equipo.' : 'Escribí el primero.'}
+          />
+        )}
         <ol className="f-chat-list">{items}</ol>
       </div>
 
@@ -175,69 +321,21 @@ export function Conversation({ conv, title, photo, initial, role, meId, onBack, 
       <div className="sr-only" role="status" aria-live="polite">
         {announce}
       </div>
+      <p className="f-chat-typing">
+        {extras ? typingText(typing) : ''}
+      </p>
 
-      <form className="f-chat-composer" onSubmit={(e) => void submit(e)}>
-        <label className="sr-only" htmlFor={taId}>
-          Escribí un mensaje
-        </label>
-        <textarea
-          id={taId}
-          rows={2}
-          value={text}
-          placeholder="Escribí un mensaje. Enter envía, Shift+Enter salta de línea."
-          aria-describedby={countId}
-          aria-invalid={over || undefined}
-          onChange={(e) => {
-            setText(e.target.value)
-            setDraft(conv, e.target.value)
-          }}
-          onKeyDown={onKey}
-        />
-        <div className="f-chat-composer-foot">
-          <span id={countId} className={over ? 'f-chat-count over' : 'f-chat-count'}>
-            {over ? `Pasaste el límite: ${text.length}/${CHAT_LIMITS.body}` : near ? `${text.length}/${CHAT_LIMITS.body}` : ''}
-          </span>
-          <button type="submit" className="btn primary sm" disabled={!text.trim() || over}>
-            <PaperPlaneRight size={14} aria-hidden="true" />
-            Enviar
-          </button>
-        </div>
-      </form>
+      <Composer
+        ref={composerRef}
+        conv={conv}
+        meId={me?.id}
+        list={list}
+        extras={extras}
+        onSent={() => {
+          pinRef.current = true
+        }}
+        onEscape={() => scrollRef.current?.focus()}
+      />
     </>
-  )
-}
-
-function MessageItem({ msg, mine }: { msg: ChatMessage; mine: boolean }): React.JSX.Element {
-  const name = msg.author.login === 'ex-miembro' ? 'Ex miembro' : msg.author.login
-  const cls = ['f-chat-msg', mine ? 'mine' : '', msg.status === 'failed' ? 'failed' : ''].filter(Boolean).join(' ')
-  return (
-    <li className={cls}>
-      <Av src={msg.author.avatarUrl} initial={msg.author.login} />
-      <div className="f-chat-msg-body">
-        <div className="f-chat-msg-head">
-          <strong>{name}</strong>
-          <time dateTime={new Date(msg.createdAt).toISOString()}>{timeLabel(msg.createdAt)}</time>
-        </div>
-        <p className="f-chat-text">
-          <LinkedText text={msg.body} />
-        </p>
-        {msg.status === 'sending' && (
-          <span className="f-chat-state">
-            <CircleNotch size={12} className="f-chat-spin" aria-hidden="true" />
-            Enviando…
-          </span>
-        )}
-        {msg.status === 'failed' && (
-          <span className="f-chat-state err">
-            <WarningCircle size={12} weight="fill" aria-hidden="true" />
-            No se envió · <button type="button" className="f-chat-retry" onClick={() => void retrySend(msg)}>
-              <ArrowClockwise size={12} aria-hidden="true" />
-              Reintentar
-            </button>
-          </span>
-        )}
-        {msg.status === 'failed' && msg.error && <span className="hint f-chat-errline">{msg.error}</span>}
-      </div>
-    </li>
   )
 }

@@ -1,6 +1,18 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { convOfTopic, diffTopics, rowFromBroadcast, SeenIds, topicOf, wantedTopics } from './chat-topics'
+import {
+  convOfTopic,
+  diffTopics,
+  reactionFromBroadcast,
+  readFromBroadcast,
+  rowFromBroadcast,
+  SeenIds,
+  Throttle,
+  topicOf,
+  typingFromBroadcast,
+  versionKey,
+  wantedTopics
+} from './chat-topics'
 
 const T = '11111111-1111-4111-8111-111111111111'
 const D = '22222222-2222-4222-8222-222222222222'
@@ -55,6 +67,14 @@ test('payload de otra conversación o con forma rara: se descarta', () => {
   assert.equal(rowFromBroadcast({ ...teamRow, created_at: 'ayer' }, team), undefined)
 })
 
+test('payload: tipo de mensaje', () => {
+  const team = { kind: 'team' as const, id: T }
+  assert.equal(rowFromBroadcast({ ...teamRow, body: 'clear', kind: 'clear' }, team)?.kind, 'clear')
+  assert.equal(rowFromBroadcast({ ...teamRow, body: '168', kind: 'retention' }, team)?.kind, 'retention')
+  assert.equal('kind' in (rowFromBroadcast({ ...teamRow, kind: 'text' }, team) ?? {}), false)
+  assert.equal(rowFromBroadcast({ ...teamRow, kind: 'admin' }, team), undefined)
+})
+
 test('payload: no se copian claves de más', () => {
   const r = rowFromBroadcast({ ...teamRow, extra: '<script>', __proto__x: 1 }, { kind: 'team', id: T })
   assert.deepEqual(Object.keys(r ?? {}).sort(), ['author_id', 'body', 'client_id', 'created_at', 'id', 'team_id'])
@@ -69,4 +89,66 @@ test('dedupe: el mismo id por los dos caminos cuenta una sola vez', () => {
   assert.equal(seen.first('a'), true, 'el más viejo se olvida al pasar el tope')
   seen.clear()
   assert.equal(seen.first('c'), true)
+})
+
+const team = { kind: 'team' as const, id: T }
+const AT = '2026-11-12T10:05:00.000001+00:00'
+
+test('edición, borrado y respuesta por broadcast', () => {
+  const edited = rowFromBroadcast({ ...teamRow, body: 'hola!', edited_at: AT, deleted_at: null, reply_to: ID }, team)
+  assert.equal(edited?.edited_at, AT)
+  assert.equal(edited?.reply_to, ID)
+  assert.equal(edited?.deleted_at, undefined)
+  const gone = rowFromBroadcast({ ...teamRow, body: '', deleted_at: AT }, team)
+  assert.equal(gone?.deleted_at, AT)
+  assert.equal(gone?.body, '')
+})
+
+test('borrado con cuerpo, cuerpo vacío sin borrar o respuesta rara: se descarta', () => {
+  assert.equal(rowFromBroadcast({ ...teamRow, deleted_at: AT }, team), undefined)
+  assert.equal(rowFromBroadcast({ ...teamRow, body: '', deleted_at: null }, team), undefined)
+  assert.equal(rowFromBroadcast({ ...teamRow, reply_to: 'x' }, team), undefined)
+  assert.equal(rowFromBroadcast({ ...teamRow, edited_at: 'ayer' }, team), undefined)
+  assert.equal(rowFromBroadcast({ ...teamRow, deleted_at: 5, body: '' }, team), undefined)
+})
+
+test('payload viejo sin los campos nuevos sigue andando', () => {
+  const r = rowFromBroadcast(teamRow, team)
+  assert.equal(r?.body, 'hola')
+  assert.equal(r?.edited_at, undefined)
+})
+
+test('reacción por broadcast', () => {
+  const ok = { message_id: ID, user_id: AUTH, emoji: '❤️', op: 'add' }
+  assert.deepEqual(reactionFromBroadcast(ok), { messageId: ID, userId: AUTH, emoji: '❤️', op: 'add' })
+  assert.equal(reactionFromBroadcast({ ...ok, emoji: '💩' }), undefined)
+  assert.equal(reactionFromBroadcast({ ...ok, emoji: '❤' }), undefined, 'sin el selector de variación')
+  assert.equal(reactionFromBroadcast({ ...ok, op: 'toggle' }), undefined)
+  assert.equal(reactionFromBroadcast({ ...ok, user_id: 'x' }), undefined)
+  assert.deepEqual(reactionFromBroadcast({ ...ok, extra: 1 }), { messageId: ID, userId: AUTH, emoji: '❤️', op: 'add' }, 'una clave nueva del servidor no la rompe')
+})
+
+test('escribiendo y visto por broadcast', () => {
+  assert.deepEqual(typingFromBroadcast({ user_id: AUTH }), { userId: AUTH })
+  assert.equal(typingFromBroadcast({ user_id: 'x' }), undefined)
+  assert.equal(typingFromBroadcast(null), undefined)
+  assert.deepEqual(typingFromBroadcast({ user_id: AUTH, id: 1 }), { userId: AUTH })
+  assert.deepEqual(readFromBroadcast({ user_id: AUTH, at: AT }), { userId: AUTH, at: Date.parse(AT) })
+  assert.equal(readFromBroadcast({ user_id: AUTH, at: 'ayer' }), undefined)
+  assert.equal(readFromBroadcast({ user_id: AUTH }), undefined)
+})
+
+test('versionKey cambia al editar o borrar', () => {
+  const base = versionKey(teamRow)
+  assert.notEqual(versionKey({ ...teamRow, edited_at: AT }), base)
+  assert.notEqual(versionKey({ ...teamRow, deleted_at: AT }), versionKey({ ...teamRow, edited_at: AT }))
+  assert.equal(versionKey({ ...teamRow }), base)
+})
+
+test('Throttle: repite recién a los 3 s y por clave', () => {
+  const th = new Throttle()
+  assert.equal(th.ok('a', 1000), true)
+  assert.equal(th.ok('a', 3999), false)
+  assert.equal(th.ok('b', 3999), true)
+  assert.equal(th.ok('a', 4000), true)
 })

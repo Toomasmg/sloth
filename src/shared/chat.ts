@@ -18,8 +18,15 @@
  *   signOut()                               → void
  *   setView(view: ChatView)                 → void                (qué está mirando el usuario: para no leídos y avisos)
  *   messages(conv: ChatConvRef, before?: string /* id de mensaje *\/, limit?: number /* 1..100, def. 50 *\/) → ChatMessage[] (viejo→nuevo)
- *   send(conv: ChatConvRef, body: string, clientId: string /* uuid v4 *\/) → ChatMessage (status 'sent')
+ *   send(conv: ChatConvRef, body: string, clientId: string /* uuid v4 *\/, replyTo?: string /* id de mensaje *\/) → ChatMessage (status 'sent')
+ *   edit(conv: ChatConvRef, messageId: string, body: string) → ChatMessage
+ *   remove(conv: ChatConvRef, messageId: string) → ChatMessage  (borrado blando: queda con deletedAt y body '')
+ *   react(conv: ChatConvRef, messageId: string, emoji: ChatReactionEmoji, on: boolean) → void
+ *   search(conv: ChatConvRef, query: string) → ChatMessage[]     (nuevo→viejo, hasta 50)
+ *   typing(conv: ChatConvRef)               → void                («escribiendo…» para los demás)
  *   markRead(conv: ChatConvRef)             → void
+ *   clear(conv: ChatConvRef)                → void                (vacía la conversación para todos; owner/admin en equipos)
+ *   setRetention(teamId: string, hours: ChatRetentionHours | null) → ChatTeam  (borrado automático; null = apagado)
  *   createTeam(input: ChatTeamInput)        → ChatTeam
  *   updateTeam(teamId: string, patch: Partial<ChatTeamInput>) → ChatTeam
  *   members(teamId: string)                 → ChatMember[]
@@ -38,7 +45,10 @@
  *
  * Eventos (main → UI):
  *   feat:chat:snapshot (ChatSnapshot)       cada vez que cambia algo de la lista/estado
- *   feat:chat:message  (ChatMessage)        mensaje nuevo (propio o ajeno) en cualquier conversación
+ *   feat:chat:message  (ChatMessage)        mensaje nuevo, editado o borrado (mismo id) en cualquier conversación
+ *   feat:chat:reaction (ChatReactionEvent)  alguien puso o sacó una reacción
+ *   feat:chat:typing   (ChatTypingEvent)    alguien está escribiendo
+ *   feat:chat:read     (ChatReadEvent)      el otro participante de un DM leyó hasta `at`
  *   feat:chat:open     (ChatConvRef)        el usuario tocó una notificación: abrir el drawer en esa conversación
  *   feat:chat:invite   (ChatInviteResult)   terminó de canjearse una invitación que esperaba el login
  */
@@ -55,8 +65,21 @@ export const CHAT_LIMITS = {
   photoBytes: 512 * 1024,
   photoSide: 256,
   githubLogin: 39,
-  inviteCode: 32
+  inviteCode: 32,
+  searchQuery: 100,
+  replyExcerpt: 140
 } as const
+
+/** Reacciones permitidas. Tienen que coincidir byte a byte con el check de 0004_chat_completo.sql. */
+export const CHAT_REACTIONS = ['👍', '❤️', '😂', '🎉', '😮', '😢', '🙏', '👀'] as const
+export type ChatReactionEmoji = (typeof CHAT_REACTIONS)[number]
+
+/** Plazos del borrado automático, en horas. Tienen que coincidir con el check de 0004_chat_completo.sql. */
+export const CHAT_RETENTION_HOURS = [24, 168, 720, 2160] as const
+export type ChatRetentionHours = (typeof CHAT_RETENTION_HOURS)[number]
+
+/** Aviso de la conversación que deja el servidor a nombre de quien hizo el cambio. */
+export type ChatNotice = { kind: 'retention'; hours: ChatRetentionHours | null } | { kind: 'clear' }
 
 export type ChatConvRef = { kind: 'team'; id: string } | { kind: 'dm'; id: string }
 
@@ -88,6 +111,8 @@ export interface ChatTeam {
   memberCount: number
   unread: number
   lastMessageAt?: number
+  /** Borrado automático de los mensajes, en horas. Sin definir = apagado. */
+  retentionHours?: ChatRetentionHours
 }
 
 export interface ChatThread {
@@ -95,6 +120,8 @@ export interface ChatThread {
   other: ChatProfile
   unread: number
   lastMessageAt?: number
+  /** Hasta cuándo leyó el otro (ms epoch), para «Visto». */
+  otherReadAt?: number
 }
 
 export interface ChatMember {
@@ -130,6 +157,47 @@ export interface ChatMessage {
   status: ChatMessageStatus
   /** Si falló, por qué (para mostrar y reintentar). */
   error?: string
+  editedAt?: number
+  /** Borrado ⇔ deletedAt definido; en ese caso body es ''. */
+  deletedAt?: number
+  replyTo?: ChatReplyRef
+  reactions?: ChatReaction[]
+  /** Si viene, no es un mensaje sino un aviso (body no se muestra). */
+  notice?: ChatNotice
+}
+
+export interface ChatReaction {
+  emoji: ChatReactionEmoji
+  userIds: string[]
+  logins: string[]
+}
+
+export interface ChatReplyRef {
+  id: string
+  authorLogin: string
+  excerpt: string
+  deleted: boolean
+}
+
+export interface ChatReactionEvent {
+  conv: ChatConvRef
+  messageId: string
+  emoji: ChatReactionEmoji
+  userId: string
+  login: string
+  op: 'add' | 'remove'
+}
+
+export interface ChatTypingEvent {
+  conv: ChatConvRef
+  userId: string
+  login: string
+}
+
+export interface ChatReadEvent {
+  conv: ChatConvRef
+  userId: string
+  at: number
 }
 
 export interface ChatTeamInput {
@@ -155,6 +223,10 @@ export interface ChatSnapshot {
   threads: ChatThread[]
   invites: ChatInvite[]
   unreadTotal: number
+  /** El servidor tiene la 0004: editar, borrar, responder, reaccionar, «escribiendo…», «visto», borrado automático y vaciar. */
+  extras: boolean
+  /** Ya llegaron las listas del servidor al menos una vez en esta sesión (hasta entonces vienen vacías). */
+  listsLoaded: boolean
 }
 
 export interface ChatConfigInput {

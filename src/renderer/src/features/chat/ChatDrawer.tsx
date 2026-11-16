@@ -6,6 +6,8 @@ import { convKey } from '../../../../shared/chat'
 import { useUi, type UiCtx } from '../host'
 import { openSettings } from '../settings/bus'
 import { Conversation, type ChatModalKind } from './Conversation'
+import { ClearDialog, RetentionDialog } from './ConvSettings'
+import { composeIntent } from './type-to-compose'
 import { InvitesList, InviteDialog, JoinByCode, MembersPanel, TeamEditor } from './teams'
 import {
   closeChat,
@@ -49,14 +51,35 @@ export function ChatDrawer(): React.JSX.Element {
   const thread = d.conv?.kind === 'dm' ? threadOf(snap, d.conv.id) : undefined
   const close = (): void => setModal(null)
 
-  // Con un modal abierto, Esc cierra el modal; si no, lo cierra el SidePanel.
-  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
-    if (e.key !== 'Escape' || e.defaultPrevented || !modal) return
-    e.preventDefault()
-    setModal(null)
-  }
-
   const showConv = !!d.conv && (!!team || !!thread)
+
+  // Con un modal abierto, Esc cierra el modal; si no, lo cierra el SidePanel. Con una conversación
+  // abierta, escribir (o pegar) con el foco en el panel pero fuera de un campo va a la caja de mensaje.
+  // El listener vive acá y no en window: la terminal y los demás paneles no pierden sus teclas.
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>): void => {
+    if (modal) {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      e.preventDefault()
+      setModal(null)
+      return
+    }
+    if (!showConv || e.defaultPrevented) return
+    const t = e.target as HTMLElement
+    const tag = t.tagName.toLowerCase()
+    const intent = composeIntent({
+      key: e.key,
+      ctrlKey: e.ctrlKey,
+      altKey: e.altKey,
+      metaKey: e.metaKey,
+      isComposing: e.nativeEvent.isComposing,
+      target: {
+        tag,
+        editable: t.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select',
+        popup: !!t.closest('[role="menu"], [role="listbox"], [role="alertdialog"], .modal')
+      }
+    })
+    if (intent) e.currentTarget.querySelector<HTMLTextAreaElement>('textarea[data-chat-composer]')?.focus()
+  }
 
   return (
     <SidePanel labelId="f-chat-title" title="Chat del equipo" onClose={closeChat} width={420}>
@@ -69,7 +92,9 @@ export function ChatDrawer(): React.JSX.Element {
             photo={team ? team.photo : thread!.other.avatarUrl}
             initial={team ? team.name : thread!.other.login}
             role={team?.role}
-            meId={snap?.auth.status === 'signedIn' ? snap.auth.me.id : undefined}
+            me={snap?.auth.status === 'signedIn' ? { id: snap.auth.me.id, login: snap.auth.me.login } : undefined}
+            otherReadAt={thread?.otherReadAt}
+            retentionHours={team?.retentionHours}
             onBack={() => showChatList()}
             onModal={(k) => setModal(k)}
           />
@@ -97,6 +122,10 @@ export function ChatDrawer(): React.JSX.Element {
           />
         )}
         {modal === 'invite' && team && <InviteDialog team={team} onClose={close} />}
+        {modal === 'retention' && team && <RetentionDialog team={team} onClose={close} />}
+        {modal === 'clear' && d.conv && (team || thread) && (
+          <ClearDialog conv={d.conv} title={team ? team.name : `@${thread!.other.login}`} onClose={close} />
+        )}
         {modal === 'members' && team && (
           <MembersPanel
             team={team}
