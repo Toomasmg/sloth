@@ -9,6 +9,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.19',
+    date: '2026-11-16',
+    title: 'Sloth en el celu',
+    items: [
+      'Nuevo: «Ver Sloth en el celular» (Ctrl+K). Escaneás un QR y en el celu ves cómo van tus sesiones, cuánto te queda del límite de 5 horas y del semanal de cada cuenta, y lo que llevás usado hoy. Acostado es un tablero; parado, la lista completa.',
+      'Anda con el celu en el mismo Wi-Fi que la PC y está apagado hasta que lo prendas. «Regenerar código» deja afuera a los celus de antes.',
+      'Opcional: aprobar o rechazar permisos desde el celu, y avisos con el celu bloqueado por ntfy. Los dos arrancan apagados.',
+      'Los relojes de límite se llenan cuando Claude responde en cada cuenta. Para leer ese dato, Sloth envuelve tu statusline: lo que ves abajo de Claude no cambia.'
+    ]
+  },
+  {
     version: '0.6.18',
     date: '2026-11-16',
     title: 'Panel de PRs y chat completo',
