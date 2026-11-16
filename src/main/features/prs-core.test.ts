@@ -3,10 +3,13 @@ import assert from 'node:assert/strict'
 import {
   checksOf,
   cleanText,
+  compareLocal,
+  freeBranch,
   mergeArgs,
   parseGithubRemote,
   parseRepoResponse,
   queryArgs,
+  seenHead,
   updateBranchArgs,
   validTarget,
   worktreesWithBranch
@@ -91,6 +94,7 @@ test('parseRepoResponse arma filas, descarta urls de otro host y lee métodos de
         mergeCommitAllowed: false,
         squashMergeAllowed: true,
         rebaseMergeAllowed: false,
+        defaultBranchRef: { name: 'main' },
         pullRequests: {
           nodes: [
             pr({}),
@@ -105,6 +109,7 @@ test('parseRepoResponse arma filas, descarta urls de otro host y lee métodos de
   const r = parseRepoResponse(JSON.stringify(json), 'o/r')
   assert.equal(r.login, 'yo')
   assert.deepEqual(r.mergeMethods, ['squash'])
+  assert.equal(r.defaultBranch, 'main')
   assert.deepEqual(r.prs.map((p) => p.number), [1, 2])
   assert.deepEqual(r.ids, { 1: 'PR_kwABC', 2: 'PR_2' })
   const [a, b] = r.prs
@@ -124,7 +129,7 @@ test('parseRepoResponse con json roto o sin repo tira un error legible', () => {
   assert.throws(() => parseRepoResponse({ data: { repository: null }, errors: [{ message: 'Could not resolve' }] }, 'o/r'), /GitHub: Could not resolve/)
 })
 
-test('mergeArgs nunca fuerza y ata el merge al commit visto', () => {
+test('mergeArgs nunca fuerza y pasa el commit que recibe a --match-head-commit', () => {
   const args = mergeArgs({ repo: 'o/r', number: 7 }, 'squash', SHA)
   assert.deepEqual(args, ['pr', 'merge', '7', '--repo', 'o/r', '--squash', '--match-head-commit', SHA])
   for (const f of ['--admin', '--auto', '--delete-branch']) assert.ok(!args.includes(f))
@@ -143,4 +148,33 @@ test('worktreesWithBranch encuentra la carpeta que tiene la rama', () => {
   const out = 'worktree C:/repo\nHEAD 1\nbranch refs/heads/main\n\nworktree C:/wt/x\nHEAD 2\nbranch refs/heads/fix/x\n\n'
   assert.deepEqual(worktreesWithBranch(out, 'fix/x'), ['C:/wt/x'])
   assert.deepEqual(worktreesWithBranch(out, 'fix'), [])
+})
+
+test('seenHead: solo deja pasar el commit que el usuario vio si sigue siendo el head', () => {
+  assert.equal(seenHead(SHA, SHA), SHA)
+  assert.throws(() => seenHead(SHA2, SHA), /cambió/)
+  assert.throws(() => seenHead(SHA, undefined), /inválido/)
+  assert.throws(() => seenHead(SHA, 'HEAD'), /inválido/)
+})
+
+test('checksOf: el estado del rollup gana a los contextos leídos', () => {
+  const ok = [{ __typename: 'CheckRun', name: 'a', status: 'COMPLETED', conclusion: 'SUCCESS' }]
+  assert.equal(checksOf(ok, 'FAILURE').state, 'fail')
+  assert.equal(checksOf(ok, 'ERROR').state, 'fail')
+  assert.equal(checksOf(ok, 'PENDING').state, 'pending')
+  assert.equal(checksOf(ok, 'SUCCESS').state, 'ok')
+  assert.equal(checksOf([{ __typename: 'CheckRun', name: 'b', status: 'COMPLETED', conclusion: 'FAILURE' }], 'PENDING').state, 'fail')
+})
+
+test('compareLocal distingue igual, atrasada (se puede avanzar) y divergida', () => {
+  assert.deepEqual(compareLocal('0\t0\n'), { state: 'same', ahead: 0, behind: 0 })
+  assert.deepEqual(compareLocal('0\t3'), { state: 'behind', ahead: 0, behind: 3 })
+  assert.deepEqual(compareLocal('2\t0'), { state: 'diverged', ahead: 2, behind: 0 })
+  assert.deepEqual(compareLocal('1 4'), { state: 'diverged', ahead: 1, behind: 4 })
+  assert.throws(() => compareLocal('fatal: bad revision'))
+})
+
+test('freeBranch busca un pr-N libre sin pisar ramas existentes', () => {
+  assert.equal(freeBranch(7, new Set()), 'pr-7')
+  assert.equal(freeBranch(7, new Set(['pr-7', 'pr-7-2'])), 'pr-7-3')
 })

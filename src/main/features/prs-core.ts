@@ -55,9 +55,9 @@ export function cleanText(s: unknown, max: number): string {
 
 export const PRS_QUERY =
   'query($owner:String!,$name:String!){viewer{login} repository(owner:$owner,name:$name){' +
-  'mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed ' +
+  'mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed defaultBranchRef{name} ' +
   'pullRequests(states:OPEN,first:30,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{' +
-  'id number title url isDraft baseRefName headRefName isCrossRepository updatedAt author{login} ' +
+  'id number title url isDraft baseRefName headRefName isCrossRepository maintainerCanModify updatedAt author{login} ' +
   'mergeable mergeStateStatus reviewDecision ' +
   'reviewRequests(first:20){nodes{requestedReviewer{... on User{login}}}} ' +
   'commits(last:1){nodes{commit{oid statusCheckRollup{state contexts(first:50){nodes{__typename ' +
@@ -84,7 +84,8 @@ function httpsUrl(x: unknown): string | null {
 
 const FAIL_CONCLUSIONS = new Set(['FAILURE', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE'])
 
-export function checksOf(contexts: unknown[]): { state: ChecksState; counts: PrRow['checkCounts']; failing: PrCheck[] } {
+/** `rollup` es statusCheckRollup.state, que cubre todos los checks aunque solo se lean los primeros contextos. */
+export function checksOf(contexts: unknown[], rollup?: unknown): { state: ChecksState; counts: PrRow['checkCounts']; failing: PrCheck[] } {
   const counts = { ok: 0, fail: 0, pending: 0 }
   const failing: PrCheck[] = []
   for (const c of contexts) {
@@ -109,7 +110,9 @@ export function checksOf(contexts: unknown[]): { state: ChecksState; counts: PrR
     counts[kind]++
     if (kind === 'fail' && failing.length < MAX_FAILING) failing.push({ name: name || 'check', url })
   }
-  const state: ChecksState = counts.fail > 0 ? 'fail' : counts.pending > 0 ? 'pending' : counts.ok > 0 ? 'ok' : 'none'
+  let state: ChecksState = counts.fail > 0 ? 'fail' : counts.pending > 0 ? 'pending' : counts.ok > 0 ? 'ok' : 'none'
+  if (rollup === 'FAILURE' || rollup === 'ERROR') state = 'fail'
+  else if ((rollup === 'PENDING' || rollup === 'EXPECTED') && state !== 'fail') state = 'pending'
   return { state, counts, failing }
 }
 
@@ -136,7 +139,8 @@ function prOf(n: unknown, repo: string, login: string): { row: PrRow; id: string
   const commit = obj(obj(nodesOf(o.commits)[0])?.commit)
   const headSha = commit?.oid
   if (typeof headSha !== 'string' || !SHA_RE.test(headSha)) return null
-  const checks = checksOf(nodesOf(obj(commit?.statusCheckRollup)?.contexts))
+  const rollup = obj(commit?.statusCheckRollup)
+  const checks = checksOf(nodesOf(rollup?.contexts), rollup?.state)
   const author = cleanText(obj(o.author)?.login, 200)
   const mergeState = cleanText(o.mergeStateStatus, 40)
   const reviewRequestedFromMe =
@@ -153,6 +157,7 @@ function prOf(n: unknown, repo: string, login: string): { row: PrRow; id: string
       base: cleanText(o.baseRefName, 200),
       head: cleanText(o.headRefName, 200),
       crossRepo: o.isCrossRepository === true,
+      maintainerCanModify: o.maintainerCanModify === true,
       headSha,
       updatedAt: cleanText(o.updatedAt, 40),
       checks: checks.state,
@@ -170,7 +175,7 @@ function prOf(n: unknown, repo: string, login: string): { row: PrRow; id: string
 export function parseRepoResponse(
   json: unknown,
   repo: string
-): { login: string; mergeMethods: MergeMethod[]; prs: PrRow[]; ids: Record<number, string> } {
+): { login: string; defaultBranch: string | null; mergeMethods: MergeMethod[]; prs: PrRow[]; ids: Record<number, string> } {
   let data: unknown = json
   if (typeof json === 'string') {
     try {
@@ -199,7 +204,15 @@ export function parseRepoResponse(
     prs.push(p.row)
     ids[p.row.number] = p.id
   }
-  return { login, mergeMethods, prs, ids }
+  const defaultBranch = cleanText(obj(r.defaultBranchRef)?.name, 200) || null
+  return { login, defaultBranch, mergeMethods, prs, ids }
+}
+
+/** El commit que el usuario vio y confirmó tiene que seguir siendo el head del PR. */
+export function seenHead(current: string, seen: unknown): string {
+  if (typeof seen !== 'string' || !SHA_RE.test(seen)) throw new Error('Commit del PR inválido.')
+  if (seen !== current) throw new Error('El PR cambió desde que lo abriste: revisalo y confirmá de nuevo.')
+  return seen
 }
 
 export function mergeArgs(t: PrTarget, method: MergeMethod, headSha: string): string[] {
@@ -228,4 +241,25 @@ export function worktreesWithBranch(porcelain: string, branch: string): string[]
     else if (line === '') path = null
   }
   return out
+}
+
+export type LocalBranchState = 'same' | 'behind' | 'diverged'
+
+/** Rama local frente a la del PR, según `git rev-list --left-right --count local...remota`. */
+export function compareLocal(counts: string): { state: LocalBranchState; ahead: number; behind: number } {
+  const m = /^(\d+)\s+(\d+)$/.exec(counts.trim())
+  if (!m) throw new Error('No pude comparar la rama local con la del PR.')
+  const ahead = Number(m[1])
+  const behind = Number(m[2])
+  const state: LocalBranchState = ahead === 0 && behind === 0 ? 'same' : ahead === 0 ? 'behind' : 'diverged'
+  return { state, ahead, behind }
+}
+
+/** Primer nombre `pr-N`, `pr-N-2`… que no esté entre las ramas locales. */
+export function freeBranch(number: number, branches: ReadonlySet<string>): string {
+  for (let i = 1; i < 50; i++) {
+    const b = i === 1 ? `pr-${number}` : `pr-${number}-${i}`
+    if (!branches.has(b)) return b
+  }
+  throw new Error(`Ya hay demasiadas ramas pr-${number}: borrá alguna.`)
 }

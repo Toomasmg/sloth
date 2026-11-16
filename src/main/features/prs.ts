@@ -5,17 +5,21 @@ import type { Feature, FeatureContext } from './context'
 import { git, gitRaw, GitError, isDir, normPath, readable, run, validBranchName } from './git-run'
 import { ghStatus, remoteUrl, repoInfo } from './git-ops'
 import {
+  compareLocal,
+  freeBranch,
   mergeArgs,
   parseGithubRemote,
   parseRepoResponse,
   queryArgs,
+  seenHead,
   updateBranchArgs,
   validMergeMethod,
   validRepo,
   validTarget,
   worktreesWithBranch
 } from './prs-core'
-import type { MergeMethod, PrRow, PrsSnapshot, PrTarget, RepoPrs } from '../../shared/prs'
+import { rebaseBlocker } from '../../shared/prs'
+import type { MergeMethod, OpenBranchMode, OpenBranchResult, PrRow, PrsSnapshot, PrTarget, RepoPrs } from '../../shared/prs'
 
 /**
  * Función «prs»: los PR abiertos de los repos de GitHub que usan los espacios, con sus checks y
@@ -26,8 +30,10 @@ import type { MergeMethod, PrRow, PrsSnapshot, PrTarget, RepoPrs } from '../../s
 const STALE_MS = 30_000
 const AUTH_TTL_MS = 5 * 60_000
 const PARALLEL = 4
+const VERSION = 2
 
 interface Saved {
+  version: number
   snapshot: Omit<PrsSnapshot, 'refreshing'>
   ids: Record<string, string>
 }
@@ -50,7 +56,9 @@ function stateFile(): string {
 function load(): void {
   try {
     const j = JSON.parse(readFileSync(stateFile(), 'utf8')) as Partial<Saved>
-    const s = j?.snapshot
+    // Con otra forma de PrRow el caché rompería la vista: se descarta y se vuelve a leer de GitHub.
+    if (j?.version !== VERSION) return
+    const s = j.snapshot
     if (s && Array.isArray(s.repos) && typeof s.at === 'number') {
       snapshot = {
         problem: s.problem === 'no-gh' || s.problem === 'no-login' || s.problem === 'no-repos' ? s.problem : null,
@@ -72,7 +80,7 @@ function persist(): void {
   try {
     mkdirSync(join(app.getPath('userData'), 'features'), { recursive: true })
     const { refreshing: _r, ...rest } = snapshot
-    const data: Saved = { snapshot: rest, ids: Object.fromEntries(ids) }
+    const data: Saved = { version: VERSION, snapshot: rest, ids: Object.fromEntries(ids) }
     const tmp = `${stateFile()}.tmp`
     writeFileSync(tmp, JSON.stringify(data), 'utf8')
     renameSync(tmp, stateFile())
@@ -117,16 +125,25 @@ async function loggedIn(): Promise<boolean> {
 
 async function fetchRepo(slug: string, repoPaths: string[], old: RepoPrs | undefined): Promise<{ repo: RepoPrs; ids: Record<number, string> | null; login: string }> {
   const kept = (error: string): { repo: RepoPrs; ids: null; login: string } => ({
-    repo: { repo: slug, repoPaths, mergeMethods: old?.mergeMethods ?? [], prs: old?.prs ?? [], error },
+    repo: { repo: slug, repoPaths, defaultBranch: old?.defaultBranch ?? null, mergeMethods: old?.mergeMethods ?? [], prs: old?.prs ?? [], error },
     ids: null,
     login: ''
   })
   const [owner, name] = slug.split('/')
   try {
     const r = await run('gh', queryArgs(owner, name), { timeoutMs: 20000, maxBytes: 4 * 1024 * 1024 })
-    if (r.code !== 0) return kept(readable(r, 'gh api graphql'))
-    const p = parseRepoResponse(r.stdout, slug)
-    return { repo: { repo: slug, repoPaths, mergeMethods: p.mergeMethods, prs: p.prs, error: null }, ids: p.ids, login: p.login }
+    let p: ReturnType<typeof parseRepoResponse>
+    try {
+      // gh sale con error si hay `errors` aunque `data` venga completo (p. ej. un campo sin permiso).
+      p = parseRepoResponse(r.stdout, slug)
+    } catch (e) {
+      return kept(r.code !== 0 ? readable(r, 'gh api graphql') : e instanceof Error ? e.message : String(e))
+    }
+    return {
+      repo: { repo: slug, repoPaths, defaultBranch: p.defaultBranch, mergeMethods: p.mergeMethods, prs: p.prs, error: null },
+      ids: p.ids,
+      login: p.login
+    }
   } catch (e) {
     return kept(e instanceof Error ? e.message : String(e))
   }
@@ -190,10 +207,10 @@ function refresh(force: boolean): Promise<void> {
   return inflight
 }
 
-/** Después de cambiar un PR: espera un refresco en curso (que pudo leer el estado viejo) y vuelve a leer. */
-async function refreshAfterChange(): Promise<void> {
-  if (inflight) await inflight
-  await refresh(true)
+/** Después de cambiar un PR: espera un refresco en curso (que pudo leer el estado viejo) y vuelve a leer, sin bloquear al que llama. */
+function refreshAfterChange(): void {
+  const prev = inflight ?? Promise.resolve()
+  prev.then(() => refresh(true)).catch((e) => ctx.log('prs: refresco', e))
 }
 
 function rowOf(x: unknown): { row: PrRow; repo: RepoPrs; target: PrTarget } {
@@ -222,17 +239,34 @@ function methodOf(repo: RepoPrs, row: PrRow, method: unknown): MergeMethod {
   return method
 }
 
-async function openBranch(x: unknown): Promise<{ id: string; created: boolean }> {
+async function localSha(repoPath: string, branch: string): Promise<string | null> {
+  const r = await gitRaw(repoPath, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`], { timeoutMs: 15000 })
+  return r.code === 0 ? r.stdout.trim() : null
+}
+
+async function localBranches(repoPath: string, prefix: string): Promise<Set<string>> {
+  const out = await git(repoPath, ['for-each-ref', '--format=%(refname:short)', `refs/heads/${prefix}*`], { timeoutMs: 15000 })
+  return new Set(out.split(/\r?\n/).filter(Boolean))
+}
+
+function validMode(m: unknown): OpenBranchMode | undefined {
+  if (m === undefined || m === null) return undefined
+  if (m === 'local' || m === 'copy') return m
+  throw new Error('Opción inválida.')
+}
+
+async function openBranch(x: unknown, modeArg: unknown): Promise<OpenBranchResult> {
   const { row, repo, target } = rowOf(x)
+  const mode = validMode(modeArg)
   if (row.crossRepo) throw new Error('Es un PR de un fork: abrilo en GitHub.')
   const head = row.head
   if (!validBranchName(head)) throw new Error('La rama del PR tiene un nombre que no puedo usar.')
   return exclusive(target, async () => {
     const paths = new Set(repo.repoPaths.map(normPath))
     const candidates = ctx.store.workspaces.filter((w) => paths.has(normPath(w.repoPath)) || paths.has(normPath(w.cwd)))
-    const opened = (id: string, created: boolean): { id: string; created: boolean } => {
+    const opened = (id: string, created: boolean): OpenBranchResult => {
       ctx.ui({ type: 'open-pane', id })
-      return { id, created }
+      return { kind: 'opened', id, created }
     }
     const same = candidates.find((w) => w.branch === head)
     if (same) return opened(same.id, false)
@@ -253,11 +287,29 @@ async function openBranch(x: unknown): Promise<{ id: string; created: boolean }>
       return opened(ws.id, true)
     }
 
-    const f = await gitRaw(repoPath, ['fetch', 'origin', `refs/heads/${head}:refs/remotes/origin/${head}`], { timeoutMs: 120000 })
+    const remote = `origin/${head}`
+    // Forzado: la rama del PR puede haberse reescrito (rebase, force-push) y el ref de seguimiento tiene que seguirla.
+    const f = await gitRaw(repoPath, ['fetch', 'origin', `+refs/heads/${head}:refs/remotes/${remote}`], { timeoutMs: 120000 })
     if (f.code !== 0) throw new GitError(readable(f, 'git fetch'))
-    const ws = await ctx.addWorkspace({ name, repoPath, accountId, branch: head, baseBranch: `origin/${head}`, autoStartClaude: false })
+
+    let branch = head
+    const local = await localSha(repoPath, head)
+    if (local) {
+      const counts = await git(repoPath, ['rev-list', '--left-right', '--count', `refs/heads/${head}...refs/remotes/${remote}`], { timeoutMs: 15000 })
+      const cmp = compareLocal(counts)
+      if (cmp.state === 'behind') {
+        // Solo avanza: la rama local no tiene nada que el PR no tenga y no está en ningún worktree.
+        await git(repoPath, ['update-ref', `refs/heads/${head}`, `refs/remotes/${remote}`, local], { timeoutMs: 15000 })
+      } else if (cmp.state === 'diverged') {
+        const copy = freeBranch(row.number, await localBranches(repoPath, `pr-${row.number}`))
+        if (!mode) return { kind: 'diverged', branch: head, ahead: cmp.ahead, behind: cmp.behind, copy }
+        if (mode === 'copy') branch = copy
+      }
+    }
+
+    const ws = await ctx.addWorkspace({ name, repoPath, accountId, branch, baseBranch: remote, autoStartClaude: false })
     try {
-      await git(ws.cwd, ['branch', '--set-upstream-to', `origin/${head}`, head], { timeoutMs: 15000 })
+      await git(ws.cwd, ['branch', '--set-upstream-to', remote, branch], { timeoutMs: 15000 })
     } catch (e) {
       ctx.log('prs: no se pudo asociar la rama a origin', e)
     }
@@ -277,6 +329,8 @@ const prs: Feature = {
     })
 
     ctx.handle('refresh', async () => {
+      // El remoto de un repo puede haber cambiado (fork a upstream, renombre).
+      if (!inflight) slugs.clear()
       await refresh(true)
       return snapshot
     })
@@ -292,35 +346,39 @@ const prs: Feature = {
       await shell.openExternal(url)
     })
 
-    ctx.handle('openBranch', (x: unknown) => openBranch(x))
+    ctx.handle('openBranch', (x: unknown, mode: unknown) => openBranch(x, mode))
 
-    ctx.handle('rebase', async (x: unknown) => {
-      const { row, target } = rowOf(x)
+    ctx.handle('rebase', async (x: unknown, sha: unknown) => {
+      const { row, repo, target } = rowOf(x)
+      const blocked = rebaseBlocker(row, repo)
+      if (blocked) throw new Error(blocked)
+      const head = seenHead(row.headSha, sha)
       const id = ids.get(keyOf(target))
       if (!id) throw new Error('Ese PR ya no está en la lista. Refrescá.')
       await exclusive(target, async () => {
-        const r = await run('gh', updateBranchArgs(id, row.headSha), { timeoutMs: 60000 })
+        const r = await run('gh', updateBranchArgs(id, head), { timeoutMs: 60000 })
         if (r.code !== 0) throw new GitError(readable(r, 'gh api graphql'))
       })
-      await refreshAfterChange()
+      refreshAfterChange()
       return { ok: true }
     })
 
-    ctx.handle('merge', async (x: unknown, method: unknown) => {
+    ctx.handle('merge', async (x: unknown, method: unknown, sha: unknown) => {
       const { row, repo, target } = rowOf(x)
       const m = methodOf(repo, row, method)
+      const head = seenHead(row.headSha, sha)
       await exclusive(target, async () => {
         // Fuera del repo: así gh no toca ramas locales.
-        const r = await run('gh', mergeArgs(target, m, row.headSha), { cwd: app.getPath('userData'), timeoutMs: 120000 })
+        const r = await run('gh', mergeArgs(target, m, head), { cwd: app.getPath('userData'), timeoutMs: 120000 })
         if (r.code !== 0) throw new GitError(readable(r, 'gh pr merge'))
       })
-      await refreshAfterChange()
+      refreshAfterChange()
       return { ok: true }
     })
 
-    ctx.handle('mergeCommand', (x: unknown, method: unknown) => {
+    ctx.handle('mergeCommand', (x: unknown, method: unknown, sha: unknown) => {
       const { row, repo, target } = rowOf(x)
-      return ['gh', ...mergeArgs(target, methodOf(repo, row, method), row.headSha)]
+      return ['gh', ...mergeArgs(target, methodOf(repo, row, method), seenHead(row.headSha, sha))]
     })
 
     ctx.onWindow((win) => {
