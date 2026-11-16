@@ -5,10 +5,11 @@ import { cleanError } from '../../format'
 import { SidePanel } from '../../ui/SidePanel'
 import { Button, InlineAlert, Input, Switch, toast } from '../../ui'
 import { useUi } from '../host'
+import { RemotoSeccion } from './RemotoSeccion'
 
 const canal = (op: string): string => `feat:celular:${op}`
 
-function Qr({ texto }: { texto: string }): React.JSX.Element {
+export function Qr({ texto }: { texto: string }): React.JSX.Element {
   const { path, lado } = useMemo(() => qrComoCaminoSvg(qrDeTexto(texto)), [texto])
   return (
     <svg className="f-cel-qr" viewBox={`0 0 ${lado} ${lado}`} role="img" aria-label="Código QR para abrir Sloth en el celu" shapeRendering="crispEdges">
@@ -47,15 +48,17 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
   }, [ui])
 
   // Sin `disabled` mientras guarda: un botón con foco que se deshabilita le tira el foco al body.
-  const hacer = async (op: string, ...args: unknown[]): Promise<void> => {
-    if (ocupado) return
+  const hacer = async (op: string, ...args: unknown[]): Promise<boolean> => {
+    if (ocupado) return false
     setErr(null)
     setOcupado(true)
     try {
       const x = await ui.invoke<CelularVista | undefined>(canal(op), ...args)
       if (x) setV(x)
+      return true
     } catch (e) {
       setErr(cleanError(e))
+      return false
     } finally {
       setOcupado(false)
     }
@@ -170,6 +173,8 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
               </Button>
             )}
           </section>
+
+          <RemotoSeccion v={v} hacer={hacer} copiar={copiar} ocupado={ocupado} />
 
           <section className="f-cel-sec" aria-labelledby="f-cel-perm">
             <h3 id="f-cel-perm" className="f-cel-h">Permisos</h3>

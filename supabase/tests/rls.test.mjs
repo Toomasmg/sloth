@@ -1,6 +1,6 @@
 // Prueba de las migraciones de supabase/migrations sobre PGlite (Postgres en WASM) con stubs de
 // auth/storage/realtime/roles de Supabase. Uso: node rls.test.mjs <0001_chat.sql> [0002…] [0003…]
-// Las pruebas de Broadcast corren solo si se pasa 0003_realtime_broadcast.sql.
+// Las pruebas de Broadcast corren solo si se pasa 0003_realtime_broadcast.sql; las del celu, con 0006_celu_remoto.sql.
 import { PGlite } from '@electric-sql/pglite'
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
 import { readFileSync } from 'node:fs'
@@ -38,6 +38,7 @@ await db.exec(stub)
 const files = process.argv.slice(2)
 for (const f of files) await db.exec(readFileSync(f, 'utf8'))
 const withBroadcast = files.some((f) => f.includes('0003_realtime_broadcast'))
+const withCelu = files.some((f) => f.includes('0006_celu_remoto'))
 console.log('migraciones OK')
 
 const U = {
@@ -183,6 +184,25 @@ if (withBroadcast) {
   await db.exec("create or replace function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void language plpgsql as $$ begin raise exception 'realtime caído'; end $$")
   await as(U.ana, "insert into public.messages(team_id, client_id, body) values ($1, gen_random_uuid(), 'sin broadcast')", [team])
   ok((await as(U.ana, 'select count(*)::int as n from public.messages where team_id=$1', [team]))[0].n === before + 1, 'si Broadcast falla el mensaje se guarda igual')
+}
+
+if (withCelu) {
+  const tAna = `celu:${U.ana}`
+  const tBruno = `celu:${U.bruno}`
+  const pub = "insert into realtime.messages(topic, extension, payload, event, private) values ($1, 'broadcast', '{}', 'estado', true)"
+  await as(U.ana, pub, [tAna], tAna)
+  ok(true, 'ana publica en su celu')
+  ok((await as(U.ana, 'select * from realtime.messages where topic = realtime.topic()', [], tAna)).length > 0, 'ana lee su celu')
+  ok((await as(U.bruno, 'select * from realtime.messages where topic = realtime.topic()', [], tAna)).length === 0, 'bruno no lee el celu de ana (no se suscribe)')
+  ok((await as(U.bruno, 'select * from realtime.messages', [], tBruno)).every((r) => r.topic !== tAna), 'bruno en su celu no ve filas del de ana')
+  await throws(as(U.bruno, pub, [tAna], tAna), 'bruno no publica en el celu de ana')
+  await throws(as(U.bruno, pub, [tAna], tBruno), 'bruno con su tópico no cuela una fila en el celu de ana')
+  await throws(as(U.ana, pub, [`team:${team}`], tAna), 'ana con su tópico no cuela una fila en team:')
+  await throws(as(U.ana, pub, [`celu:${U.ana.toUpperCase()}x`], tAna), 'ana no cuela una fila con otro tópico parecido')
+  await throws(as(U.ana, "insert into realtime.messages(topic, extension, payload, event, private) values ($1, 'presence', '{}', 'x', true)", [tAna], tAna), 'solo broadcast, no presence')
+  ok((await as(null, 'select * from realtime.messages', [], tAna)).length === 0, 'anon no lee el celu')
+  await throws(as(null, pub, [tAna], tAna), 'anon no publica en el celu')
+  await throws(as(null, 'select public.can_use_celu_topic($1)', [tAna]), 'anon no ejecuta can_use_celu_topic')
 }
 
 await throws(as(null, 'select * from public.messages'), 'anon sin acceso a messages')
