@@ -16,11 +16,12 @@ test('vigentes saca los vencidos', () => {
   assert.deepEqual(vigentes([a, b], 10).map((x) => x.id), ['b'])
 })
 
-test('ordenarGrants es estable: por nombre y con ops en orden fijo', () => {
-  const g = (id: string, nombre: string, ops: ChatMcpGrant['ops']): ChatMcpGrant => ({ conv: { kind: 'team', id }, nombre, ops, at: 0 })
-  const r = ordenarGrants([g('2', 'beta', ['enviar', 'leer']), g('1', 'alfa', ['leer'])])
-  assert.deepEqual(r.map((x) => x.nombre), ['alfa', 'beta'])
-  assert.deepEqual(r[1].ops, ['leer', 'enviar'])
+test('ordenarGrants es estable: por nombre y después por cuenta, sin mutar la lista', () => {
+  const g = (accountId: string, id: string, nombre: string): ChatMcpGrant => ({ accountId, conv: { kind: 'team', id }, nombre, at: 0 })
+  const lista = [g('b', '2', 'beta'), g('b', '1', 'alfa'), g('a', '1', 'alfa')]
+  const r = ordenarGrants(lista)
+  assert.deepEqual(r.map((x) => `${x.nombre}/${x.accountId}`), ['alfa/a', 'alfa/b', 'beta/b'])
+  assert.equal(lista[0].nombre, 'beta')
 })
 
 test('alternarCuenta suma sin repetir y saca', () => {

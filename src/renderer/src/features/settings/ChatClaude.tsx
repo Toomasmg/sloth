@@ -8,14 +8,18 @@ import { errText, Group, Row, ToggleRow } from './ui'
 
 function estado(a: ChatMcpAccountReg, elegida: boolean): string {
   switch (a.state) {
+    case 'revisando':
+      return 'Revisando…'
     case 'ok':
       return elegida ? 'Listo' : 'Sin acceso'
     case 'pendiente':
-      return 'Se aplica al cerrar Claude en esta cuenta'
+      return a.detail ?? 'Se aplica al cerrar Claude en esta cuenta'
     case 'conflicto':
       return 'Ya tenés otro servidor MCP llamado “sloth”: no lo tocamos'
     case 'sin-node':
       return 'Falta Node.js en el PATH'
+    case 'sin-cli':
+      return 'No encontré Claude Code en el PATH: no se tocó nada'
     case 'error':
       return a.detail ?? 'No se pudo configurar'
   }
@@ -58,12 +62,13 @@ export function ChatClaudeGroup(): React.JSX.Element {
 
   const grants = view ? ordenarGrants(view.grants) : []
   const l = view?.limits
+  const etiqueta = (id: string): string => view?.accounts.find((a) => a.accountId === id)?.label ?? id
 
   return (
     <Group id="g-chat-claude" title="Claude en el chat">
       <ToggleRow
         title="Dejar que Claude use el chat"
-        hint="Claude Code podrá listar, leer y mandar mensajes desde las cuentas que marques abajo. Cada conversación te pide permiso la primera vez. Apagado por defecto."
+        hint="Claude Code podrá listar, leer y mandar mensajes desde las cuentas que marques abajo. Para leer te pide permiso; cada mensaje que quiera mandar te lo muestra antes. Apagado por defecto."
         checked={view?.enabled ?? false}
         disabled={!view || busy}
         onChange={(on) => void run('feat:chat:mcpSetEnabled', on)}
@@ -98,47 +103,43 @@ export function ChatClaudeGroup(): React.JSX.Element {
           </ul>
         </Row>
       )}
-      {view?.enabled && (
-        <>
-          <Row
-            title="Conversaciones con permiso permanente"
-            hint={grants.length === 0 ? 'Ninguna conversación tiene permiso permanente.' : undefined}
-            stack
-          >
-            {grants.length > 0 && (
-              <>
-                <ul className="f-set-chatclaude-list">
-                  {grants.map((g) => (
-                    <li key={convKey(g.conv)}>
-                      <strong>{g.nombre}</strong>
-                      <span className="f-set-chatclaude-ops">
-                        {g.ops.map((op) => (
-                          <span key={op} className="f-set-chatclaude-op">
-                            <Tag mono={false}>{op === 'leer' ? 'leer' : 'enviar'}</Tag>
-                            <Button
-                              variant="ghost"
-                              size="xs"
-                              disabled={busy}
-                              aria-label={`Quitar permiso de ${op} en ${g.nombre}`}
-                              onClick={() => void run('feat:chat:mcpRevoke', convKey(g.conv), op)}
-                            >
-                              Quitar
-                            </Button>
-                          </span>
-                        ))}
+      {view && (view.enabled || grants.length > 0) && (
+        <Row
+          title="Conversaciones que Claude puede leer sin preguntar"
+          hint={grants.length === 0 ? 'Ninguna. Mandar mensajes siempre te pide confirmación.' : 'Mandar mensajes siempre te pide confirmación.'}
+          stack
+        >
+          {grants.length > 0 && (
+            <>
+              <ul className="f-set-chatclaude-list">
+                {grants.map((g) => (
+                  <li key={`${g.accountId}|${convKey(g.conv)}`}>
+                    <strong>{g.nombre}</strong>
+                    <span className="f-set-chatclaude-ops">
+                      <span className="f-set-chatclaude-op">
+                        <Tag mono={false}>{etiqueta(g.accountId)}</Tag>
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          disabled={busy}
+                          aria-label={`Quitar permiso de leer ${g.nombre} desde ${etiqueta(g.accountId)}`}
+                          onClick={() => void run('feat:chat:mcpRevoke', g.accountId, convKey(g.conv))}
+                        >
+                          Quitar
+                        </Button>
                       </span>
-                    </li>
-                  ))}
-                </ul>
-                <div>
-                  <Button variant="danger" size="sm" disabled={busy} onClick={() => void run('feat:chat:mcpRevokeAll')}>
-                    Quitar todas
-                  </Button>
-                </div>
-              </>
-            )}
-          </Row>
-        </>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div>
+                <Button variant="danger" size="sm" disabled={busy} onClick={() => void run('feat:chat:mcpRevokeAll')}>
+                  Quitar todas
+                </Button>
+              </div>
+            </>
+          )}
+        </Row>
       )}
       {view && (
         <div className="f-set-chatclaude-notes">
