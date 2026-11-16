@@ -9,6 +9,7 @@ on:
       - 'src/main/features/celular-pagina.ts'
       - 'src/shared/celu-remoto.ts'
       - 'scripts/build-celu-web.mjs'
+      - 'package-lock.json'
       - '.github/workflows/celu-web.yml'
   workflow_dispatch:
 

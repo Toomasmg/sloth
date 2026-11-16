@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const CSP =
   "default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; " +
-  "img-src 'self' https://avatars.githubusercontent.com; connect-src 'self' https: wss:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'"
+  "img-src 'self'; connect-src 'self' https: wss:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'"
 
 function reemplazar(html, de, a) {
   if (!html.includes(de)) throw new Error(`build-celu-web: la página de celular-pagina.ts ya no tiene «${de}»; revisá armarIndex`)
