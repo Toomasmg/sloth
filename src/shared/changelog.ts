@@ -9,6 +9,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.24',
+    date: '2026-11-16',
+    title: 'El celu desde cualquier red',
+    items: [
+      'Celular: además del Wi-Fi de casa, ahora lo podés ver desde cualquier red. Prendé «Verlo también fuera de tu Wi-Fi» en el panel del celular, escaneá el QR y entrá con GitHub.',
+      'Lo que viaja va cifrado con una clave que solo tienen tu PC y tu celu: nunca sale lo que pasa en la terminal ni tus prompts.',
+      'En Android (Samsung o Chrome) la página se instala como app, con el ícono de Sloth y a pantalla completa.',
+      '«Regenerar código» deja afuera de verdad a los celus de antes.'
+    ]
+  },
+  {
     version: '0.6.23',
     date: '2026-11-16',
     title: 'Claude en el chat',
