@@ -3,6 +3,7 @@ import type { Command, FeatureUi } from '../host'
 import { useUi } from '../host'
 import { ChatDrawer } from './ChatDrawer'
 import { JoinInvite } from './teams'
+import { McpAsk } from './McpAsk'
 import { openChat, openJoinInvite, useChatAttach, useChatSnapshot, useDrawer, useJoinInviteOpen } from './store'
 import './chat.css'
 
@@ -42,6 +43,7 @@ function ChatGlobal(): React.JSX.Element {
     <>
       {d.open && <ChatDrawer />}
       {join && <JoinInvite />}
+      <McpAsk />
     </>
   )
 }

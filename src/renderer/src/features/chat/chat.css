@@ -692,3 +692,41 @@
     box-shadow: 0 0 0 2px var(--accent);
   }
 }
+
+/* ---------- Claude en el chat ---------- */
+.f-chat-via {
+  padding: 0 var(--s-1);
+  border: 1px solid var(--divider);
+  border-radius: var(--r-sm);
+  color: var(--text-3);
+  font-size: var(--fs-11);
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.f-chat-mcpask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  max-width: 480px;
+}
+.f-chat-mcpask-note {
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--fs-12);
+}
+.f-chat-mcpask-preview {
+  margin: 0;
+  max-height: 160px;
+  overflow: auto;
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-13);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.f-chat-mcpask-actions {
+  flex-wrap: wrap;
+}

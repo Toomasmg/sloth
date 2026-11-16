@@ -25,7 +25,7 @@ export function hookScriptPath(): string {
 let nodeEnPath: boolean | undefined
 
 /** Una sola vez por arranque: el envoltorio corre con node y, sin node, la statusline quedaría vacía. */
-function hayNode(): boolean {
+export function hayNode(): boolean {
   if (nodeEnPath === undefined) {
     try {
       execFileSync(process.platform === 'win32' ? 'where.exe' : 'which', ['node'], { stdio: 'ignore', windowsHide: true, timeout: 5000 })
@@ -42,7 +42,7 @@ export function statuslineScriptPath(): string {
   return join(app.getPath('userData'), 'sloth-statusline.cjs')
 }
 
-function writeIfChanged(file: string, content: string): void {
+export function writeIfChanged(file: string, content: string): void {
   let current = ''
   try {
     current = readFileSync(file, 'utf8')

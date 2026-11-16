@@ -29,6 +29,12 @@ test('mensaje editado y borrado', () => {
   assert.equal('editedAt' in (messageFromRow(row, author) ?? {}), false)
 })
 
+test('mensaje vía Claude: solo con via = claude', () => {
+  assert.equal(messageFromRow({ ...row, via: 'claude' }, author)?.via, 'claude')
+  assert.equal('via' in (messageFromRow({ ...row, via: 'otro' }, author) ?? {}), false)
+  assert.equal('via' in (messageFromRow(row, author) ?? {}), false)
+})
+
 test('avisos de la conversación y borrado automático del equipo', () => {
   assert.deepEqual(messageFromRow({ ...row, body: 'clear', kind: 'clear' }, author)?.notice, { kind: 'clear' })
   assert.deepEqual(messageFromRow({ ...row, body: '720', kind: 'retention' }, author)?.notice, { kind: 'retention', hours: 720 })
