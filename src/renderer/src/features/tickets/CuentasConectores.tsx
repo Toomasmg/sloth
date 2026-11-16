@@ -7,7 +7,7 @@ import { Button, Select } from '../../ui'
 
 export function textoDisponibilidad(nombreConector: string, d: Disponibilidad | undefined): string {
   if (!d || d.tipo === 'sin_revisar') return 'sin revisar'
-  if (d.tipo === 'falta') return `sin ${nombreConector}`
+  if (d.tipo === 'falta') return d.parecido ? `${nombreConector}: «${d.parecido.nombre}» sin todas sus herramientas` : `sin ${nombreConector}`
   if (d.tipo === 'elegir') return `${nombreConector}: elegí el servidor`
   if (d.estado === 'needs-auth') return `${nombreConector}: falta autenticar`
   if (d.estado === 'failed') return `${nombreConector}: no arranca`
@@ -88,7 +88,11 @@ export function CuentasConectores({ snap }: { snap: Snapshot }): React.JSX.Eleme
                 )}
                 {d?.tipo === 'elegir' && (
                   <label className="field f-tickets-cuentas-elegir">
-                    <span>Esta cuenta tiene más de un servidor posible. ¿Cuál usa Sloth?</span>
+                    <span>
+                      {d.opciones.length === 1
+                        ? `«${d.opciones[0].nombre}» tiene las herramientas de ${nombre} con otro nombre. ¿Sloth lo usa como ${nombre}?`
+                        : 'Esta cuenta tiene más de un servidor posible. ¿Cuál usa Sloth?'}
+                    </span>
                     <Select value={snap.config.servidores?.[a.id]?.[cid] ?? ''} onChange={(e) => elegirServidor(a.id, e.target.value)} disabled={ocupado}>
                       <option value="">Elegí un servidor…</option>
                       {d.opciones.map((o) => (

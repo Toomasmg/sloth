@@ -99,7 +99,8 @@ export interface CuentaRevisada {
 /** Si una cuenta puede usar un conector MCP y con qué servidor. */
 export type Disponibilidad =
   | { tipo: 'sin_revisar' }
-  | { tipo: 'falta' }
+  /** parecido: un servidor que parece el del conector pero no tiene todas sus herramientas. */
+  | { tipo: 'falta'; parecido?: { nombre: string; faltan: string[] } }
   | { tipo: 'elegir'; opciones: { nombre: string; prefijo: string; estado: EstadoMcp }[] }
   /** adaptado: el servidor tiene otro prefijo que el del conector. verificado: se vieron sus herramientas. */
   | { tipo: 'tiene'; nombre: string; prefijo: string; estado: EstadoMcp; adaptado: boolean; verificado: boolean }

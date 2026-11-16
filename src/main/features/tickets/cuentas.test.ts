@@ -10,12 +10,16 @@ import {
   candidatos,
   conPrefijo,
   disponibilidad,
+  elegibles,
   mensajeCuenta,
   prefijoDeServidor,
+  porHerramientas,
   problemaEnSesion,
   REVISAR_SCHEMA,
   revisarCuenta,
+  revisarTemprano,
   sanearCache,
+  servidorDeLaLista,
   servidoresDeSalida,
   usable
 } from './cuentas'
@@ -120,7 +124,11 @@ test('candidatos: exacto, por palabras y nada cuando no está', () => {
   assert.deepEqual(candidatos(GRUV, [srv('claude.ai Atlassian MCP', 'connected'), srv('gruv-tomy', 'pending')]).map((s) => s.nombre), ['gruv-tomy'])
   const personales = [srv('atlassian', 'connected', JIRA.herramientas.lista), srv('plugin:design:atlassian', 'connected'), srv('claude.ai Notion', 'needs-auth')]
   assert.deepEqual(candidatos(JIRA, personales).map((s) => s.nombre), ['atlassian', 'plugin:design:atlassian'])
-  assert.deepEqual(candidatos(JIRA, [...personales, srv('claude.ai Atlassian MCP', 'connected')]).map((s) => s.nombre), ['claude.ai Atlassian MCP'])
+  assert.deepEqual(candidatos(JIRA, [...personales, srv('claude.ai Atlassian MCP', 'connected')]).map((s) => s.nombre), [
+    'claude.ai Atlassian MCP',
+    'atlassian',
+    'plugin:design:atlassian'
+  ])
   assert.deepEqual(candidatos(GRUV, [srv('claude.ai Atlassian MCP', 'connected'), srv('context7', 'pending')]), [])
 })
 
@@ -166,6 +174,58 @@ test('disponibilidad: el elegido manda, uno inválido se ignora, y el único ver
   const uno = cuenta([srv('atlassian', 'connected', JIRA.herramientas.lista), srv('plugin:design:atlassian', 'pending')])
   const d = disponibilidad(JIRA, uno)
   assert.equal(d.tipo === 'tiene' && d.nombre, 'atlassian')
+})
+
+test('disponibilidad: con el de claude.ai sin autorizar y gruv-tomy andando, se adapta a gruv-tomy', () => {
+  const d = disponibilidad(GRUV, cuenta([srv('claude.ai Gruv', 'needs-auth'), srv('gruv-tomy', 'connected', GRUV_TOOLS)]))
+  assert.deepEqual(d, { tipo: 'tiene', nombre: 'gruv-tomy', prefijo: 'mcp__gruv-tomy__', estado: 'connected', adaptado: true, verificado: true })
+  const exacto = disponibilidad(GRUV, cuenta([srv('claude.ai Gruv', 'connected', GRUV_TOOLS), srv('gruv-tomy', 'connected', GRUV_TOOLS)]))
+  assert.equal(exacto.tipo === 'tiene' && exacto.prefijo, 'mcp__claude_ai_Gruv__')
+  const solo = disponibilidad(GRUV, cuenta([srv('claude.ai Gruv', 'needs-auth'), srv('gruv-tomy', 'pending')]))
+  assert.equal(solo.tipo === 'tiene' && solo.estado, 'needs-auth')
+})
+
+test('disponibilidad: un servidor de otro nombre con todas las herramientas se ofrece, no se adapta solo', () => {
+  const c = cuenta([srv('mis-tickets', 'connected', GRUV_TOOLS)])
+  assert.deepEqual(porHerramientas(GRUV, c.servidores).map((s) => s.nombre), ['mis-tickets'])
+  assert.deepEqual(disponibilidad(GRUV, c), { tipo: 'elegir', opciones: [{ nombre: 'mis-tickets', prefijo: 'mcp__mis-tickets__', estado: 'connected' }] })
+  const d = disponibilidad(GRUV, c, 'mcp__mis-tickets__')
+  assert.equal(d.tipo === 'tiene' && d.prefijo, 'mcp__mis-tickets__')
+  assert.match(mensajeCuenta(GRUV, disponibilidad(GRUV, c), 'Cosmos', []) ?? '', /^«mis-tickets» de la cuenta «Cosmos» tiene las herramientas de Gruv con otro nombre\./)
+  assert.deepEqual(porHerramientas(GRUV, [srv('mis-tickets', 'pending')]), [])
+  assert.deepEqual(porHerramientas(GRUV, [srv('gruv-tomy', 'connected', GRUV_TOOLS)]), [])
+})
+
+test('porHerramientas: con una lista de una sola herramienta no alcanza', () => {
+  const uno = { ...GRUV, herramientas: { ...GRUV.herramientas, lista: ['listar_tickets'] } }
+  assert.deepEqual(porHerramientas(uno, [srv('mis-tickets', 'connected', GRUV_TOOLS)]), [])
+  assert.deepEqual(disponibilidad(uno, cuenta([srv('mis-tickets', 'connected', GRUV_TOOLS)])), { tipo: 'falta' })
+})
+
+test('disponibilidad: al parecido le faltan herramientas y el mensaje las nombra', () => {
+  const sin = GRUV_TOOLS.filter((t) => t !== 'ver_mi_inicio')
+  const d = disponibilidad(GRUV, cuenta([srv('gruv-tomy', 'connected', sin), srv('gruv-viejo', 'connected', ['ver_reloj'])]))
+  assert.deepEqual(d, { tipo: 'falta', parecido: { nombre: 'gruv-tomy', faltan: ['ver_mi_inicio'] } })
+  assert.equal(
+    mensajeCuenta(GRUV, d, 'Cosmos', ['Personal']),
+    'La cuenta «Cosmos» tiene «gruv-tomy», pero le faltan herramientas que usa Gruv: ver_mi_inicio. Copiá Gruv como conector propio y ajustá sus herramientas, o agregalas al servidor. Lo tiene: «Personal».'
+  )
+})
+
+test('revisarTemprano: solo con un init sin servidores pending', () => {
+  const init = (servers: unknown[]): string => JSON.stringify({ type: 'system', subtype: 'init', mcp_servers: servers, tools: ['mcp__gruv-tomy__listar_tickets'] })
+  assert.deepEqual(revisarTemprano(init([{ name: 'gruv-tomy', status: 'connected' }]), 7), {
+    revisadaEn: 7,
+    servidores: [{ nombre: 'gruv-tomy', prefijo: 'mcp__gruv-tomy__', estado: 'connected', herramientas: ['listar_tickets'] }]
+  })
+  assert.equal(revisarTemprano(init([{ name: 'gruv-tomy', status: 'connected' }, { name: 'otro', status: 'pending' }]), 7), undefined)
+  assert.equal(revisarTemprano('no es json', 7), undefined)
+  assert.equal(revisarTemprano(JSON.stringify({ type: 'assistant' }), 7), undefined)
+})
+
+test('revisarCuenta entiende la salida de stream-json, una línea por mensaje', () => {
+  const lineas = (JSON.parse(salidaCosmos()) as unknown[]).map((m) => JSON.stringify(m)).join('\n') + '\nbasura\n'
+  assert.deepEqual(revisarCuenta(lineas, 5), revisarCuenta(salidaCosmos(), 5))
 })
 
 test('usable: solo lo que está y no pide autorización ni falló', () => {
@@ -216,7 +276,10 @@ test('problemaEnSesion: sin el servidor o sin sus herramientas, la lista vacía 
   const p = problemaEnSesion(GRUV, 'mcp__gruv-tomy__', cosmos)
   assert.equal(p?.tipo === 'tiene' && p.estado, 'pending')
   assert.equal(problemaEnSesion(GRUV, 'mcp__claude_ai_Gruv__', [srv('claude.ai Gruv', 'connected', GRUV_TOOLS)]), undefined)
-  assert.deepEqual(problemaEnSesion(GRUV, 'mcp__claude_ai_Gruv__', [srv('claude.ai Gruv', 'connected', ['ver_reloj'])]), { tipo: 'falta' })
+  assert.deepEqual(problemaEnSesion(GRUV, 'mcp__claude_ai_Gruv__', [srv('claude.ai Gruv', 'connected', ['ver_reloj'])]), {
+    tipo: 'falta',
+    parecido: { nombre: 'claude.ai Gruv', faltan: ['buscar_persona', 'listar_tickets', 'ver_flujo_tickets', 'ver_mi_inicio'] }
+  })
   assert.equal(problemaEnSesion(GRUV, 'mcp__claude_ai_Gruv__', undefined), undefined)
 })
 
@@ -267,4 +330,53 @@ test('revisar usa los args de descubrir con su propio schema', () => {
   const a = buildDescubrirArgs(REVISAR_SCHEMA)
   assert.equal(a[a.indexOf('--json-schema') + 1], JSON.stringify(REVISAR_SCHEMA))
   assert.equal(a[a.indexOf('--allowedTools') + 1], '')
+})
+
+test('elegibles: lo que se ofrece para elegir se puede guardar, sea por nombre o por herramientas', () => {
+  const c = cuenta([srv('mis-tickets', 'connected', GRUV_TOOLS), srv('gruv-tomy', 'pending'), srv('context7', 'connected')])
+  const d = disponibilidad(GRUV, cuenta([srv('mis-tickets', 'connected', GRUV_TOOLS)]))
+  assert.ok(d.tipo === 'elegir')
+  for (const o of d.opciones) assert.ok(elegibles(GRUV, c.servidores).some((s) => s.prefijo === o.prefijo))
+  assert.deepEqual(elegibles(GRUV, c.servidores).map((s) => s.nombre), ['gruv-tomy', 'mis-tickets'])
+})
+
+test('disponibilidad: con el exacto caído y un servidor de otro nombre andando, se ofrece elegir', () => {
+  const c = cuenta([srv('claude.ai Gruv', 'needs-auth'), srv('mis-tickets', 'connected', GRUV_TOOLS)])
+  assert.deepEqual(disponibilidad(GRUV, c), {
+    tipo: 'elegir',
+    opciones: [
+      { nombre: 'claude.ai Gruv', prefijo: 'mcp__claude_ai_Gruv__', estado: 'needs-auth' },
+      { nombre: 'mis-tickets', prefijo: 'mcp__mis-tickets__', estado: 'connected' }
+    ]
+  })
+  const elegido = disponibilidad(GRUV, c, 'mcp__claude_ai_Gruv__')
+  assert.equal(elegido.tipo === 'tiene' && elegido.estado, 'needs-auth')
+  const caido = disponibilidad(GRUV, cuenta([srv('claude.ai Gruv', 'needs-auth'), srv('mis-tickets', 'failed', GRUV_TOOLS)]))
+  assert.equal(caido.tipo === 'tiene' && caido.prefijo, 'mcp__claude_ai_Gruv__')
+})
+
+test('disponibilidad: con el exacto caído y dos del mismo nombre andando, se elige entre los tres', () => {
+  const c = cuenta([srv('claude.ai Gruv', 'failed'), srv('gruv-a', 'connected', GRUV_TOOLS), srv('gruv-b', 'connected', GRUV_TOOLS)])
+  const d = disponibilidad(GRUV, c)
+  assert.deepEqual(d.tipo === 'elegir' && d.opciones.map((o) => o.nombre), ['claude.ai Gruv', 'gruv-a', 'gruv-b'])
+})
+
+test('disponibilidad: un parecido sin ninguna herramienta en común no cuenta', () => {
+  const d = disponibilidad(GRUV, cuenta([srv('gruv-viejo', 'connected', ['ver_reloj']), srv('plugin:gruv', 'connected', [])]))
+  assert.deepEqual(d, { tipo: 'falta' })
+})
+
+test('servidorDeLaLista: solo con el mismo servidor con que se leyó la lista', () => {
+  const adaptado = conPrefijo(GRUV, 'mcp__mis-tickets__')
+  assert.equal(servidorDeLaLista('mcp__mis-tickets__', adaptado), adaptado)
+  assert.throws(() => servidorDeLaLista(GRUV.herramientas.prefijo, adaptado), /cambió desde que se leyó la lista\. Actualizá Gruv/)
+  assert.throws(() => servidorDeLaLista(undefined, GRUV), /Actualizá Gruv/)
+})
+
+test('mensajeCuenta: el pending de claude.ai no habla de servidores propios', () => {
+  const base = { tipo: 'tiene' as const, adaptado: false, verificado: false, estado: 'pending' as const }
+  const ai = mensajeCuenta(GRUV, { ...base, nombre: 'claude.ai Gruv', prefijo: 'mcp__claude_ai_Gruv__' }, 'Cosmos', []) ?? ''
+  assert.doesNotMatch(ai, /\/mcp|tarda en arrancar/)
+  const propio = mensajeCuenta(GRUV, { ...base, nombre: 'mis-tickets', prefijo: 'mcp__mis-tickets__' }, 'Cosmos', []) ?? ''
+  assert.match(propio, /tarda en arrancar/)
 })

@@ -73,6 +73,8 @@ export interface RunOptions<T> {
   timeoutMs?: number
   signal?: AbortSignal
   parse: (stdout: string) => T
+  /** Mira cada línea de stdout apenas llega: si devuelve algo, se corta el proceso y ese es el resultado. */
+  temprano?: (linea: string) => T | undefined
 }
 
 /** Rechaza con un mensaje legible. */
@@ -81,6 +83,7 @@ export function runClaude<T>(o: RunOptions<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     let out = ''
     let err = ''
+    let pendiente = ''
     let done = false
     const child = spawn(o.exe, o.args, { cwd: o.cwd, env: o.env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
     const finish = (e?: Error, r?: T): void => {
@@ -102,8 +105,27 @@ export function runClaude<T>(o: RunOptions<T>): Promise<T> {
     o.signal?.addEventListener('abort', onAbort)
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
+    const mirar = (d: string): void => {
+      if (!o.temprano || done) return
+      const lineas = (pendiente + d).split('\n')
+      pendiente = lineas.pop() ?? ''
+      if (pendiente.length > MAX_STDOUT) pendiente = ''
+      for (const l of lineas) {
+        let r: T | undefined
+        try {
+          r = o.temprano(l)
+        } catch {
+          continue
+        }
+        if (r !== undefined) {
+          killTree(child.pid)
+          return finish(undefined, r)
+        }
+      }
+    }
     child.stdout.on('data', (d: string) => {
       if (out.length < MAX_STDOUT) out += d
+      mirar(d)
     })
     child.stderr.on('data', (d: string) => {
       if (err.length < 8000) err += d

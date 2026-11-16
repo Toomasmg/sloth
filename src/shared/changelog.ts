@@ -9,6 +9,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.17',
+    date: '2026-11-16',
+    title: 'Más fluido y tickets más rápidos',
+    items: [
+      'Los diálogos, las pantallas, el panel lateral y los avisos se van con una animación corta en vez de desaparecer de golpe. Los menús y las ayudas aparecen suaves. Con «Efectos de animación» apagado en Windows, todo se cierra al instante.',
+      'Tickets: un conector propio se reconoce por sus herramientas, aunque tenga otro nombre, y lo podés elegir aunque el de claude.ai esté caído. Si falta algo, el aviso te dice qué.',
+      'Tickets: revisar las cuentas es más rápido, y un ticket que ya abriste vuelve a abrir al instante. «Recargar» trae el detalle de nuevo.',
+      'Preparar un PR tarda menos.'
+    ]
+  },
+  {
     version: '0.6.16',
     date: '2026-11-14',
     title: 'Pegar, conectores por cuenta y micrófono a mano',
