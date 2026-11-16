@@ -1,6 +1,10 @@
+import { randomUUID } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { FeatureContext } from './context'
+import type { ConvCandidata } from './chat-mcp-core'
+import { VIA_CLAUDE_PREFIX } from '../../shared/chat-mcp'
 import {
+  CHAT_LIMITS,
   convKey,
   type ChatAuth,
   type ChatConnection,
@@ -111,6 +115,12 @@ export interface ChatData {
   stop(): Promise<void>
   /** Entra a un equipo con su código (lo usa también la invitación completa). */
   joinByCode(code: unknown): Promise<ChatTeam>
+  /** Equipos y directos ya cargados, para el MCP. Sin listas (ventana cerrada) tira. */
+  conversaciones(): ConvCandidata[]
+  leerUltimos(conv: ChatConvRef, n: number): Promise<ChatMessage[]>
+  enviarViaClaude(conv: ChatConvRef, texto: string): Promise<ChatMessage>
+  /** El servidor tiene la 0005 (columna `via`). */
+  viaColumn(): boolean
 }
 
 export const EMPTY_PART: ChatDataPart = { connection: 'off', teams: [], threads: [], invites: [], unreadTotal: 0, extras: false, listsLoaded: false }
@@ -189,10 +199,11 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
   const failedTopics = new Set<string>()
   let broadcastWarned = false
   let extras = false
+  let viaCol = false
   const typingThrottle = new Throttle()
   let purgeTimer: ReturnType<typeof setInterval> | undefined
 
-  const cols = (): string => (extras ? MSG_COLS_EXTRAS : MSG_COLS_BASE)
+  const cols = (): string => `${extras ? MSG_COLS_EXTRAS : MSG_COLS_BASE}${viaCol ? ', via' : ''}`
 
   const clientNow = (): SupabaseClient => {
     const c = core.client() as SupabaseClient | null
@@ -251,6 +262,25 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     if (next === extras) return
     extras = next
     onChange()
+  }
+
+  /** La 0005 va aparte de la 0004: solo un «no existe la columna» dice que falta; otro error no cambia nada. */
+  async function detectVia(c: SupabaseClient): Promise<void> {
+    const r = await c.from('messages').select('via').limit(1)
+    if (r.error && !MISSING_SCHEMA.has(r.error.code ?? '')) {
+      ctx.log('chat: no se pudo comprobar la actualización 0005:', r.error.code ?? '?')
+      return
+    }
+    const next = !r.error
+    if (next === viaCol) return
+    viaCol = next
+    onChange()
+  }
+
+  function checkVia(c: SupabaseClient, g: number): Promise<void> {
+    return detectVia(c).catch((e: unknown) => {
+      if (g === gen) ctx.log('chat: no se pudo comprobar la actualización 0005:', msgOf(e))
+    })
   }
 
   /** Si el chequeo falla por la red, se queda con lo que sabía y reintenta; sin conexión, reintenta la reconexión. */
@@ -508,7 +538,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       if (subscribedOnce) {
         failedTopics.clear()
         const cl = core.client() as SupabaseClient | null
-        const check0 = cl ? checkExtras(cl, g) : Promise.resolve()
+        const check0 = cl ? Promise.all([checkExtras(cl, g), checkVia(cl, g)]) : Promise.resolve()
         void check0.then(() => (g === gen ? refreshLists(true) : undefined))
       }
       subscribedOnce = true
@@ -718,16 +748,13 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     if (view.open && view.conv && isFocused() && unreadOf(view.conv) > 0) markReadQuiet(view.conv)
   })
 
-  ctx.handle('messages', async (rawConv: unknown, rawBefore?: unknown, rawLimit?: unknown): Promise<ChatMessage[]> => {
+  async function readMessages(ref: ChatConvRef, beforeId: string | undefined, limit: number): Promise<ChatMessage[]> {
     const c = clientNow()
-    const ref = parseConvRef(rawConv)
-    const limit = parseLimit(rawLimit)
     let q = c
       .from('messages')
       .select(cols())
       .eq(ref.kind === 'team' ? 'team_id' : 'thread_id', ref.id)
-    if (rawBefore !== undefined && rawBefore !== null) {
-      const beforeId = parseUuid(rawBefore, 'Mensaje inválido.')
+    if (beforeId !== undefined) {
       const b = await c.from('messages').select('created_at').eq('id', beforeId).maybeSingle()
       check(b, 'No se pudo leer la conversación.')
       if (!b.data) return []
@@ -740,20 +767,25 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     const ordered = oldestFirst(rows)
     const msgs = ordered.map((r) => messageFromRow(r, profileFor(s(r.author_id)))).filter(isMsg)
     return enrich(c, ordered, msgs)
+  }
+
+  ctx.handle('messages', async (rawConv: unknown, rawBefore?: unknown, rawLimit?: unknown): Promise<ChatMessage[]> => {
+    const ref = parseConvRef(rawConv)
+    const limit = parseLimit(rawLimit)
+    const beforeId = rawBefore !== undefined && rawBefore !== null ? parseUuid(rawBefore, 'Mensaje inválido.') : undefined
+    return readMessages(ref, beforeId, limit)
   })
 
-  ctx.handle('send', async (rawConv: unknown, rawBody: unknown, rawClientId: unknown, rawReplyTo?: unknown): Promise<ChatMessage> => {
+  async function sendMessage(ref: ChatConvRef, text: string, clientId: string, replyTo: string | undefined, via?: 'claude'): Promise<ChatMessage> {
     const c = clientNow()
     const me = meNow()
-    const ref = parseConvRef(rawConv)
-    const body = parseBody(rawBody)
-    const clientId = parseClientId(rawClientId)
-    const replyTo = parseOptionalUuid(rawReplyTo)
     const col = ref.kind === 'team' ? 'team_id' : 'thread_id'
+    const useCol = via !== undefined && viaCol
+    const body = via !== undefined && !viaCol ? [...(VIA_CLAUDE_PREFIX + text)].slice(0, CHAT_LIMITS.body).join('') : text
     const insert = (reply: string | undefined) =>
       c
         .from('messages')
-        .insert({ [col]: ref.id, client_id: clientId, body, ...(extras && reply ? { reply_to: reply } : {}) })
+        .insert({ [col]: ref.id, client_id: clientId, body, ...(extras && reply ? { reply_to: reply } : {}), ...(useCol ? { via } : {}) })
         .select(cols())
     let res = await insert(replyTo)
     // Si el citado se borró mientras tanto, el mensaje sale igual, sin la cita: si no, «Reintentar» fallaría siempre.
@@ -783,7 +815,11 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     if (res.error.code === 'P0001' && res.error.message) throw new Error(res.error.message.slice(0, 300))
     if (res.error.code === '42501') throw new Error('No podés escribir en esta conversación.')
     throw new Error('No se pudo enviar el mensaje.')
-  })
+  }
+
+  ctx.handle('send', async (rawConv: unknown, rawBody: unknown, rawClientId: unknown, rawReplyTo?: unknown): Promise<ChatMessage> =>
+    sendMessage(parseConvRef(rawConv), parseBody(rawBody), parseClientId(rawClientId), parseOptionalUuid(rawReplyTo))
+  )
 
   async function changeOwn(rawConv: unknown, rawId: unknown, patch: Record<string, unknown>, denied: string): Promise<ChatMessage> {
     const c = clientNow()
@@ -1070,7 +1106,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
         onStatus: (st) => onStatus(g, st)
       })
       onChange()
-      await checkExtras(c, g)
+      await Promise.all([checkExtras(c, g), checkVia(c, g)])
       await refreshLists(true)
       if (g !== gen) return
       purgeExpired(c)
@@ -1101,6 +1137,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       failedTopics.clear()
       broadcastWarned = false
       extras = false
+      viaCol = false
       typingThrottle.clear()
       // removeAllChannels (al cerrar «sloth-inbox») cierra también los canales rápidos.
       topics.clear()
@@ -1109,6 +1146,20 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       if (close) await close().catch(() => undefined)
     },
 
-    joinByCode
+    joinByCode,
+
+    conversaciones: (): ConvCandidata[] => {
+      if (!listsLoaded) throw new Error('Abrí el chat de Sloth para cargar las conversaciones.')
+      return [
+        ...lists.teams.map((t): ConvCandidata => ({ conv: { kind: 'team', id: t.id }, nombre: t.name, tipo: 'equipo' })),
+        ...lists.threads.map((t): ConvCandidata => ({ conv: { kind: 'dm', id: t.id }, nombre: t.other.login, tipo: 'directo' }))
+      ]
+    },
+
+    leerUltimos: (conv: ChatConvRef, n: number): Promise<ChatMessage[]> => readMessages(conv, undefined, n),
+
+    enviarViaClaude: (conv: ChatConvRef, texto: string): Promise<ChatMessage> => sendMessage(conv, texto, randomUUID(), undefined, 'claude'),
+
+    viaColumn: (): boolean => viaCol
   }
 }
