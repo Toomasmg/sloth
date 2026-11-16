@@ -470,6 +470,12 @@ export async function loadMessages(conv: ChatConvRef, older = false): Promise<st
   }
 }
 
+/** Lo que hay en caché ahora mismo, sin esperar al render (para los bucles que paginan). */
+export function peekConv(conv: ChatConvRef): { list: ChatMessage[]; more: boolean } {
+  const key = convKey(conv)
+  return { list: msgs.get(key) ?? NO_MSGS, more: meta.get(key)?.more ?? false }
+}
+
 /** Marca leído la conversación (RPC en main). */
 export function markRead(conv: ChatConvRef): void {
   call('markRead', conv).catch(() => undefined)

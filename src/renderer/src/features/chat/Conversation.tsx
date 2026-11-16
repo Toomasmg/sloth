@@ -12,6 +12,8 @@ import {
   loadMessages,
   markRead,
   MAX_CACHED,
+  PAGE,
+  peekConv,
   useAnnouncement,
   useConvMessages,
   useConvMeta,
@@ -42,7 +44,9 @@ interface Props {
 const NEEDS_UPDATE = 'Editar, borrar, responder y reaccionar necesitan que el admin del servidor aplique la actualización 0004 del chat.'
 const TOO_OLD = 'Ese mensaje es muy viejo para mostrarlo acá.'
 const FLASH_MS = 1600
+const MAX_JUMP_PAGES = Math.ceil(MAX_CACHED / PAGE)
 const NOTICE_MS = 6000
+const EXPIRY_TICK_MS = 60_000
 let updateHintShown = false
 
 /**
@@ -52,7 +56,9 @@ let updateHintShown = false
 export function Conversation({ conv, title, photo, initial, role, me, otherReadAt, retentionHours, onBack, onModal }: Props): React.JSX.Element {
   const stored = useConvMessages(conv)
   const isTeam = conv.kind === 'team'
-  // La RLS ya no devuelve los vencidos; esto saca los que vencen con la conversación abierta.
+  // La RLS ya no devuelve los vencidos; esto saca los que vencen con la conversación abierta (el tick
+  // vuelve a renderizar aunque no llegue nada).
+  const [, setTick] = useState(0)
   const list = dropExpired(stored, isTeam ? retentionHours : undefined, Date.now())
   const info = useConvMeta(conv)
   const announce = useAnnouncement()
@@ -69,21 +75,28 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
   const searchBtnRef = useRef<HTMLButtonElement>(null)
   const pinRef = useRef(true)
   const prependRef = useRef<number | null>(null)
-  const listRef = useRef(list)
-  const infoRef = useRef(info)
+  const aliveRef = useRef(true)
   const timers = useRef<ReturnType<typeof setTimeout>[]>([])
   const canManage = isTeam && (role === 'owner' || role === 'admin')
-  listRef.current = list
-  infoRef.current = info
 
   // Al abrir: pedir los mensajes y marcar leído. Cada conversación tiene su propio montaje (key).
   useEffect(() => {
+    aliveRef.current = true
     markRead(conv)
     void loadMessages(conv).then((e) => e && setLoadErr(e))
     const pending = timers.current
-    return () => pending.forEach(clearTimeout)
+    return () => {
+      aliveRef.current = false
+      pending.forEach(clearTimeout)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conv.kind, conv.id])
+
+  useEffect(() => {
+    if (!isTeam || retentionHours === undefined) return
+    const t = setInterval(() => setTick((n) => n + 1), EXPIRY_TICK_MS)
+    return () => clearInterval(t)
+  }, [isTeam, retentionHours])
 
   // El aviso de la actualización 0004 sale una sola vez por sesión.
   useEffect(() => {
@@ -127,14 +140,19 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
 
   const jump = async (id: string): Promise<void> => {
     pinRef.current = false
-    while (!listRef.current.some((m) => m.id === id) && infoRef.current?.more && listRef.current.length < MAX_CACHED) {
+    const has = (): boolean => peekConv(conv).list.some((m) => m.id === id)
+    for (let i = 0; i < MAX_JUMP_PAGES && !has(); i++) {
+      const before = peekConv(conv)
+      if (!before.more || before.list.length >= MAX_CACHED) break
       const e = await loadMessages(conv, true)
+      if (!aliveRef.current) return
       if (e) {
         setLoadErr(e)
         return
       }
+      if (peekConv(conv).list.length === before.list.length) break
     }
-    if (!listRef.current.some((m) => m.id === id)) {
+    if (!has()) {
       setNotice(TOO_OLD)
       later(() => setNotice(undefined), NOTICE_MS)
       return
@@ -303,7 +321,7 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
       <div className="sr-only" role="status" aria-live="polite">
         {announce}
       </div>
-      <p className="f-chat-typing" aria-live="polite">
+      <p className="f-chat-typing">
         {extras ? typingText(typing) : ''}
       </p>
 
