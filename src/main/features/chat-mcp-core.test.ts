@@ -2,8 +2,11 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   conGrant,
+  cuentaDelToken,
   debeRegistrar,
   envolverContenido,
+  hashToken,
+  limpiarNombre,
   parsearConfig,
   parsearPedido,
   permitido,
@@ -51,6 +54,15 @@ test('validarTexto rechaza bidi e invisibles', () => {
 
 test('validarTexto deja \\n y \\t', () => {
   assert.equal(validarTexto(' hola\r\nchau\tya '), 'hola\nchau\tya')
+})
+
+test('validarTexto con un tope menor (marca como prefijo)', () => {
+  assert.equal(validarTexto('a'.repeat(3987), 3987).length, 3987)
+  assert.throws(() => validarTexto('a'.repeat(3988), 3987), /3987/)
+})
+
+test('limpiarNombre saca bidi e invisibles', () => {
+  assert.equal(limpiarNombre('ab\u202Ecd\u200B'), 'abcd')
 })
 
 test('validarN: por defecto 20 y rechaza fuera de rango', () => {
@@ -104,13 +116,18 @@ test('envolverContenido no deja cerrar el bloque desde un cuerpo', () => {
 
 test('parsearPedido acepta uno bien formado', () => {
   const p = parsearPedido(JSON.stringify({ token: TOKEN, ws: 'w1', pedido: { op: 'leer', conversacion: 'x', n: 3 } }))
-  assert.deepEqual(p, { token: TOKEN, ws: 'w1', cuenta: '', pedido: { op: 'leer', conversacion: 'x', n: 3 } })
-  assert.equal(parsearPedido(JSON.stringify({ token: TOKEN, cuenta: 'a1', pedido: { op: 'listar' } })).cuenta, 'a1')
+  assert.deepEqual(p, { token: TOKEN, ws: 'w1', pedido: { op: 'leer', conversacion: 'x', n: 3 } })
+  assert.deepEqual(Object.keys(parsearPedido(JSON.stringify({ token: TOKEN, cuenta: 'a1', pedido: { op: 'listar' } }))).sort(), ['pedido', 'token', 'ws'])
 })
 
-test('parsearPedido rechaza una cuenta que no es string o es larguísima', () => {
-  assert.throws(() => parsearPedido(JSON.stringify({ token: TOKEN, cuenta: 3, pedido: { op: 'listar' } })), /Cuenta/)
-  assert.throws(() => parsearPedido(JSON.stringify({ token: TOKEN, cuenta: 'x'.repeat(65), pedido: { op: 'listar' } })), /Cuenta/)
+test('cuentaDelToken deriva la cuenta del hash y no acepta otros', () => {
+  const B = 'b'.repeat(64)
+  const hashes = { a: hashToken(TOKEN), b: hashToken(B) }
+  assert.equal(cuentaDelToken(TOKEN, hashes), 'a')
+  assert.equal(cuentaDelToken(B, hashes), 'b')
+  assert.equal(cuentaDelToken('c'.repeat(64), hashes), undefined)
+  assert.equal(cuentaDelToken(TOKEN, {}), undefined)
+  assert.equal(cuentaDelToken(TOKEN, { a: 'no-es-hash' }), undefined)
 })
 
 test('parsearPedido rechaza token corto', () => {
@@ -122,34 +139,43 @@ test('parsearPedido rechaza op rara', () => {
   assert.throws(() => parsearPedido('no es json'), /inválido/)
 })
 
-test('conGrant y sinGrant son idempotentes', () => {
+test('los permisos van por cuenta y conversación, y solo para leer', () => {
   const conv = { kind: 'team' as const, id: T1 }
-  const a = conGrant({ grants: [] }, { conv, nombre: 'Diseño' }, 'leer', 1)
-  assert.equal(conGrant(a, { conv, nombre: 'Diseño' }, 'leer', 2), a)
-  const b = conGrant(a, { conv, nombre: 'Diseño' }, 'enviar', 3)
-  assert.deepEqual(b.grants[0].ops, ['leer', 'enviar'])
-  assert.equal(permitido(b, conv, 'enviar'), true)
-  const c = sinGrant(b, `team:${T1}`, 'enviar')
-  assert.deepEqual(sinGrant(c, `team:${T1}`, 'enviar'), c)
-  assert.equal(permitido(c, conv, 'enviar'), false)
-  assert.equal(permitido(c, conv, 'leer'), true)
-  assert.deepEqual(sinGrant(c, `team:${T1}`), { grants: [] })
-  assert.deepEqual(sinGrant({ grants: [] }, `team:${T1}`), { grants: [] })
+  const a = conGrant({ grants: [] }, 'a', { conv, nombre: 'Diseño' }, 1)
+  assert.equal(conGrant(a, 'a', { conv, nombre: 'Diseño' }, 2), a)
+  assert.equal(permitido(a, 'a', conv, 'leer'), true)
+  assert.equal(permitido(a, 'b', conv, 'leer'), false)
+  assert.equal(permitido(a, 'a', conv, 'enviar'), false)
+  const b = conGrant(a, 'b', { conv, nombre: 'Diseño' }, 3)
+  assert.equal(b.grants.length, 2)
+  const c = sinGrant(b, 'a', `team:${T1}`)
+  assert.equal(permitido(c, 'a', conv, 'leer'), false)
+  assert.equal(permitido(c, 'b', conv, 'leer'), true)
+  assert.deepEqual(sinGrant(c, 'b'), { grants: [] })
 })
 
 test('parsearConfig con basura queda apagado', () => {
-  assert.deepEqual(parsearConfig('x'), { enabled: false, cuentas: [], grants: [] })
-  assert.deepEqual(parsearConfig({ enabled: 'true', grants: 'no' }), { enabled: false, cuentas: [], grants: [] })
+  const vacio = { enabled: false, cuentas: [], grants: [], tokens: {} }
+  assert.deepEqual(parsearConfig('x'), vacio)
+  assert.deepEqual(parsearConfig({ enabled: 'true', grants: 'no', tokens: 'x' }), vacio)
   const ok = parsearConfig({
     enabled: true,
     grants: [
-      { conv: { kind: 'team', id: T1 }, nombre: 'A', ops: ['leer', 'leer', 'otra'], at: 5 },
-      { conv: { kind: 'team', id: 'no-uuid' }, nombre: 'B', ops: ['leer'], at: 1 },
-      { conv: { kind: 'dm', id: D1 }, ops: [] },
+      { accountId: 'a', conv: { kind: 'team', id: T1 }, nombre: 'A', at: 5 },
+      { accountId: 'a', conv: { kind: 'team', id: T1 }, nombre: 'repetido', at: 6 },
+      { conv: { kind: 'team', id: T2 }, nombre: 'sin cuenta (versión vieja)', ops: ['leer'], at: 1 },
+      { accountId: 'a', conv: { kind: 'dm', id: D1 }, nombre: 'solo enviar', ops: ['enviar'], at: 1 },
+      { accountId: 'a', conv: { kind: 'team', id: 'no-uuid' }, nombre: 'B', at: 1 },
       null
-    ]
+    ],
+    tokens: { a: 'f'.repeat(64), b: 'corto', c: 3 }
   })
-  assert.deepEqual(ok, { enabled: true, cuentas: [], grants: [{ conv: { kind: 'team', id: T1 }, nombre: 'A', ops: ['leer'], at: 5 }] })
+  assert.deepEqual(ok, {
+    enabled: true,
+    cuentas: [],
+    grants: [{ accountId: 'a', conv: { kind: 'team', id: T1 }, nombre: 'A', at: 5 }],
+    tokens: { a: 'f'.repeat(64) }
+  })
 })
 
 test('parsearConfig limpia la lista de cuentas', () => {

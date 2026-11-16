@@ -1,12 +1,13 @@
 /**
  * Chat por Claude: un MCP propio (`sloth`) con el que Claude lee y manda mensajes del chat de Sloth.
- * El script MCP habla con el main por un pipe local autenticado con un token; Supabase lo usa solo el main.
+ * El script MCP habla con el main por un pipe local. Cada cuenta habilitada tiene su token (llega al script
+ * por el env de su registro): el main deriva la cuenta del token. Supabase lo usa solo el main.
  *
  * Canales (feat:chat:<op>):
  *   mcpConfig()                              → ChatMcpView
  *   mcpSetEnabled(on: boolean)               → ChatMcpView
  *   mcpSetAccounts(ids: string[])            → ChatMcpView   (cuentas donde se registra el MCP)
- *   mcpRevoke(convKey: string, op?: ChatMcpOp) → ChatMcpView   (sin op, saca el permiso entero)
+ *   mcpRevoke(accountId: string, convKey: string) → ChatMcpView
  *   mcpRevokeAll()                           → ChatMcpView
  *   mcpPending()                             → ChatMcpAsk[]
  *   mcpAnswer(id: string, choice: ChatMcpChoice) → void
@@ -16,16 +17,18 @@
 import type { ChatConvRef } from './chat'
 
 export type ChatMcpOp = 'leer' | 'enviar'
+/** «always» solo vale para leer: enviar se confirma siempre viendo el texto. */
 export type ChatMcpChoice = 'once' | 'always' | 'deny'
 
+/** Permiso permanente de leer una conversación desde una cuenta. */
 export interface ChatMcpGrant {
+  accountId: string
   conv: ChatConvRef
   nombre: string
-  ops: ChatMcpOp[]
   at: number
 }
 
-export type ChatMcpRegState = 'ok' | 'pendiente' | 'conflicto' | 'sin-node' | 'error'
+export type ChatMcpRegState = 'revisando' | 'ok' | 'pendiente' | 'conflicto' | 'sin-node' | 'sin-cli' | 'error'
 
 export interface ChatMcpAccountReg {
   accountId: string
@@ -50,10 +53,11 @@ export interface ChatMcpAsk {
   op: ChatMcpOp
   conv: ChatConvRef
   nombre: string
-  /** Nombre del espacio que pide, o 'una terminal fuera de Sloth'. */
-  workspace: string
-  account?: string
-  /** Solo en 'enviar': el texto que se mandaría (ya validado). */
+  /** Cuenta que pide: sale del token, es lo único verificado del origen. */
+  account: string
+  /** Espacio que dice la terminal (SLOTH_WS): no verificado, y solo si es de esa cuenta. */
+  workspace?: string
+  /** Solo en 'enviar': el texto que escribió Claude y se mandaría (ya validado). */
   preview?: string
   expiresAt: number
 }

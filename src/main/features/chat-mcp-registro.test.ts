@@ -1,62 +1,64 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { aplicarRegistro, entradaMcp, esNuestra } from './chat-mcp-registro'
+import { argsAlta, argsBaja, esNuestra, leerRegistro, planificar, TOKEN_ENV } from './chat-mcp-registro'
+import { hashToken } from './chat-mcp-core'
 
-const E = entradaMcp('C:\\Users\\x\\AppData\\Roaming\\Sloth\\sloth-chat-mcp.cjs', 'acc-1')
+const SCRIPT = 'C:\\Users\\x\\AppData\\Roaming\\Sloth\\sloth-chat-mcp.cjs'
+const SCRIPT_N = 'C:/Users/x/AppData/Roaming/Sloth/sloth-chat-mcp.cjs'
+const TOKEN = 'a'.repeat(64)
+const nuestra = (env: Record<string, string> = { [TOKEN_ENV]: TOKEN }, script = SCRIPT_N) => ({ type: 'stdio', command: 'node', args: [script], env })
 const otro = { type: 'stdio', command: 'npx', args: ['otro-mcp'], env: {} }
 
-test('entradaMcp usa barras normales y fija la cuenta', () => {
-  assert.deepEqual(E, { type: 'stdio', command: 'node', args: ['C:/Users/x/AppData/Roaming/Sloth/sloth-chat-mcp.cjs', '--cuenta', 'acc-1'], env: {} })
-  assert.equal(esNuestra(E), true)
+test('esNuestra mira el script, con cualquier barra', () => {
+  assert.equal(esNuestra(nuestra()), true)
+  assert.equal(esNuestra({ args: [SCRIPT] }), true)
   assert.equal(esNuestra(otro), false)
+  assert.equal(esNuestra(null), false)
 })
 
-test('alta en un .claude.json vacío', () => {
-  const r = aplicarRegistro({}, E)
-  assert.deepEqual(r, { state: 'ok', json: { mcpServers: { sloth: E } } })
+test('leerRegistro: ausente, ajena, nuestra con y sin token', () => {
+  assert.deepEqual(leerRegistro({}), { estado: 'ausente' })
+  assert.deepEqual(leerRegistro({ mcpServers: { otro } }), { estado: 'ausente' })
+  assert.deepEqual(leerRegistro({ mcpServers: { sloth: otro } }), { estado: 'ajena' })
+  assert.deepEqual(leerRegistro({ mcpServers: [] }), { estado: 'ajena' })
+  assert.deepEqual(leerRegistro('x'), { estado: 'ajena' })
+  assert.deepEqual(leerRegistro({ mcpServers: { sloth: nuestra() } }), { estado: 'nuestra', script: SCRIPT_N, token: TOKEN })
+  const vieja = { type: 'stdio', command: 'node', args: [SCRIPT_N, '--cuenta', 'acc-1'], env: {} }
+  assert.deepEqual(leerRegistro({ mcpServers: { sloth: vieja } }), { estado: 'nuestra', script: SCRIPT_N })
 })
 
-test('alta idempotente: la segunda vez no hay nada que escribir', () => {
-  const r = aplicarRegistro({}, E)
-  assert.deepEqual(aplicarRegistro(r.json ?? {}, E), { state: 'ok' })
+test('planificar: alta, nada, reemplazo y baja', () => {
+  const h = hashToken(TOKEN)
+  const conToken = leerRegistro({ mcpServers: { sloth: nuestra() } })
+  assert.equal(planificar(true, { estado: 'ausente' }, SCRIPT, h, hashToken), 'alta')
+  assert.equal(planificar(false, { estado: 'ausente' }, SCRIPT, undefined, hashToken), 'nada')
+  assert.equal(planificar(true, conToken, SCRIPT, h, hashToken), 'nada')
+  assert.equal(planificar(false, conToken, SCRIPT, h, hashToken), 'baja')
 })
 
-test('alta conserva otros servidores y claves sin mutar la entrada', () => {
-  const json = { numStartups: 3, mcpServers: { otro } }
-  const antes = JSON.stringify(json)
-  const r = aplicarRegistro(json, E)
-  assert.equal(JSON.stringify(json), antes)
-  assert.deepEqual(r.json, { numStartups: 3, mcpServers: { otro, sloth: E } })
+test('planificar reemplaza si el token no es el que reconoce el main, o si cambió la ruta', () => {
+  const conToken = leerRegistro({ mcpServers: { sloth: nuestra() } })
+  assert.equal(planificar(true, conToken, SCRIPT, undefined, hashToken), 'reemplazo')
+  assert.equal(planificar(true, conToken, SCRIPT, hashToken('b'.repeat(64)), hashToken), 'reemplazo')
+  assert.equal(planificar(true, conToken, 'D:/otro/sloth-chat-mcp.cjs', hashToken(TOKEN), hashToken), 'reemplazo')
+  assert.equal(planificar(true, leerRegistro({ mcpServers: { sloth: nuestra({}) } }), SCRIPT, hashToken(TOKEN), hashToken), 'reemplazo')
 })
 
-test('actualiza una ruta vieja nuestra', () => {
-  const vieja = entradaMcp('D:/viejo/sloth-chat-mcp.cjs', 'acc-1')
-  const r = aplicarRegistro({ mcpServers: { sloth: vieja } }, E)
-  assert.deepEqual(r, { state: 'ok', json: { mcpServers: { sloth: E } } })
+test('planificar no toca un sloth ajeno', () => {
+  assert.equal(planificar(true, { estado: 'ajena' }, SCRIPT, undefined, hashToken), 'conflicto')
+  assert.equal(planificar(false, { estado: 'ajena' }, SCRIPT, undefined, hashToken), 'nada')
 })
 
-test('la entrada de E1 sin cuenta, o con otra cuenta, se reescribe', () => {
-  const sinCuenta = { type: 'stdio', command: 'node', args: ['C:/Users/x/AppData/Roaming/Sloth/sloth-chat-mcp.cjs'], env: {} }
-  assert.deepEqual(aplicarRegistro({ mcpServers: { sloth: sinCuenta } }, E), { state: 'ok', json: { mcpServers: { sloth: E } } })
-  const otraCuenta = entradaMcp('C:/Users/x/AppData/Roaming/Sloth/sloth-chat-mcp.cjs', 'acc-2')
-  assert.deepEqual(aplicarRegistro({ mcpServers: { sloth: otraCuenta } }, E), { state: 'ok', json: { mcpServers: { sloth: E } } })
+test('argsAlta arma el comando del CLI con el token en el env del servidor', () => {
+  assert.deepEqual(argsAlta(SCRIPT, TOKEN), ['mcp', 'add', '-s', 'user', 'sloth', '-e', `${TOKEN_ENV}=${TOKEN}`, '--', 'node', SCRIPT_N])
+  assert.deepEqual(argsBaja(), ['mcp', 'remove', '-s', 'user', 'sloth'])
 })
 
-test('un sloth ajeno es conflicto y no se toca', () => {
-  assert.deepEqual(aplicarRegistro({ mcpServers: { sloth: otro } }, E), { state: 'conflicto' })
-})
-
-test('baja de la nuestra', () => {
-  const r = aplicarRegistro({ a: 1, mcpServers: { otro, sloth: E } }, null)
-  assert.deepEqual(r, { state: 'ok', json: { a: 1, mcpServers: { otro } } })
-})
-
-test('baja con una ajena no cambia nada', () => {
-  assert.deepEqual(aplicarRegistro({ mcpServers: { sloth: otro } }, null), { state: 'ok' })
-  assert.deepEqual(aplicarRegistro({}, null), { state: 'ok' })
-})
-
-test('mcpServers que no es objeto es conflicto', () => {
-  assert.deepEqual(aplicarRegistro({ mcpServers: [] }, E), { state: 'conflicto' })
-  assert.deepEqual(aplicarRegistro({ mcpServers: 'x' }, null), { state: 'conflicto' })
+test('argsAlta rechaza tokens y rutas raras', () => {
+  assert.throws(() => argsAlta(SCRIPT, 'corto'), /Token/)
+  assert.throws(() => argsAlta(SCRIPT, `${TOKEN}\n-e X=1`), /Token/)
+  assert.throws(() => argsAlta('relativo/sloth-chat-mcp.cjs', TOKEN), /Ruta/)
+  assert.throws(() => argsAlta('C:/x/otro.cjs', TOKEN), /Ruta/)
+  assert.throws(() => argsAlta('C:/x"/sloth-chat-mcp.cjs', TOKEN), /Ruta/)
+  assert.throws(() => argsAlta('C:/x\n/sloth-chat-mcp.cjs', TOKEN), /Ruta/)
 })
