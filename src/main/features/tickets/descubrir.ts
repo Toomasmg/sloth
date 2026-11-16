@@ -20,11 +20,11 @@ export interface Descubiertas {
   bloqueadas: number
 }
 
-export function buildDescubrirArgs(schema: object = DESCUBRIR_SCHEMA): string[] {
+export function buildDescubrirArgs(schema: object = DESCUBRIR_SCHEMA, formato: 'json' | 'stream-json' = 'json'): string[] {
   return [
     '-p',
     '--output-format',
-    'json',
+    formato,
     '--verbose',
     '--model',
     'haiku',
@@ -39,6 +39,7 @@ export function buildDescubrirArgs(schema: object = DESCUBRIR_SCHEMA): string[] 
     '--disallowedTools',
     '',
     '--no-session-persistence',
+    '--disable-slash-commands',
     '--permission-mode',
     'default',
     // La respuesta estructurada (StructuredOutput) ya cuenta como un turno.
