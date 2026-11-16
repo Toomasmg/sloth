@@ -83,6 +83,17 @@ const startOfToday = (): number => {
   return d.getTime()
 }
 
+let responder: ((id: string, choice: PermissionChoice) => void) | null = null
+
+/**
+ * Responde un pedido pendiente con la misma lógica que las tarjetas de la app (queda en el historial
+ * de decisiones). Lo usa «celular». Lanza si el pedido ya no está pendiente.
+ */
+export function responderPermiso(id: string, choice: 'allow' | 'deny'): void {
+  if (!responder) throw new Error('Los permisos todavía no están listos.')
+  responder(id, choice)
+}
+
 const feature: Feature = {
   name: 'permissions',
   register(ctx: FeatureContext) {
@@ -127,6 +138,12 @@ const feature: Feature = {
       else if (choice === 'terminal') remember({ ...base, tag: 'terminal' })
       b.answerPermission(id, decisionFor(choice, message))
       save()
+    }
+
+    responder = (id, choice) => {
+      const b = ctx.terminal()
+      if (!b) throw new Error('Las terminales todavía no están listas.')
+      answer(b, id, choice)
     }
 
     function showWindow(wsId?: string): void {
