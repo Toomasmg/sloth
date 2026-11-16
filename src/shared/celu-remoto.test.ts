@@ -20,6 +20,7 @@ import {
   validarHola,
   VIEJO_MS
 } from './celu-remoto'
+import { qrDeTexto } from './qr'
 
 const ID = '3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b'
 const OTRO_ID = '00000000-1111-2222-3333-444444444444'
@@ -81,6 +82,18 @@ test('enlaceCelu y leerEmparejamiento: ida y vuelta', () => {
   assert.ok(enlace.startsWith(`${CELU_WEB_URL}#p=`))
   assert.deepEqual(leerEmparejamiento(new URL(enlace).hash), p)
   assert.deepEqual(leerEmparejamiento(enlaceCelu(p, 'http://localhost:5173/').split('#')[1]), p)
+})
+
+test('el enlace con una anon key JWT entra en el QR', () => {
+  const jwt = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${'e'.repeat(139)}.${'s'.repeat(43)}`
+  assert.equal(jwt.length, 220)
+  const p = { u: 'https://abcdefghijklmnopqrst.supabase.co', k: jwt, s: S, id: ID }
+  const enlace = enlaceCelu(p)
+  assert.equal(S.length, 43)
+  assert.ok(enlace.length > 500)
+  const qr = qrDeTexto(enlace)
+  assert.ok(qr.size <= 25 * 4 + 17)
+  assert.deepEqual(leerEmparejamiento(new URL(enlace).hash), p)
 })
 
 test('leerEmparejamiento rechaza http, ids raros, secretos cortos y basura', () => {
