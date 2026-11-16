@@ -388,11 +388,28 @@ const feature: Feature = {
       return vista()
     })
 
-    ctx.handle('remoto-regenerar', async () => {
+    // Con la clave nueva la PC deja de publicar con la vieja y no abre decisiones selladas con ella. El
+    // secreto no frena una sesión de GitHub robada: para eso se cierran las sesiones de los otros dispositivos.
+    ctx.handle('remoto-regenerar', async (p: unknown) => {
+      const { cerrarOtras } = (p ?? {}) as { cerrarOtras?: unknown }
+      if (cerrarOtras !== undefined && typeof cerrarOtras !== 'boolean') throw new Error('Valor inválido.')
+      const anterior = cfg.remoto
       cfg.remoto = { ...cfg.remoto, secreto: nuevoToken() }
-      guardar()
+      try {
+        guardarConfig(cfg)
+      } catch (e) {
+        cfg.remoto = anterior
+        throw new Error(`No se pudo guardar el código nuevo: ${(e as Error).message}`)
+      }
       ctx.log('secreto remoto regenerado: los celus anteriores quedan afuera')
-      return aplicarRemota()
+      const v = await aplicarRemota()
+      if (!cerrarOtras) return v
+      const s = sesionChat()
+      if (!s) throw new Error('El código es nuevo, pero sin sesión en el chat no pude cerrar las sesiones de los otros dispositivos.')
+      const { error } = await s.client.auth.signOut({ scope: 'others' })
+      if (error) throw new Error(`El código es nuevo, pero no pude cerrar las sesiones de los otros dispositivos: ${error.message}`)
+      ctx.log('sesiones del chat de los otros dispositivos cerradas')
+      return v
     })
 
     ctx.handle('probar-ntfy', () => mandarNtfy('termino', '', undefined, true))

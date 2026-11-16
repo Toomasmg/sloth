@@ -5,15 +5,31 @@ import { Qr } from './CelularPanel'
 
 interface Props {
   v: CelularVista
-  hacer: (op: string, ...args: unknown[]) => Promise<void>
+  hacer: (op: string, ...args: unknown[]) => Promise<boolean>
   copiar: (texto: string, que: string) => Promise<void>
+  ocupado: boolean
 }
 
 /** «Desde cualquier red»: el celu ve Sloth por el Supabase del chat, con todo cifrado de punta a punta. */
-export function RemotoSeccion({ v, hacer, copiar }: Props): React.JSX.Element | null {
+export function RemotoSeccion({ v, hacer, copiar, ocupado }: Props): React.JSX.Element | null {
   const [confirmar, setConfirmar] = useState(false)
+  const [cerrarOtras, setCerrarOtras] = useState(true)
   const r = v.remoto
   if (!r) return null
+  const enlace = r.enlace
+
+  const regenerar = async (): Promise<void> => {
+    if (ocupado) {
+      toast({ tone: 'danger', message: 'Sloth está terminando otro cambio. Probá regenerar de nuevo en un momento.' })
+      return
+    }
+    setConfirmar(false)
+    if (await hacer('remoto-regenerar', { cerrarOtras }))
+      toast({
+        tone: 'success',
+        message: cerrarOtras ? 'Código nuevo y sesiones de los otros dispositivos cerradas. Los celus de antes quedaron afuera.' : 'Código nuevo. Los celus de antes ya no pueden ver ni aprobar nada.'
+      })
+  }
 
   return (
     <section className="f-cel-sec" aria-labelledby="f-cel-remoto">
@@ -29,9 +45,9 @@ export function RemotoSeccion({ v, hacer, copiar }: Props): React.JSX.Element | 
       {r.encendido && r.estado === 'conectando' && <p className="f-cel-nota">Conectando…</p>}
       {r.encendido && r.estado === 'error' && <InlineAlert tone="danger">{r.error ?? 'No se pudo conectar.'}</InlineAlert>}
 
-      {r.encendido && r.estado === 'listo' && r.enlace && (
+      {r.encendido && r.estado === 'listo' && enlace && (
         <div className="f-cel-qrbox">
-          <Qr texto={r.enlace} />
+          <Qr texto={enlace} />
           <div className="f-cel-qrtexto">
             {r.celuActivo && (
               <p className="f-cel-ok f-cel-remoto-activo" role="status">
@@ -39,9 +55,10 @@ export function RemotoSeccion({ v, hacer, copiar }: Props): React.JSX.Element | 
               </p>
             )}
             <p className="f-cel-nota">Escaneá con la cámara y entrá con la misma cuenta de GitHub. Después podés instalarla como app.</p>
-            <Button size="sm" variant="secondary" onClick={() => void copiar(r.enlace as string, 'Enlace')}>
+            <Button size="sm" variant="secondary" onClick={() => void copiar(enlace, 'Enlace')}>
               Copiar enlace
             </Button>
+            <p className="f-cel-nota">El enlace lleva el código: no lo pegues en chats ni lo dejes en el portapapeles.</p>
           </div>
         </div>
       )}
@@ -49,7 +66,11 @@ export function RemotoSeccion({ v, hacer, copiar }: Props): React.JSX.Element | 
       {r.encendido && r.estado === 'listo' &&
         (confirmar ? (
           <div className="f-cel-confirm" role="group" aria-label="Regenerar el código del celu remoto">
-            <p>Los celus que ya escanearon el código dejan de ver Sloth hasta que escaneen el nuevo.</p>
+            <p>Los celus que ya escanearon el código dejan de ver Sloth y de poder aprobar hasta que escaneen el nuevo.</p>
+            <Switch checked={cerrarOtras} onChange={setCerrarOtras}>
+              Cerrar también la sesión de GitHub en los otros dispositivos
+            </Switch>
+            <p className="f-cel-nota">Si perdiste el celu, dejalo prendido. Sloth sigue con su sesión en esta PC; en otras PCs con esta cuenta vas a tener que volver a entrar al chat.</p>
             <div className="f-cel-acciones">
               <Button size="sm" variant="ghost" onClick={() => setConfirmar(false)}>
                 Cancelar
@@ -57,10 +78,7 @@ export function RemotoSeccion({ v, hacer, copiar }: Props): React.JSX.Element | 
               <Button
                 size="sm"
                 variant="danger"
-                onClick={() => {
-                  setConfirmar(false)
-                  void hacer('remoto-regenerar').then(() => toast({ tone: 'success', message: 'Código nuevo. Los celus de antes quedaron afuera.' }))
-                }}
+                onClick={() => void regenerar()}
               >
                 Regenerar código
               </Button>
