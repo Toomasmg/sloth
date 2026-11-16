@@ -18,6 +18,7 @@ export const READ_EVENT = 'read'
 /** Realtime corta en 100 canales por conexión; uno queda para «sloth-inbox» y el resto de margen. */
 export const MAX_TOPICS = 90
 export const SEEN_MAX = 2000
+export const TYPING_MIN_MS = 3000
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const TOPIC_RE = /^(team|thread):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
@@ -135,5 +136,26 @@ export class SeenIds {
 
   clear(): void {
     this.ids.clear()
+  }
+}
+
+/** Limita un aviso por clave: `ok` es true si pasaron al menos `minMs` desde el último que dejó pasar. */
+export class Throttle {
+  private last = new Map<string, number>()
+  private minMs: number
+
+  constructor(minMs = TYPING_MIN_MS) {
+    this.minMs = minMs
+  }
+
+  ok(key: string, at: number): boolean {
+    const prev = this.last.get(key)
+    if (prev !== undefined && at - prev < this.minMs) return false
+    this.last.set(key, at)
+    return true
+  }
+
+  clear(): void {
+    this.last.clear()
   }
 }

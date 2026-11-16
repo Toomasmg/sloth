@@ -7,6 +7,7 @@ import {
   readFromBroadcast,
   rowFromBroadcast,
   SeenIds,
+  Throttle,
   topicOf,
   typingFromBroadcast,
   versionKey,
@@ -133,4 +134,12 @@ test('versionKey cambia al editar o borrar', () => {
   assert.notEqual(versionKey({ ...teamRow, edited_at: AT }), base)
   assert.notEqual(versionKey({ ...teamRow, deleted_at: AT }), versionKey({ ...teamRow, edited_at: AT }))
   assert.equal(versionKey({ ...teamRow }), base)
+})
+
+test('Throttle: repite recién a los 3 s y por clave', () => {
+  const th = new Throttle()
+  assert.equal(th.ok('a', 1000), true)
+  assert.equal(th.ok('a', 3999), false)
+  assert.equal(th.ok('b', 3999), true)
+  assert.equal(th.ok('a', 4000), true)
 })

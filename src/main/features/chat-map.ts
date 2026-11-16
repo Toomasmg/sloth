@@ -349,11 +349,12 @@ export function otherOf(row: ThreadRow, meId: string): string | undefined {
   return undefined
 }
 
-export function threadFromRow(row: ThreadRow, other: ChatProfile, info: { unread: number; lastMessageAt?: number }): ChatThread | undefined {
+export function threadFromRow(row: ThreadRow, other: ChatProfile, info: { unread: number; lastMessageAt?: number; otherReadAt?: number }): ChatThread | undefined {
   const id = str(row.id)
   if (!id) return undefined
   const t: ChatThread = { id, other, unread: info.unread }
   if (info.lastMessageAt !== undefined) t.lastMessageAt = info.lastMessageAt
+  if (info.otherReadAt !== undefined) t.otherReadAt = info.otherReadAt
   return t
 }
 

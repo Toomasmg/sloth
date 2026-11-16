@@ -10,6 +10,9 @@ import {
   type ChatMember,
   type ChatMessage,
   type ChatProfile,
+  type ChatReactionEvent,
+  type ChatReadEvent,
+  type ChatTypingEvent,
   type ChatSnapshot,
   type ChatTeam,
   type ChatThread,
@@ -24,20 +27,27 @@ import {
   compareMembers,
   messageFromRow,
   MSG_COLS_BASE,
+  MSG_COLS_EXTRAS,
   memberFromRow,
   oldestFirst,
   otherOf,
+  otherReadAt,
   parseBody,
   parseClientId,
   parseConvRef,
+  parseEmoji,
   parseInviteCode,
   parseLimit,
   parseLogin,
+  parseOptionalUuid,
+  parseSearch,
   parseTeamFields,
   parseUuid,
   parseView,
   photoPathOf,
   profileFromRow,
+  reactionsByMessage,
+  replyRefFrom,
   roleOf,
   sameConv,
   sortByActivity,
@@ -51,7 +61,24 @@ import {
 } from './chat-map'
 import { decodePhotoBase64, downloadTeamPhoto, PhotoCache, removeTeamPhoto, uploadTeamPhoto, type Photo } from './chat-photos'
 import { openInbox, openTopic } from './chat-realtime'
-import { BROADCAST_EVENT, convOfTopic, diffTopics, rowFromBroadcast, SeenIds, wantedTopics } from './chat-topics'
+import {
+  BROADCAST_EVENT,
+  convOfTopic,
+  diffTopics,
+  reactionFromBroadcast,
+  READ_EVENT,
+  REACTION_EVENT,
+  readFromBroadcast,
+  rowFromBroadcast,
+  SeenIds,
+  Throttle,
+  TYPING_EVENT,
+  typingFromBroadcast,
+  UPDATE_EVENT,
+  versionKey,
+  wantedTopics
+} from './chat-topics'
+import { escapeLike, mentionsLogin } from '../../shared/chat-text'
 import { currentSettings } from './settings'
 
 /**
@@ -155,6 +182,10 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
   const topics = new Map<string, () => Promise<void>>()
   const failedTopics = new Set<string>()
   let broadcastWarned = false
+  let extras = false
+  const typingThrottle = new Throttle()
+
+  const cols = (): string => (extras ? MSG_COLS_EXTRAS : MSG_COLS_BASE)
 
   const clientNow = (): SupabaseClient => {
     const c = core.client() as SupabaseClient | null
@@ -195,6 +226,50 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       const p = profileFromRow(row)
       if (p) cacheProfile(p)
     }
+  }
+
+  // ---------- mensajes enriquecidos ----------
+
+  /** El servidor tiene la 0004 si existen sus columnas y la tabla de reacciones. */
+  async function detectExtras(c: SupabaseClient): Promise<void> {
+    const [a, b] = await Promise.all([
+      c.from('messages').select('id, edited_at, deleted_at, reply_to').limit(1),
+      c.from('message_reactions').select('message_id').limit(1)
+    ])
+    const next = !a.error && !b.error
+    if (next === extras) return
+    extras = next
+    onChange()
+  }
+
+  /** Suma reacciones (si `withReactions`) y el mensaje al que responde cada uno. Sin la 0004 no hace nada. */
+  async function enrich(c: SupabaseClient, rows: MessageRow[], msgs: ChatMessage[], withReactions = true): Promise<ChatMessage[]> {
+    if (!extras || msgs.length === 0) return msgs
+    const inPage = new Map(rows.map((r) => [s(r.id), r]))
+    const missing = uniq(rows.map((r) => s(r.reply_to)).filter((id) => id !== '' && !inPage.has(id)))
+    const [react, parents] = await Promise.all([
+      withReactions ? c.from('message_reactions').select('message_id, user_id, emoji').in('message_id', msgs.map((m) => m.id)) : undefined,
+      missing.length ? c.from('messages').select('id, author_id, body, deleted_at').in('id', missing) : undefined
+    ])
+    const reactionRows = react && !react.error ? ((react.data ?? []) as Array<{ message_id: unknown; user_id: unknown; emoji: unknown }>) : []
+    const parentRows = parents && !parents.error ? ((parents.data ?? []) as Array<{ id: unknown; author_id: unknown; body: unknown; deleted_at?: unknown }>) : []
+    for (const r of rows) {
+      const p = inPage.get(s(r.reply_to))
+      if (p) parentRows.push(p)
+    }
+    await loadProfiles(c, [...reactionRows.map((r) => s(r.user_id)), ...parentRows.map((r) => s(r.author_id))])
+    const byMessage = reactionsByMessage(reactionRows, (id) => profileFor(id).login)
+    const parentById = new Map(parentRows.map((r) => [s(r.id), r]))
+    const replyOf = new Map(rows.map((r) => [s(r.id), s(r.reply_to)]))
+    return msgs.map((m) => {
+      const out = { ...m }
+      const reactions = byMessage.get(m.id)
+      if (reactions) out.reactions = reactions
+      const parent = parentById.get(replyOf.get(m.id) ?? '')
+      const ref = parent ? replyRefFrom(parent, profileFor(s(parent.author_id)).login) : undefined
+      if (ref) out.replyTo = ref
+      return out
+    })
   }
 
   // ---------- fotos ----------
@@ -248,7 +323,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     const [mem, inv, thr, unr] = await Promise.all([
       c.from('team_members').select('team_id, role').eq('user_id', meId),
       c.from('team_invites').select('id, team_id, invited_by, created_at').eq('github_login_lower', me.login.toLowerCase()),
-      c.from('dm_threads').select('id, user_a, user_b'),
+      c.from('dm_threads').select('id, user_a, user_b, last_read_a, last_read_b'),
       c.rpc('unread_counts')
     ])
     check(mem, 'No se pudieron leer tus equipos.')
@@ -316,7 +391,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       const other = otherOf(r, meId)
       if (!other) continue
       const u = unread.get(convKey({ kind: 'dm', id: s(r.id) }))
-      const t = threadFromRow(r, profileFor(other), { unread: u?.unread ?? 0, lastMessageAt: u?.lastMessageAt })
+      const t = threadFromRow(r, profileFor(other), { unread: u?.unread ?? 0, lastMessageAt: u?.lastMessageAt, otherReadAt: otherReadAt(r, meId) })
       if (t) threads.push(t)
     }
     sortByActivity(threads, (t) => t.other.login)
@@ -406,7 +481,9 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       // rápidos que se cayeron con la conexión se vuelven a probar al recargar las listas.
       if (subscribedOnce) {
         failedTopics.clear()
-        void refreshLists(true)
+        const cl = core.client() as SupabaseClient | null
+        const check0 = cl ? detectExtras(cl).catch(() => ctx.log('chat: no se pudo comprobar la actualización 0004.')) : Promise.resolve()
+        void check0.then(() => (g === gen ? refreshLists(true) : undefined))
       }
       subscribedOnce = true
     } else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') {
@@ -427,12 +504,14 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     const c = core.client() as SupabaseClient | null
     if (!isRow(raw) || !me || !c) return
     const conv = convOfRow(raw)
-    if (!conv || !seen.first(s(raw.id))) return
+    if (!conv || !seen.first(versionKey(raw))) return
     const authorId = s(raw.author_id)
     await loadProfiles(c, [authorId])
     if (g !== gen) return
-    const msg = messageFromRow(raw, profileFor(authorId))
-    if (!msg) return
+    const base = messageFromRow(raw, profileFor(authorId))
+    if (!base) return
+    const msg = (await enrich(c, [raw], [base], false))[0] ?? base
+    if (g !== gen) return
     // Propio o ajeno: la UI reemplaza su «enviando…» por clientId, así que no se duplica.
     ctx.emit('message', msg)
     if (authorId === me.id) return
@@ -453,7 +532,59 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     onChange()
     // Avisos del sistema: solo con «notify.team» activo y fuera de «No molestar» (Configuración).
     const st = currentSettings()
-    if (!focused && st.notify.team && !st.noMolestar) void notify(conv, msg.author, msg.body).catch(() => undefined)
+    if (!focused && st.notify.team && !st.noMolestar) {
+      void notify(conv, msg.author, msg.body, mentionsLogin(msg.body, me.login)).catch(() => undefined)
+    }
+  }
+
+  async function onUpdateRow(g: number, raw: unknown): Promise<void> {
+    if (g !== gen) return
+    const c = core.client() as SupabaseClient | null
+    if (!isRow(raw) || !c) return
+    if (!convOfRow(raw) || !seen.first(versionKey(raw))) return
+    const authorId = s(raw.author_id)
+    await loadProfiles(c, [authorId])
+    if (g !== gen) return
+    const base = messageFromRow(raw, profileFor(authorId))
+    if (!base) return
+    const msg = (await enrich(c, [raw], [base], false))[0] ?? base
+    if (g !== gen) return
+    ctx.emit('message', msg)
+  }
+
+  async function onReaction(g: number, conv: ChatConvRef, payload: unknown): Promise<void> {
+    const ev = reactionFromBroadcast(payload)
+    const c = core.client() as SupabaseClient | null
+    if (g !== gen || !ev || !c || !core.me()) return
+    await loadProfiles(c, [ev.userId])
+    if (g !== gen) return
+    ctx.emit('reaction', {
+      conv,
+      messageId: ev.messageId,
+      emoji: ev.emoji,
+      userId: ev.userId,
+      login: profileFor(ev.userId).login,
+      op: ev.op
+    } satisfies ChatReactionEvent)
+  }
+
+  async function onTyping(g: number, conv: ChatConvRef, payload: unknown): Promise<void> {
+    const ev = typingFromBroadcast(payload)
+    const c = core.client() as SupabaseClient | null
+    const me = core.me()
+    if (g !== gen || !ev || !c || !me || ev.userId === me.id) return
+    await loadProfiles(c, [ev.userId])
+    if (g !== gen) return
+    ctx.emit('typing', { conv, userId: ev.userId, login: profileFor(ev.userId).login } satisfies ChatTypingEvent)
+  }
+
+  function onRead(g: number, conv: ChatConvRef, payload: unknown): void {
+    const ev = readFromBroadcast(payload)
+    const me = core.me()
+    if (g !== gen || !ev || !me || conv.kind !== 'dm' || ev.userId === me.id) return
+    lists = { ...lists, threads: lists.threads.map((t) => (t.id === conv.id ? { ...t, otherReadAt: ev.at } : t)) }
+    onChange()
+    ctx.emit('read', { conv, userId: ev.userId, at: ev.at } satisfies ChatReadEvent)
   }
 
   function closeTopic(topic: string): void {
@@ -474,14 +605,28 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       if (!conv) continue
       topics.set(
         t,
-        openTopic(c, t, BROADCAST_EVENT, {
-          onMessage: (payload) => {
-            if (g !== gen) return
-            const row = rowFromBroadcast(payload, conv)
-            if (row) onInsertRow(g, row).catch(() => ctx.log('chat: no se pudo procesar un mensaje nuevo.'))
+        openTopic(
+          c,
+          t,
+          {
+            [BROADCAST_EVENT]: (payload) => {
+              const row = rowFromBroadcast(payload, conv)
+              if (row) onInsertRow(g, row).catch(() => ctx.log('chat: no se pudo procesar un mensaje nuevo.'))
+            },
+            [UPDATE_EVENT]: (payload) => {
+              const row = rowFromBroadcast(payload, conv)
+              if (row) onUpdateRow(g, row).catch(() => ctx.log('chat: no se pudo procesar un mensaje editado.'))
+            },
+            [REACTION_EVENT]: (payload) => {
+              onReaction(g, conv, payload).catch(() => ctx.log('chat: no se pudo procesar una reacción.'))
+            },
+            [TYPING_EVENT]: (payload) => {
+              onTyping(g, conv, payload).catch(() => ctx.log('chat: no se pudo procesar un aviso de escritura.'))
+            },
+            [READ_EVENT]: (payload) => onRead(g, conv, payload)
           },
-          onStatus: (st) => onTopicStatus(g, t, st)
-        })
+          (st) => onTopicStatus(g, t, st)
+        )
       )
     }
   }
@@ -499,19 +644,20 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     ctx.log('chat: el canal rápido (Broadcast) no está disponible; sigue con postgres_changes. ¿Falta aplicar 0003_realtime_broadcast.sql?')
   }
 
-  /** Aviso del sistema para un mensaje ajeno con la ventana sin foco. Como mucho uno cada 5 s por conversación. */
-  async function notify(conv: ChatConvRef, author: ChatProfile, body: string): Promise<void> {
+  /** Aviso del sistema para un mensaje ajeno con la ventana sin foco. Como mucho uno cada 5 s por conversación, salvo que mencionen al usuario. */
+  async function notify(conv: ChatConvRef, author: ChatProfile, body: string, mention = false): Promise<void> {
     const t = now()
     const key = convKey(conv)
     const last = lastNotify.get(key)
-    if (last !== undefined && t - last < NOTIFY_MIN_MS) return
+    if (!mention && last !== undefined && t - last < NOTIFY_MIN_MS) return
     lastNotify.set(key, t)
     const w = ctx.window()
     if (!w || w.isDestroyed()) return
     const N = await loadNotifier().catch(() => undefined)
     if (!N || !N.isSupported()) return ctx.log('chat: el sistema no soporta notificaciones.')
     const where = conv.kind === 'team' ? (lists.teams.find((x) => x.id === conv.id)?.name ?? 'Equipo') : 'Mensaje directo'
-    const n = new N({ title: `${author.login} · ${where}`, body: firstChars(body, NOTICE_CHARS), silent: false })
+    const title = mention ? `${author.login} te mencionó · ${where}` : `${author.login} · ${where}`
+    const n = new N({ title, body: firstChars(body, NOTICE_CHARS), silent: false })
     n.on('click', () => {
       if (w.isDestroyed()) return
       w.show()
@@ -547,7 +693,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     const limit = parseLimit(rawLimit)
     let q = c
       .from('messages')
-      .select(MSG_COLS_BASE)
+      .select(cols())
       .eq(ref.kind === 'team' ? 'team_id' : 'thread_id', ref.id)
     if (rawBefore !== undefined && rawBefore !== null) {
       const beforeId = parseUuid(rawBefore, 'Mensaje inválido.')
@@ -558,46 +704,121 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     }
     const res = await q.order('created_at', { ascending: false }).limit(limit)
     check(res, 'No se pudo leer la conversación.')
-    const rows = (res.data ?? []) as MessageRow[]
+    const rows = (res.data ?? []) as unknown as MessageRow[]
     await loadProfiles(c, rows.map((r) => s(r.author_id)))
-    return oldestFirst(rows)
-      .map((r) => messageFromRow(r, profileFor(s(r.author_id))))
-      .filter(isMsg)
+    const ordered = oldestFirst(rows)
+    const msgs = ordered.map((r) => messageFromRow(r, profileFor(s(r.author_id)))).filter(isMsg)
+    return enrich(c, ordered, msgs)
   })
 
-  ctx.handle('send', async (rawConv: unknown, rawBody: unknown, rawClientId: unknown): Promise<ChatMessage> => {
+  ctx.handle('send', async (rawConv: unknown, rawBody: unknown, rawClientId: unknown, rawReplyTo?: unknown): Promise<ChatMessage> => {
     const c = clientNow()
     const me = meNow()
     const ref = parseConvRef(rawConv)
     const body = parseBody(rawBody)
     const clientId = parseClientId(rawClientId)
+    const replyTo = parseOptionalUuid(rawReplyTo)
     const col = ref.kind === 'team' ? 'team_id' : 'thread_id'
     const res = await c
       .from('messages')
-      .insert({ [col]: ref.id, client_id: clientId, body })
-      .select(MSG_COLS_BASE)
+      .insert({ [col]: ref.id, client_id: clientId, body, ...(extras && replyTo ? { reply_to: replyTo } : {}) })
+      .select(cols())
     if (!res.error) {
-      const row = ((res.data ?? []) as MessageRow[])[0]
+      const row = (res.data as unknown as MessageRow[] | null)?.[0]
       const msg = row ? messageFromRow(row, me) : undefined
-      if (!msg) throw new Error('No se pudo enviar el mensaje.')
-      return msg
+      if (!row || !msg) throw new Error('No se pudo enviar el mensaje.')
+      return (await enrich(c, [row], [msg], false))[0] ?? msg
     }
     if (res.error.code === '23505') {
       // clientId repetido: es un reintento. Se devuelve el mensaje que ya estaba guardado.
       const ex = await c
         .from('messages')
-        .select(MSG_COLS_BASE)
+        .select(cols())
         .eq('author_id', me.id)
         .eq('client_id', clientId)
         .eq(col, ref.id)
         .maybeSingle()
-      const msg = !ex.error && ex.data ? messageFromRow(ex.data as MessageRow, me) : undefined
-      if (msg) return msg
+      const exRow = !ex.error && ex.data ? (ex.data as unknown as MessageRow) : undefined
+      const msg = exRow ? messageFromRow(exRow, me) : undefined
+      if (exRow && msg) return (await enrich(c, [exRow], [msg]))[0] ?? msg
       throw new Error('No se pudo enviar el mensaje.')
     }
     if (res.error.code === 'P0001' && res.error.message) throw new Error(res.error.message.slice(0, 300))
     if (res.error.code === '42501') throw new Error('No podés escribir en esta conversación.')
     throw new Error('No se pudo enviar el mensaje.')
+  })
+
+  async function changeOwn(rawConv: unknown, rawId: unknown, patch: Record<string, unknown>, denied: string): Promise<ChatMessage> {
+    const c = clientNow()
+    const me = meNow()
+    const ref = parseConvRef(rawConv)
+    const id = parseUuid(rawId, 'Mensaje inválido.')
+    const res = await c
+      .from('messages')
+      .update(patch)
+      .eq('id', id)
+      .eq('author_id', me.id)
+      .eq(ref.kind === 'team' ? 'team_id' : 'thread_id', ref.id)
+      .select(cols())
+    if (res.error?.code === '42501') throw new Error(denied)
+    check(res, denied)
+    const row = (res.data as unknown as MessageRow[] | null)?.[0]
+    const msg = row ? messageFromRow(row, me) : undefined
+    if (!row || !msg) throw new Error(denied)
+    return (await enrich(c, [row], [msg]))[0] ?? msg
+  }
+
+  ctx.handle('edit', async (rawConv: unknown, rawId: unknown, rawBody: unknown): Promise<ChatMessage> => {
+    if (!extras) throw new Error('Para editar, el servidor del chat necesita la actualización 0004.')
+    return changeOwn(rawConv, rawId, { body: parseBody(rawBody) }, 'No podés editar ese mensaje.')
+  })
+
+  ctx.handle('remove', async (rawConv: unknown, rawId: unknown): Promise<ChatMessage> => {
+    if (!extras) throw new Error('Para borrar, el servidor del chat necesita la actualización 0004.')
+    return changeOwn(rawConv, rawId, { deleted_at: new Date().toISOString() }, 'No podés borrar ese mensaje.')
+  })
+
+  ctx.handle('react', async (rawConv: unknown, rawId: unknown, rawEmoji: unknown, rawOn: unknown): Promise<void> => {
+    if (!extras) throw new Error('Para reaccionar, el servidor del chat necesita la actualización 0004.')
+    const c = clientNow()
+    const me = meNow()
+    parseConvRef(rawConv)
+    const messageId = parseUuid(rawId, 'Mensaje inválido.')
+    const emoji = parseEmoji(rawEmoji)
+    if (typeof rawOn !== 'boolean') throw new Error('Reacción inválida.')
+    const res = rawOn
+      ? await c.from('message_reactions').insert({ message_id: messageId, emoji })
+      : await c.from('message_reactions').delete().eq('message_id', messageId).eq('user_id', me.id).eq('emoji', emoji)
+    if (res.error?.code === '23505') return
+    if (res.error?.code === '42501') throw new Error('No podés reaccionar a ese mensaje.')
+    check(res, 'No se pudo guardar la reacción.')
+  })
+
+  ctx.handle('search', async (rawConv: unknown, rawQuery: unknown): Promise<ChatMessage[]> => {
+    const c = clientNow()
+    const ref = parseConvRef(rawConv)
+    const q = parseSearch(rawQuery)
+    let query = c
+      .from('messages')
+      .select(cols())
+      .eq(ref.kind === 'team' ? 'team_id' : 'thread_id', ref.id)
+      .ilike('body', `%${escapeLike(q)}%`)
+    if (extras) query = query.is('deleted_at', null)
+    const res = await query.order('created_at', { ascending: false }).limit(50)
+    check(res, 'No se pudo buscar.')
+    const rows = (res.data ?? []) as unknown as MessageRow[]
+    await loadProfiles(c, rows.map((r) => s(r.author_id)))
+    const msgs = rows.map((r) => messageFromRow(r, profileFor(s(r.author_id)))).filter(isMsg)
+    return enrich(c, rows, msgs)
+  })
+
+  ctx.handle('typing', async (rawConv: unknown): Promise<void> => {
+    if (!extras) return
+    const c = clientNow()
+    const ref = parseConvRef(rawConv)
+    if (!typingThrottle.ok(convKey(ref), now())) return
+    const res = await c.rpc('chat_typing', ref.kind === 'team' ? { p_team: ref.id } : { p_thread: ref.id })
+    if (res.error) ctx.log('chat: no se pudo avisar que estás escribiendo.')
   })
 
   ctx.handle('markRead', async (rawConv: unknown): Promise<void> => {
@@ -759,7 +980,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     part: (): ChatDataPart => {
       const teams = lists.teams.map(withPhoto)
       const unreadTotal = teams.reduce((n, t) => n + t.unread, 0) + lists.threads.reduce((n, t) => n + t.unread, 0)
-      return { connection, teams, threads: lists.threads, invites: lists.invites, unreadTotal, extras: false }
+      return { connection, teams, threads: lists.threads, invites: lists.invites, unreadTotal, extras }
     },
 
     start: async (): Promise<void> => {
@@ -773,9 +994,13 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
         onInsert: (raw) => {
           onInsertRow(g, raw).catch(() => ctx.log('chat: no se pudo procesar un mensaje nuevo.'))
         },
+        onUpdate: (raw) => {
+          onUpdateRow(g, raw).catch(() => ctx.log('chat: no se pudo procesar un mensaje editado.'))
+        },
         onStatus: (st) => onStatus(g, st)
       })
       onChange()
+      await detectExtras(c).catch(() => ctx.log('chat: no se pudo comprobar la actualización 0004.'))
       await refreshLists(true)
     },
 
@@ -796,6 +1021,8 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       seen.clear()
       failedTopics.clear()
       broadcastWarned = false
+      extras = false
+      typingThrottle.clear()
       // removeAllChannels (al cerrar «sloth-inbox») cierra también los canales rápidos.
       topics.clear()
       const close = closeInbox
