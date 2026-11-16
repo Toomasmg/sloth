@@ -71,3 +71,51 @@ export function composerKey(
   if (key === 'Escape' && mode.kind !== 'new') return 'cancel'
   return null
 }
+
+const GROUP_GAP_MS = 5 * 60_000
+
+/** Un mensaje abre grupo (con avatar y nombre) si cambia el autor, pasan más de 5 minutos o cambia el día. */
+export function startsGroup(prev: ChatMessage | undefined, m: ChatMessage): boolean {
+  if (!prev || prev.deletedAt !== undefined || m.deletedAt !== undefined) return true
+  if (prev.author.id !== m.author.id || m.replyTo) return true
+  if (m.createdAt - prev.createdAt > GROUP_GAP_MS) return true
+  return new Date(prev.createdAt).toDateString() !== new Date(m.createdAt).toDateString()
+}
+
+export function typingText(logins: readonly string[]): string {
+  if (logins.length === 0) return ''
+  if (logins.length === 1) return `${logins[0]} está escribiendo…`
+  if (logins.length === 2) return `${logins[0]} y ${logins[1]} están escribiendo…`
+  return 'Varios están escribiendo…'
+}
+
+export interface MatchPart {
+  text: string
+  hit: boolean
+}
+
+/** Parte el texto en tramos que coinciden con la búsqueda (sin distinguir mayúsculas) y tramos que no. */
+export function matchParts(text: string, query: string): MatchPart[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return [{ text, hit: false }]
+  const low = text.toLowerCase()
+  const out: MatchPart[] = []
+  let at = 0
+  for (let i = low.indexOf(q); i >= 0; i = low.indexOf(q, at)) {
+    if (i > at) out.push({ text: text.slice(at, i), hit: false })
+    out.push({ text: text.slice(i, i + q.length), hit: true })
+    at = i + q.length
+  }
+  if (at < text.length) out.push({ text: text.slice(at), hit: false })
+  return out
+}
+
+/** Un tramo corto del texto alrededor de la primera coincidencia, con «…» donde se cortó. */
+export function snippet(text: string, query: string, max = 140): string {
+  const flat = text.replace(/\s+/g, ' ').trim()
+  if (flat.length <= max) return flat
+  const i = flat.toLowerCase().indexOf(query.trim().toLowerCase())
+  const start = Math.max(0, Math.min(i < 0 ? 0 : i - 30, flat.length - max))
+  const end = Math.min(flat.length, start + max)
+  return `${start > 0 ? '…' : ''}${flat.slice(start, end)}${end < flat.length ? '…' : ''}`
+}

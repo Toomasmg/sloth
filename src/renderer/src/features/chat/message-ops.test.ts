@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { ChatMessage, ChatReactionEvent } from '../../../../shared/chat'
-import { applyReaction, composerKey, lastEditable, mergeUpdate, seenUpTo } from './message-ops'
+import { applyReaction, composerKey, lastEditable, matchParts, mergeUpdate, seenUpTo, snippet, startsGroup, typingText } from './message-ops'
 
 const conv = { kind: 'dm', id: 'c1' } as const
 const msg = (over: Partial<ChatMessage> = {}): ChatMessage => ({
@@ -104,4 +104,38 @@ test('Esc cancela el modo y en modo nuevo no hace nada', () => {
   assert.equal(composerKey('Escape', mods, '', reply), 'cancel')
   assert.equal(composerKey('Escape', mods, '', { kind: 'edit', id: 'm', original: 'x' }), 'cancel')
   assert.equal(composerKey('Escape', mods, '', { kind: 'new' }), null)
+})
+
+test('startsGroup agrupa al mismo autor seguido y corta por autor, tiempo, cita y borrado', () => {
+  const a = msg({ id: 'a', createdAt: 1_000_000 })
+  assert.equal(startsGroup(undefined, a), true)
+  assert.equal(startsGroup(a, msg({ id: 'b', createdAt: 1_000_000 + 60_000 })), false)
+  assert.equal(startsGroup(a, msg({ id: 'b', createdAt: 1_000_000 + 6 * 60_000 })), true)
+  assert.equal(startsGroup(a, msg({ id: 'b', author: { id: 'otro', login: 'o' }, createdAt: 1_000_001 })), true)
+  assert.equal(startsGroup(a, msg({ id: 'b', createdAt: 1_000_001, replyTo: { id: 'x', authorLogin: 'q', excerpt: '', deleted: false } })), true)
+  assert.equal(startsGroup(a, msg({ id: 'b', createdAt: 1_000_001, deletedAt: 5 })), true)
+})
+
+test('typingText según cuántos escriben', () => {
+  assert.equal(typingText([]), '')
+  assert.equal(typingText(['ana']), 'ana está escribiendo…')
+  assert.equal(typingText(['ana', 'beto']), 'ana y beto están escribiendo…')
+  assert.equal(typingText(['a', 'b', 'c']), 'Varios están escribiendo…')
+})
+
+test('matchParts marca las coincidencias sin tocar el resto ni interpretar HTML', () => {
+  assert.deepEqual(matchParts('Hola <b>hola</b>', 'HOLA'), [
+    { text: 'Hola', hit: true },
+    { text: ' <b>', hit: false },
+    { text: 'hola', hit: true },
+    { text: '</b>', hit: false }
+  ])
+  assert.deepEqual(matchParts('abc', ' '), [{ text: 'abc', hit: false }])
+})
+
+test('snippet corta alrededor de la coincidencia', () => {
+  const long = `${'x'.repeat(200)} aguja ${'y'.repeat(200)}`
+  const out = snippet(long, 'aguja', 60)
+  assert.ok(out.includes('aguja') && out.startsWith('…') && out.endsWith('…'))
+  assert.equal(snippet('corto', 'co'), 'corto')
 })

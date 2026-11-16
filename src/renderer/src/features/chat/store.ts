@@ -2,22 +2,32 @@ import { useEffect, useSyncExternalStore } from 'react'
 import type {
   ChatConvRef,
   ChatInviteResult,
+  ChatMember,
   ChatMessage,
+  ChatProfile,
+  ChatReactionEmoji,
+  ChatReactionEvent,
+  ChatReplyRef,
   ChatSnapshot,
   ChatTeam,
   ChatThread,
+  ChatTypingEvent,
   ChatView
 } from '../../../../shared/chat'
 import { convKey } from '../../../../shared/chat'
+import { mentionsLogin } from '../../../../shared/chat-text'
 import type { UiCtx } from '../host'
 import { toast } from '../../ui/Toast'
 import { getSettings } from '../settings/store'
 import { playChatChime } from '../sound/audio'
 import { planIncoming, planSent, RecentIds, sameConv, toastText } from './alerts'
+import { applyReaction, mergeUpdate } from './message-ops'
+import { availableConv, loadLastConv, navReduce, saveLastConv, type KeyValueStore, type NavAction, type NavState } from './nav'
 
 /**
  * Estado del chat en la interfaz: espejo del snapshot de main, caché de mensajes por conversación,
- * envío optimista y estado del drawer. Sin timers ni polling: todo llega por eventos de main.
+ * envío optimista y estado del drawer. Sin polling: todo llega por eventos de main (el único timer
+ * vence los «escribiendo…»).
  */
 
 /** Máximo de mensajes en caché por conversación. */
@@ -27,10 +37,10 @@ export const PAGE = 50
 /** Texto que se anuncia en la región aria-live al llegar un mensaje ajeno a la conversación abierta. */
 const ANNOUNCE_CHARS = 200
 
-interface DrawerState {
-  open: boolean
-  conv?: ChatConvRef
-}
+/** Cuánto dura «escribiendo…» sin que llegue otro aviso del mismo usuario. */
+const TYPING_MS = 6000
+/** Mínimo entre dos avisos de «estoy escribiendo». */
+const TYPING_PING_MS = 3000
 
 interface ConvMeta {
   /** Hay mensajes más viejos sin cargar (se pide con «Cargar anteriores»). */
@@ -40,7 +50,11 @@ interface ConvMeta {
 let api: UiCtx | null = null
 let wired = false
 let snap: ChatSnapshot | null = null
-let drawer: DrawerState = { open: false }
+let nav: NavState = { open: false }
+/** Usuario de la sesión: la última conversación se guarda por usuario. */
+let navUser: string | undefined
+/** El usuario ya eligió dónde estar en esta sesión: no se le pisa con lo guardado. */
+let navTouched = false
 let announcement = ''
 let joinOpen = false
 /** Error de una invitación que esperaba el login, para mostrarlo en el diálogo si sigue abierto. */
@@ -48,6 +62,10 @@ let inviteError: string | null = null
 const msgs = new Map<string, ChatMessage[]>()
 const meta = new Map<string, ConvMeta>()
 const drafts = new Map<string, string>()
+const typingBy = new Map<string, Map<string, { login: string; until: number }>>()
+const typingLogins = new Map<string, string[]>()
+const typingTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const lastPing = new Map<string, number>()
 const listeners = new Set<() => void>()
 
 const notify = (): void => {
@@ -102,13 +120,60 @@ function mergeInto(conv: ChatConvRef, incoming: ChatMessage[], side: 'oldest' | 
 
 // ---------- snapshot y eventos de main ----------
 
+const storage = (): KeyValueStore | null => {
+  try {
+    return window.localStorage
+  } catch {
+    return null
+  }
+}
+
+function setNav(a: NavAction): void {
+  nav = navReduce(nav, a)
+  if (a.type !== 'close') navTouched = true
+  const store = storage()
+  if (navUser && store && a.type !== 'close') {
+    try {
+      saveLastConv(store, navUser, nav.conv)
+    } catch (e) {
+      api?.notifyError(`No se pudo recordar la conversación: ${errText(e)}`)
+    }
+  }
+  notify()
+}
+
+/** Al conocer al usuario, vuelve a la conversación en la que se había quedado (si sigue existiendo). */
+function syncNavUser(next: ChatSnapshot): void {
+  const id = next.auth.status === 'signedIn' ? next.auth.me.id : undefined
+  if (id === navUser) return
+  navUser = id
+  if (!id) {
+    nav = { open: nav.open }
+    return
+  }
+  const store = storage()
+  if (!store || navTouched) return
+  try {
+    const last = availableConv(
+      loadLastConv(store, id),
+      next.teams.map((t) => t.id),
+      next.threads.map((t) => t.id)
+    )
+    nav = { open: nav.open, conv: last }
+    if (!last) saveLastConv(store, id, undefined)
+  } catch {
+    nav = { open: nav.open }
+  }
+}
+
 function setSnap(next: ChatSnapshot): void {
   const prev = snap
   snap = next
+  syncNavUser(next)
   notify()
   // Al reconectar (pasa a «live») se piden de nuevo los mensajes de la conversación abierta.
-  if (prev?.connection !== 'live' && next.connection === 'live' && drawer.open && drawer.conv) {
-    void loadMessages(drawer.conv)
+  if (prev?.connection !== 'live' && next.connection === 'live' && nav.open && nav.conv) {
+    void loadMessages(nav.conv)
   }
 }
 
@@ -120,11 +185,14 @@ const alerted = new RecentIds()
 
 function alertIncoming(m: ChatMessage): void {
   const { settings } = getSettings()
+  const me = snap?.auth.status === 'signedIn' ? snap.auth.me : undefined
+  const mention = !!me && mentionsLogin(m.body, me.login)
   const plan = planIncoming({
     mine: m.author.id === meId(),
     alreadySeen: alerted.seen(m.id),
     windowFocused: document.hasFocus(),
-    viewing: drawer.open && sameConv(drawer.conv, m.conv),
+    viewing: nav.open && sameConv(nav.conv, m.conv),
+    mention,
     settings
   })
   if (plan.sound) playChatChime(plan.sound, settings.soundName)
@@ -132,20 +200,79 @@ function alertIncoming(m: ChatMessage): void {
   const convName = m.conv.kind === 'team' ? teamOf(snap, m.conv.id)?.name : undefined
   toast({
     tone: 'info',
-    message: toastText(m.author.login, convName, m.body),
+    message: toastText(mention ? `${m.author.login} te mencionó` : m.author.login, convName, m.body),
     actionLabel: 'Abrir',
     onAction: () => openChat(m.conv)
   })
 }
 
 function onRealtime(m: ChatMessage): void {
-  mergeInto(m.conv, [m], 'oldest')
+  const key = convKey(m.conv)
+  const prev = (msgs.get(key) ?? []).find((x) => x.id === m.id)
+  if (prev) {
+    // El evento no trae las reacciones: las que ya tenía el mensaje se conservan.
+    mergeInto(m.conv, [mergeUpdate(prev, { ...m, reactions: undefined })], 'oldest')
+    return
+  }
+  mergeInto(m.conv, [mergeUpdate(undefined, m)], 'oldest')
+  clearTyping(key, m.author.id)
+  if (m.deletedAt !== undefined) return
   alertIncoming(m)
   if (m.author.id === meId()) return
-  if (drawer.open && drawer.conv && convKey(drawer.conv) === convKey(m.conv)) {
+  if (nav.open && nav.conv && convKey(nav.conv) === key) {
     announcement = `${m.author.login}: ${m.body.slice(0, ANNOUNCE_CHARS)}`
     notify()
   }
+}
+
+function onReaction(ev: ChatReactionEvent): void {
+  patchMessage(ev.conv, ev.messageId, (m) => applyReaction(m, ev))
+}
+
+function patchMessage(conv: ChatConvRef, id: string, fn: (m: ChatMessage) => ChatMessage): void {
+  const key = convKey(conv)
+  const list = msgs.get(key)
+  const at = list?.findIndex((m) => m.id === id) ?? -1
+  if (!list || at < 0) return
+  const next = list.slice()
+  next[at] = fn(list[at])
+  msgs.set(key, next)
+  notify()
+}
+
+/** Recalcula quién está escribiendo en una conversación y programa el próximo vencimiento. */
+function refreshTyping(key: string): void {
+  const room = typingBy.get(key)
+  const now = Date.now()
+  room?.forEach((t, id) => {
+    if (t.until <= now) room.delete(id)
+  })
+  const logins = room ? [...room.values()].map((t) => t.login) : []
+  const before = typingLogins.get(key) ?? NO_LOGINS
+  if (logins.length !== before.length || logins.some((l, i) => l !== before[i])) {
+    if (logins.length) typingLogins.set(key, logins)
+    else typingLogins.delete(key)
+    notify()
+  }
+  const timer = typingTimers.get(key)
+  if (timer) clearTimeout(timer)
+  if (room && room.size > 0) {
+    const soonest = Math.min(...[...room.values()].map((t) => t.until))
+    typingTimers.set(key, setTimeout(() => refreshTyping(key), Math.max(50, soonest - now)))
+  } else typingTimers.delete(key)
+}
+
+function clearTyping(key: string, userId: string): void {
+  if (typingBy.get(key)?.delete(userId)) refreshTyping(key)
+}
+
+function onTyping(ev: ChatTypingEvent): void {
+  if (ev.userId === meId()) return
+  const key = convKey(ev.conv)
+  const room = typingBy.get(key) ?? new Map<string, { login: string; until: number }>()
+  room.set(ev.userId, { login: ev.login, until: Date.now() + TYPING_MS })
+  typingBy.set(key, room)
+  refreshTyping(key)
 }
 
 /**
@@ -158,6 +285,8 @@ export function attachChat(ui: UiCtx): void {
   wired = true
   ui.on('feat:chat:snapshot', (s: ChatSnapshot) => setSnap(s))
   ui.on('feat:chat:message', (m: ChatMessage) => onRealtime(m))
+  ui.on('feat:chat:reaction', (ev: ChatReactionEvent) => onReaction(ev))
+  ui.on('feat:chat:typing', (ev: ChatTypingEvent) => onTyping(ev))
   ui.on('feat:chat:open', (conv: ChatConvRef) => openChat(conv))
   ui.on('feat:chat:invite', (r: ChatInviteResult) => onInviteResult(r))
   void call<ChatSnapshot>('state')
@@ -182,7 +311,24 @@ export interface DrawerView {
 }
 
 export function useDrawer(): DrawerView {
-  return useSyncExternalStore(subscribe, () => drawer)
+  return useSyncExternalStore(subscribe, () => nav)
+}
+
+const NO_LOGINS: string[] = []
+/** Logins de quienes están escribiendo en la conversación. */
+export function useTyping(conv: ChatConvRef): string[] {
+  const key = convKey(conv)
+  return useSyncExternalStore(subscribe, () => typingLogins.get(key) ?? NO_LOGINS)
+}
+
+/** El servidor tiene la actualización 0004: editar, borrar, responder, reaccionar, «escribiendo…» y «Visto». */
+export function useExtras(): boolean {
+  return useSyncExternalStore(subscribe, () => snap?.extras === true)
+}
+
+/** Hay snapshot y el servidor no tiene la 0004. */
+export function useExtrasMissing(): boolean {
+  return useSyncExternalStore(subscribe, () => !!snap && snap.auth.status === 'signedIn' && !snap.extras)
 }
 
 const NO_MSGS: ChatMessage[] = []
@@ -203,21 +349,18 @@ export function useAnnouncement(): string {
 
 // ---------- drawer ----------
 
-/** Abre el drawer. Sin `conv`, abre la lista. */
+/** Abre el drawer. Sin `conv`, vuelve a donde estaba (la lista, si todavía no entró a ninguna). */
 export function openChat(conv?: ChatConvRef): void {
-  drawer = { open: true, conv }
-  notify()
+  setNav({ type: 'open', conv })
 }
 
 export function closeChat(): void {
-  if (!drawer.open) return
-  drawer = { open: false }
-  notify()
+  if (nav.open) setNav({ type: 'close' })
 }
 
+/** La flecha de volver: lo único que saca al usuario de su conversación. */
 export function showChatList(): void {
-  drawer = { open: true }
-  notify()
+  setNav({ type: 'back' })
 }
 
 export function openJoinInvite(): void {
@@ -306,8 +449,8 @@ export function sendView(view: ChatView): void {
 async function transmit(m: ChatMessage): Promise<void> {
   mergeInto(m.conv, [{ ...m, status: 'sending', error: undefined }], 'oldest')
   try {
-    const sent = await call<ChatMessage>('send', m.conv, m.body, m.clientId)
-    mergeInto(m.conv, [{ ...sent, status: 'sent' }], 'oldest')
+    const sent = await call<ChatMessage>('send', m.conv, m.body, m.clientId, m.replyTo?.id)
+    mergeInto(m.conv, [{ ...sent, replyTo: sent.replyTo ?? m.replyTo, status: 'sent' }], 'oldest')
     const { settings } = getSettings()
     const plan = planSent(settings, alerted.seen(`sent:${m.clientId}`))
     if (plan.sound) playChatChime(plan.sound, settings.soundName)
@@ -323,7 +466,7 @@ async function transmit(m: ChatMessage): Promise<void> {
  * Envía con estado optimista: aparece «enviando…» al instante; si main no responde bien queda
  * «failed» con «Reintentar» (mismo clientId, así que no se duplica).
  */
-export async function sendMessage(conv: ChatConvRef, rawBody: string): Promise<void> {
+export async function sendMessage(conv: ChatConvRef, rawBody: string, replyTo?: ChatReplyRef): Promise<void> {
   const me = snap?.auth.status === 'signedIn' ? snap.auth.me : undefined
   const body = rawBody.trim()
   if (!me) throw new Error('Iniciá sesión en el chat.')
@@ -336,12 +479,79 @@ export async function sendMessage(conv: ChatConvRef, rawBody: string): Promise<v
     author: me,
     body,
     createdAt: Date.now(),
-    status: 'sending'
+    status: 'sending',
+    ...(replyTo && { replyTo })
   })
 }
 
 export async function retrySend(m: ChatMessage): Promise<void> {
   await transmit({ ...m, status: 'sending', error: undefined })
+}
+
+function putUpdate(m: ChatMessage): void {
+  const prev = (msgs.get(convKey(m.conv)) ?? []).find((x) => x.id === m.id)
+  mergeInto(m.conv, [mergeUpdate(prev, m)], 'oldest')
+}
+
+/** Edita el cuerpo de un mensaje propio. Los errores los muestra quien llama. */
+export async function editMessage(conv: ChatConvRef, id: string, body: string): Promise<void> {
+  putUpdate(await call<ChatMessage>('edit', conv, id, body))
+}
+
+/** Borra un mensaje: los que no llegaron a salir solo se sacan de la caché. */
+export async function removeMessage(m: ChatMessage): Promise<void> {
+  if (isLocal(m) || m.status === 'failed') {
+    const key = convKey(m.conv)
+    msgs.set(key, (msgs.get(key) ?? []).filter((x) => x.clientId !== m.clientId))
+    notify()
+    return
+  }
+  putUpdate(await call<ChatMessage>('remove', m.conv, m.id))
+}
+
+/** Pone o saca la reacción al instante; si main la rechaza, vuelve atrás y avisa. */
+export function toggleReaction(m: ChatMessage, emoji: ChatReactionEmoji, me: { id: string; login: string }): void {
+  const on = !(m.reactions ?? []).some((r) => r.emoji === emoji && r.userIds.includes(me.id))
+  const ev = (op: 'add' | 'remove'): ChatReactionEvent => ({ conv: m.conv, messageId: m.id, emoji, userId: me.id, login: me.login, op })
+  patchMessage(m.conv, m.id, (x) => applyReaction(x, ev(on ? 'add' : 'remove')))
+  call('react', m.conv, m.id, emoji, on).catch((e: unknown) => {
+    patchMessage(m.conv, m.id, (x) => applyReaction(x, ev(on ? 'remove' : 'add')))
+    toast({ tone: 'danger', message: errText(e) })
+  })
+}
+
+const membersCache = new Map<string, ChatProfile[]>()
+
+/** A quién se puede mencionar en la conversación (sin vos): los miembros del equipo, o el otro en un directo. */
+export async function mentionCandidates(conv: ChatConvRef): Promise<ChatProfile[]> {
+  const key = convKey(conv)
+  const hit = membersCache.get(key)
+  if (hit) return hit
+  const me = meId()
+  let list: ChatProfile[]
+  if (conv.kind === 'dm') {
+    const other = threadOf(snap, conv.id)?.other
+    list = other ? [other] : []
+  } else {
+    list = (await call<ChatMember[]>('members', conv.id)).map((m) => m.profile)
+  }
+  const out = list.filter((p) => p.id !== me)
+  membersCache.set(key, out)
+  return out
+}
+
+export function searchMessages(conv: ChatConvRef, query: string): Promise<ChatMessage[]> {
+  return call<ChatMessage[]>('search', conv, query)
+}
+
+/** Avisa a los demás que estás escribiendo, a lo sumo cada 3 segundos. */
+export function pingTyping(conv: ChatConvRef): void {
+  if (snap?.extras !== true) return
+  const key = convKey(conv)
+  const now = Date.now()
+  if (now - (lastPing.get(key) ?? 0) < TYPING_PING_MS) return
+  lastPing.set(key, now)
+  call('typing', conv).catch(() => undefined)
 }
 
 // ---------- helpers de vista ----------
