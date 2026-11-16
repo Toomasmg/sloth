@@ -490,7 +490,8 @@ async function transmit(m: ChatMessage): Promise<void> {
   mergeInto(m.conv, [{ ...m, status: 'sending', error: undefined }], 'oldest')
   try {
     const sent = await call<ChatMessage>('send', m.conv, m.body, m.clientId, m.replyTo?.id)
-    mergeInto(m.conv, [{ ...sent, replyTo: sent.replyTo ?? m.replyTo, status: 'sent' }], 'oldest')
+    // Sin la cita del servidor no se repone la local: main la saca si el citado se borró antes de enviar.
+    mergeInto(m.conv, [{ ...sent, status: 'sent' }], 'oldest')
     const { settings } = getSettings()
     const plan = planSent(settings, alerted.seen(`sent:${m.clientId}`))
     if (plan.sound) playChatChime(plan.sound, settings.soundName)

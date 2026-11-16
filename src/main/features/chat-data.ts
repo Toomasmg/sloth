@@ -148,6 +148,7 @@ type Lists = { teams: ChatTeam[]; threads: ChatThread[]; invites: ChatInvite[] }
 const EMPTY_LISTS: Lists = { teams: [], threads: [], invites: [] }
 
 type PgError = { code?: string; message?: string }
+const REPLY_GONE = 'Solo podés responder a un mensaje de esta conversación.'
 const MISSING_SCHEMA = new Set(['42703', '42P01', 'PGRST204', 'PGRST205'])
 
 /** Error de PostgREST → mensaje para mostrar. Solo pasan los RAISE de nuestras funciones (P0001). */
@@ -749,10 +750,16 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     const clientId = parseClientId(rawClientId)
     const replyTo = parseOptionalUuid(rawReplyTo)
     const col = ref.kind === 'team' ? 'team_id' : 'thread_id'
-    const res = await c
-      .from('messages')
-      .insert({ [col]: ref.id, client_id: clientId, body, ...(extras && replyTo ? { reply_to: replyTo } : {}) })
-      .select(cols())
+    const insert = (reply: string | undefined) =>
+      c
+        .from('messages')
+        .insert({ [col]: ref.id, client_id: clientId, body, ...(extras && reply ? { reply_to: reply } : {}) })
+        .select(cols())
+    let res = await insert(replyTo)
+    // Si el citado se borró mientras tanto, el mensaje sale igual, sin la cita: si no, «Reintentar» fallaría siempre.
+    if (res.error && replyTo && (res.error.code === '23503' || (res.error.code === 'P0001' && res.error.message === REPLY_GONE))) {
+      res = await insert(undefined)
+    }
     if (!res.error) {
       const row = (res.data as unknown as MessageRow[] | null)?.[0]
       const msg = row ? messageFromRow(row, me) : undefined
