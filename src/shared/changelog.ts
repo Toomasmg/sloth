@@ -9,6 +9,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.23',
+    date: '2026-11-16',
+    title: 'Claude en el chat',
+    items: [
+      'Nuevo: Claude puede leer y mandar mensajes del chat desde tus terminales. Se prende en Configuración → Chat → «Claude en el chat» y elegís en qué cuentas de Claude.',
+      'Cada mensaje que quiera mandar Claude te muestra el texto exacto y espera tu confirmación. Sale con tu nombre y la marca «vía Claude».',
+      'Leer el chat también pide permiso por conversación, y lo podés revocar cuando quieras.'
+    ]
+  },
+  {
     version: '0.6.22',
     date: '2026-11-16',
     title: '«Te necesita» solo cuando de verdad',
