@@ -13,6 +13,7 @@
     "build": "electron-vite build && npm run build:daemon && npm run build:whisper",
     "build:whisper": "node scripts/fetch-whisper.mjs",
     "build:daemon": "node scripts/build-daemon.mjs",
+    "build:celu-web": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/build-celu-web.mjs",
     "postinstall": "node scripts/patch-node-pty.mjs",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
