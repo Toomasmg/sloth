@@ -84,11 +84,13 @@ En **Celular → Desde cualquier red**, Sloth publica la misma vista que en el W
 1. Corré `supabase/migrations/0006_celu_remoto.sql` en el SQL Editor. Es idempotente.
 2. En **Auth → URL Configuration → Redirect URLs**, sumá `https://toomasmg.github.io/sloth/celu/**`: el celu entra con GitHub desde esa página.
 3. En GitHub, **Settings → Pages → Source: GitHub Actions**. La página la publica el workflow «Celu web» (`.github/workflows/celu-web.yml`) cuando algo de `src/celu-web/` llega a `main`, o a mano con *Run workflow*. Solo lleva la anon key; nunca la service key.
-4. Escaneá el QR del panel con el celu y entrá con la **misma** cuenta de GitHub que en Sloth. Después, en Chrome (Android) usá «Instalar app»; en Samsung Internet, «Agregar página a → Pantalla de inicio».
+4. Escaneá el QR del panel con el celu y entrá con la **misma** cuenta de GitHub que en Sloth. Después, en Chrome (Android) usá «Instalar app»; en Samsung Internet, «Agregar página a → Pantalla de inicio». En iPhone usala desde Safari: la app de la pantalla de inicio tiene su propio almacenamiento y no ve el emparejamiento.
 
-- **Qué ve el admin de Supabase:** nada útil. Todo va cifrado (AES-256-GCM) con una clave que sale del secreto del QR, y ese secreto viaja en el `#` del enlace, que el navegador nunca manda a ningún servidor. Nunca se publica el contenido de las terminales ni los prompts: solo el estado de las sesiones, el uso y los pedidos de permiso.
+- **Qué ve el admin de Supabase:** nada útil. Todo va cifrado (AES-256-GCM) con una clave que sale del secreto del QR, y ese secreto viaja en el `#` del enlace, que el navegador no manda al servidor. Sí puede quedar en el historial del navegador (y sincronizarse con tu cuenta de Google) y, si usás «Copiar enlace», en el portapapeles: no lo compartas. Nunca se publica el contenido de las terminales ni los prompts: solo el estado de las sesiones, el uso y los pedidos de permiso.
 - **Aprobar permisos desde afuera** tiene su propio interruptor, apagado, que solo se prende con «Aprobar desde el celu» prendido. Cada decisión vale para un pedido, vence al minuto y no se puede repetir.
-- **Regenerar el secreto** deja afuera a todos los celus emparejados.
+- **Regenerar el código:** Sloth deja de publicar con la clave vieja y descarta las decisiones selladas con ella, así que los celus emparejados ya no ven ni aprueban nada. Con «Cerrar también la sesión de GitHub en los otros dispositivos» (prendido por defecto) además revoca las sesiones del chat de esa cuenta en todos lados menos en esta PC; el token que ya tenga el celu sigue valiendo hasta que vence (una hora como mucho), pero sin la clave no le sirve para el canal.
+- **Qué guarda el celu:** la dirección del proyecto, la anon key y tu id en `localStorage`; la clave del canal, como `CryptoKey` no exportable en IndexedDB (el secreto del QR no se guarda), y la sesión de Supabase que deja supabase-js en `localStorage`.
+- **El origen compartido:** `localStorage` e IndexedDB son por origen, no por carpeta, y `toomasmg.github.io` lo comparten todas las páginas de GitHub Pages de esa cuenta. Un script de cualquiera de ellas (o una dependencia comprometida) podría leer la sesión de Supabase, que es la misma del chat, y usar la clave mientras corre. Para un uso más amplio que el propio, servila desde un origen solo para ella: un dominio o subdominio propio en GitHub Pages, o Cloudflare Pages (`<proyecto>.pages.dev`), y sumá esa URL en Redirect URLs.
 - **Costo:** Sloth publica solo mientras un celu tiene la página abierta (latido cada 15 s y cambios cada 2 s como mucho). Con 2 h por día son unos 80 k mensajes por mes por usuario; el plan gratis trae 2 M.
 
 ## Qué protege la migración (RLS)
@@ -98,7 +100,7 @@ En **Celular → Desde cualquier red**, Sloth publica la misma vista que en el W
 - Entrar a un equipo, abrir un DM y marcar como leído pasan solo por funciones que revisan permisos; no se puede insertar directo. El código de invitación lo ven solo los owners y los admins.
 - El usuario de GitHub sale de la identidad que guarda Supabase al iniciar sesión, y el usuario no la puede editar. Por eso nadie puede hacerse pasar por `ana` para quedarse con su invitación.
 - Las fotos van en un bucket **privado**. Las ven solo los miembros del equipo y las cambian solo los owners y los admins.
-- El canal del celu (`celu:<uid>`, migración 0006) lo leen y escriben **solo** su dueño. Es la única política de escritura en Realtime y no abre los canales del chat.
+- El canal del celu (`celu:<uid>`, migración 0006) lo leen y escriben **solo** su dueño. Es la única política de escritura en Realtime y no abre los canales del chat: además del tópico del canal, ata la columna `topic` de la fila.
 
 La migración tiene una prueba con PGlite (Postgres en WASM), con 65 casos de acceso permitido y prohibido (los del canal del celu incluidos): `npm i --no-save @electric-sql/pglite` y después `node supabase/tests/rls.test.mjs supabase/migrations/0001_chat.sql supabase/migrations/0002_hardening.sql supabase/migrations/0003_realtime_broadcast.sql supabase/migrations/0006_celu_remoto.sql`.
 
