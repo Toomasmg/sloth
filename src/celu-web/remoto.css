@@ -1,14 +1,15 @@
-/* Login de la versión remota. Mismos colores que la página del Wi-Fi (celular-pagina.ts). */
+/* Login de la versión remota. Usa los colores de app.css (la página del Wi-Fi). Los tamaños van sueltos a
+   propósito: esta página se publica aparte y no carga los tokens de la app. */
 #remoto-login {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 50; /* lint-css-ok: página independiente, sin tokens de la app */
   display: grid;
   place-items: center;
-  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
-  background: #08090b;
-  color: #e8eaed;
-  font: 14px/1.4 Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  padding: 16px;
+  background: var(--fondo);
+  color: var(--texto);
+  font: 14px/1.4 var(--ui); /* lint-css-ok: página independiente, sin tokens de la app */
 }
 #remoto-login[hidden] {
   display: none;
@@ -21,14 +22,14 @@
   text-align: center;
 }
 .remoto-marca {
-  font-size: 22px;
+  font-size: 22px; /* lint-css-ok: página independiente, sin tokens de la app */
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: #f1f3f4;
+  color: var(--fuerte);
 }
 .remoto-caja p {
   margin: 0;
-  font-size: 16px;
+  font-size: 16px; /* lint-css-ok: página independiente, sin tokens de la app */
   line-height: 1.5;
 }
 .remoto-acciones {
@@ -40,18 +41,18 @@
   min-height: 48px;
   padding: 0 20px;
   border: 0;
-  border-radius: 12px;
-  background: #7cc4ff;
-  color: #08090b;
+  border-radius: 12px; /* lint-css-ok: página independiente, sin tokens de la app */
+  background: var(--celeste);
+  color: var(--fondo);
   font-weight: 600;
-  font-size: 16px;
+  font-size: 16px; /* lint-css-ok: página independiente, sin tokens de la app */
   cursor: pointer;
 }
 .remoto-btn-sec {
-  background: #1e2228;
-  color: #e8eaed;
+  background: var(--pista);
+  color: var(--texto);
 }
 .remoto-btn:focus-visible {
-  outline: 2px solid #8cc2ff;
+  outline: 2px solid var(--trabaja);
   outline-offset: 2px;
 }
