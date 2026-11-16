@@ -5,11 +5,16 @@
  * Lo que llega por broadcast es dato no confiable aunque lo publique la base: se valida la forma
  * completa y que la conversación de la fila sea la del tópico por el que llegó.
  */
-import { CHAT_LIMITS, type ChatConvRef } from '../../shared/chat'
-import { codepoints, isObj, type MessageRow } from './chat-map'
+import { CHAT_LIMITS, type ChatConvRef, type ChatReactionEmoji } from '../../shared/chat'
+import { codepoints, isObj, isReactionEmoji, type MessageRow } from './chat-map'
 
 /** Nombre del evento que manda el trigger de 0003_realtime_broadcast.sql. */
 export const BROADCAST_EVENT = 'message'
+/** Eventos de 0004_chat_completo.sql. */
+export const UPDATE_EVENT = 'message_update'
+export const REACTION_EVENT = 'reaction'
+export const TYPING_EVENT = 'typing'
+export const READ_EVENT = 'read'
 /** Realtime corta en 100 canales por conexión; uno queda para «sloth-inbox» y el resto de margen. */
 export const MAX_TOPICS = 90
 export const SEEN_MAX = 2000
@@ -18,6 +23,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const TOPIC_RE = /^(team|thread):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
 
 const isUuid = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v)
+const isDate = (v: unknown): v is string => typeof v === 'string' && !Number.isNaN(Date.parse(v))
 
 export function topicOf(conv: ChatConvRef): string {
   return `${conv.kind === 'team' ? 'team' : 'thread'}:${conv.id.toLowerCase()}`
@@ -56,16 +62,54 @@ export function diffTopics(current: Iterable<string>, wanted: readonly string[])
  */
 export function rowFromBroadcast(payload: unknown, conv: ChatConvRef): MessageRow | undefined {
   if (!isObj(payload)) return undefined
-  const { id, client_id, team_id, thread_id, author_id, body, created_at } = payload
+  const { id, client_id, team_id, thread_id, author_id, body, created_at, edited_at, deleted_at, reply_to } = payload
   if (!isUuid(id) || !isUuid(client_id) || !isUuid(author_id)) return undefined
   if (typeof body !== 'string') return undefined
-  const n = codepoints(body)
-  if (n < 1 || n > CHAT_LIMITS.body) return undefined
-  if (typeof created_at !== 'string' || Number.isNaN(Date.parse(created_at))) return undefined
+  if (!isDate(created_at)) return undefined
+  if (edited_at != null && !isDate(edited_at)) return undefined
+  if (deleted_at != null && !isDate(deleted_at)) return undefined
+  if (reply_to != null && !isUuid(reply_to)) return undefined
+  if (deleted_at != null) {
+    if (body !== '') return undefined
+  } else {
+    const n = codepoints(body)
+    if (n < 1 || n > CHAT_LIMITS.body) return undefined
+  }
   if (conv.kind === 'team' ? team_id !== conv.id || thread_id != null : thread_id !== conv.id || team_id != null) return undefined
-  return conv.kind === 'team'
+  const row: MessageRow = conv.kind === 'team'
     ? { id, client_id, team_id, author_id, body, created_at }
     : { id, client_id, thread_id, author_id, body, created_at }
+  if (edited_at != null) row.edited_at = edited_at
+  if (deleted_at != null) row.deleted_at = deleted_at
+  if (reply_to != null) row.reply_to = reply_to
+  return row
+}
+
+/** Clave de versión para el dedupe: una edición o un borrado del mismo mensaje cuentan como nuevos. */
+export const versionKey = (row: MessageRow): string =>
+  `${String(row.id)}:${typeof row.edited_at === 'string' ? row.edited_at : ''}:${typeof row.deleted_at === 'string' ? row.deleted_at : ''}`
+
+const hasOnlyKeys = (o: Record<string, unknown>, keys: readonly string[]): boolean =>
+  Object.keys(o).length === keys.length && keys.every((k) => Object.hasOwn(o, k))
+
+export function reactionFromBroadcast(
+  p: unknown
+): { messageId: string; userId: string; emoji: ChatReactionEmoji; op: 'add' | 'remove' } | undefined {
+  if (!isObj(p) || !hasOnlyKeys(p, ['message_id', 'user_id', 'emoji', 'op'])) return undefined
+  const { message_id, user_id, emoji, op } = p
+  if (!isUuid(message_id) || !isUuid(user_id) || !isReactionEmoji(emoji)) return undefined
+  if (op !== 'add' && op !== 'remove') return undefined
+  return { messageId: message_id, userId: user_id, emoji, op }
+}
+
+export function typingFromBroadcast(p: unknown): { userId: string } | undefined {
+  if (!isObj(p) || !hasOnlyKeys(p, ['user_id']) || !isUuid(p.user_id)) return undefined
+  return { userId: p.user_id }
+}
+
+export function readFromBroadcast(p: unknown): { userId: string; at: number } | undefined {
+  if (!isObj(p) || !hasOnlyKeys(p, ['user_id', 'at']) || !isUuid(p.user_id) || !isDate(p.at)) return undefined
+  return { userId: p.user_id, at: Date.parse(p.at) }
 }
 
 /** Ids ya procesados (el mismo mensaje llega por broadcast y por postgres_changes). Acotado: olvida los más viejos. */
