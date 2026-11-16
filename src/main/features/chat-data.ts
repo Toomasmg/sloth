@@ -813,7 +813,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       .select(cols())
       .eq(ref.kind === 'team' ? 'team_id' : 'thread_id', ref.id)
       .ilike('body', `%${escapeLike(q)}%`)
-    if (extras) query = query.is('deleted_at', null)
+    if (extras) query = query.is('deleted_at', null).eq('kind', 'text')
     const res = await query.order('created_at', { ascending: false }).limit(50)
     check(res, 'No se pudo buscar.')
     const rows = (res.data ?? []) as unknown as MessageRow[]
