@@ -87,11 +87,11 @@ const NUEVAS: Record<string, (args: unknown[]) => unknown> = {
   parseAccion: ([out, ac]) => parseAccion(GRUV, s(out), a(ac))
 }
 
-/** Única diferencia deliberada con 0.6.4 en los args: el modo de permisos fijo. */
+/** Diferencias deliberadas con 0.6.4 en los args: sin skills ni comandos, y el modo de permisos fijo. */
 function conModoPermisos(args: string[]): string[] {
   const i = args.indexOf('--no-session-persistence')
   assert.ok(i >= 0, 'el golden debería tener --no-session-persistence')
-  return [...args.slice(0, i + 1), '--permission-mode', 'default', ...args.slice(i + 1)]
+  return [...args.slice(0, i + 1), '--disable-slash-commands', '--permission-mode', 'default', ...args.slice(i + 1)]
 }
 
 const CLASES: Record<string, string> = { NoGruvError: ConectorFaltaError.name, ToolMissingError: HerramientaFaltaError.name, Error: Error.name }

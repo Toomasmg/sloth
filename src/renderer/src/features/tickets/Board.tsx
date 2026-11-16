@@ -93,6 +93,7 @@ export function Board(): React.JSX.Element {
   const [wbusy, setWbusy] = useState<Record<string, Accion>>({})
   const [toast, setToast] = useState<string | null>(null)
   const [detTick, setDetTick] = useState(0)
+  const frescoRef = useRef(false)
   /** Candado sincrónico: evita dos escrituras en el mismo ticket aunque se clickee rápido. */
   const lock = useRef(new Set<string>())
 
@@ -173,7 +174,10 @@ export function Board(): React.JSX.Element {
     if (!curId || !snap?.conector.leeDetalle) return
     let alive = true
     setDet((d) => ({ ...d, [curId]: { ...d[curId], loading: true, error: undefined } }))
-    ui.invoke<Detalle>('feat:tickets:detail', curId).then(
+    // Al abrir un ticket sirve el detalle que ya se leyó; «Recargar» pide uno nuevo.
+    const fresco = frescoRef.current
+    frescoRef.current = false
+    ui.invoke<Detalle>('feat:tickets:detail', curId, fresco).then(
       (data) => {
         if (alive) setDet((d) => ({ ...d, [curId]: { data } }))
       },
@@ -687,7 +691,10 @@ export function Board(): React.JSX.Element {
                   onStart={() => void start(current)}
                   onOpenSpace={openSpace}
                   onWrite={(a, payload, opt) => write(current.id, a, payload, opt)}
-                  onReload={() => setDetTick((n) => n + 1)}
+                  onReload={() => {
+                    frescoRef.current = true
+                    setDetTick((n) => n + 1)
+                  }}
                 />
               )}
             </section>

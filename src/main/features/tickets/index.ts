@@ -29,17 +29,20 @@ import { resolveClaudeExe, runClaude } from './claude-run'
 import type { ConectorDef, ConectorGh, ConectorMcp } from './conector'
 import { crearAlmacen, type Almacen, type ConfigCruda, type FsTickets } from './almacen'
 import { CONECTORES } from './conectores'
+import { deA } from './concurrencia'
 import { buildDescubrirArgs, buildDescubrirPrompt, parseDescubrir, type Descubiertas } from './descubrir'
 import {
   buildRevisarPrompt,
-  candidatos,
   conPrefijo,
   disponibilidad,
+  elegibles,
   mensajeCuenta,
   problemaEnSesion,
   REVISAR_SCHEMA,
   revisarCuenta,
+  revisarTemprano,
   sanearCache,
+  servidorDeLaLista,
   servidoresDeSalida,
   usable
 } from './cuentas'
@@ -318,10 +321,14 @@ function chequearCuenta(def: ConectorMcp, run: { accountId: string; label: strin
   if (msg) throw new Error(msg)
 }
 
-/** Lo que dijo el system/init de una consulta pisa lo revisado: es lo más nuevo que se sabe de esa cuenta. */
-function actualizarDesdeInit(cuentaId: string, sesion: ServidorMcp[]): void {
+/**
+ * Lo que dijo el system/init de una consulta pisa lo revisado: es lo más nuevo que se sabe de esa cuenta.
+ * Parcial: la sesión corrió sin los conectores de claude.ai, así que los que no vinieron se conservan.
+ */
+function actualizarDesdeInit(cuentaId: string, sesion: ServidorMcp[], parcial = false): void {
   const previa = cuentasCache[cuentaId]
-  cuentasCache = { ...cuentasCache, [cuentaId]: { revisadaEn: previa?.revisadaEn ?? Date.now(), servidores: sesion } }
+  const deClaudeAi = parcial ? (previa?.servidores ?? []).filter((s) => s.nombre.startsWith('claude.ai ') && !sesion.some((x) => x.prefijo === s.prefijo)) : []
+  cuentasCache = { ...cuentasCache, [cuentaId]: { revisadaEn: previa?.revisadaEn ?? Date.now(), servidores: [...sesion, ...deClaudeAi] } }
   guardarCuentas()
 }
 
@@ -515,6 +522,8 @@ async function start(rawId: unknown, rawAccount?: unknown): Promise<{ id: string
     initialPrompt: usaComandoTicket(def) ? `/ticket ${id}` : undefined,
     resume: true
   })
+  // El /ticket de la terminal suele asignarlo o moverlo: el detalle guardado deja de valer.
+  detalles.delete(id)
   ctx.ui({ type: 'open-pane', id: ws.id })
   return { id: ws.id, created: true }
 }
@@ -525,9 +534,12 @@ interface Ejecucion {
   exe: string
   cwd: string
   env: Record<string, string>
+  /** La sesión corrió sin los conectores de claude.ai: su system/init no los trae. */
+  sinClaudeAi?: boolean
 }
 
-function ejecucion(nombre: string, accountId: string): Ejecucion {
+/** Con `mcp`, si la cuenta lo usa con un servidor que no es de claude.ai, la sesión no conecta los de claude.ai. */
+function ejecucion(nombre: string, accountId: string, mcp?: ConectorMcp): Ejecucion {
   const acc = ctx.store.account(accountId)
   if (!acc) throw new Error(`La cuenta para consultar ${nombre} ya no existe. Elegí otra en Configuración.`)
   if (!accountStatus(acc).loggedIn) throw new Error(`La cuenta «${acc.label}» no tiene sesión iniciada.`)
@@ -535,14 +547,20 @@ function ejecucion(nombre: string, accountId: string): Ejecucion {
   if (!exe) throw new Error('No encontré el ejecutable de Claude Code (claude.exe) en el PATH.')
   const cwd = join(carpeta(), 'tickets-run')
   mkdirSync(cwd, { recursive: true })
-  return { accountId: acc.id, label: acc.label, exe, cwd, env: { ...baseEnv(), CLAUDE_CONFIG_DIR: acc.configDir } }
+  // Un MCP propio lento puede tardar más que el tope por defecto de Claude Code en arrancar.
+  const env = { MCP_TIMEOUT: '30000', ...baseEnv(), CLAUDE_CONFIG_DIR: acc.configDir }
+  const run: Ejecucion = { accountId: acc.id, label: acc.label, exe, cwd, env }
+  if (!mcp || defPara(mcp, acc.id).herramientas.prefijo.startsWith('mcp__claude_ai_')) return run
+  // Conectar todos los de claude.ai solo para no usarlos demora cada consulta. Si la variable no existe en esta
+  // versión de Claude Code, no cambia nada: el init los trae igual.
+  return { ...run, sinClaudeAi: true, env: { ...env, ENABLE_CLAUDEAI_MCP_SERVERS: 'false' } }
 }
 
 /** Cuenta con la que se leen y escriben tickets: la que consultó la última vez. */
 function cuenta(def: ConectorDef): Ejecucion {
   const id = state.config.queryAccountId
   if (!id) throw new Error(`Actualizá ${def.nombre} primero para elegir la cuenta que lo conecta.`)
-  return ejecucion(def.nombre, id)
+  return ejecucion(def.nombre, id, def.via === 'mcp' ? def : undefined)
 }
 
 const ghRunCon = (signal?: AbortSignal): GhRun => async (args, input) => {
@@ -578,14 +596,14 @@ async function refreshGh(def: ConectorGh): Promise<{ count: number }> {
     const repo = await repoGh()
     if (ac.signal.aborted) throw new Error('Consulta cancelada.')
     const ghRun = ghRunCon(ac.signal)
-    const me = await ghYo(ghRun)
-    const tickets = await ghLista(ghRun, def, repo)
+    const [me, tickets] = await Promise.all([ghYo(ghRun), ghLista(ghRun, def, repo)])
     state.tickets = tickets
     detalles.clear()
     delete state.estados
     state.me = me
     state.fetchedAt = Date.now()
     delete state.fetchedBy
+    delete state.leidoCon
     state.lastRun = { durationMs: Date.now() - inicio }
     delete state.lastError
     noDisponible = {}
@@ -605,7 +623,7 @@ async function refreshGh(def: ConectorGh): Promise<{ count: number }> {
  */
 function leerLista(def: ConectorMcp, d: ConectorMcp, run: Ejecucion, s: string): ResultadoLista {
   const sesion = servidoresDeSalida(s)
-  if (sesion) actualizarDesdeInit(run.accountId, sesion)
+  if (sesion) actualizarDesdeInit(run.accountId, sesion, run.sinClaudeAi)
   let r: ResultadoLista
   try {
     r = parseClaudeOutput(d, s)
@@ -625,7 +643,7 @@ async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: n
   const def = activo()
   if (def.via === 'gh') return refreshGh(def)
   const requested = typeof rawAccount === 'string' && rawAccount ? rawAccount : undefined
-  const run = ejecucion(def.nombre, requested ?? state.config.queryAccountId ?? (await pickAccount(def)))
+  const run = ejecucion(def.nombre, requested ?? state.config.queryAccountId ?? (await pickAccount(def)), def)
   try {
     chequearCuenta(def, run)
   } catch (e) {
@@ -650,10 +668,12 @@ async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: n
       parse: (s) => leerLista(def, d, run, s)
     })
     state.tickets = r.tickets
+    detalles.clear()
     if (r.estados?.length) state.estados = r.estados
     if (r.me) state.me = r.me
     state.fetchedAt = Date.now()
     state.fetchedBy = run.accountId
+    state.leidoCon = d.herramientas.prefijo
     state.lastRun = { tokens: r.tokens, costUsd: r.costUsd, durationMs: r.durationMs }
     delete state.lastError
     noDisponible = {}
@@ -696,7 +716,7 @@ function servidorElegido(raw: unknown, previos: TicketsConfig['servidores'], nue
   const porCuenta = { ...previos?.[cuentaId] }
   if (prefijo === '') delete porCuenta[conector]
   else {
-    const cs = candidatos(def, cuentasCache[cuentaId]?.servidores ?? [])
+    const cs = elegibles(def, cuentasCache[cuentaId]?.servidores ?? [])
     if (!cs.some((s) => s.prefijo === prefijo)) throw new Error('Ese servidor no está en esa cuenta. Tocá «Volver a revisar».')
     porCuenta[conector] = prefijo
   }
@@ -781,19 +801,24 @@ function ticketEnLista(def: ConectorDef, id: string): Ticket {
   return t
 }
 
-/** Lectura del detalle al abrir un ticket (criterios con id, comentarios, horas cargadas). */
-async function detalle(rawId: unknown): Promise<Detalle> {
+/** Lectura del detalle al abrir un ticket (criterios con id, comentarios, horas cargadas). Sin `fresco`, sale de la caché si está. */
+async function detalle(rawId: unknown, rawFresco?: unknown): Promise<Detalle> {
   const def = activo()
   if (!leeDetalle(def)) throw new Error(`${def.nombre} no tiene detalle de tickets en Sloth.`)
+  const fresco = rawFresco === true
   const id = ticketId(def, rawId)
   const t = ticketEnLista(def, id)
+  if (!fresco) {
+    const c = detalles.get(id)
+    if (c) return c
+  }
   if (def.via === 'gh') {
     const d = await ghDetalle(ghRunCon(), t)
     if (state.tickets.includes(t)) detalles.set(id, d)
     return d
   }
   const c = cuenta(def)
-  const dc = defPara(def, c.accountId)
+  const dc = servidorDeLaLista(state.leidoCon, defPara(def, c.accountId))
   try {
     const d = await runClaude({
       exe: c.exe,
@@ -836,12 +861,12 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
   if (!input) return { detail: detalles.get(id) ?? null }
 
   const c = def.via === 'mcp' ? cuenta(def) : undefined
+  const dc = def.via === 'mcp' && c ? servidorDeLaLista(state.leidoCon, defPara(def, c.accountId)) : undefined
   escribiendo.add(id)
   try {
     let minutosTotal: number | undefined
     if (def.via === 'gh') await ghAccion(ghRunCon(), t, a, input, state.me)
-    else if (c) {
-      const dc = defPara(def, c.accountId)
+    else if (c && dc) {
       const r = await runClaude({
         exe: c.exe,
         args: buildAccionArgs(dc, state.config.model, a),
@@ -911,7 +936,10 @@ async function descubrir(rawPrefijo: unknown, rawAccount: unknown): Promise<Desc
   }
 }
 
-/** «Volver a revisar»: una consulta por cuenta, en serie, que no llama a ninguna herramienta y solo lee system/init. */
+/**
+ * «Volver a revisar»: una consulta por cuenta, de a tres, que no llama a ninguna herramienta y solo lee
+ * system/init. Si en el init no quedó ningún servidor pending, se corta ahí sin esperar al modelo.
+ */
 async function revisarCuentas(raw: unknown): Promise<TicketsSnapshot> {
   let ids: string[]
   if (raw === undefined || raw === null || raw === '') ids = logueadas().map((a) => a.id)
@@ -922,18 +950,19 @@ async function revisarCuentas(raw: unknown): Promise<TicketsSnapshot> {
   descubriendo = true
   avisar()
   try {
-    for (const id of ids) {
+    await deA(ids, 3, async (id) => {
       const previa = cuentasCache[id]
       try {
         const run = ejecucion('los conectores', id)
         const r = await runClaude({
           exe: run.exe,
-          args: buildDescubrirArgs(REVISAR_SCHEMA),
+          args: buildDescubrirArgs(REVISAR_SCHEMA, 'stream-json'),
           prompt: buildRevisarPrompt(),
           cwd: run.cwd,
           env: run.env,
           quien: 'Claude',
           timeoutMs: 90_000,
+          temprano: (l) => revisarTemprano(l, Date.now()),
           parse: (s) => revisarCuenta(s, Date.now())
         })
         cuentasCache = { ...cuentasCache, [id]: r }
@@ -942,7 +971,7 @@ async function revisarCuentas(raw: unknown): Promise<TicketsSnapshot> {
         cuentasCache = { ...cuentasCache, [id]: { revisadaEn: Date.now(), servidores: previa?.servidores ?? [], error: (e as Error).message.slice(0, 500) } }
         ctx.log('tickets: revisar: error')
       }
-    }
+    })
   } finally {
     descubriendo = false
     guardarCuentas()
@@ -1073,7 +1102,7 @@ const feature: Feature = {
     c.handle('setConfig', (p: unknown) => setConfig(p))
     c.handle('hasRepo', (id: unknown) => hasRepo(id))
     c.handle('start', (id: unknown, acc: unknown) => start(id, acc))
-    c.handle('detail', (id: unknown) => detalle(id))
+    c.handle('detail', (id: unknown, fresco: unknown) => detalle(id, fresco))
     c.handle('accion', (a: unknown, id: unknown, p: unknown) => accion(a, id, p))
     c.handle('propios', () => propios())
     c.handle('propio', (id: unknown) => structuredClone(noIncluido(id).def))

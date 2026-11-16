@@ -388,19 +388,20 @@ const feature: Feature = {
         const info = await repoInfo(cwd)
         if (!info.isRepo || !info.top) throw new GitError('No es un repositorio git.')
         const branch = info.branch ?? null
-        const base = typeof baseArg === 'string' && validBranchName(baseArg) ? baseArg : await baseFor(cwd, info.top)
-        const up = await upstream(cwd)
-        const unpushed = await commitsToPush(cwd)
+        // gh va en paralelo porque es lo lento (red); atrapa adentro para que un fallo no tumbe lo de git.
+        const prP: Promise<{ pr: Awaited<ReturnType<typeof prView>> | null; error: string | null }> =
+          branch && !isProtected(branch)
+            ? prView(cwd, branch).then(
+                (pr) => ({ pr, error: null }),
+                (e: unknown) => ({ pr: null, error: e instanceof Error ? e.message : String(e) })
+              )
+            : Promise.resolve({ pr: null, error: null })
+        const baseP =
+          typeof baseArg === 'string' && validBranchName(baseArg) ? Promise.resolve(baseArg) : baseFor(cwd, info.top)
+        const [base, up, unpushed, prRes] = await Promise.all([baseP, upstream(cwd), commitsToPush(cwd), prP])
         const commits = base ? await commitsVsBase(cwd, base) : []
-        let existing = null
-        let ghError: string | null = null
-        if (branch && !isProtected(branch)) {
-          try {
-            existing = await prView(cwd, branch)
-          } catch (e) {
-            ghError = e instanceof Error ? e.message : String(e)
-          }
-        }
+        const existing = prRes.pr
+        const ghError = prRes.error
         const tpl = readTemplate(info.top)
         return {
           branch,
