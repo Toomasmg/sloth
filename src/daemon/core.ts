@@ -324,6 +324,8 @@ export class TerminalCore {
       tool: typeof p.tool === 'string' ? p.tool : undefined,
       message: typeof p.message === 'string' ? p.message : undefined,
       notificationType: typeof p.notificationType === 'string' ? p.notificationType : undefined,
+      enSegundoPlano: p.enSegundoPlano === true ? true : undefined,
+      avisoDeTarea: p.avisoDeTarea === true ? true : undefined,
       at: Date.now()
     }
     this.lastHooks.set(ev.ws, ev)

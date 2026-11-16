@@ -46,7 +46,9 @@ process.stdin.on('end', () => {
     }
     timeout = 125000;
   } else {
-    body = JSON.stringify({ ws, event, tool: j.tool_name, message: j.message, notificationType: j.notification_type });
+    const fondo = event === 'PreToolUse' && !!j.tool_input && j.tool_input.run_in_background === true;
+    const aviso = event === 'UserPromptSubmit' && typeof j.prompt === 'string' && j.prompt.trimStart().startsWith('<task-notification>');
+    body = JSON.stringify({ ws, event, tool: j.tool_name, message: j.message, notificationType: j.notification_type, enSegundoPlano: fondo || undefined, avisoDeTarea: aviso || undefined });
   }
   const req = http.request(target, { method: 'POST', headers: { 'content-type': 'application/json', 'x-sloth-token': token }, timeout }, (res) => {
     if (!isPerm) { res.resume(); res.on('end', () => done()); return; }

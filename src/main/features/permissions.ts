@@ -313,6 +313,7 @@ const feature: Feature = {
     )
 
     ctx.onHook((p: HookEventPayload) => {
+      if (p.enFondo) return
       if (p.event === 'Stop') notifyText(p.ws, 'terminó', 'Claude terminó. Revisá los cambios antes de seguir.')
       else if (p.event === 'Notification' && p.notificationType !== 'permission_prompt')
         notifyText(p.ws, 'te espera', p.message || 'Claude necesita tu atención.')

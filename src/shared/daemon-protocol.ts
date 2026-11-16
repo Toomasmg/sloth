@@ -18,6 +18,12 @@ export interface HookEventPayload {
   tool?: string
   message?: string
   notificationType?: string
+  /** PreToolUse de una herramienta que corre en segundo plano (run_in_background). */
+  enSegundoPlano?: boolean
+  /** UserPromptSubmit que no escribió el usuario: Claude Code avisa que terminó una tarea de fondo. */
+  avisoDeTarea?: boolean
+  /** Lo completa el main: shells de ese espacio que siguen corriendo cuando llegó el evento. */
+  enFondo?: number
   /** Momento en que lo recibió el servidor de hooks (ms). */
   at?: number
 }
