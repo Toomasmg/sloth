@@ -2,6 +2,9 @@ import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import type { SpawnSpec } from '../shared/daemon-protocol'
 import type { ShellChoice } from './features/settings-model'
+import { shellArgs, type ShellFamily } from './shell-args'
+
+export { shellArgs, type ShellFamily }
 
 export interface PtySpec {
   cwd: string
@@ -9,9 +12,6 @@ export interface PtySpec {
   /** argv de Claude que la shell corre al abrirse (p. ej. ['claude', '--continue']). Sin valor = solo la shell. */
   claude?: string[]
 }
-
-/** Familia de sintaxis de la shell: cambia cómo se pasa el comando inicial. */
-export type ShellFamily = 'ps' | 'cmd' | 'posix'
 
 const GIT_BASH_PATHS = ['C:\\Program Files\\Git\\bin\\bash.exe']
 
@@ -40,26 +40,6 @@ export function resolveShell(choice: ShellChoice): { file: string; family: Shell
     if (bash) return { file: bash, family: 'posix' }
   }
   return hasPwsh() ? { file: 'pwsh.exe', family: 'ps' } : { file: 'powershell.exe', family: 'ps' }
-}
-
-// Argumentos que no necesitan comillas en ninguna de las shells.
-const PLAIN = /^[A-Za-z0-9_\-./:=\\]+$/
-const psArg = (s: string): string => (PLAIN.test(s) ? s : `'${s.replace(/'/g, "''")}'`)
-const posixArg = (s: string): string => (PLAIN.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`)
-// cmd no tiene escape confiable: se quitan las comillas y los caracteres especiales del prompt.
-const cmdArg = (s: string): string => (PLAIN.test(s) ? s : `"${s.replace(/["&|<>^%!()]/g, '')}"`)
-
-/** Argumentos de la shell: solo la shell, o la shell corriendo el comando de Claude y quedándose abierta. */
-export function shellArgs(family: ShellFamily, claude?: string[]): string[] {
-  if (!claude?.length) return family === 'ps' ? ['-NoLogo'] : family === 'posix' ? ['--login', '-i'] : []
-  switch (family) {
-    case 'ps':
-      return ['-NoLogo', '-NoExit', '-Command', claude.map(psArg).join(' ')]
-    case 'cmd':
-      return ['/k', claude.map(cmdArg).join(' ')]
-    case 'posix':
-      return ['--login', '-i', '-c', `${claude.map(posixArg).join(' ')}; exec bash --login -i`]
-  }
 }
 
 /**

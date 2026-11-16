@@ -13,6 +13,7 @@ import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
 import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
 import { clipboardForPaste } from './clipboard-paste'
 import { createWorktree } from './git'
+import { validBranchName } from './features/git-run'
 import { normTicketId, TEMPLATE_COLOR_KEYS, validBranch } from '../shared/templates-shared'
 import { baseSettingsFor, syncSharedSetup, unshareSetup } from './setup'
 import { UsageScanner } from './usage'
@@ -373,6 +374,7 @@ app.whenReady().then(async () => {
     const initialPrompt = input.initialPrompt?.trim() || undefined
     if (initialPrompt && initialPrompt.length > 4000) throw new Error('El prompt inicial es demasiado largo.')
     const branch = input.branch?.trim() || undefined
+    if (branch && !validBranchName(branch)) throw new Error('La rama no es un nombre válido.')
     const baseBranch = input.baseBranch?.trim() || undefined
     if (baseBranch && !validBranch(baseBranch)) throw new Error('La rama base no es un nombre válido.')
     const color = input.color === undefined || input.color === null || input.color === '' ? undefined : String(input.color)
@@ -602,7 +604,8 @@ function createWindow(onShown?: () => void): void {
     wc.setZoomLevel(next)
   })
 
-  if (process.env.ELECTRON_RENDERER_URL) void win.loadURL(process.env.ELECTRON_RENDERER_URL)
+  // Solo en desarrollo: el instalado nunca carga la interfaz desde una URL del entorno.
+  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) void win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else void win.loadURL('app://ui/index.html')
 
   // Se muestra cuando ya pintó (la pantalla de carga de index.html), maximizada si quedó así.

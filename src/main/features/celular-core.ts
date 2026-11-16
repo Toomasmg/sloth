@@ -143,6 +143,15 @@ export function armarEstado(e: Entrada): EstadoCelular {
 
 export type TipoAviso = 'termino' | 'teNecesita' | 'permiso'
 
+const PERMISO_POR_CLASE: Record<string, string> = {
+  cmd: 'Claude quiere correr un comando.',
+  edit: 'Claude quiere editar archivos.',
+  net: 'Claude quiere acceder a internet.'
+}
+
+/** Qué pide Claude, sin el comando ni la ruta: ese texto sale a los servidores de ntfy. */
+export const resumenPermiso = (clase: string): string => PERMISO_POR_CLASE[clase] ?? 'Claude quiere usar una herramienta.'
+
 /** Título y cuerpo del aviso por ntfy. Pasa por los servidores de ntfy: solo el nombre del espacio y qué pasó. */
 export function textoAviso(tipo: TipoAviso, espacio: string, detalle?: string): { titulo: string; cuerpo: string } {
   const nombre = corto(espacio.replace(/[\r\n]+/g, ' '), 60)
