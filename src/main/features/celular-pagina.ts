@@ -28,7 +28,12 @@ export const PAGINA_HTML = `<!doctype html>
     <span class="marca">Sloth</span>
     <div class="cuentas" role="group" aria-label="Cuenta" id="cuentas"></div>
     <span class="conexion" id="conexion" role="status"><span class="punto"></span><span id="conexion-texto">Conectando…</span></span>
+    <button type="button" class="completa" id="completa" aria-label="Pantalla completa" title="Pantalla completa" hidden><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg></button>
   </header>
+  <div class="pista" id="pista-ios" role="note" hidden>
+    <span>Para verlo sin la barra del navegador: tocá Compartir y «Agregar a inicio», y abrilo desde ese ícono.</span>
+    <button type="button" id="pista-ok">Entendido</button>
+  </div>
   <div class="relojes">
     <section class="reloj" id="g5" aria-label="Límite de 5 horas"></section>
     <section class="reloj" id="g7" aria-label="Límite semanal"></section>
@@ -75,7 +80,7 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
   display: grid; gap: 14px;
   padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "top" "relojes" "centro";
+  grid-template-areas: "top" "pista" "relojes" "centro";
   align-content: start;
 }
 .top { grid-area: top; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -135,8 +140,8 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
   .app {
     height: 100%; gap: 16px;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.55fr) minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-    grid-template-areas: "g5 top g7" "g5 centro g7";
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas: "g5 top g7" "g5 pista g7" "g5 centro g7";
     align-content: stretch; align-items: center;
     background: radial-gradient(ellipse at 50% 120%, #15181D 0%, var(--fondo) 70%);
   }
@@ -172,6 +177,10 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
   .hoy { flex: none; }
   .hoy { margin-top: auto; }
 }
+.completa { flex: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid var(--borde); background: var(--panel); color: var(--texto); }
+.pista { grid-area: pista; display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 12px; border-radius: 12px; background: rgba(90,169,255,0.12); border: 1px solid rgba(140,194,255,0.3); font-size: 12px; color: var(--texto); }
+.pista span { flex: 1; min-width: 0; }
+.pista button { flex: none; min-height: 44px; padding: 0 12px; border: 0; border-radius: 9px; background: #2A2F37; color: var(--fuerte); font-weight: 600; }
 .aviso-pantalla { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 24px max(24px, env(safe-area-inset-right)) 24px max(24px, env(safe-area-inset-left)); background: var(--fondo); text-align: center; }
 .aviso-pantalla h1 { margin: 0; font-size: 20px; }
 .aviso-pantalla p { margin: 0 auto; max-width: 36ch; color: var(--suave); }
@@ -445,6 +454,29 @@ export const PAGINA_JS = `(function () {
         pintar();
       }, function () { pintarConexion(); })
       .then(function () { if (token && !document.hidden) timer = setTimeout(consultar, CADA_MS); });
+  }
+
+  // Sin la barra del navegador. Una página http no se puede instalar como app en Android, pero sí
+  // puede pedir pantalla completa con un toque; el iPhone no deja, y la única salida es el ícono de inicio.
+  var enApp = window.matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone === true;
+  var raiz = document.documentElement;
+  var pedir = raiz.requestFullscreen ? function () { return raiz.requestFullscreen({ navigationUI: 'hide' }); } : raiz.webkitRequestFullscreen ? function () { raiz.webkitRequestFullscreen(); return Promise.resolve(); } : null;
+  var enCompleta = function () { return !!(document.fullscreenElement || document.webkitFullscreenElement); };
+  if (pedir && !enApp) {
+    var boton = $('completa');
+    var entrar = function () {
+      if (enCompleta()) return;
+      try { var r = pedir(); if (r && r.catch) r.catch(function () { /* el navegador no quiso */ }); } catch (e) { /* idem */ }
+    };
+    var actualizar = function () { boton.hidden = enCompleta(); };
+    boton.addEventListener('click', entrar);
+    document.addEventListener('pointerup', entrar);
+    document.addEventListener('fullscreenchange', actualizar);
+    document.addEventListener('webkitfullscreenchange', actualizar);
+    actualizar();
+  } else if (!enApp && /iP(hone|od)/.test(navigator.userAgent) && !leer('sloth-pista-ios')) {
+    $('pista-ios').hidden = false;
+    $('pista-ok').addEventListener('click', function () { $('pista-ios').hidden = true; guardar('sloth-pista-ios', '1'); });
   }
 
   document.addEventListener('visibilitychange', function () {
