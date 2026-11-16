@@ -9,6 +9,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.21',
+    date: '2026-11-16',
+    title: 'Acciones del chat a mano',
+    items: [
+      'Chat: las acciones de un mensaje (reaccionar, responder, más) aparecen solo al hacer clic en él, pegadas a la burbuja y de a una. Al tocar otro mensaje, pasan a ese. Esc las cierra sin cerrar el chat.',
+      'El aviso de actualización ya no flota sobre el chat ni el micrófono: se muestra en la píldora de versión de arriba.'
+    ]
+  },
+  {
     version: '0.6.20',
     date: '2026-11-16',
     title: 'El celu sin la barra del navegador',
