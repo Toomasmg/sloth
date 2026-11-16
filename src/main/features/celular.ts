@@ -7,10 +7,13 @@ import { dirname, join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import type { PendingPermission } from '../daemon-client'
 import type { HookEventPayload } from '../hooks'
-import { PUERTO_POR_DEFECTO, type CelularVista } from '../../shared/celular'
+import { PUERTO_POR_DEFECTO, type CelularVista, type RemotoVista } from '../../shared/celular'
+import { enlaceCelu, secretoValido } from '../../shared/celu-remoto'
 import { LIMITES_ARCHIVO } from '../statusline-core'
 import { armarEstado, debeAvisar, elegirIp, leerLimites, puertoValido, temaValido, textoAviso, type TipoAviso } from './celular-core'
 import { crearFuenteWifi, type FuenteDeEstado, type ProveedorDeEstado } from './celular-servidor'
+import { crearFuenteRemota, type CambioRemoto } from './celular-remoto'
+import { sesionChat } from './chat'
 import { kindOf, labelOf } from './permissions-core'
 import { responderPermiso } from './permissions'
 import { currentSettings } from './settings'
@@ -31,6 +34,7 @@ interface Config {
   token: string
   aprobar: boolean
   ntfy: { encendido: boolean; tema: string }
+  remoto: { encendido: boolean; aprobar: boolean; secreto: string }
 }
 
 const REVISAR_IP_MS = 15_000
@@ -41,7 +45,7 @@ const nuevoToken = (): string => randomBytes(32).toString('base64url')
 const nuevoTema = (): string => `sloth-${randomBytes(9).toString('hex')}`
 
 function porDefecto(): Config {
-  return { encendido: false, puerto: PUERTO_POR_DEFECTO, token: nuevoToken(), aprobar: false, ntfy: { encendido: false, tema: nuevoTema() } }
+  return { encendido: false, puerto: PUERTO_POR_DEFECTO, token: nuevoToken(), aprobar: false, ntfy: { encendido: false, tema: nuevoTema() }, remoto: { encendido: false, aprobar: false, secreto: nuevoToken() } }
 }
 
 function cargar(): Config {
@@ -56,6 +60,11 @@ function cargar(): Config {
       ntfy: {
         encendido: raw.ntfy?.encendido === true,
         tema: temaValido(raw.ntfy?.tema) ? raw.ntfy.tema : base.ntfy.tema
+      },
+      remoto: {
+        encendido: raw.remoto?.encendido === true,
+        aprobar: raw.aprobar === true && raw.remoto?.aprobar === true,
+        secreto: secretoValido(raw.remoto?.secreto) ? raw.remoto.secreto : base.remoto.secreto
       }
     }
   } catch {
@@ -93,12 +102,28 @@ const feature: Feature = {
     let revisor: NodeJS.Timeout | null = null
     let icono: Buffer | null | undefined
     const enviados = new Map<string, number>()
+    let fuenteRemota: FuenteDeEstado | null = null
+    let remotoEstado: RemotoVista['estado'] = 'apagado'
+    let remotoError: string | null = null
+    let celuActivo = false
 
     const guardar = (): void => {
       try {
         guardarConfig(cfg)
       } catch (e) {
         ctx.log('no se pudo guardar la configuración:', (e as Error).message)
+      }
+    }
+
+    const vistaRemota = (): RemotoVista => {
+      const s = cfg.remoto.encendido ? sesionChat() : null
+      return {
+        encendido: cfg.remoto.encendido,
+        aprobar: cfg.remoto.aprobar,
+        estado: cfg.remoto.encendido ? remotoEstado : 'apagado',
+        enlace: s ? enlaceCelu({ u: s.supabaseUrl, k: s.anonKey, s: cfg.remoto.secreto, id: s.userId }) : null,
+        celuActivo,
+        error: remotoError
       }
     }
 
@@ -111,7 +136,8 @@ const feature: Feature = {
       aprobar: cfg.aprobar,
       ntfy: { ...cfg.ntfy },
       error,
-      ipCambio
+      ipCambio,
+      remoto: vistaRemota()
     })
     const avisar = (): void => ctx.emit('changed', vista())
 
@@ -235,6 +261,43 @@ const feature: Feature = {
       return vista()
     }
 
+    async function detenerRemota(): Promise<void> {
+      const f = fuenteRemota
+      fuenteRemota = null
+      remotoEstado = 'apagado'
+      remotoError = null
+      celuActivo = false
+      if (f) await f.detener()
+    }
+
+    // Independiente del Wi-Fi: anda aunque el servidor de casa esté apagado.
+    async function iniciarRemota(): Promise<void> {
+      await detenerRemota()
+      if (!cfg.remoto.encendido) return
+      const f = crearFuenteRemota({
+        proveedor,
+        sesion: sesionChat,
+        secreto: () => cfg.remoto.secreto,
+        puedeAprobar: () => cfg.aprobar && cfg.remoto.aprobar,
+        alCambiar: (e: CambioRemoto) => {
+          if (fuenteRemota !== f) return
+          remotoEstado = e.estado
+          remotoError = e.error
+          celuActivo = e.celuActivo
+          avisar()
+        },
+        log: ctx.log
+      })
+      fuenteRemota = f
+      await f.iniciar()
+    }
+
+    async function aplicarRemota(): Promise<CelularVista> {
+      await iniciarRemota()
+      avisar()
+      return vista()
+    }
+
     async function mandarNtfy(tipo: TipoAviso, wsId: string, detalle?: string, prueba = false): Promise<void> {
       if (!prueba && (!cfg.ntfy.encendido || currentSettings().noMolestar)) return
       if (!temaValido(cfg.ntfy.tema)) throw new Error('El tema de ntfy no es válido.')
@@ -296,6 +359,7 @@ const feature: Feature = {
     ctx.handle('aprobar', (on: unknown) => {
       if (typeof on !== 'boolean') throw new Error('Valor inválido.')
       cfg.aprobar = on
+      if (!on) cfg.remoto.aprobar = false
       guardar()
       avisar()
       return vista()
@@ -311,6 +375,26 @@ const feature: Feature = {
       return vista()
     })
 
+    ctx.handle('remoto', async (p: unknown) => {
+      const { encendido, aprobar } = (p ?? {}) as { encendido?: unknown; aprobar?: unknown }
+      if (encendido !== undefined && typeof encendido !== 'boolean') throw new Error('Valor inválido.')
+      if (aprobar !== undefined && typeof aprobar !== 'boolean') throw new Error('Valor inválido.')
+      if (aprobar === true && !cfg.aprobar) throw new Error('Primero prendé “Aprobar desde el celu”.')
+      const cambiaEncendido = encendido !== undefined && encendido !== cfg.remoto.encendido
+      cfg.remoto = { ...cfg.remoto, encendido: encendido ?? cfg.remoto.encendido, aprobar: aprobar ?? cfg.remoto.aprobar }
+      guardar()
+      if (cambiaEncendido) return aplicarRemota()
+      avisar()
+      return vista()
+    })
+
+    ctx.handle('remoto-regenerar', async () => {
+      cfg.remoto = { ...cfg.remoto, secreto: nuevoToken() }
+      guardar()
+      ctx.log('secreto remoto regenerado: los celus anteriores quedan afuera')
+      return aplicarRemota()
+    })
+
     ctx.handle('probar-ntfy', () => mandarNtfy('termino', '', undefined, true))
 
     ctx.handle('visto-ip', () => {
@@ -321,9 +405,10 @@ const feature: Feature = {
     detenerTodo = async () => {
       if (revisor) clearInterval(revisor)
       revisor = null
-      await detener()
+      await Promise.all([detener(), detenerRemota()])
     }
 
+    void iniciarRemota().catch((e: unknown) => ctx.log('celu remoto: no se pudo arrancar:', (e as Error).message))
     void aplicar().catch((e: unknown) => ctx.log('no se pudo arrancar:', (e as Error).message))
   },
   dispose() {

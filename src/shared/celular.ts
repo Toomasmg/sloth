@@ -69,6 +69,20 @@ export interface CelularVista {
   error: string | null
   /** La IP cambió desde que se abrió el servidor: el QR viejo ya no sirve. */
   ipCambio: boolean
+  /** «Desde cualquier red»: el canal remoto por el Supabase del chat. */
+  remoto?: RemotoVista
+}
+
+export interface RemotoVista {
+  encendido: boolean
+  /** Segunda llave para aprobar desde afuera; solo vale con `aprobar` prendido. */
+  aprobar: boolean
+  estado: 'apagado' | 'sin-chat' | 'conectando' | 'listo' | 'error'
+  /** Enlace del QR (con el secreto en el #), o null si no hay sesión de chat o está apagado. */
+  enlace: string | null
+  /** Hubo un `hola` del celu en los últimos 75 s. */
+  celuActivo: boolean
+  error: string | null
 }
 
 export const PUERTO_POR_DEFECTO = 47321
