@@ -1,13 +1,19 @@
 /**
- * Código QR (modo byte, corrección M, versiones 1 a 10) para el enlace del celular. Sigue el
+ * Código QR (modo byte, corrección M, versiones 1 a 40) para el enlace del celular. Sigue el
  * algoritmo de la norma ISO/IEC 18004 en la forma de la implementación de Nayuki. Alcanza para
- * ~210 bytes, de sobra para http://<ip>:<puerto>/?t=<token>.
+ * 2331 bytes: el enlace de afuera del Wi-Fi lleva la URL de Supabase y la anon key, y pasa los 300.
  */
 
 /** Corrección M: palabras de corrección por bloque y cantidad de bloques, por versión (índice 0 sin uso). */
-const ECC_POR_BLOQUE = [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26]
-const BLOQUES = [-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5]
-const VERSION_MAX = 10
+const ECC_POR_BLOQUE = [
+  -1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28,
+  28, 28, 28, 28
+]
+const BLOQUES = [
+  -1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47,
+  49
+]
+export const VERSION_MAX = 40
 /** Bits de formato del nivel M. */
 const FORMATO_M = 0
 
@@ -102,10 +108,10 @@ export function bitsDeVersion(ver: number): number {
   return (ver << 12) | rem
 }
 
-function posicionesDeAlineacion(ver: number, size: number): number[] {
+export function posicionesDeAlineacion(ver: number, size = ver * 4 + 17): number[] {
   if (ver === 1) return []
   const n = Math.floor(ver / 7) + 2
-  const paso = Math.ceil((ver * 4 + 4) / (n * 2 - 2)) * 2
+  const paso = Math.floor((ver * 8 + n * 3 + 5) / (n * 4 - 4)) * 2
   const r = [6]
   for (let pos = size - 7; r.length < n; pos -= paso) r.splice(1, 0, pos)
   return r
@@ -246,7 +252,7 @@ function penalidad(m: Matriz): number {
   return p
 }
 
-/** Arma el QR del texto. Lanza si no entra en la versión 10. */
+/** Arma el QR del texto. Lanza si no entra en la versión 40. */
 export function qrDeTexto(texto: string): Qr {
   const bytes = [...new TextEncoder().encode(texto)]
   let ver = 1
