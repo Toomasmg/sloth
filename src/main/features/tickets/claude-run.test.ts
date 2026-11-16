@@ -22,17 +22,28 @@ test('runClaude devuelve lo que parsea', async () => {
   assert.equal(await runClaude({ ...base, parse: (s) => s.toUpperCase() }), 'HOLA')
 })
 
-test('runClaude con temprano corta el proceso apenas una línea alcanza', async () => {
+const vive = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+test('runClaude con temprano corta el proceso apenas una línea alcanza y lo mata', async () => {
   const inicio = Date.now()
-  const r = await runClaude({
+  const pid = await runClaude({
     ...base,
-    args: ['-e', "console.log(JSON.stringify({type:'system',subtype:'init'}));setTimeout(()=>{},20000)"],
+    args: ['-e', "console.log(JSON.stringify({type:'system',subtype:'init',pid:process.pid}));setTimeout(()=>{},20000)"],
     timeoutMs: 10_000,
-    parse: () => 'tarde',
-    temprano: (l) => (l.includes('init') ? 'ok' : undefined)
+    parse: () => 0,
+    temprano: (l) => (l.includes('init') ? Number(JSON.parse(l).pid) : undefined)
   })
-  assert.equal(r, 'ok')
+  assert.ok(pid > 0)
   assert.ok(Date.now() - inicio < 5000)
+  for (let i = 0; i < 50 && vive(pid); i++) await new Promise((r) => setTimeout(r, 100))
+  assert.equal(vive(pid), false)
 })
 
 test('runClaude ignora un temprano que tira y sigue hasta el final', async () => {

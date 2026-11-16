@@ -29,6 +29,7 @@ import { resolveClaudeExe, runClaude } from './claude-run'
 import type { ConectorDef, ConectorGh, ConectorMcp } from './conector'
 import { crearAlmacen, type Almacen, type ConfigCruda, type FsTickets } from './almacen'
 import { CONECTORES } from './conectores'
+import { deA } from './concurrencia'
 import { buildDescubrirArgs, buildDescubrirPrompt, parseDescubrir, type Descubiertas } from './descubrir'
 import {
   buildRevisarPrompt,
@@ -927,14 +928,6 @@ async function descubrir(rawPrefijo: unknown, rawAccount: unknown): Promise<Desc
   } finally {
     descubriendo = false
   }
-}
-
-async function deA<T>(xs: T[], n: number, fn: (x: T) => Promise<void>): Promise<void> {
-  const cola = [...xs]
-  const uno = async (): Promise<void> => {
-    for (let x = cola.shift(); x !== undefined; x = cola.shift()) await fn(x)
-  }
-  await Promise.all(Array.from({ length: Math.min(n, cola.length) }, uno))
 }
 
 /**
