@@ -9,6 +9,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.20',
+    date: '2026-11-16',
+    title: 'El celu sin la barra del navegador',
+    items: [
+      'Celular: en Android, tocá la página una vez y se ve en pantalla completa, sin la dirección ni las pestañas. Si salís, el botón de arriba la vuelve a poner.',
+      'Celular: en iPhone, agregala a la pantalla de inicio (Compartir → «Agregar a inicio») y abrila desde ese ícono para verla sin la barra.'
+    ]
+  },
+  {
     version: '0.6.19',
     date: '2026-11-16',
     title: 'Sloth en el celu',
