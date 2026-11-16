@@ -10,6 +10,7 @@ import { convKey, type ChatConvRef } from '../../shared/chat'
 import { VIA_CLAUDE_PREFIX, type ChatMcpAccountReg, type ChatMcpAsk, type ChatMcpChoice, type ChatMcpGrant, type ChatMcpOp, type ChatMcpView } from '../../shared/chat-mcp'
 import {
   conGrant,
+  debeRegistrar,
   envolverContenido,
   MCP_LIMITS,
   parsearConfig,
@@ -18,6 +19,7 @@ import {
   resolverConversacion,
   sinGrant,
   Tope,
+  validarCuentas,
   validarN,
   validarTexto,
   type ConvCandidata,
@@ -46,6 +48,7 @@ const CONN_MS = 5000
 const NO_PERMITIDO = 'El usuario no lo permitió (o no respondió a tiempo).'
 const APAGADO = 'El chat por Claude está apagado. Se prende en Configuración → Chat.'
 const FUERA = 'una terminal fuera de Sloth'
+const CUENTA_NO = 'Esta cuenta de Claude no tiene permitido usar el chat. Se elige en Configuración → Chat.'
 const KEY_RE = /^(team|dm):[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const msgOf = (e: unknown): string => (e instanceof Error && e.message ? e.message.slice(0, 300) : 'Algo salió mal.')
@@ -75,7 +78,7 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
   const pipe = pipePath(userData)
   const token = randomBytes(32)
 
-  let cfg = { enabled: false, grants: [] as ChatMcpGrant[] }
+  let cfg = { enabled: false, cuentas: [] as string[], grants: [] as ChatMcpGrant[] }
   try {
     if (existsSync(cfgPath)) cfg = parsearConfig(JSON.parse(readFileSync(cfgPath, 'utf8')))
   } catch (e) {
@@ -94,9 +97,13 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
     ctx.log('chat-mcp: no se pudo escribir el script:', msgOf(e))
   }
 
+  const existentes = (): string[] => ctx.store.accounts.map((a) => a.id)
+
   function view(): ChatMcpView {
+    const ids = existentes()
     return {
       enabled: cfg.enabled,
+      cuentas: cfg.cuentas.filter((id) => ids.includes(id)),
       grants: cfg.grants,
       limits: {
         enviarPorMinuto: MCP_LIMITS.enviarPorMinuto,
@@ -113,7 +120,7 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
   const emitAsks = (): void => ctx.emit('mcpAsks', [...pendientes.values()].map((p) => p.ask))
 
   function save(): void {
-    writeJsonAtomic(cfgPath, { v: 1, enabled: cfg.enabled, grants: cfg.grants })
+    writeJsonAtomic(cfgPath, { v: 1, enabled: cfg.enabled, cuentas: cfg.cuentas, grants: cfg.grants })
   }
 
   function writeInfo(): void {
@@ -123,12 +130,12 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
   }
 
 
-  function sincronizar(acc: Account): void {
+  function sincronizar(acc: Account, baja = false): void {
     const set = (state: ChatMcpAccountReg['state'], detail?: string): void => {
       regs.set(acc.id, detail ? { accountId: acc.id, label: acc.label, state, detail } : { accountId: acc.id, label: acc.label, state })
     }
     try {
-      const entrada = cfg.enabled ? entradaMcp(scriptPath) : null
+      const entrada = !baja && debeRegistrar(cfg, acc.id, existentes()) ? entradaMcp(scriptPath, acc.id) : null
       if (entrada && !hayNode()) return set('sin-node', 'Falta node en el PATH: Claude no puede arrancar el MCP.')
       if (!existsSync(acc.configDir)) return set('error', 'Falta la carpeta de la cuenta.')
       const file = join(acc.configDir, '.claude.json')
@@ -165,6 +172,17 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
 
   ctx.onPrepareAccount((acc) => {
     sincronizar(acc)
+    emitConfig()
+  })
+
+  ctx.onRemoveAccount((acc) => {
+    sincronizar(acc, true)
+    if (regs.get(acc.id)?.state !== 'ok') ctx.log('chat-mcp: no se pudo sacar el MCP de la cuenta borrada:', regs.get(acc.id)?.detail ?? '')
+    regs.delete(acc.id)
+    if (cfg.cuentas.includes(acc.id)) {
+      cfg = { ...cfg, cuentas: cfg.cuentas.filter((id) => id !== acc.id) }
+      save()
+    }
     emitConfig()
   })
 
@@ -271,6 +289,7 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
     const got = Buffer.from(p.token, 'hex')
     if (got.length !== token.length || !timingSafeEqual(got, token)) return { ok: false, error: 'No autorizado.' }
     if (!cfg.enabled) return { ok: false, error: APAGADO }
+    if (!debeRegistrar(cfg, p.cuenta, existentes())) return { ok: false, error: CUENTA_NO }
     try {
       return { ok: true, texto: await atender(p.pedido, p.ws) }
     } catch (e) {
@@ -349,6 +368,13 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
         await stopServer()
       }
     }
+    sincronizarTodas()
+    return view()
+  })
+
+  ctx.handle('mcpSetAccounts', (raw: unknown): ChatMcpView => {
+    cfg = { ...cfg, cuentas: validarCuentas(raw, existentes()) }
+    save()
     sincronizarTodas()
     return view()
   })

@@ -44,6 +44,8 @@ export interface FeatureContext {
   accountBusy(accountId: string): boolean
   /** Se llama cada vez que se prepara una cuenta, después de instalar settings y hooks. */
   onPrepareAccount(cb: (acc: Account) => void): void
+  /** Se llama justo antes de borrar una cuenta del store (sin espacios que la usen). */
+  onRemoveAccount(cb: (acc: Account) => void): void
   /** Mata la terminal del panel; la UI la vuelve a abrir (con el spec actual del espacio). */
   restartTerminal(id: string): Promise<void>
   /**

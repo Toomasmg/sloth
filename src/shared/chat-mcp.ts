@@ -5,6 +5,7 @@
  * Canales (feat:chat:<op>):
  *   mcpConfig()                              → ChatMcpView
  *   mcpSetEnabled(on: boolean)               → ChatMcpView
+ *   mcpSetAccounts(ids: string[])            → ChatMcpView   (cuentas donde se registra el MCP)
  *   mcpRevoke(convKey: string, op?: ChatMcpOp) → ChatMcpView   (sin op, saca el permiso entero)
  *   mcpRevokeAll()                           → ChatMcpView
  *   mcpPending()                             → ChatMcpAsk[]
@@ -35,6 +36,8 @@ export interface ChatMcpAccountReg {
 
 export interface ChatMcpView {
   enabled: boolean
+  /** Ids de las cuentas elegidas (solo las que existen). Con el interruptor prendido, el MCP va solo en estas. */
+  cuentas: string[]
   grants: ChatMcpGrant[]
   limits: { enviarPorMinuto: number; leerPorMinuto: number; maxTexto: number; maxLeer: number }
   accounts: ChatMcpAccountReg[]
