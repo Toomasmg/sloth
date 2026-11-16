@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto'
 import { Store } from './store'
 import { accountStatus, createAccount } from './accounts'
 import { installInto, stateForEvent, writeHookScript, type HookEventPayload } from './hooks'
+import { esFalsoFinal, pendientes, registrar as registrarFondo, venceEn, type Fondo } from './segundo-plano-core'
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
 import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
 import { clipboardForPaste } from './clipboard-paste'
@@ -103,6 +104,7 @@ app.whenReady().then(async () => {
   writeHookScript()
   const usage = new UsageScanner()
   const hookListeners: ((p: HookEventPayload) => void)[] = []
+  const fondos = new Map<string, Fondo>()
   const dataListeners: ((id: string, chunks: PtyChunk[]) => void)[] = []
   const exitListeners: ((id: string, code: number) => void)[] = []
   const writeListeners: ((id: string, data: string) => void)[] = []
@@ -118,11 +120,27 @@ app.whenReady().then(async () => {
 
   /** Evento de hook de Claude → estado del espacio (+ aviso de Windows si la ventana no está enfocada). */
   function onHook(p: HookEventPayload): void {
+    const ahora = Date.now()
+    registrarFondo(fondos, p, ahora)
+    const n = pendientes(fondos, p.ws, ahora)
+    // Con un shell de fondo corriendo, terminar el turno no es «terminó» ni «te espera»: no se avisa.
+    if (esFalsoFinal(p, n)) p = { ...p, enFondo: n }
     for (const l of hookListeners) safe('hook', () => l(p))
     const ws = store.workspace(p.ws)
     if (!ws) return
-    const { state, detail } = stateForEvent(p)
-    setAgent(ws.id, { state, detail, at: p.at ?? Date.now() })
+    const { state, detail } = p.enFondo
+      ? { state: 'working' as const, detail: p.enFondo === 1 ? 'Shell en segundo plano' : `${p.enFondo} shells en segundo plano` }
+      : stateForEvent(p)
+    const status = { state, detail, at: p.at ?? ahora }
+    setAgent(ws.id, status)
+    if (p.enFondo) {
+      const vence = venceEn(fondos, ws.id, ahora)
+      // Si el aviso del shell nunca llega, no queda «trabajando» para siempre.
+      if (vence !== null)
+        setTimeout(() => {
+          if (agents.get(ws.id) === status) setAgent(ws.id, { state: 'done', at: Date.now() })
+        }, vence - ahora + 1000).unref()
+    }
     // Los avisos de Windows los manda la función «permissions» (respeta «No molestar» y los ajustes).
   }
 
