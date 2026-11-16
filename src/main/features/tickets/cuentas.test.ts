@@ -18,6 +18,7 @@ import {
   revisarCuenta,
   revisarTemprano,
   sanearCache,
+  servidorDeLaLista,
   servidoresDeSalida,
   usable
 } from './cuentas'
@@ -328,4 +329,11 @@ test('revisar usa los args de descubrir con su propio schema', () => {
   const a = buildDescubrirArgs(REVISAR_SCHEMA)
   assert.equal(a[a.indexOf('--json-schema') + 1], JSON.stringify(REVISAR_SCHEMA))
   assert.equal(a[a.indexOf('--allowedTools') + 1], '')
+})
+
+test('servidorDeLaLista: solo con el mismo servidor con que se leyó la lista', () => {
+  const adaptado = conPrefijo(GRUV, 'mcp__mis-tickets__')
+  assert.equal(servidorDeLaLista('mcp__mis-tickets__', adaptado), adaptado)
+  assert.throws(() => servidorDeLaLista(GRUV.herramientas.prefijo, adaptado), /cambió desde que se leyó la lista\. Actualizá Gruv/)
+  assert.throws(() => servidorDeLaLista(undefined, GRUV), /Actualizá Gruv/)
 })

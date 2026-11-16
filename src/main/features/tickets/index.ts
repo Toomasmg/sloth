@@ -42,6 +42,7 @@ import {
   revisarCuenta,
   revisarTemprano,
   sanearCache,
+  servidorDeLaLista,
   servidoresDeSalida,
   usable
 } from './cuentas'
@@ -602,6 +603,7 @@ async function refreshGh(def: ConectorGh): Promise<{ count: number }> {
     state.me = me
     state.fetchedAt = Date.now()
     delete state.fetchedBy
+    delete state.leidoCon
     state.lastRun = { durationMs: Date.now() - inicio }
     delete state.lastError
     noDisponible = {}
@@ -671,6 +673,7 @@ async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: n
     if (r.me) state.me = r.me
     state.fetchedAt = Date.now()
     state.fetchedBy = run.accountId
+    state.leidoCon = d.herramientas.prefijo
     state.lastRun = { tokens: r.tokens, costUsd: r.costUsd, durationMs: r.durationMs }
     delete state.lastError
     noDisponible = {}
@@ -815,7 +818,7 @@ async function detalle(rawId: unknown, rawFresco?: unknown): Promise<Detalle> {
     return d
   }
   const c = cuenta(def)
-  const dc = defPara(def, c.accountId)
+  const dc = servidorDeLaLista(state.leidoCon, defPara(def, c.accountId))
   try {
     const d = await runClaude({
       exe: c.exe,
@@ -858,12 +861,12 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
   if (!input) return { detail: detalles.get(id) ?? null }
 
   const c = def.via === 'mcp' ? cuenta(def) : undefined
+  const dc = def.via === 'mcp' && c ? servidorDeLaLista(state.leidoCon, defPara(def, c.accountId)) : undefined
   escribiendo.add(id)
   try {
     let minutosTotal: number | undefined
     if (def.via === 'gh') await ghAccion(ghRunCon(), t, a, input, state.me)
-    else if (c) {
-      const dc = defPara(def, c.accountId)
+    else if (c && dc) {
       const r = await runClaude({
         exe: c.exe,
         args: buildAccionArgs(dc, state.config.model, a),

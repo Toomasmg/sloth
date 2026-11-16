@@ -218,6 +218,15 @@ export function conPrefijo(def: ConectorMcp, prefijo: string): ConectorMcp {
   return { ...def, herramientas: { ...def.herramientas, prefijo } }
 }
 
+/**
+ * El conector para leer el detalle o escribir en un ticket de la lista: tiene que ir al mismo servidor con el
+ * que se leyó la lista. Si la cuenta pasó a resolver otro (o no se sabe con cuál se leyó), se pide actualizar.
+ */
+export function servidorDeLaLista(leidoCon: string | undefined, actual: ConectorMcp): ConectorMcp {
+  if (leidoCon === actual.herramientas.prefijo) return actual
+  throw new Error(`El servidor de ${actual.nombre} de la cuenta cambió desde que se leyó la lista. Actualizá ${actual.nombre} antes de seguir.`)
+}
+
 export const usable = (d: Disponibilidad): boolean => d.tipo === 'tiene' && d.estado !== 'needs-auth' && d.estado !== 'failed'
 
 /**

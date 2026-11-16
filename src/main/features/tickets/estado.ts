@@ -20,6 +20,8 @@ export interface TicketsState {
   me?: Yo
   fetchedAt?: number
   fetchedBy?: string
+  /** Prefijo del servidor MCP con el que se leyó la lista: el detalle y las escrituras van al mismo. */
+  leidoCon?: string
   lastRun?: Corrida
   lastError?: string
   /** gruvMtimeMs: el mtime del gruv.json migrado; si gruv.json cambia, se vuelve a migrar. */
@@ -151,6 +153,7 @@ function armar(o: Obj, config: TicketsConfig, buscar: Buscar, migradoDe: unknown
     me: normYo(def, o.me),
     fetchedAt: numero(o.fetchedAt),
     fetchedBy: noVacio(o.fetchedBy),
+    leidoCon: typeof o.leidoCon === 'string' && o.leidoCon.length <= 64 && PREFIJO_RE.test(o.leidoCon) ? o.leidoCon : undefined,
     lastRun: sanearCorrida(o.lastRun),
     lastError: noVacio(o.lastError),
     migradoDe: m === undefined ? undefined : sinVacios({ archivo: 'gruv.json' as const, en: m, gruvMtimeMs }),

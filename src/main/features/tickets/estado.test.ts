@@ -296,3 +296,10 @@ test('los servidores elegidos por cuenta se sanean: queda solo lo válido', () =
     { 'acc-1': { jira: 'mcp__atlassian__' } }
   )
 })
+
+test('leidoCon: se conserva un prefijo válido, se descarta uno raro y se va con la lista', () => {
+  const s = sanearEstado({ ...TICKETS_V2, leidoCon: 'mcp__mis-tickets__' }, conectorPorId)
+  assert.equal(s?.leidoCon, 'mcp__mis-tickets__')
+  assert.equal(sanearEstado({ ...TICKETS_V2, leidoCon: 'otra cosa' }, conectorPorId)?.leidoCon, undefined)
+  assert.ok(s && !('leidoCon' in sinLista(s)))
+})
