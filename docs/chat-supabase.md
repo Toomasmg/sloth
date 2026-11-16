@@ -83,7 +83,8 @@ En **Celular → Desde cualquier red**, Sloth publica la misma vista que en el W
 
 1. Corré `supabase/migrations/0006_celu_remoto.sql` en el SQL Editor. Es idempotente.
 2. En **Auth → URL Configuration → Redirect URLs**, sumá `https://toomasmg.github.io/sloth/celu/**`: el celu entra con GitHub desde esa página.
-3. Escaneá el QR del panel con el celu y entrá con la **misma** cuenta de GitHub que en Sloth.
+3. En GitHub, **Settings → Pages → Source: GitHub Actions**. La página la publica el workflow «Celu web» (`.github/workflows/celu-web.yml`) cuando algo de `src/celu-web/` llega a `main`, o a mano con *Run workflow*. Solo lleva la anon key; nunca la service key.
+4. Escaneá el QR del panel con el celu y entrá con la **misma** cuenta de GitHub que en Sloth. Después, en Chrome (Android) usá «Instalar app»; en Samsung Internet, «Agregar página a → Pantalla de inicio».
 
 - **Qué ve el admin de Supabase:** nada útil. Todo va cifrado (AES-256-GCM) con una clave que sale del secreto del QR, y ese secreto viaja en el `#` del enlace, que el navegador nunca manda a ningún servidor. Nunca se publica el contenido de las terminales ni los prompts: solo el estado de las sesiones, el uso y los pedidos de permiso.
 - **Aprobar permisos desde afuera** tiene su propio interruptor, apagado, que solo se prende con «Aprobar desde el celu» prendido. Cada decisión vale para un pedido, vence al minuto y no se puede repetir.
