@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { ModalLoading } from '../../Modal'
 import type { FeatureUi } from '../host'
 import { useUi } from '../host'
-import { UpdateIcon } from '../../icons/SlothIcons'
+import { CheckIcon, UpdateIcon } from '../../icons/SlothIcons'
 import { onOpenAbout, onUpdateToast, openAbout, showUpdateToast } from './bus'
 import { setPhase, usePhase } from './phase'
 import { useUpdateDot, useUpdateStatus } from './useUpdateStatus'
@@ -20,6 +20,24 @@ export function UpdateDot(): React.JSX.Element | null {
   return useUpdateDot() ? <span className="f-updater-dot" role="img" aria-label="Hay una versión pendiente" title="Hay una versión pendiente" /> : null
 }
 
+/** Confirmaciones breves del actualizador: viven en la píldora de la barra superior, no flotan sobre el contenido. */
+function useUpdateNote(): string {
+  const [note, setNote] = useState('')
+  useEffect(() => {
+    let timer: number | undefined
+    const off = onUpdateToast((m) => {
+      setNote(m)
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => setNote(''), 2400)
+    })
+    return () => {
+      off()
+      window.clearTimeout(timer)
+    }
+  }, [])
+  return note
+}
+
 /**
  * Aviso discreto en la barra superior: «Hay una versión nueva» con «Ver novedades» y «Más tarde».
  * «Más tarde» lo oculta y deja un punto en el acceso a Configuración (ver useUpdateDot).
@@ -28,6 +46,15 @@ function UpdateBanner(): React.JSX.Element | null {
   const ui = useUi()
   const st = useUpdateStatus()
   const { phase } = usePhase()
+  const note = useUpdateNote()
+  if (note) {
+    return (
+      <div role="status" className="f-updater-banner is-flash">
+        <CheckIcon size={14} />
+        <span className="f-updater-banner-text">{note}</span>
+      </div>
+    )
+  }
   if (!st || !st.version || st.later) return null
   const v = st.version
   const queued = !!st.queued
@@ -75,21 +102,8 @@ function UpdateBanner(): React.JSX.Element | null {
 
 function Global(): React.JSX.Element {
   const [open, setOpen] = useState(false)
-  const [toast, setToast] = useState('')
   const { phase } = usePhase()
   useEffect(() => onOpenAbout(() => setOpen(true)), [])
-  useEffect(() => {
-    let timer: number | undefined
-    const off = onUpdateToast((m) => {
-      setToast(m)
-      window.clearTimeout(timer)
-      timer = window.setTimeout(() => setToast(''), 2400)
-    })
-    return () => {
-      off()
-      window.clearTimeout(timer)
-    }
-  }, [])
   return (
     <>
       {phase && (
@@ -101,14 +115,6 @@ function Global(): React.JSX.Element {
         <Suspense fallback={<ModalLoading />}>
           <AboutModal onClose={() => setOpen(false)} />
         </Suspense>
-      )}
-      {toast && (
-        <div role="status" className="f-updater-toast">
-          <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" fill="none" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 12.5l4.5 4.5L19 7.5" />
-          </svg>
-          <span>{toast}</span>
-        </div>
       )}
     </>
   )

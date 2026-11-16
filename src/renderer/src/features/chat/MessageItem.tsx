@@ -1,9 +1,10 @@
-import { useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { ArrowBendUpLeft, ArrowClockwise, CircleNotch, Copy, DotsThree, PencilSimple, Smiley, Trash, WarningCircle } from '@phosphor-icons/react'
 import { CHAT_REACTIONS, type ChatMessage, type ChatReactionEmoji } from '../../../../shared/chat'
 import { ContextMenu, IconButton, Menu, Tooltip, toast, type MenuItem } from '../../ui'
 import { Av, LinkedText, timeLabel } from './view-utils'
 import { ConfirmInline } from './teams/shared'
+import { barPlacement, opensBar } from './active-msg'
 import { removeMessage, retrySend, errText, toggleReaction } from './store'
 
 const REACTION_NAMES: Record<ChatReactionEmoji, string> = {
@@ -28,6 +29,10 @@ interface Props {
   /** «Visto» va debajo de este mensaje (solo en directos). */
   seen: boolean
   flash: boolean
+  /** La barra de acciones de este mensaje está abierta (a lo sumo una en toda la conversación). */
+  active: boolean
+  onToggle(id: string): void
+  onCloseBar(): void
   onReply(m: ChatMessage): void
   onEdit(m: ChatMessage): void
   onJump(id: string): void
@@ -35,13 +40,17 @@ interface Props {
 
 const emojiIcon = (e: string): React.JSX.Element => <span className="f-chat-emoji">{e}</span>
 
-export function MessageItem({ msg, mine, me, head, extras, seen, flash, onReply, onEdit, onJump }: Props): React.JSX.Element {
+export function MessageItem({ msg, mine, me, head, extras, seen, flash, active, onToggle, onCloseBar, onReply, onEdit, onJump }: Props): React.JSX.Element {
   const [ctx, setCtx] = useState<{ x: number; y: number } | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [below, setBelow] = useState(false)
   const liRef = useRef<HTMLLIElement>(null)
+  const bubbleRef = useRef<HTMLDivElement>(null)
+  const barRef = useRef<HTMLDivElement>(null)
   const deleted = msg.deletedAt !== undefined
   const sent = msg.status === 'sent'
   const name = msg.author.login === 'ex-miembro' ? 'Ex miembro' : msg.author.login
+  const barOpen = active && !deleted && !confirming
   const canAct = extras && sent && !deleted && !!me
   const quote = deleted ? undefined : msg.replyTo
 
@@ -59,6 +68,31 @@ export function MessageItem({ msg, mine, me, head, extras, seen, flash, onReply,
     removeMessage(msg).catch((e: unknown) => toast({ tone: 'danger', message: errText(e) }))
   }
 
+  useLayoutEffect(() => {
+    if (!barOpen) return
+    const view = liRef.current?.closest('.f-chat-scroll')?.getBoundingClientRect().top ?? 0
+    const bubble = bubbleRef.current?.getBoundingClientRect().top ?? 0
+    setBelow(barPlacement(bubble, view, barRef.current?.offsetHeight ?? 32) === 'below')
+  }, [barOpen])
+
+  const closeBar = (): void => {
+    liRef.current?.focus()
+    onCloseBar()
+  }
+
+  const closing = (items: MenuItem[]): MenuItem[] =>
+    items.map((it) =>
+      it.type === 'separator'
+        ? it
+        : {
+            ...it,
+            onSelect: () => {
+              closeBar()
+              it.onSelect()
+            }
+          }
+    )
+
   const reactItems = (long: boolean): MenuItem[] =>
     CHAT_REACTIONS.map((e) => ({
       id: `react-${e}`,
@@ -70,14 +104,39 @@ export function MessageItem({ msg, mine, me, head, extras, seen, flash, onReply,
   const moreItems = (withReactions: boolean): MenuItem[] => {
     const items: MenuItem[] = []
     if (canAct) {
-      items.push({ id: 'reply', label: 'Responder', icon: <ArrowBendUpLeft size={14} />, onSelect: () => onReply(msg) })
-      if (withReactions) items.push({ type: 'separator' }, ...reactItems(true), { type: 'separator' })
+      items.push({
+        id: 'reply',
+        label: 'Responder',
+        icon: <ArrowBendUpLeft size={14} />,
+        onSelect: () => onReply(msg)
+      })
+      if (withReactions)
+        items.push({ type: 'separator' }, ...reactItems(true), {
+          type: 'separator'
+        })
     }
-    items.push({ id: 'copy', label: 'Copiar texto', icon: <Copy size={14} />, onSelect: copy })
-    if (canAct && mine) items.push({ id: 'edit', label: 'Editar', icon: <PencilSimple size={14} />, onSelect: () => onEdit(msg) })
+    items.push({
+      id: 'copy',
+      label: 'Copiar texto',
+      icon: <Copy size={14} />,
+      onSelect: copy
+    })
+    if (canAct && mine)
+      items.push({
+        id: 'edit',
+        label: 'Editar',
+        icon: <PencilSimple size={14} />,
+        onSelect: () => onEdit(msg)
+      })
     // Mientras dice «Enviando…» no se ofrece: el envío ya salió y el mensaje llegaría igual a todos.
     if (mine && (canAct || msg.status === 'failed')) {
-      items.push({ id: 'delete', label: 'Eliminar', icon: <Trash size={14} />, danger: true, onSelect: () => setConfirming(true) })
+      items.push({
+        id: 'delete',
+        label: 'Eliminar',
+        icon: <Trash size={14} />,
+        danger: true,
+        onSelect: () => setConfirming(true)
+      })
     }
     return items
   }
@@ -87,8 +146,18 @@ export function MessageItem({ msg, mine, me, head, extras, seen, flash, onReply,
     e.preventDefault()
     setCtx({ x: e.clientX, y: e.clientY })
   }
+  const onBubbleClick = (e: MouseEvent): void => {
+    if (deleted) return
+    const interactive = !!(e.target as HTMLElement).closest('a, button')
+    if (opensBar({ interactive }, !window.getSelection()?.isCollapsed)) onToggle(msg.id)
+  }
   const onKeyDown = (e: KeyboardEvent<HTMLLIElement>): void => {
     if (e.target !== e.currentTarget || deleted) return
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onToggle(msg.id)
+      return
+    }
     if (e.key !== 'ContextMenu' && !(e.shiftKey && e.key === 'F10')) return
     e.preventDefault()
     const r = e.currentTarget.getBoundingClientRect()
@@ -100,7 +169,16 @@ export function MessageItem({ msg, mine, me, head, extras, seen, flash, onReply,
     .join(' ')
 
   return (
-    <li className={cls} data-mid={msg.id} ref={liRef} tabIndex={0} onContextMenu={openCtx} onKeyDown={onKeyDown}>
+    <li
+      className={cls}
+      data-mid={msg.id}
+      ref={liRef}
+      tabIndex={0}
+      aria-expanded={deleted ? undefined : barOpen}
+      aria-controls={barOpen ? `bar-${msg.id}` : undefined}
+      onContextMenu={openCtx}
+      onKeyDown={onKeyDown}
+    >
       {!mine && (head ? <Av src={msg.author.avatarUrl} initial={msg.author.login} size={28} /> : <span className="f-chat-av-gap" aria-hidden="true" />)}
       <div className="f-chat-msg-body">
         {head && (
@@ -109,26 +187,55 @@ export function MessageItem({ msg, mine, me, head, extras, seen, flash, onReply,
             <time dateTime={new Date(msg.createdAt).toISOString()}>{timeLabel(msg.createdAt)}</time>
           </div>
         )}
-        <div className="f-chat-bubble">
-          {(!head || mine) && <span className="sr-only">{name}: </span>}
-          {quote && (
-            <button type="button" className="f-chat-quote" onClick={() => onJump(quote.id)} aria-label={`Ir al mensaje citado de ${quote.authorLogin}`}>
-              <strong>@{quote.authorLogin}</strong>
-              <span>{quote.deleted ? 'Mensaje eliminado' : quote.excerpt}</span>
-            </button>
-          )}
-          {deleted ? (
-            <p className="f-chat-text f-chat-text-gone">Mensaje eliminado</p>
-          ) : (
-            <p className="f-chat-text">
-              <LinkedText text={msg.body} meLogin={me?.login} />
-              {msg.editedAt !== undefined && (
-                <span className="f-chat-edited" title={`Editado ${new Date(msg.editedAt).toLocaleString('es-AR')}`}>
-                  {' '}
-                  (editado)
-                </span>
+        <div className="f-chat-bubble-wrap">
+          <div className="f-chat-bubble" ref={bubbleRef} onClick={onBubbleClick}>
+            {(!head || mine) && <span className="sr-only">{name}: </span>}
+            {quote && (
+              <button type="button" className="f-chat-quote" onClick={() => onJump(quote.id)} aria-label={`Ir al mensaje citado de ${quote.authorLogin}`}>
+                <strong>@{quote.authorLogin}</strong>
+                <span>{quote.deleted ? 'Mensaje eliminado' : quote.excerpt}</span>
+              </button>
+            )}
+            {deleted ? (
+              <p className="f-chat-text f-chat-text-gone">Mensaje eliminado</p>
+            ) : (
+              <p className="f-chat-text">
+                <LinkedText text={msg.body} meLogin={me?.login} />
+                {msg.editedAt !== undefined && (
+                  <span className="f-chat-edited" title={`Editado ${new Date(msg.editedAt).toLocaleString('es-AR')}`}>
+                    {' '}
+                    (editado)
+                  </span>
+                )}
+              </p>
+            )}
+          </div>
+          {barOpen && (
+            <div className={`f-chat-bar${below ? ' below' : ''}`} id={`bar-${msg.id}`} ref={barRef} role="group" aria-label="Acciones del mensaje">
+              {canAct && (
+                <Menu
+                  aria-label="Reaccionar"
+                  items={closing(reactItems(false))}
+                  trigger={(p) => <IconButton {...p} label="Reaccionar" size="sm" icon={<Smiley size={14} />} />}
+                />
               )}
-            </p>
+              {canAct && (
+                <IconButton
+                  label="Responder"
+                  size="sm"
+                  icon={<ArrowBendUpLeft size={14} />}
+                  onClick={() => {
+                    closeBar()
+                    onReply(msg)
+                  }}
+                />
+              )}
+              <Menu
+                aria-label="Más acciones"
+                items={closing(moreItems(false))}
+                trigger={(p) => <IconButton {...p} label="Más acciones" size="sm" icon={<DotsThree size={14} weight="bold" />} />}
+              />
+            </div>
           )}
         </div>
 
@@ -184,24 +291,6 @@ export function MessageItem({ msg, mine, me, head, extras, seen, flash, onReply,
           />
         )}
       </div>
-
-      {!deleted && !confirming && (
-        <div className="f-chat-bar">
-          {canAct && (
-            <Menu
-              aria-label="Reaccionar"
-              items={reactItems(false)}
-              trigger={(p) => <IconButton {...p} label="Reaccionar" size="sm" icon={<Smiley size={14} />} />}
-            />
-          )}
-          {canAct && <IconButton label="Responder" size="sm" icon={<ArrowBendUpLeft size={14} />} onClick={() => onReply(msg)} />}
-          <Menu
-            aria-label="Más acciones"
-            items={moreItems(false)}
-            trigger={(p) => <IconButton {...p} label="Más acciones" size="sm" icon={<DotsThree size={14} weight="bold" />} />}
-          />
-        </div>
-      )}
 
       {ctx && (
         <ContextMenu

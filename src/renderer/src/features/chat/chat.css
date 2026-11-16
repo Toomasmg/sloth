@@ -484,12 +484,21 @@
   }
 }
 
-/* Barra de acciones: flota sobre la esquina del mensaje con el mouse o el foco adentro. */
+/* Barra de acciones: se abre al tocar el mensaje y se pega al borde superior de la burbuja, del lado de la burbuja. */
+.f-chat-bubble-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.f-chat-bubble {
+  cursor: pointer;
+}
 .f-chat-bar {
   position: absolute;
-  top: calc(var(--s-4) * -1);
-  right: var(--s-2);
-  display: none;
+  bottom: calc(100% - var(--s-1));
+  left: var(--s-2);
+  display: flex;
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--divider-strong);
@@ -497,13 +506,13 @@
   background: var(--raised);
   z-index: var(--z-sticky);
 }
-.f-chat-msg.mine .f-chat-bar {
-  right: auto;
-  left: var(--s-2);
+.f-chat-bar.below {
+  bottom: auto;
+  top: calc(100% - var(--s-1));
 }
-.f-chat-msg:hover .f-chat-bar,
-.f-chat-msg:focus-within .f-chat-bar {
-  display: flex;
+.f-chat-msg.mine .f-chat-bar {
+  left: auto;
+  right: var(--s-2);
 }
 
 /* ---------- Búsqueda ---------- */
