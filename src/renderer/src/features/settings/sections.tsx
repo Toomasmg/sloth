@@ -16,7 +16,7 @@ import { runFeatureCommand } from '../palette'
 import { setPhase } from '../updater/phase'
 import { useUpdateDot } from '../updater/useUpdateStatus'
 import { SoundTest } from '../sound/SoundTest'
-import { resolveAccountColor, pickProjectsDir, projectsDirOf, updateSettings, useSettings } from './store'
+import { resolveAccountColor, pickProjectsDir, projectsDirOf, termFontStack, updateSettings, useSettings } from './store'
 import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, EDITORS, LINE_HEIGHT, PLAN_SUGGESTIONS, SCROLLBACK, SHELLS, SLEEP_MINUTES, TERM_FONTS, TERM_FONT, UI_FONT, UPDATE_CHANNELS, type AccentChoice, type CursorShape, type Density, type EditorChoice, type ShellChoice, type ShortcutId, type SleepMinutes, type SoundName, type TermFont, type ThemeChoice, type UpdateChannel } from '../../../../main/features/settings-model'
 import { errText, Group, Row, Slider, ToggleRow, useSave, SectionHint } from './ui'
 import { Button, EmptyState, IconButton, Input, Segmented, Select, Tag } from '../../ui'
@@ -520,7 +520,7 @@ export function TerminalSection(): React.JSX.Element {
       <pre
         className="f-set-term"
         aria-label="Vista previa de la terminal"
-        style={{ fontFamily: `'${t.fontFamily}', 'JetBrains Mono', Consolas, monospace`, fontSize: `${t.fontSize}px`, lineHeight: t.lineHeight, background: th.background, color: th.foreground }}
+        style={{ fontFamily: termFontStack(t.fontFamily), fontSize: `${t.fontSize}px`, lineHeight: t.lineHeight, background: th.background, color: th.foreground }}
       >
         <span style={{ color: th.brightBlack }}>~/mi-app/front</span>
         {'\n'}
