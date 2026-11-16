@@ -97,6 +97,8 @@ const INDEX: readonly [string, SectionId][] = [
   ['Exportar configuración', 'backup'],
   ['Importar configuración', 'backup'],
   ['Reglas de permisos y decisiones', 'notif'],
+  ['Claude en el chat', 'equipo'],
+  ['Dejar que Claude use el chat', 'equipo'],
   ['Plantillas del equipo', 'equipo'],
   ['Plantillas de espacio', 'plantillas'],
   ['Nueva plantilla', 'plantillas'],

@@ -184,6 +184,11 @@ export function MessageItem({ msg, mine, me, head, extras, seen, flash, active, 
         {head && (
           <div className="f-chat-msg-head">
             {!mine && <strong>{name}</strong>}
+            {msg.via === 'claude' && (
+              <span className="f-chat-via" title={`Lo mandó Claude Code en nombre de ${name}`}>
+                vía Claude
+              </span>
+            )}
             <time dateTime={new Date(msg.createdAt).toISOString()}>{timeLabel(msg.createdAt)}</time>
           </div>
         )}

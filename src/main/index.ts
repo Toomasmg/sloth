@@ -108,6 +108,8 @@ app.whenReady().then(async () => {
   const dataListeners: ((id: string, chunks: PtyChunk[]) => void)[] = []
   const exitListeners: ((id: string, code: number) => void)[] = []
   const writeListeners: ((id: string, data: string) => void)[] = []
+  const prepareListeners: ((acc: Account) => void)[] = []
+  const removeListeners: ((acc: Account) => void)[] = []
   const commandOverrides: ((ws: Workspace, acc: Account) => string | undefined)[] = []
   const safe = (name: string, fn: () => void): void => {
     try {
@@ -238,6 +240,7 @@ app.whenReady().then(async () => {
     installInto(acc.configDir, baseSettingsFor(acc))
     const report = syncSharedSetup(acc, !accountBusy(acc.id))
     if (report.skipped.length) console.warn(`[setup] ${acc.label}:`, report.skipped.join('; '))
+    for (const l of prepareListeners) safe('preparar cuenta', () => l(acc))
   }
 
   /** Claude guarda cada conversación en projects/<cwd con separadores como '-'>. */
@@ -347,6 +350,8 @@ app.whenReady().then(async () => {
     const used = store.workspaces.filter((w) => w.accountId === id)
     if (used.length) throw new Error(`La usan ${used.length} espacio(s): ${used.map((w) => w.name).join(', ')}`)
     await (await backend()).kill(loginPaneId(id))
+    const acc = store.account(id)
+    if (acc) for (const l of removeListeners) safe('borrar cuenta', () => l(acc))
     store.removeAccount(id)
   })
 
@@ -502,6 +507,9 @@ app.whenReady().then(async () => {
         store.removeWorkspace(id)
       },
       prepareAccount,
+      accountBusy,
+      onPrepareAccount: (cb) => prepareListeners.push(cb),
+      onRemoveAccount: (cb) => removeListeners.push(cb),
       restartTerminal: async (id) => {
         await (await backend()).kill(id)
         uiCommand({ type: 'restart-pane', id })

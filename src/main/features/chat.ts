@@ -1,4 +1,4 @@
-import { app, clipboard, safeStorage, shell, type BrowserWindow } from 'electron'
+import { app, clipboard, Notification, safeStorage, shell, type BrowserWindow } from 'electron'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
@@ -12,6 +12,7 @@ import { readTeamConfig, repoKey } from './team-config-core'
 import { registerChatData, type ChatData, type ChatCoreHandle } from './chat-data'
 import { buildInvitation, decideInvite, looksLikeInvitation, parseInvitation, type ChatInvitation } from './chat-invite'
 import { writeJsonAtomic } from './tray-settings'
+import { registerChatMcp } from './chat-mcp'
 
 /**
  * Función «chat» (lado main): config de Supabase, login con GitHub (PKCE) y sesión cifrada.
@@ -194,6 +195,21 @@ const feature: Feature = {
       } satisfies ChatCoreHandle,
       emit
     )
+
+    const mcp = registerChatMcp(ctx, {
+      data,
+      isFocused: () => !!win && !win.isDestroyed() && win.isFocused(),
+      notify: (title, body) => {
+        if (!Notification.isSupported()) return
+        const n = new Notification({ title, body, silent: false })
+        n.on('click', () => {
+          if (!win || win.isDestroyed()) return
+          win.show()
+          win.focus()
+        })
+        n.show()
+      }
+    })
 
     /** Autorrefresco y datos solo con sesión y ventana abierta. Una sola conexión realtime. */
     function updateRuntime(): void {
@@ -529,6 +545,7 @@ const feature: Feature = {
       stopRuntime()
       client?.auth.stopAutoRefresh().catch(() => {})
       client?.removeAllChannels().catch(() => {})
+      mcp.dispose().catch((e: unknown) => ctx.log('chat: no se pudo cerrar el MCP:', msg(e)))
     }
   },
   dispose() {

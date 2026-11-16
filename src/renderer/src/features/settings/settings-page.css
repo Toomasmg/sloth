@@ -863,3 +863,51 @@ button.f-set-toggle:disabled {
 .f-set-row-title .ui-tag {
   margin-left: var(--s-2);
 }
+
+.f-set-chatclaude-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.f-set-chatclaude-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+.f-set-chatclaude-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  cursor: pointer;
+}
+.f-set-chatclaude-check input {
+  accent-color: var(--accent);
+}
+.f-set-chatclaude-check:has(input:disabled) {
+  cursor: default;
+  opacity: 0.6;
+}
+.f-set-chatclaude-ops {
+  display: flex;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+.f-set-chatclaude-op {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+.f-set-chatclaude-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  padding: var(--s-2) var(--s-3);
+}
+.f-set-chatclaude-notes .f-set-hint {
+  margin: 0;
+}
