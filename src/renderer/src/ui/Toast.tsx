@@ -40,7 +40,7 @@ function ToastCard({ t }: { t: ToastItem }): React.JSX.Element {
     return () => window.clearTimeout(h)
   }, [t.duration, leave])
   return (
-    <div className={`ui-toast ui-toast--${t.tone}${closing ? ' is-closing' : ''}`} role={t.tone === 'danger' ? 'alert' : 'status'}>
+    <div className={`ui-toast ui-toast--${t.tone}${closing ? ' is-closing' : ''}`} inert={closing} role={t.tone === 'danger' ? 'alert' : 'status'}>
       {(t.tone === 'danger' || t.tone === 'warning') && <WarningIcon size={16} />}
       <span className="ui-toast-msg">{t.message}</span>
       {t.actionLabel && (

@@ -11,7 +11,8 @@ function exitMs(): number {
 
 /**
  * Salida con animación: `leave()` marca `closing` (el CSS corre la entrada al revés) y llama a `done`
- * cuando termina. Un segundo `leave()` mientras sale no hace nada.
+ * cuando termina. Un segundo `leave()` mientras sale no hace nada. Quien lo usa pone `inert={closing}`
+ * en su raíz: el foco sigue adentro hasta desmontar, y sin eso Enter o Espacio actuarían sobre lo que se va.
  */
 export function useExit(done: () => void): [closing: boolean, leave: () => void] {
   const [closing, setClosing] = useState(false)

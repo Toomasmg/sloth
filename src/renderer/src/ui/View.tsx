@@ -81,7 +81,7 @@ export function View({ labelId, title, onClose, actions, backLabel = 'Espacios',
   }, [restore])
 
   return (
-    <div ref={rootRef} className={`ui-view${closing ? ' is-closing' : ''} ${className ?? ''}`} role="dialog" aria-modal="true" aria-labelledby={labelId} onKeyDown={trapTab}>
+    <div ref={rootRef} className={`ui-view${closing ? ' is-closing' : ''} ${className ?? ''}`} inert={closing} role="dialog" aria-modal="true" aria-labelledby={labelId} onKeyDown={trapTab}>
       <header className="ui-view-head">
         <button ref={backRef} type="button" className="ui-view-back" title="Volver (Esc)" aria-label={backLabel === 'Espacios' ? 'Volver a los espacios' : `Volver a ${backLabel}`} onClick={request}>
           <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

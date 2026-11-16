@@ -147,7 +147,7 @@ export function Modal(p: ModalProps): React.JSX.Element {
   }
 
   return (
-    <div className={`${backdropClassName ?? 'modal-backdrop'}${closing ? ' is-closing' : ''}`} onMouseDown={backdropClose ? requestClose : undefined}>
+    <div className={`${backdropClassName ?? 'modal-backdrop'}${closing ? ' is-closing' : ''}`} inert={closing} onMouseDown={backdropClose ? requestClose : undefined}>
       {onSubmit ? (
         <form {...common} noValidate ref={rootRef as React.RefObject<HTMLFormElement>} onSubmit={onSubmit}>
           {head}

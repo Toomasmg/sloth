@@ -62,7 +62,7 @@ export function SidePanel({ labelId, title, onClose, actions, width = 400, class
   }, [])
 
   return (
-    <aside ref={rootRef} className={`ui-side${closing ? ' is-closing' : ''} ${className ?? ''}`} style={{ width }} role="dialog" aria-modal="false" aria-labelledby={labelId}>
+    <aside ref={rootRef} className={`ui-side${closing ? ' is-closing' : ''} ${className ?? ''}`} inert={closing} style={{ width }} role="dialog" aria-modal="false" aria-labelledby={labelId}>
       <header className="ui-side-head">
         <h2 className="ui-side-title" id={labelId}>
           {title}
