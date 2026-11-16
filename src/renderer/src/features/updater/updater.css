@@ -38,7 +38,7 @@
   color: var(--text-2);
 }
 
-.f-updater-note {
+.f-updater-banner.is-flash {
   padding-right: 10px;
 }
 
@@ -219,7 +219,6 @@
   color: var(--text-2);
 }
 
-/* Aviso «Se instala al cerrar Sloth» (abajo a la derecha, como en el artboard). */
 .f-updater-actions {
   display: flex;
   flex-wrap: wrap;

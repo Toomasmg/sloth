@@ -115,9 +115,13 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
     if (prependRef.current !== null) {
       el.scrollTop = el.scrollHeight - prependRef.current
       prependRef.current = null
+      openTop.current = el.scrollTop
       return
     }
-    if (pinRef.current) el.scrollTop = el.scrollHeight
+    if (pinRef.current) {
+      el.scrollTop = el.scrollHeight
+      openTop.current = el.scrollTop
+    }
   }, [stored])
 
   const later = (fn: () => void, ms: number): void => {
@@ -137,16 +141,13 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
   }
 
   useEffect(() => {
-    setActiveId(null)
-  }, [conv.id])
-
-  useEffect(() => {
     if (!activeId) return
     const onDown = (e: PointerEvent): void => {
       if (!(e.target as Element).closest('.f-chat-bar, .f-chat-bubble, [role="menu"]')) setActiveId(null)
     }
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape') return
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      e.preventDefault()
       const li = scrollRef.current?.querySelector<HTMLElement>(`[data-mid="${CSS.escape(activeId)}"]`)
       if (li?.contains(document.activeElement)) li.focus()
       setActiveId(null)

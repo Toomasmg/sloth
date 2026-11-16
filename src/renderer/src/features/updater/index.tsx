@@ -49,7 +49,7 @@ function UpdateBanner(): React.JSX.Element | null {
   const note = useUpdateNote()
   if (note) {
     return (
-      <div role="status" className="f-updater-banner f-updater-note">
+      <div role="status" className="f-updater-banner is-flash">
         <CheckIcon size={14} />
         <span className="f-updater-banner-text">{note}</span>
       </div>

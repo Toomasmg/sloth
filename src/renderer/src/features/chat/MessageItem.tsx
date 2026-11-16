@@ -75,14 +75,19 @@ export function MessageItem({ msg, mine, me, head, extras, seen, flash, active, 
     setBelow(barPlacement(bubble, view, barRef.current?.offsetHeight ?? 32) === 'below')
   }, [barOpen])
 
+  const closeBar = (): void => {
+    liRef.current?.focus()
+    onCloseBar()
+  }
+
   const closing = (items: MenuItem[]): MenuItem[] =>
     items.map((it) =>
-      'type' in it
+      it.type === 'separator'
         ? it
         : {
             ...it,
             onSelect: () => {
-              onCloseBar()
+              closeBar()
               it.onSelect()
             }
           }
@@ -220,7 +225,7 @@ export function MessageItem({ msg, mine, me, head, extras, seen, flash, active, 
                   size="sm"
                   icon={<ArrowBendUpLeft size={14} />}
                   onClick={() => {
-                    onCloseBar()
+                    closeBar()
                     onReply(msg)
                   }}
                 />
