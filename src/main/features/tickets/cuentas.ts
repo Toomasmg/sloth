@@ -43,14 +43,20 @@ const textos = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is 
 const estadoDe = (v: unknown): EstadoMcp => (typeof v === 'string' && v !== 'otro' && ESTADOS.includes(v as EstadoMcp) ? (v as EstadoMcp) : 'otro')
 const nombreValido = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= NOMBRE_MAX && !CONTROL.test(v)
 
-function mensajes(stdout: string): Msg[] | undefined {
-  let raw: unknown
+function parsear(texto: string): unknown {
   try {
-    raw = JSON.parse(stdout.trim())
+    return JSON.parse(texto)
   } catch {
     return undefined
   }
-  return (Array.isArray(raw) ? raw : [raw]).filter(esMsg)
+}
+
+/** Acepta la salida de `--output-format json` (un arreglo) y la de `stream-json` (un mensaje por línea). */
+function mensajes(stdout: string): Msg[] | undefined {
+  const raw = parsear(stdout.trim())
+  if (raw !== undefined) return (Array.isArray(raw) ? raw : [raw]).filter(esMsg)
+  const xs = stdout.split('\n').flatMap((l) => (l.trim() ? [parsear(l.trim())] : [])).filter(esMsg)
+  return xs.length ? xs : undefined
 }
 
 /**
@@ -74,7 +80,7 @@ function repartir(servidores: readonly ServidorMcp[], nombres: readonly string[]
 }
 
 /**
- * Los servidores del `system/init` de `--output-format json --verbose`. La respuesta de Claude solo
+ * Los servidores del `system/init` de `--verbose` (con `json` o `stream-json`). La respuesta de Claude solo
  * completa herramientas de servidores que ya vinieron en init y no las listaron. undefined sin init.
  */
 export function servidoresDeSalida(stdout: string): ServidorMcp[] | undefined {
@@ -115,6 +121,18 @@ export function revisarCuenta(stdout: string, ahora: number): CuentaRevisada {
   return { revisadaEn: ahora, servidores }
 }
 
+/**
+ * Con `stream-json` el init llega antes de que el modelo arranque: si ningún servidor quedó pending,
+ * ya está todo lo que hace falta y no vale la pena esperar el turno del modelo.
+ */
+export function revisarTemprano(linea: string, ahora: number): CuentaRevisada | undefined {
+  const raw = parsear(linea.trim())
+  if (!esMsg(raw) || raw.type !== 'system' || raw.subtype !== 'init') return undefined
+  const servidores = servidoresDeSalida(linea)
+  if (!servidores || servidores.some((s) => s.estado === 'pending')) return undefined
+  return { revisadaEn: ahora, servidores }
+}
+
 const nucleo = (prefijo: string): string => prefijo.replace(/^mcp__/, '').replace(/__$/, '').toLowerCase()
 
 function palabras(def: ConectorMcp): string[] {
@@ -123,13 +141,39 @@ function palabras(def: ConectorMcp): string[] {
 }
 
 const tieneLista = (def: ConectorMcp, s: ServidorMcp): boolean => !s.herramientas || def.herramientas.lista.every((t) => s.herramientas?.includes(t))
+const comparteNombre = (ps: readonly string[], s: ServidorMcp): boolean => ps.some((p) => nucleo(s.prefijo).includes(p))
+const FALTAN_MAX = 10
 
-/** Los servidores de la cuenta que pueden ser el de este conector. */
+/** Los servidores de la cuenta que pueden ser el de este conector, con el exacto primero. */
 export function candidatos(def: ConectorMcp, servidores: readonly ServidorMcp[]): ServidorMcp[] {
   const exacto = servidores.find((s) => s.prefijo === def.herramientas.prefijo)
-  if (exacto) return [exacto]
   const ps = palabras(def)
-  return servidores.filter((s) => ps.some((p) => nucleo(s.prefijo).includes(p)) && tieneLista(def, s))
+  const otros = servidores.filter((s) => s !== exacto && comparteNombre(ps, s) && tieneLista(def, s))
+  return exacto ? [exacto, ...otros] : otros
+}
+
+/**
+ * Servidores con otro nombre que tienen todas las herramientas de la lista. Con una lista de una
+ * sola herramienta el parecido puede ser casualidad, así que no cuentan.
+ */
+export function porHerramientas(def: ConectorMcp, servidores: readonly ServidorMcp[]): ServidorMcp[] {
+  const lista = def.herramientas.lista
+  if (lista.length < 2) return []
+  const ps = palabras(def)
+  return servidores.filter((s) => s.prefijo !== def.herramientas.prefijo && s.herramientas && !comparteNombre(ps, s) && lista.every((t) => s.herramientas?.includes(t)))
+}
+
+const faltantes = (def: ConectorMcp, s: ServidorMcp): string[] => def.herramientas.lista.filter((t) => !s.herramientas?.includes(t)).sort().slice(0, FALTAN_MAX)
+
+function parecido(def: ConectorMcp, servidores: readonly ServidorMcp[]): { nombre: string; faltan: string[] } | undefined {
+  const ps = palabras(def)
+  let mejor: { nombre: string; faltan: string[]; n: number } | undefined
+  for (const s of servidores) {
+    if (!s.herramientas || !comparteNombre(ps, s)) continue
+    const n = def.herramientas.lista.filter((t) => !s.herramientas?.includes(t)).length
+    if (n > 0 && (!mejor || n < mejor.n)) mejor = { nombre: s.nombre, faltan: faltantes(def, s), n }
+  }
+  return mejor && { nombre: mejor.nombre, faltan: mejor.faltan }
 }
 
 function tiene(def: ConectorMcp, s: ServidorMcp): Disponibilidad {
@@ -143,18 +187,29 @@ function tiene(def: ConectorMcp, s: ServidorMcp): Disponibilidad {
   }
 }
 
+const opcion = (s: ServidorMcp): { nombre: string; prefijo: string; estado: EstadoMcp } => ({ nombre: s.nombre, prefijo: s.prefijo, estado: s.estado })
+
 export function disponibilidad(def: ConectorMcp, cuenta: CuentaRevisada | undefined, elegido?: string): Disponibilidad {
   if (!cuenta) return { tipo: 'sin_revisar' }
   const cs = candidatos(def, cuenta.servidores)
-  if (!cs.length) return { tipo: 'falta' }
-  const elegida = elegido ? cs.find((s) => s.prefijo === elegido) : undefined
+  const ph = porHerramientas(def, cuenta.servidores)
+  const elegida = elegido ? [...cs, ...ph].find((s) => s.prefijo === elegido) : undefined
   if (elegida) return tiene(def, elegida)
   const exacto = cs.find((s) => s.prefijo === def.herramientas.prefijo)
+  if (exacto && usable(tiene(def, exacto))) return tiene(def, exacto)
+  const otros = cs.filter((s) => s !== exacto)
+  // El exacto pide autorización o falló pero hay otro con el mismo sistema andando: se usa ese.
+  const andando = otros.filter((s) => s.herramientas && usable(tiene(def, s)))
+  if (andando.length === 1) return tiene(def, andando[0])
   if (exacto) return tiene(def, exacto)
-  const verificados = cs.filter((s) => s.herramientas)
+  const verificados = otros.filter((s) => s.herramientas)
   if (verificados.length === 1) return tiene(def, verificados[0])
-  if (cs.length === 1) return tiene(def, cs[0])
-  return { tipo: 'elegir', opciones: cs.map((s) => ({ nombre: s.nombre, prefijo: s.prefijo, estado: s.estado })) }
+  if (otros.length === 1) return tiene(def, otros[0])
+  if (otros.length) return { tipo: 'elegir', opciones: otros.map(opcion) }
+  // Nunca se adapta solo a un servidor de otro nombre: cambiaría a quién se le permiten las herramientas.
+  if (ph.length) return { tipo: 'elegir', opciones: ph.map(opcion) }
+  const p = parecido(def, cuenta.servidores)
+  return p ? { tipo: 'falta', parecido: p } : { tipo: 'falta' }
 }
 
 /** Una copia que llama a las mismas herramientas cortas con el prefijo del servidor de la cuenta. */
@@ -173,7 +228,7 @@ export function problemaEnSesion(def: ConectorMcp, prefijoUsado: string, sesion:
   if (!sesion) return undefined
   const s = sesion.find((x) => x.prefijo === prefijoUsado)
   if (!s) return { tipo: 'falta' }
-  if (s.herramientas && !tieneLista(def, s)) return { tipo: 'falta' }
+  if (s.herramientas && !tieneLista(def, s)) return { tipo: 'falta', parecido: { nombre: s.nombre, faltan: faltantes(def, s) } }
   const d = tiene(def, s)
   if (s.estado === 'connected' && d.tipo === 'tiene' && d.verificado) return undefined
   return d
@@ -184,11 +239,16 @@ export function mensajeCuenta(def: ConectorMcp, d: Disponibilidad, cuenta: strin
   const esClaudeAi = def.herramientas.prefijo.startsWith('mcp__claude_ai_')
   if (d.tipo === 'sin_revisar') return undefined
   if (d.tipo === 'falta') {
-    const base = esClaudeAi
+    const p = d.parecido
+    const base = p
+      ? `La cuenta «${cuenta}» tiene «${p.nombre}», pero le faltan herramientas que usa ${n}: ${p.faltan.join(', ')}. Copiá ${n} como conector propio y ajustá sus herramientas, o agregalas al servidor.`
+      : esClaudeAi
       ? `Conectá ${n} en claude.ai con la cuenta «${cuenta}» (claude.ai → Configuración → Conectores) y tocá «Volver a revisar».`
       : `La cuenta «${cuenta}» no tiene el servidor MCP de ${n}. Agregalo en esa cuenta y tocá «Volver a revisar».`
     return otras.length ? `${base} Lo tiene: ${otras.map((o) => `«${o}»`).join(', ')}.` : base
   }
+  if (d.tipo === 'elegir' && d.opciones.length === 1)
+    return `«${d.opciones[0].nombre}» de la cuenta «${cuenta}» tiene las herramientas de ${n} con otro nombre. Si es ese, elegilo en los ajustes de Tickets.`
   if (d.tipo === 'elegir') return `La cuenta «${cuenta}» tiene más de un servidor que puede ser ${n}. Elegí cuál en los ajustes de Tickets.`
   const deClaudeAi = d.nombre.startsWith('claude.ai ')
   if (d.estado === 'needs-auth')
@@ -199,7 +259,7 @@ export function mensajeCuenta(def: ConectorMcp, d: Disponibilidad, cuenta: strin
   if (usable(d) && d.verificado && d.estado !== 'pending') return undefined
   // Un MCP propio que queda pending suele estar esperando que lo autentiquen.
   const auth = deClaudeAi ? '' : ' Si pide autenticarse, abrí una terminal con esa cuenta y corré /mcp.'
-  return `«${d.nombre}» no respondió a tiempo en la cuenta «${cuenta}».${auth} Podés probar igual o tocar «Volver a revisar».`
+  return `«${d.nombre}» no respondió a tiempo en la cuenta «${cuenta}».${auth} Podés probar igual o tocar «Volver a revisar». Si tu servidor tarda en arrancar, volvé a probar: Sloth ya le da hasta 30 s.`
 }
 
 function sanearServidor(v: unknown): ServidorMcp | undefined {
