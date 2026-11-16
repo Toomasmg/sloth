@@ -1,0 +1,45 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { applyMention, escapeLike, mentionQueryAt, mentionsLogin, splitMentions } from './chat-text'
+
+test('menciones: separa texto y logins', () => {
+  assert.deepEqual(splitMentions('hola @Tomy, ¿venís?'), [
+    { kind: 'text', text: 'hola ' },
+    { kind: 'mention', login: 'Tomy' },
+    { kind: 'text', text: ', ¿venís?' }
+  ])
+  assert.deepEqual(splitMentions('@ana'), [{ kind: 'mention', login: 'ana' }])
+  assert.deepEqual(splitMentions(''), [])
+})
+
+test('un mail no es una mención', () => {
+  assert.deepEqual(splitMentions('escribí a a@b.com'), [{ kind: 'text', text: 'escribí a a@b.com' }])
+  assert.equal(mentionsLogin('mandalo a tomy@empresa.com', 'tomy'), false)
+  assert.equal(mentionsLogin('@@tomy', 'tomy'), false)
+  assert.equal(mentionsLogin('@-tomy', 'tomy'), false)
+})
+
+test('mención sin distinguir mayúsculas', () => {
+  assert.equal(mentionsLogin('ey @TOMY mirá', 'tomy'), true)
+  assert.equal(mentionsLogin('ey @tomyx mirá', 'tomy'), false)
+  assert.equal(mentionsLogin('(@tomy)', 'Tomy'), true)
+})
+
+test('consulta de mención en el cursor', () => {
+  assert.deepEqual(mentionQueryAt('hola @to', 8), { start: 5, query: 'to' })
+  assert.deepEqual(mentionQueryAt('@', 1), { start: 0, query: '' })
+  assert.equal(mentionQueryAt('hola @tomy', 8), undefined, 'cursor en medio de la palabra')
+  assert.equal(mentionQueryAt('mail a@b', 8), undefined)
+  assert.equal(mentionQueryAt('hola @to y', 10), undefined)
+  assert.equal(mentionQueryAt('x', 5), undefined)
+})
+
+test('aplicar mención deja un espacio después', () => {
+  assert.deepEqual(applyMention('hola @to', 5, 8, 'tomy'), { text: 'hola @tomy ', caret: 11 })
+  assert.deepEqual(applyMention('@to mirá', 0, 3, 'tomy'), { text: '@tomy mirá', caret: 6 })
+})
+
+test('escapar comodines de LIKE', () => {
+  assert.equal(escapeLike('50%_\\'), '50\\%\\_\\\\')
+  assert.equal(escapeLike('hola'), 'hola')
+})
