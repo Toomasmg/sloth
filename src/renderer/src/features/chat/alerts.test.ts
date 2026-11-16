@@ -4,7 +4,15 @@ import { chatButtonLabel, firstWords, planIncoming, planSent, RecentIds, toastTe
 import { chatChimeSpec } from '../sound/logic'
 
 const on: ChatAlertSettings = { sounds: true, noMolestar: false, notify: { team: true, soundIn: true, soundOut: true } }
-const base = { mine: false, alreadySeen: false, windowFocused: true, viewing: false, settings: on }
+const base = { mine: false, alreadySeen: false, windowFocused: true, viewing: false, mention: false, settings: on }
+
+test('una mención avisa aunque el aviso de equipos esté apagado, salvo No molestar', () => {
+  const off = { ...on, notify: { ...on.notify, team: false } }
+  assert.equal(planIncoming({ ...base, settings: off }).toast, false)
+  assert.equal(planIncoming({ ...base, mention: true, settings: off }).toast, true)
+  assert.equal(planIncoming({ ...base, mention: true, settings: { ...off, noMolestar: true } }).toast, false)
+  assert.equal(planIncoming({ ...base, mention: true, viewing: true }).toast, false)
+})
 
 test('ajeno con foco y sin mirar: suena y avisa en la app', () => {
   assert.deepEqual(planIncoming(base), { sound: 'receive', toast: true })

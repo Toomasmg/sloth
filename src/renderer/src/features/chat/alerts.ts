@@ -21,18 +21,21 @@ export interface IncomingInput {
   windowFocused: boolean
   /** El usuario tiene abierta justo esa conversación. */
   viewing: boolean
+  /** El mensaje nombra al usuario con @login. */
+  mention: boolean
   settings: ChatAlertSettings
 }
 
 /**
  * Qué hacer con un mensaje que llega por el evento «message». Los propios no avisan ni suenan acá
  * (el sonido de enviar sale del envío). El toast es solo con la ventana en foco: sin foco avisa el sistema.
+ * Una mención avisa aunque el aviso de equipos esté apagado; «No molestar» la silencia igual.
  */
 export function planIncoming(i: IncomingInput): ChatAlertPlan {
   if (i.mine || i.alreadySeen) return NONE
   const quiet = i.settings.noMolestar
   const sound = !quiet && i.settings.sounds && i.settings.notify.soundIn ? 'receive' : null
-  const toast = !quiet && i.settings.notify.team && i.windowFocused && !i.viewing
+  const toast = !quiet && (i.settings.notify.team || i.mention) && i.windowFocused && !i.viewing
   return { sound, toast }
 }
 

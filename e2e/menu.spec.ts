@@ -76,7 +76,7 @@ test('Ctrl+1 sigue siendo «ir al panel 1» y no abre ningún destino', async ({
 test('el riel marca el destino y el menú del logo ya no existe', async ({ sloth: { page } }) => {
   await expect(page.getByRole('button', { name: 'Menú de Sloth' })).toHaveCount(0)
   const rail = page.getByRole('navigation', { name: 'Navegación' })
-  await expect(rail.getByRole('button')).toHaveCount(7)
+  await expect(rail.getByRole('button')).toHaveCount(8)
   await rail.getByRole('button', { name: 'Configuración' }).click()
   await expect(rail.getByRole('button', { name: 'Configuración' })).toHaveAttribute('aria-current', 'page')
   await expect(page).toHaveScreenshot('riel-configuracion.png')
