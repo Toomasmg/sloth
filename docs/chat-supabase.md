@@ -100,7 +100,7 @@ En **Celular → Desde cualquier red**, Sloth publica la misma vista que en el W
 - Las fotos van en un bucket **privado**. Las ven solo los miembros del equipo y las cambian solo los owners y los admins.
 - El canal del celu (`celu:<uid>`, migración 0006) lo leen y escriben **solo** su dueño. Es la única política de escritura en Realtime y no abre los canales del chat.
 
-La migración tiene una prueba con PGlite (Postgres en WASM), con 40 casos de acceso permitido y prohibido: `npm i --no-save @electric-sql/pglite` y después `node supabase/tests/rls.test.mjs supabase/migrations/0001_chat.sql supabase/migrations/0002_hardening.sql supabase/migrations/0003_realtime_broadcast.sql`.
+La migración tiene una prueba con PGlite (Postgres en WASM), con 65 casos de acceso permitido y prohibido (los del canal del celu incluidos): `npm i --no-save @electric-sql/pglite` y después `node supabase/tests/rls.test.mjs supabase/migrations/0001_chat.sql supabase/migrations/0002_hardening.sql supabase/migrations/0003_realtime_broadcast.sql supabase/migrations/0006_celu_remoto.sql`.
 
 ## Costos y consumo
 
