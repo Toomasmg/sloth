@@ -9,6 +9,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.25',
+    date: '2026-11-16',
+    title: 'El QR del celu remoto',
+    items: [
+      'Celular: al prender «Verlo también fuera de tu Wi-Fi» el panel ya no se cae; el código QR ahora entra aunque el enlace sea largo.',
+      'Si un código no se puede dibujar, el panel avisa y te deja copiar el enlace.'
+    ]
+  },
+  {
     version: '0.6.24',
     date: '2026-11-16',
     title: 'El celu desde cualquier red',
