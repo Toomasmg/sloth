@@ -5,6 +5,7 @@ import type { AppUpdater, CancellationToken, UpdateInfo } from 'electron-updater
 import type { Feature, FeatureContext } from './context'
 import { groupNotes, type NoteGroup } from './updater-notes'
 import { currentSettings } from './settings'
+import { friendly, isPostponedOn, localDay, nextCheckDelay, notesText, parseChannel, parsePostponed, type Postponed, type UpdateChannel } from './updater-core'
 
 /**
  * Actualizaciones automáticas desde los releases de GitHub (Toomasmg/sloth).
@@ -15,7 +16,7 @@ import { currentSettings } from './settings'
  */
 
 export type UpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error'
-export type UpdateChannel = 'estable' | 'beta'
+export type { UpdateChannel }
 export interface UpdateStatus {
   state: UpdateState
   version?: string
@@ -44,7 +45,6 @@ export interface UpdateStatus {
 }
 
 const FIRST_CHECK_MS = 20_000
-const EVERY_MS = 6 * 60 * 60 * 1000
 const HIDDEN_RETRY_MS = 5 * 60 * 1000
 const REPO_API = 'https://api.github.com/repos/Toomasmg/sloth/releases/tags'
 
@@ -54,20 +54,11 @@ let timer: NodeJS.Timeout | null = null
  * «Más tarde»: la versión pospuesta y el día (local, AAAA-MM-DD). Sobrevive a reiniciar Sloth: el
  * aviso no vuelve con esa misma versión hasta el día siguiente (al arrancar, o en un chequeo).
  */
-interface Postponed {
-  version: string
-  day: string
-}
 const laterFile = (): string => join(app.getPath('userData'), 'features', 'updater-later.json')
-const dayNow = (): string => {
-  const d = new Date()
-  const p = (n: number): string => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
+const dayNow = (): string => localDay(new Date())
 function readPostponed(): Postponed | null {
   try {
-    const raw = JSON.parse(readFileSync(laterFile(), 'utf8').replace(/^﻿/, '')) as Partial<Postponed>
-    return typeof raw.version === 'string' && typeof raw.day === 'string' ? { version: raw.version, day: raw.day } : null
+    return parsePostponed(JSON.parse(readFileSync(laterFile(), 'utf8').replace(/^﻿/, '')))
   } catch {
     return null
   }
@@ -84,27 +75,16 @@ function writePostponed(p: Postponed): void {
 }
 /** ¿Esta versión quedó para después hoy? Otra versión, o el día siguiente, vuelve a avisar. */
 const isPostponed = (version: string): boolean => {
-  const p = readPostponed()
-  return !!p && p.version === version && p.day === dayNow()
+  return isPostponedOn(readPostponed(), version, dayNow())
 }
 
 /** Canal de actualizaciones: se lee del archivo de Configuración (default «estable»). */
 export function readChannel(): UpdateChannel {
   try {
-    const raw = JSON.parse(readFileSync(join(app.getPath('userData'), 'features', 'settings.json'), 'utf8').replace(/^﻿/, '')) as Record<string, unknown>
-    return raw?.updateChannel === 'beta' ? 'beta' : 'estable'
+    return parseChannel(JSON.parse(readFileSync(join(app.getPath('userData'), 'features', 'settings.json'), 'utf8').replace(/^﻿/, '')))
   } catch {
     return 'estable'
   }
-}
-
-/** Mensajes de error más cortos y en castellano para la UI. */
-function friendly(e: unknown): string {
-  const msg = String((e as Error)?.message ?? e ?? '')
-  if (/ENOTFOUND|ECONNREFUSED|ETIMEDOUT|ERR_INTERNET_DISCONNECTED|net::/i.test(msg)) return 'No hay conexión con GitHub.'
-  if (/404|No published versions|Cannot find latest/i.test(msg)) return 'Todavía no hay versiones publicadas.'
-  if (/sha512 checksum mismatch/i.test(msg)) return 'La descarga llegó dañada; se reintenta en el próximo chequeo.'
-  return msg.split('\n')[0].slice(0, 200) || 'Error desconocido.'
 }
 
 /** Las notas que trae el propio update, o si no, el cuerpo del release en GitHub (sin autenticación). */
@@ -139,13 +119,6 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
       }
     )
   })
-}
-
-const notesText = (info: UpdateInfo): string => {
-  const rn = info.releaseNotes
-  if (typeof rn === 'string') return rn
-  if (Array.isArray(rn)) return rn.map((x) => x.note ?? '').filter(Boolean).join('\n\n')
-  return ''
 }
 
 const feature: Feature = {
@@ -228,7 +201,7 @@ const feature: Feature = {
     }
 
     async function loadNotes(info: UpdateInfo): Promise<void> {
-      let raw = notesText(info)
+      let raw = notesText(info.releaseNotes)
       let date = info.releaseDate
       if (!raw.trim()) {
         const r = await fetchReleaseBody(info.version)
@@ -309,7 +282,7 @@ const feature: Feature = {
         // Ventana oculta o minimizada (bandeja): no se busca. Se reintenta en 5 min.
         const w = ctx.window()
         if (!w || w.isDestroyed() || !w.isVisible() || w.isMinimized()) return schedule(HIDDEN_RETRY_MS)
-        void check(false).finally(() => schedule(currentSettings().lightMode ? EVERY_MS * 2 : EVERY_MS))
+        void check(false).finally(() => schedule(nextCheckDelay(currentSettings().lightMode)))
       }, ms)
       timer.unref()
     }
