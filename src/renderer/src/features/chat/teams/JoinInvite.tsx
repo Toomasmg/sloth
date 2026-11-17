@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { CircleNotch, ClipboardText, Ticket } from '@phosphor-icons/react'
 import type { ChatInviteJoin, ChatInvitePreview } from '../../../../../shared/chat'
+import { esHostSupabase } from '../../../../../shared/chat-text'
 import { Modal } from '../../../Modal'
 import { Button, InlineAlert, Textarea } from '../../../ui'
 import { useUi } from '../../host'
@@ -160,6 +161,11 @@ export function JoinInvite(): React.JSX.Element {
         <p className="f-chat-join-host mono" aria-label={`Servidor: ${p.host}`}>
           {p.host}
         </p>
+        {!esHostSupabase(p.host) && (
+          <InlineAlert tone="warning">
+            Este servidor no es de Supabase (<span className="mono">supabase.co</span>). Quien lo maneja ve todo lo que se escribe en el chat. Seguí solo si sabés de quién es.
+          </InlineAlert>
+        )}
         {replace ? (
           <InlineAlert tone="warning">
             Ya tenés el chat conectado a <strong>{p.currentHost}</strong>. Si seguís, esa configuración se reemplaza y se cierra tu sesión del chat.

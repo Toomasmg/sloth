@@ -6,6 +6,7 @@ import { fmtTok, totalTok, usageTitle } from '../../format'
 import { LogoMark } from '../../Logo'
 import { loginPaneId, type Account } from '../../../../shared/types'
 import type { ChatConfigView, ChatSnapshot } from '../../../../shared/chat'
+import { esHostSupabase } from '../../../../shared/chat-text'
 import { SHORTCUT_ACTIONS, bindingOf, comboFromEvent, findConflict, keyTokenOf, setShortcutCapture, type ShortcutAction } from '../../shortcuts'
 import { openReport } from '../report/bus'
 import { request as requestExportImport } from '../export-import/bus'
@@ -19,7 +20,7 @@ import { SoundTest } from '../sound/SoundTest'
 import { resolveAccountColor, pickProjectsDir, projectsDirOf, termFontStack, updateSettings, useSettings } from './store'
 import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, EDITORS, LINE_HEIGHT, PLAN_SUGGESTIONS, SCROLLBACK, SHELLS, SLEEP_MINUTES, TERM_FONTS, TERM_FONT, UI_FONT, UPDATE_CHANNELS, type AccentChoice, type CursorShape, type Density, type EditorChoice, type ShellChoice, type ShortcutId, type SleepMinutes, type SoundName, type TermFont, type ThemeChoice, type UpdateChannel } from '../../../../main/features/settings-model'
 import { errText, Group, Row, Slider, ToggleRow, useSave, SectionHint } from './ui'
-import { Button, EmptyState, IconButton, Input, Segmented, Select, Tag } from '../../ui'
+import { Button, EmptyState, IconButton, InlineAlert, Input, Segmented, Select, Tag } from '../../ui'
 import { ChatClaudeGroup } from './ChatClaude'
 import { Ajustes as TicketsAjustes } from '../tickets/Ajustes'
 import { setBoardOpen, useSnapshot } from '../tickets/model'
@@ -916,6 +917,9 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
           <p>
             El repo <strong title={repoName}>{repoName}</strong> propone usar el chat en <strong>{new URL(offered.supabaseUrl).host}</strong>. ¿Usarlo?
           </p>
+          {!esHostSupabase(new URL(offered.supabaseUrl).host) && (
+            <InlineAlert tone="warning">Ese servidor no es de Supabase (supabase.co). Quien lo maneja ve todo lo que se escribe en el chat. Usalo solo si sabés de quién es.</InlineAlert>
+          )}
           <Button variant="primary" size="sm" disabled={busy} onClick={() => void act(() => ui.invoke('feat:chat:acceptTeamConfig', offered.repo), 'Usando la configuración del repo.')}>
             Usar
           </Button>

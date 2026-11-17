@@ -146,7 +146,7 @@ export function MembersPanel({
       {confirm?.kind === 'remove' && (
         <ConfirmInline
           id={`${titleId}-remove`}
-          message={`¿Sacar a ${confirm.member.profile.login} de ${team.name}? Deja de ver los mensajes del equipo.`}
+          message={`¿Sacar a ${confirm.member.profile.login} de ${team.name}? Deja de ver los mensajes del equipo y cambia el código de invitación: las invitaciones que ya mandaste dejan de servir.`}
           confirmLabel="Sacar del equipo"
           busy={busyKey !== null}
           onConfirm={() => void runConfirm(confirm)}
