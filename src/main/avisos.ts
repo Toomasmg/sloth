@@ -15,6 +15,12 @@ export function avisoArchivoApartado(original: string, apartado: string): void {
   )
 }
 
+export function avisoSoloLectura(archivo: string, motivo: string): void {
+  avisar(
+    `${basename(archivo)} ${motivo}. Sigo con valores por defecto y no voy a guardar cambios en ese archivo hasta que reinicies Sloth (el archivo queda como está, en ${archivo}).`
+  )
+}
+
 /** Devuelve los avisos pendientes y los olvida: cada uno se muestra una sola vez. */
 export function tomarAvisos(): string[] {
   const r = pendientes
