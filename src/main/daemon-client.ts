@@ -164,11 +164,13 @@ interface Launcher {
 
 function ensureKey(userDataDir: string): string {
   const file = daemonKeyFileFor(userDataDir)
+  // Solo se crea una clave si no hay o si la que hay no sirve. Con otro error (antivirus, OneDrive, un bloqueo)
+  // pisarla dejaría inalcanzable al daemon vivo: este arranque queda con terminales en proceso.
   try {
     const k = readFileSync(file, 'utf8').trim()
     if (KEY_RE.test(k)) return k
-  } catch {
-    /* no existe: se crea */
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw new Error(`no se pudo leer la clave del daemon: ${(e as Error).message}`)
   }
   mkdirSync(userDataDir, { recursive: true })
   const k = randomBytes(32).toString('hex')
@@ -421,17 +423,18 @@ async function connectOrLaunch(l: Launcher, appVersion: string, allowLaunch: boo
   throw new Error(`El daemon no levantó en ${CONNECT_TIMEOUT_MS / 1000} s (${(last as Error)?.message ?? '?'}).`)
 }
 
-async function waitPipeGone(pipe: string, ms: number): Promise<void> {
+async function waitPipeGone(pipe: string, ms: number): Promise<boolean> {
   const deadline = Date.now() + ms
   while (Date.now() < deadline) {
     try {
       const s = await connectPipe(pipe)
       s.destroy()
     } catch {
-      return
+      return true
     }
     await sleep(100)
   }
+  return false
 }
 
 function apagarDaemonV1(sock: Socket, token: string): Promise<void> {
@@ -458,34 +461,38 @@ function apagarDaemonV1(sock: Socket, token: string): Promise<void> {
 
 /**
  * Un daemon del protocolo 1 no se sigue usando aunque tenga terminales vivas: ese saludo no
- * autentica al daemon. Se lo apaga y el token viejo se borra para que no le sirva a nadie.
+ * autentica al daemon. Se lo apaga y el token viejo se borra para que no le sirva a nadie. Si no se
+ * le pudo pedir que se apague, el token queda para reintentar en el próximo arranque: sin él nadie
+ * podría apagarlo, y con terminales vivas no se apaga solo.
  */
 async function retirarDaemonV1(userDataDir: string, log: (m: string) => void): Promise<void> {
   const tokenFile = tokenFileFor(userDataDir)
   if (!existsSync(tokenFile)) return
   try {
     const token = readFileSync(tokenFile, 'utf8').trim()
-    if (!KEY_RE.test(token)) return
-    const pipe = legacyPipeNameFor(userDataDir)
-    let sock: Socket
-    try {
-      sock = await connectPipe(pipe)
-    } catch (e) {
-      const code = (e as NodeJS.ErrnoException).code
-      if (code === 'ENOENT' || code === 'ECONNREFUSED') return
-      throw e
+    if (KEY_RE.test(token)) {
+      const pipe = legacyPipeNameFor(userDataDir)
+      let sock: Socket | undefined
+      try {
+        sock = await connectPipe(pipe)
+      } catch (e) {
+        const code = (e as NodeJS.ErrnoException).code
+        if (code !== 'ENOENT' && code !== 'ECONNREFUSED') throw e
+      }
+      if (sock) {
+        await apagarDaemonV1(sock, token)
+        const apagado = await waitPipeGone(pipe, 3000)
+        log(apagado ? '[daemon] se apagó el daemon del protocolo 1' : '[daemon] se le pidió al daemon del protocolo 1 que se apague; todavía no cerró')
+      }
     }
-    await apagarDaemonV1(sock, token)
-    await waitPipeGone(pipe, 3000)
-    log('[daemon] se apagó el daemon del protocolo 1')
   } catch (e) {
-    log(`[daemon] no se pudo apagar el daemon del protocolo 1: ${(e as Error)?.message ?? String(e)}`)
-  } finally {
-    try {
-      rmSync(tokenFile, { force: true })
-    } catch (e) {
-      log(`[daemon] no se pudo borrar daemon-token: ${(e as Error)?.message ?? String(e)}`)
-    }
+    log(`[daemon] no se pudo apagar el daemon del protocolo 1 (se reintenta en el próximo arranque): ${(e as Error)?.message ?? String(e)}`)
+    return
+  }
+  try {
+    rmSync(tokenFile, { force: true })
+  } catch (e) {
+    log(`[daemon] no se pudo borrar daemon-token: ${(e as Error)?.message ?? String(e)}`)
   }
 }
 
