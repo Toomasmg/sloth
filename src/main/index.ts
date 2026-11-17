@@ -23,6 +23,7 @@ import { normTicketId, TEMPLATE_COLOR_KEYS, validBranch } from '../shared/templa
 import { baseSettingsFor, syncSharedSetup, unshareSetup } from './setup'
 import { UsageScanner } from './usage'
 import { FEATURES } from './features'
+import { hookTokenDe } from '../daemon/auth'
 import { APP_ID } from '../shared/app-id'
 import { currentSettings, initialChrome } from './features/settings'
 import { validateWorkspacePatch } from './workspace-patch'
@@ -315,7 +316,7 @@ app.whenReady().then(async () => {
       ...accountEnv(acc),
       SLOTH_WS: ws.id,
       SLOTH_HOOK_URL: b.hookUrl,
-      SLOTH_TOKEN: b.hookToken
+      SLOTH_TOKEN: hookTokenDe(b.hookToken, ws.id)
     }
     const claude = claudeCommand(ws, acc)
     return { cwd: ws.cwd, env, claude, claudeExe: claude ? resolveClaudeExe() : undefined }
