@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
-import { esperarCierre, matarArbol, pidValido, spawnOptsArbol } from './kill-tree'
+import { cortarArbol, esperarCierre, matarArbol, pidValido, spawnOptsArbol } from './kill-tree'
 import type { KillDeps } from './kill-tree'
 
 function falsas(platform: NodeJS.Platform, over: Partial<KillDeps> = {}): { deps: KillDeps; llamadas: string[] } {
@@ -10,6 +10,7 @@ function falsas(platform: NodeJS.Platform, over: Partial<KillDeps> = {}): { deps
     platform,
     taskkill: async (pid) => {
       llamadas.push(`taskkill:${pid}`)
+      return true
     },
     killGroup: (pid) => {
       llamadas.push(`group:${pid}`)
@@ -68,6 +69,30 @@ test('un pid inválido no mata nada', async () => {
 test('si taskkill falla, matarArbol resuelve igual', async () => {
   const { deps } = falsas('win32', { taskkill: () => Promise.reject(new Error('falló')) })
   await assert.doesNotReject(matarArbol(123, deps))
+})
+
+test('si taskkill sale con error, cae a matar el proceso directo', async () => {
+  const { deps, llamadas } = falsas('win32', { taskkill: async () => false })
+  await matarArbol(123, deps)
+  assert.deepEqual(llamadas, ['one:123'])
+})
+
+test('si taskkill tira y killOne también, matarArbol resuelve igual', async () => {
+  const { deps } = falsas('win32', {
+    taskkill: () => Promise.reject(new Error('falló')),
+    killOne: () => {
+      throw new Error('EPERM')
+    }
+  })
+  await assert.doesNotReject(matarArbol(123, deps))
+})
+
+test('cortarArbol no espera más del plazo aunque taskkill no vuelva', async () => {
+  const { deps } = falsas('win32', { taskkill: () => new Promise<boolean>(() => {}) })
+  const hijo = Object.assign(hijoFalso(), { pid: 123 })
+  const t0 = Date.now()
+  await cortarArbol(hijo, deps, 50)
+  assert.ok(Date.now() - t0 < 1000)
 })
 
 test('detached solo fuera de Windows', () => {

@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
-import { esperarCierre, matarArbol, spawnOptsArbol } from '../kill-tree'
+import { cortarArbol, spawnOptsArbol } from '../kill-tree'
+import type { KillDeps } from '../kill-tree'
 import { depsReales } from '../kill-tree-real'
 
 /**
@@ -25,6 +26,8 @@ export interface RunOpts {
   signal?: AbortSignal
   /** Variables que se suman al entorno de siempre (p. ej. las de gitSafeEnv). */
   env?: Record<string, string>
+  /** Solo para tests: cómo se mata el árbol del hijo. */
+  matar?: KillDeps
 }
 
 type ConfigPar = readonly [string, string]
@@ -160,9 +163,7 @@ export function run(cmd: 'git' | 'gh', args: string[], opts: RunOpts = {}): Prom
     // Se rechaza recién cuando el árbol murió (tope 3 s): si no, el llamador sigue con ssh o hooks vivos tocando el repo.
     const cortar = (error: GitError): void => {
       terminar()
-      void matarArbol(child.pid, depsReales())
-        .then(() => esperarCierre(child, 3000))
-        .then(() => reject(error))
+      void cortarArbol(child, opts.matar ?? depsReales(), 3000).then(() => reject(error))
     }
     const alAbortar = (): void => {
       if (done) return

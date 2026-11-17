@@ -2,7 +2,8 @@ import type { SpawnOptions } from 'node:child_process'
 
 export interface KillDeps {
   platform: NodeJS.Platform
-  taskkill(pid: number): Promise<void>
+  /** true si taskkill salió bien; false si falló o venció. */
+  taskkill(pid: number): Promise<boolean>
   killGroup(pid: number): void
   killOne(pid: number): void
 }
@@ -25,8 +26,16 @@ function esEsrch(e: unknown): boolean {
 export async function matarArbol(pid: number | undefined, deps: KillDeps): Promise<void> {
   if (!pidValido(pid)) return
   if (deps.platform === 'win32') {
+    let ok = false
     try {
-      await deps.taskkill(pid)
+      ok = await deps.taskkill(pid)
+    } catch {
+      ok = false
+    }
+    if (ok) return
+    // taskkill puede no estar en el PATH, vencer o negar el acceso: al menos se mata el proceso directo.
+    try {
+      deps.killOne(pid)
     } catch {
       return
     }
@@ -50,6 +59,13 @@ export interface Cerrable {
   signalCode: NodeJS.Signals | null
   once(evento: 'exit' | 'close', fn: () => void): unknown
   off(evento: 'exit' | 'close', fn: () => void): unknown
+}
+
+// Un único plazo para matar y esperar el cierre: quien cancela nunca espera más de `ms`.
+export async function cortarArbol(child: Cerrable & { pid?: number }, deps: KillDeps, ms: number): Promise<void> {
+  const cierre = esperarCierre(child, ms)
+  await Promise.race([matarArbol(child.pid, deps), cierre])
+  await cierre
 }
 
 export function esperarCierre(child: Cerrable, ms: number): Promise<void> {
