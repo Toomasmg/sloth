@@ -7,6 +7,7 @@ import {
   SIN_CONECTOR,
   type Accion,
   type ConectorPropioVista,
+  type Corrida,
   type CuentaRevisada,
   type CuentaVista,
   type Detalle,
@@ -17,7 +18,8 @@ import {
   type ServidorMcp,
   type Ticket,
   type TicketsConfig,
-  type TicketsSnapshot
+  type TicketsSnapshot,
+  type UsoPorDia
 } from '../../../shared/tickets'
 import type { Feature, FeatureContext } from '../context'
 import { accountStatus } from '../../accounts'
@@ -65,6 +67,7 @@ import {
   type ArchivoPropios,
   type ConectorRegistrado
 } from './propios'
+import { costoValido, diaLocal, leerUso, sumarUso, textoTope, TopeVueltasError, VUELTAS_DEFECTO, vueltasValidas, type UsoCorrida } from './uso'
 import { ASSIGNEE_MAX, assigneeValido, conConector, sinLista, type TicketsState } from './estado'
 import { ghAccion, ghDetalle, ghLista, ghYo, repoValido, type GhRun } from './gh'
 import { GitError, run as correr } from '../git-run'
@@ -371,6 +374,7 @@ function snapshot(): TicketsSnapshot {
     fetchedAt: state.fetchedAt,
     fetchedBy: state.fetchedBy,
     lastRun: state.lastRun,
+    uso: state.uso,
     lastError: def ? state.lastError : id === SIN_CONECTOR ? undefined : cambiado(id) ? noDisponibleConector(id) : `${noEsta(id)} Elegí otro en los ajustes.`,
     pendienteAceptar: def ? undefined : cambiado(id)?.def.id,
     aviso: almacen.aviso(),
@@ -416,7 +420,8 @@ export interface TicketsParaEquipo {
   estados: Estado[]
   fetchedAt?: number
   fetchedBy?: string
-  lastRun?: { tokens?: number; costUsd?: number; durationMs?: number }
+  lastRun?: Corrida
+  uso?: UsoPorDia
   lastError?: string
   running: boolean
   model: string
@@ -443,6 +448,7 @@ export function ticketsParaEquipo(): TicketsParaEquipo {
     fetchedAt: state.fetchedAt,
     fetchedBy: state.fetchedBy,
     lastRun: state.lastRun,
+    uso: state.uso,
     lastError: state.lastError,
     carpetas: def.via === 'gh' ? carpetasDe() : undefined
   }
@@ -653,9 +659,37 @@ function leerLista(def: ConectorMcp, d: ConectorMcp, run: Ejecucion, s: string):
   return r
 }
 
-async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: number }> {
+const vueltasConfig = (): number => vueltasValidas(state.config.maxTurns) ?? VUELTAS_DEFECTO
+
+/** Los topes de la config; `maxTurns` pisa el de la config solo para una consulta ya validada. */
+const limites = (maxTurns?: number): { maxTurns?: number; maxCostUsd?: number } => ({
+  maxTurns: maxTurns ?? state.config.maxTurns,
+  maxCostUsd: state.config.maxCostUsd
+})
+
+/** Se anota también lo que cortó un tope: ese costo ya se gastó. */
+function registrarUso(conectorId: string, u: UsoCorrida): void {
+  state.uso = sumarUso(state.uso, diaLocal(Date.now()), conectorId, u)
+  changed()
+}
+
+/** Antes del parser del conector: anota lo gastado y, si cortó un tope, lo dice en vez de leer una salida a medias. */
+function medirUso(conectorId: string, s: string, vueltas: number, accion?: boolean): void {
+  const u = leerUso(s)
+  if (!u) return
+  registrarUso(conectorId, u)
+  if (u.tope) throw new TopeVueltasError(textoTope(u.tope, u.tope === 'vueltas' ? vueltas : (costoValido(state.config.maxCostUsd) ?? 0), accion), u.tope, u)
+}
+
+async function refresh(rawAccount: unknown, rawVueltas?: unknown): Promise<{ count: number; tokens?: number }> {
   if (running) throw new Error('Ya hay una consulta en curso.')
   const def = activo()
+  let usadas = vueltasConfig()
+  if (rawVueltas !== undefined && rawVueltas !== null) {
+    const v = vueltasValidas(rawVueltas)
+    if (v === undefined) throw new Error('Tope de vueltas inválido.')
+    usadas = v
+  }
   if (def.via === 'gh') return refreshGh(def)
   const requested = typeof rawAccount === 'string' && rawAccount ? rawAccount : undefined
   const run = ejecucion(def.nombre, requested ?? state.config.queryAccountId ?? (await pickAccount(def)), def)
@@ -674,13 +708,16 @@ async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: n
     const r = await runClaude({
       exe: run.exe,
       // --verbose trae el system/init: de ahí sale qué servidores tenía la sesión de verdad.
-      args: [...buildListaArgs(d, state.config.model, ajenosDe(run, d)), '--verbose'],
+      args: [...buildListaArgs(d, state.config.model, ajenosDe(run, d), limites(usadas)), '--verbose'],
       prompt: buildPrompt(d, state.config.assigneeId),
       cwd: run.cwd,
       env: run.env,
       quien: def.nombre,
       signal: ac.signal,
-      parse: (s) => leerLista(def, d, run, s)
+      parse: (s) => {
+        medirUso(def.id, s, usadas)
+        return leerLista(def, d, run, s)
+      }
     })
     state.tickets = r.tickets
     detalles.clear()
@@ -689,13 +726,14 @@ async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: n
     state.fetchedAt = Date.now()
     state.fetchedBy = run.accountId
     state.leidoCon = d.herramientas.prefijo
-    state.lastRun = { tokens: r.tokens, costUsd: r.costUsd, durationMs: r.durationMs }
+    state.lastRun = { tokens: r.tokens, costUsd: r.costUsd, durationMs: r.durationMs, numTurns: r.numTurns, maxTurns: usadas }
     delete state.lastError
     noDisponible = {}
     state.config.queryAccountId = run.accountId
     return { count: r.tickets.length, tokens: r.tokens }
   } catch (e) {
     const msg = e instanceof ConectorFaltaError ? (textoCuenta(def, { tipo: 'falta' }, run) ?? e.message) : (e as Error).message
+    if (e instanceof TopeVueltasError) state.lastRun = { ...e.uso, maxTurns: usadas, tope: e.tope }
     state.lastError = msg
     throw new Error(msg)
   } finally {
@@ -788,6 +826,22 @@ function setConfig(raw: unknown): TicketsSnapshot {
     else delete c.projectRepos[project]
   }
   if ('confirmRefresh' in p) c.confirmRefresh = p.confirmRefresh !== false
+  if ('maxTurns' in p) {
+    if (p.maxTurns === null || p.maxTurns === '') delete c.maxTurns
+    else {
+      const v = vueltasValidas(p.maxTurns)
+      if (v === undefined) throw new Error('El tope de vueltas va de 1 a 200.')
+      c.maxTurns = v
+    }
+  }
+  if ('maxCostUsd' in p) {
+    if (p.maxCostUsd === null || p.maxCostUsd === '') delete c.maxCostUsd
+    else {
+      const v = costoValido(p.maxCostUsd)
+      if (v === undefined) throw new Error('El tope de costo va de 0,01 a 100 dólares.')
+      c.maxCostUsd = v
+    }
+  }
   if (nuevo !== undefined) {
     // Pasar a otro conector deja de lado lo leído con el anterior.
     state = conConector(state, nuevo)
@@ -837,13 +891,16 @@ async function detalle(rawId: unknown, rawFresco?: unknown): Promise<Detalle> {
   try {
     const d = await runClaude({
       exe: c.exe,
-      args: buildDetalleArgs(dc, state.config.model, ajenosDe(c, dc)),
+      args: buildDetalleArgs(dc, state.config.model, ajenosDe(c, dc), limites()),
       prompt: buildDetallePrompt(dc, id),
       cwd: c.cwd,
       env: c.env,
       quien: def.nombre,
       timeoutMs: DETALLE_TIMEOUT_MS,
-      parse: (s) => parseDetalle(dc, s)
+      parse: (s) => {
+        medirUso(def.id, s, vueltasConfig())
+        return parseDetalle(dc, s)
+      }
     })
     // Si mientras tanto cambió la lista (otro conector u otra carpeta), este detalle ya no es de ella.
     if (state.tickets.includes(t)) detalles.set(id, d)
@@ -884,13 +941,16 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
     else if (c && dc) {
       const r = await runClaude({
         exe: c.exe,
-        args: buildAccionArgs(dc, state.config.model, a, ajenosDe(c, dc)),
+        args: buildAccionArgs(dc, state.config.model, a, ajenosDe(c, dc), limites()),
         prompt: buildAccionPrompt(dc, a, input),
         cwd: c.cwd,
         env: c.env,
         quien: def.nombre,
         timeoutMs: DETALLE_TIMEOUT_MS,
-        parse: (s) => parseAccion(dc, s, a)
+        parse: (s) => {
+        medirUso(def.id, s, vueltasConfig(), true)
+        return parseAccion(dc, s, a)
+      }
       })
       minutosTotal = r.minutosTotal
     }
@@ -1109,7 +1169,7 @@ const feature: Feature = {
     recargarPropios(state.config)
     cargarCuentas()
     c.handle('state', () => snapshot())
-    c.handle('refresh', (acc: unknown) => refresh(acc))
+    c.handle('refresh', (acc: unknown, vueltas: unknown) => refresh(acc, vueltas))
     c.handle('cancel', () => {
       running?.abort()
       return true
