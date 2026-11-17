@@ -5,7 +5,7 @@ import { AddAccountIcon, MoreIcon, TeamIcon, UpdateIcon } from '../../icons/Slot
 import { fmtTok, totalTok, usageTitle } from '../../format'
 import { LogoMark } from '../../Logo'
 import { loginPaneId, type Account } from '../../../../shared/types'
-import type { ChatConfigView, ChatSnapshot } from '../../../../shared/chat'
+import { isSupabaseHost, type ChatConfigView, type ChatSnapshot } from '../../../../shared/chat'
 import { SHORTCUT_ACTIONS, bindingOf, comboFromEvent, findConflict, keyTokenOf, setShortcutCapture, type ShortcutAction } from '../../shortcuts'
 import { openReport } from '../report/bus'
 import { request as requestExportImport } from '../export-import/bus'
@@ -758,7 +758,6 @@ const hostOfUrl = (u: string): string => {
     return ''
   }
 }
-const isSupabaseHost = (host: string): boolean => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.supabase\.co$/.test(host)
 
 export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element {
   const ui = useUi()

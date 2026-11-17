@@ -57,6 +57,9 @@
 export const CHAT_CALLBACK_PORTS = [53682, 53683, 53684] as const
 export const CHAT_CALLBACK_PATH = '/auth/callback'
 
+// Un solo nivel bajo supabase.co y sin puerto: esos nombres los reparte Supabase, no se pueden imitar con otro dominio.
+export const isSupabaseHost = (host: string): boolean => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.supabase\.co$/.test(host)
+
 export const CHAT_LIMITS = {
   body: 4000,
   teamName: 60,
@@ -264,6 +267,8 @@ export interface ChatInvitePreview {
   decision: ChatInviteDecision
   /** Host de la configuración que se reemplazaría (solo con confirmReplace). */
   currentHost?: string
+  /** El servidor no está en supabase.co: para confirmar hay que mandar `${decision}@${host}`. */
+  selfHosted?: true
 }
 
 export type ChatInviteJoin = { kind: 'joined'; team: ChatTeam } | { kind: 'signingIn' }

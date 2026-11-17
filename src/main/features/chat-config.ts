@@ -7,6 +7,7 @@
  * repetir el valor de la key en ningún error ni log.
  */
 import { createHash } from 'node:crypto'
+import { isSupabaseHost } from '../../shared/chat'
 
 export interface ChatServerConfig {
   /** Origen normalizado: https://<ref>.supabase.co */
@@ -26,8 +27,6 @@ const MAX_KEY_LENGTH = 2048
 const MAX_URL_LENGTH = 300
 const PUBLISHABLE = /^sb_publishable_[A-Za-z0-9_-]{8,}$/
 const JWT_PART = /^[A-Za-z0-9_-]+$/
-// Un solo nivel bajo supabase.co: esos nombres los reparte Supabase, no se pueden imitar con otro dominio.
-const SUPABASE_HOST = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.supabase\.co$/
 
 const SECRET_MSG =
   'Esa es una service_role / secret key. Nunca va en Sloth ni en .sloth/team.json: da acceso total a la base. Usá la anon / publishable key (Project Settings → API).'
@@ -53,7 +52,7 @@ export function normalizeSupabaseUrl(raw: unknown, opts: UrlOptions = {}): strin
   if (u.search || u.hash) throw new Error('La URL de Supabase no puede tener ? ni # al final.')
   if (u.pathname !== '/' && u.pathname !== '') throw new Error('La URL de Supabase no puede tener ruta: va solo la URL del proyecto.')
   if (!u.hostname) throw new Error('La URL de Supabase no tiene dominio.')
-  if (!opts.selfHosted && (u.port || !SUPABASE_HOST.test(u.hostname)))
+  if (!opts.selfHosted && !isSupabaseHost(u.host))
     throw new Error(`Sloth solo acepta proyectos de Supabase (https://<ref>.supabase.co) y «${u.host}» no lo es. Si es un servidor propio de tu equipo, cargalo a mano en Configuración › Chat y marcá «Servidor propio».`)
   return u.origin
 }
@@ -108,6 +107,19 @@ export function parseChatServerConfig(raw: unknown, opts: { allowSelfHosted?: bo
   if (selfHosted && opts.allowSelfHosted === false) throw new Error('Un servidor propio solo se puede cargar a mano en Configuración › Chat.')
   const supabaseUrl = normalizeSupabaseUrl(raw.supabaseUrl, { selfHosted })
   return { supabaseUrl, anonKey: checkAnonKey(raw.anonKey), ...(selfHosted ? { selfHosted: true as const } : {}) }
+}
+
+/**
+ * La config de chat.json. Una guardada antes de la marca «Servidor propio» con un host fuera de
+ * supabase.co ya la había cargado o confirmado la persona: se migra marcada, nunca se descarta.
+ */
+export function parseSavedChatConfig(raw: unknown): { cfg: ChatServerConfig; migrated: boolean } {
+  try {
+    return { cfg: parseChatServerConfig(raw), migrated: false }
+  } catch (e) {
+    if (!isObj(raw) || raw.selfHosted !== undefined) throw e
+    return { cfg: parseChatServerConfig({ ...raw, selfHosted: true }), migrated: true }
+  }
 }
 
 /** Lo que se muestra de la key: primeros 6 y últimos 4 caracteres. */

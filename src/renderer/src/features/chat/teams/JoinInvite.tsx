@@ -46,7 +46,7 @@ export function JoinInvite(): React.JSX.Element {
     clearInviteError()
   }, [pendingErr])
 
-  const join = async (confirmed?: 'confirmNew' | 'confirmReplace', teamName?: string): Promise<void> => {
+  const join = async (confirmed?: string, teamName?: string): Promise<void> => {
     setBusy(true)
     setErr(null)
     try {
@@ -160,6 +160,11 @@ export function JoinInvite(): React.JSX.Element {
         <p className="f-chat-join-host mono" aria-label={`Servidor: ${p.host}`}>
           {p.host}
         </p>
+        {p.selfHosted && (
+          <InlineAlert tone="warning">
+            <strong className="mono">{p.host}</strong> no está en supabase.co: es un servidor propio. Tu inicio de sesión con GitHub, todo lo que escribas en el chat y lo que Claude lea de él pasan por ese servidor. Seguí solo si es de tu equipo y lo administra alguien de confianza.
+          </InlineAlert>
+        )}
         {replace ? (
           <InlineAlert tone="warning">
             Ya tenés el chat conectado a <strong>{p.currentHost}</strong>. Si seguís, esa configuración se reemplaza y se cierra tu sesión del chat.
@@ -175,7 +180,10 @@ export function JoinInvite(): React.JSX.Element {
         <Button variant="ghost" onClick={() => setPhase({ kind: 'paste' })} disabled={busy}>
           Volver
         </Button>
-        <Button variant={replace ? 'danger' : 'primary'} loading={busy} data-autofocus onClick={() => void join(p.decision === 'confirmReplace' ? 'confirmReplace' : 'confirmNew', p.teamName)}>
+        <Button variant={replace ? 'danger' : 'primary'} loading={busy} data-autofocus onClick={() => {
+            const decision = p.decision === 'confirmReplace' ? 'confirmReplace' : 'confirmNew'
+            void join(p.selfHosted ? `${decision}@${p.host}` : decision, p.teamName)
+          }}>
           {replace ? 'Reemplazar y entrar' : 'Conectar y entrar'}
         </Button>
       </>

@@ -4,13 +4,14 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Feature, FeatureContext } from './context'
 import type { ChatAuth, ChatConfigView, ChatInviteJoin, ChatInvitePreview, ChatInviteResult, ChatProfile, ChatSnapshot, ChatTeam } from '../../shared/chat'
 import { CHAT_CALLBACK_PATH, CHAT_CALLBACK_PORTS } from '../../shared/chat'
-import { keyHash, keyPreview, parseChatServerConfig, type ChatServerConfig } from './chat-config'
+import { keyHash, keyPreview, parseChatServerConfig, parseSavedChatConfig, type ChatServerConfig } from './chat-config'
 import { createSessionStore, type SessionStore } from './chat-session'
 import { githubEnSettings, startGithubLogin, type GithubLogin } from './chat-auth'
 import { readTeamConfig, repoKey } from './team-config-core'
 import { registerChatData, type ChatData, type ChatCoreHandle } from './chat-data'
-import { buildInvitation, decideInvite, looksLikeInvitation, parseInvitation, type ChatInvitation } from './chat-invite'
-import { escribirJsonAtomico, leerJson } from '../json-file'
+import { buildInvitation, decideInvite, inviteConfirmation, looksLikeInvitation, parseInvitation, type ChatInvitation } from './chat-invite'
+import { escribirJsonAtomico, leerJson, respaldar } from '../json-file'
+import { avisar } from '../avisos'
 import { registerChatMcp } from './chat-mcp'
 
 /**
@@ -107,15 +108,36 @@ const feature: Feature = {
     function loadSaved(): SavedFile {
       const raw = leerJson(configFile, { validar: (v) => (isObj(v) ? v : undefined), porDefecto: (): Record<string, unknown> => ({}) }).valor
       const out: SavedFile = {}
+      let migrated = false
       if (raw.config !== undefined)
         try {
-          out.config = parseChatServerConfig(raw.config)
+          const r = parseSavedChatConfig(raw.config)
+          out.config = r.cfg
+          migrated = r.migrated
         } catch {
-          ctx.log('chat: la configuración guardada no es válida; se ignora.')
+          // Se ignora, pero el próximo guardado reescribe chat.json sin ella: queda una copia.
+          try {
+            respaldar(configFile)
+            ctx.log('chat: la configuración guardada no es válida; se ignora (quedó una copia .bak).')
+          } catch (e) {
+            ctx.log(`chat: la configuración guardada no es válida y no se pudo respaldar: ${msg(e)}`)
+          }
         }
       const a = raw.accepted
       if (isObj(a) && typeof a.repo === 'string' && typeof a.supabaseUrl === 'string' && typeof a.keyHash === 'string')
         out.accepted = { repo: a.repo, supabaseUrl: a.supabaseUrl, keyHash: a.keyHash }
+      if (migrated && out.config) {
+        // Se guarda ya marcada (con copia de antes) para que el aviso salga una sola vez.
+        try {
+          respaldar(configFile)
+          escribirJsonAtomico(configFile, out)
+        } catch (e) {
+          ctx.log(`chat: no se pudo guardar la marca de servidor propio: ${msg(e)}`)
+        }
+        avisar(
+          `El chat usa ${new URL(out.config.supabaseUrl).host}, que no está en supabase.co: quedó marcado como «Servidor propio». Tu sesión de GitHub y lo que escribas en el chat pasan por ese servidor. Si no lo reconocés, borralo en Configuración › Chat.`
+        )
+      }
       return out
     }
 
@@ -411,7 +433,8 @@ const feature: Feature = {
         host: new URL(inv.cfg.supabaseUrl).host,
         ...(inv.teamName ? { teamName: inv.teamName } : {}),
         decision,
-        ...(decision === 'confirmReplace' && active ? { currentHost: new URL(active.cfg.supabaseUrl).host } : {})
+        ...(decision === 'confirmReplace' && active ? { currentHost: new URL(active.cfg.supabaseUrl).host } : {}),
+        ...(inv.cfg.selfHosted ? { selfHosted: true as const } : {})
       }
     }
 
@@ -423,7 +446,7 @@ const feature: Feature = {
       const inv = parseInvitation(text)
       const { decision, host } = inviteState(inv)
       if (decision === 'confirmNew' || decision === 'confirmReplace') {
-        if (confirmed !== decision) throw new Error(`Confirmá que querés conectarte a ${host} antes de seguir.`)
+        if (confirmed !== inviteConfirmation(decision, inv)) throw new Error(`Confirmá que querés conectarte a ${host} antes de seguir.`)
         saved.config = inv.cfg
         persist()
         refresh()

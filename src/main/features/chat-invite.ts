@@ -5,7 +5,7 @@
  * El texto pegado es dato no confiable: se valida entero (mismas reglas que Configuración) y lo único
  * que sale de acá es una config de chat válida, un código con el formato de la base y un nombre limpio.
  */
-import { CHAT_LIMITS } from '../../shared/chat'
+import { CHAT_LIMITS, isSupabaseHost } from '../../shared/chat'
 import { checkAnonKey, keyHash, normalizeSupabaseUrl, type ChatServerConfig } from './chat-config'
 import { codepoints, parseInviteCode } from './chat-map'
 
@@ -45,7 +45,7 @@ export function buildInvitation(cfg: ChatServerConfig, code: string, teamName?: 
   } catch {
     team = undefined
   }
-  const body = { url: normalizeSupabaseUrl(cfg.supabaseUrl), key: checkAnonKey(cfg.anonKey), code: parseInviteCode(code), ...(team ? { team } : {}) }
+  const body = { url: normalizeSupabaseUrl(cfg.supabaseUrl, { selfHosted: cfg.selfHosted === true }), key: checkAnonKey(cfg.anonKey), code: parseInviteCode(code), ...(team ? { team } : {}) }
   const token = `${INVITE_PREFIX}${Buffer.from(JSON.stringify(body), 'utf8').toString('base64url')}`
   if (token.length - INVITE_PREFIX.length > MAX_INVITE_TOKEN) throw new Error('La invitación quedó demasiado larga.')
   return token
@@ -76,12 +76,14 @@ export function parseInvitation(raw: unknown): ChatInvitation {
   }
   if (!isObj(data)) throw new Error('La invitación está dañada o incompleta. Pedí que te la copien de nuevo.')
   for (const k of Object.keys(data)) if (!KEYS.has(k)) throw new Error('La invitación trae datos que Sloth no conoce. ¿Es de una versión más nueva?')
+  // Un host fuera de supabase.co se acepta como servidor propio: decideInvite pide confirmarlo con el host completo a la vista.
   let supabaseUrl: string
   try {
-    supabaseUrl = normalizeSupabaseUrl(data.url)
+    supabaseUrl = normalizeSupabaseUrl(data.url, { selfHosted: true })
   } catch (e) {
     throw new Error(`La invitación no es válida: ${(e as Error).message}`)
   }
+  const selfHosted = !isSupabaseHost(new URL(supabaseUrl).host)
   let anonKey: string
   try {
     anonKey = checkAnonKey(data.key)
@@ -95,7 +97,12 @@ export function parseInvitation(raw: unknown): ChatInvitation {
     throw new Error('La invitación no es válida: el código del equipo no tiene el formato correcto.')
   }
   const teamName = cleanTeamName(data.team)
-  return { cfg: { supabaseUrl, anonKey }, code, ...(teamName ? { teamName } : {}) }
+  return { cfg: { supabaseUrl, anonKey, ...(selfHosted ? { selfHosted: true as const } : {}) }, code, ...(teamName ? { teamName } : {}) }
+}
+
+/** Lo que la UI tiene que mandar para confirmar: con servidor propio, atado al host que mostró. */
+export function inviteConfirmation(decision: InviteDecision, inv: ChatInvitation): string {
+  return inv.cfg.selfHosted ? `${decision}@${new URL(inv.cfg.supabaseUrl).host}` : decision
 }
 
 /**

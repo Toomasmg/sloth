@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeSupabaseUrl, parseChatServerConfig } from './chat-config'
-import { parseInvitation } from './chat-invite'
+import { keyHash, normalizeSupabaseUrl, parseChatServerConfig, parseSavedChatConfig } from './chat-config'
+import { buildInvitation, decideInvite, inviteConfirmation, parseInvitation } from './chat-invite'
 import { parseTeamConfig } from './team-config-core'
 
 const KEY = 'sb_publishable_abcdefgh12345'
@@ -28,9 +28,35 @@ test('servidor propio: solo con la marca y solo desde Configuración', () => {
   assert.equal(parseChatServerConfig({ supabaseUrl: REF, anonKey: KEY }).selfHosted, undefined)
 })
 
-test('una invitación o un team.json con otro host se rechazan', () => {
-  const token = Buffer.from(JSON.stringify({ url: 'https://acme.supabase.co.evil.example', key: KEY, code: 'abcd-efgh-ijkl' })).toString('base64url')
-  assert.throws(() => parseInvitation(`sloth-invitacion:v1.${token}`), /solo acepta proyectos de Supabase/)
+test('una invitación a otro host entra como servidor propio y se confirma con el host completo', () => {
+  const token = Buffer.from(JSON.stringify({ url: 'https://acme.supabase.co.evil.example', key: KEY, code: '0123456789abcdef' })).toString('base64url')
+  const inv = parseInvitation(`sloth-invitacion:v1.${token}`)
+  assert.equal(inv.cfg.selfHosted, true)
+  assert.equal(decideInvite(inv, { signedIn: false }), 'confirmNew')
+  assert.equal(inviteConfirmation('confirmNew', inv), 'confirmNew@acme.supabase.co.evil.example')
+  const supa = parseInvitation(buildInvitation({ supabaseUrl: REF, anonKey: KEY }, '0123456789abcdef'))
+  assert.equal(supa.cfg.selfHosted, undefined)
+  assert.equal(inviteConfirmation('confirmNew', supa), 'confirmNew')
+})
+
+test('el owner de un servidor propio puede armar la invitación y vuelve igual', () => {
+  const own = { supabaseUrl: 'https://chat.acme.com', anonKey: KEY, selfHosted: true as const }
+  const inv = parseInvitation(buildInvitation(own, '0123456789abcdef', 'Acme'))
+  assert.deepEqual(inv.cfg, own)
+  assert.equal(decideInvite(inv, { active: { supabaseUrl: own.supabaseUrl, keyHash: keyHash(KEY) }, signedIn: true }), 'redeem')
+  assert.throws(() => buildInvitation({ supabaseUrl: 'https://chat.acme.com', anonKey: KEY }, '0123456789abcdef'), /Servidor propio/)
+})
+
+test('una config guardada de servidor propio sin la marca se migra, no se descarta', () => {
+  const r = parseSavedChatConfig({ supabaseUrl: 'https://chat.acme.com', anonKey: KEY })
+  assert.equal(r.migrated, true)
+  assert.deepEqual(r.cfg, { supabaseUrl: 'https://chat.acme.com', anonKey: KEY, selfHosted: true })
+  assert.equal(parseSavedChatConfig({ supabaseUrl: REF, anonKey: KEY }).migrated, false)
+  assert.throws(() => parseSavedChatConfig({ supabaseUrl: 'http://chat.acme.com', anonKey: KEY }))
+  assert.throws(() => parseSavedChatConfig({ supabaseUrl: 'https://chat.acme.com', anonKey: 'sb_secret_x' }))
+})
+
+test('un team.json con otro host pierde solo el chat', () => {
   const team = (chat: object): string => JSON.stringify({ formato: 'sloth-team', versión: 1, equipo: 'X', chat })
   const otro = parseTeamConfig(team({ supabaseUrl: 'https://evil.example', anonKey: KEY }))
   assert.equal(otro.chat, undefined)
