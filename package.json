@@ -12,6 +12,7 @@
     "dev": "npm run build:daemon && electron-vite dev",
     "build": "electron-vite build && npm run build:daemon && npm run build:whisper",
     "build:whisper": "node scripts/fetch-whisper.mjs",
+    "fetch-whisper": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/test-hooks.mjs scripts/fetch-whisper-model.mjs",
     "build:daemon": "node scripts/build-daemon.mjs",
     "build:celu-web": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/test-hooks.mjs scripts/build-celu-web.mjs",
     "postinstall": "node scripts/patch-node-pty.mjs",
@@ -79,7 +80,12 @@
       },
       {
         "from": "vendor/whisper",
-        "to": "whisper"
+        "to": "whisper",
+        "filter": [
+          "**/*",
+          "!*.bin",
+          "!*.part"
+        ]
       }
     ],
     "win": {
