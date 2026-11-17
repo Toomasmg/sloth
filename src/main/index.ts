@@ -10,6 +10,7 @@ import { accountStatus, createAccount } from './accounts'
 import { installInto, stateForEvent, writeHookScript, type HookEventPayload } from './hooks'
 import { esFalsoFinal, pendientes, registrar as registrarFondo, venceEn, type Fondo } from './segundo-plano-core'
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
+import { avisar } from './avisos'
 import { pastePayload } from './claude-launch'
 import { resolveClaudeExe } from './features/tickets/claude-run'
 import { initialPromptProblem } from '../shared/initial-prompt'
@@ -263,12 +264,11 @@ app.whenReady().then(async () => {
     const s = pendingPaste.get(wsId)
     if (!s) return
     pendingPaste.delete(wsId)
-    if (Date.now() > s.until) return
+    const name = store.workspace(wsId)?.name ?? 'un espacio'
+    if (Date.now() > s.until) return avisar(`Claude tardó en arrancar en «${name}» y no le pegué el primer mensaje: escribilo a mano.`)
+    // Sin Enter: si Claude se cerró en el medio, el texto queda en la línea de la shell sin ejecutarse.
     setTimeout(() => {
-      void backend().then((b) => {
-        b.write(wsId, pastePayload(s.text))
-        setTimeout(() => b.write(wsId, '\r'), 300)
-      })
+      void backend().then((b) => b.write(wsId, pastePayload(s.text)))
     }, 1500)
   }
 

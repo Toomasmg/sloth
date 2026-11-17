@@ -74,7 +74,9 @@ export function MembersPanel({
       }
       const r = await ui.invoke<ChatRemoveResult>('feat:chat:removeMember', team.id, c.member.profile.id)
       setConfirm(null)
-      setStatus(`Sacaste a ${c.member.profile.login} del equipo. ${r.aviso}`)
+      // Si el código no cambió la persona puede volver a entrar: es una advertencia, no un éxito.
+      if (r.codigoNuevo) setStatus(`Sacaste a ${c.member.profile.login} del equipo. ${r.aviso}`)
+      else setErr(`Sacaste a ${c.member.profile.login} del equipo. ${r.aviso}`)
       await reload()
     } catch (e) {
       setErr(cleanError(e))
