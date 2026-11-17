@@ -9,6 +9,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.27',
+    date: '2026-11-17',
+    title: 'Más seguro con repos ajenos',
+    items: [
+      'El primer mensaje de un espacio llega entero en PowerShell, cmd y Git Bash, con comillas, acentos o «/ticket», y no hay forma de que ejecute comandos.',
+      'Los scripts de tu repo (por ejemplo .bat o gradlew) vuelven a correr normal en la terminal.',
+      '«Permitir siempre ediciones en este repo» ya no sigue accesos directos que apunten afuera del repo.',
+      'Sloth ya no ejecuta nada que venga en la configuración de git de un repo ajeno al mostrar cambios o el historial.',
+      'Chat: sacar a alguien del equipo cambia el código en el mismo paso (hace falta aplicar la migración 0007). Si usás un servidor propio, se avisa y se pide confirmar al aceptar invitaciones.',
+      'Celular: el panel avisa que por Wi-Fi la conexión no va cifrada.'
+    ]
+  },
+  {
     version: '0.6.26',
     date: '2026-11-17',
     title: 'Más seguro con repos ajenos y sin perder tu configuración',
