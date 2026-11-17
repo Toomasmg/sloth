@@ -390,8 +390,8 @@ export function PaletteBar(): React.JSX.Element {
       e.preventDefault()
       run(sel)
     } else if (e.key === 'Tab') {
-      e.preventDefault()
-      if (!e.shiftKey && sel?.spaceId && !scoped) {
+      if (!e.shiftKey && !scoped && sel?.spaceId && query.trim()) {
+        e.preventDefault()
         setScope(sel.spaceId)
         setQuery('')
         setFilter('todo')

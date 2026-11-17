@@ -27,6 +27,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: [['Ctrl', 'Shift', 'B']], what: 'Enviar a varios espacios', group: 'General', id: 'broadcast' },
   { keys: [['Ctrl', 'N']], what: 'Nuevo espacio', group: 'General', id: 'new' },
   { keys: [['Ctrl', 'B']], what: 'Mostrar u ocultar la barra lateral', group: 'General', id: 'sidebar' },
+  { keys: [['F6'], ['Shift', 'F6']], what: 'Saltar entre la barra superior, el riel, la barra lateral y los paneles (sirve también dentro de la terminal)', group: 'General' },
   { keys: [['Ctrl', 'Shift', '1–5']], what: 'Ir a Espacios (1), Tickets (2), Equipo (3), Historial (4) o Ramas aparte (5)', group: 'General' },
   { keys: [['Ctrl', 'Shift', 'M']], what: 'Abrir el chat del equipo', group: 'Chat', id: 'chat' },
   { keys: [['Esc']], what: 'Cerrar ventanas y paletas', group: 'General' },
