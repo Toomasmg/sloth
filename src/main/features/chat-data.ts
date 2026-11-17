@@ -127,7 +127,7 @@ export interface ChatData {
   viaColumn(): boolean
 }
 
-export const EMPTY_PART: ChatDataPart = { connection: 'off', teams: [], threads: [], invites: [], unreadTotal: 0, extras: false, listsLoaded: false }
+export const EMPTY_PART: ChatDataPart = { connection: 'off', teams: [], threads: [], invites: [], unreadTotal: 0, extras: false, dmClearForMe: false, listsLoaded: false }
 
 /** Dependencias inyectables (las pruebas no cargan Electron). */
 export interface NoticeLike {
@@ -204,8 +204,8 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
   let broadcastWarned = false
   let extras = false
   let viaCol = false
-/** 0008: vencimiento y usos del código de invitación. */
-let codeLimits = false
+  let codeLimits = false
+  let dmClearForMe = false
   const typingThrottle = new Throttle()
   let purgeTimer: ReturnType<typeof setInterval> | undefined
 
@@ -289,15 +289,22 @@ let codeLimits = false
     })
   }
 
+  /** Las dos cosas vienen en la 0008, pero se miran por separado: cada una cambia algo distinto. */
   async function detectCodeLimits(c: SupabaseClient): Promise<void> {
-    const r = await c.from('team_invite_codes').select('expires_at, uses_left').limit(1)
-    if (r.error && !MISSING_SCHEMA.has(r.error.code ?? '')) {
-      ctx.log('chat: no se pudo comprobar la actualización 0008:', r.error.code ?? '?')
+    const [codes, cleared] = await Promise.all([
+      c.from('team_invite_codes').select('expires_at, uses_left').limit(1),
+      c.from('dm_threads').select('cleared_a').limit(0)
+    ])
+    const errors: PgError[] = [codes.error, cleared.error].filter((e) => e !== null)
+    if (errors.some((e) => !MISSING_SCHEMA.has(e.code ?? ''))) {
+      ctx.log('chat: no se pudo comprobar la actualización 0008:', errors.map((e) => e.code ?? '?').join(', '))
       return
     }
-    const next = !r.error
-    if (next === codeLimits) return
-    codeLimits = next
+    const nextCodes = !codes.error
+    const nextClear = !cleared.error
+    if (nextCodes === codeLimits && nextClear === dmClearForMe) return
+    codeLimits = nextCodes
+    dmClearForMe = nextClear
     onChange()
   }
 
@@ -946,12 +953,17 @@ let codeLimits = false
     if (res.error) ctx.log('chat: no se pudo avisar que estás escribiendo.')
   })
 
-  ctx.handle('clear', async (rawConv: unknown): Promise<void> => {
+  ctx.handle('clear', async (rawConv: unknown, rawForMe: unknown): Promise<void> => {
     if (!extras) throw new Error('Para vaciar, el servidor del chat necesita la actualización 0004.')
     const c = clientNow()
     const ref = parseConvRef(rawConv)
     const role = ref.kind === 'team' ? lists.teams.find((t) => t.id === ref.id)?.role : undefined
     if (!canManageConv(ref.kind, role)) throw new Error('Solo owner o admin pueden vaciar la conversación del equipo.')
+    // Lo que confirmó la persona tiene que coincidir con lo que va a hacer el servidor: sin la 0008, vaciar
+    // un DM lo borra para los dos.
+    if (ref.kind === 'dm' && rawForMe !== dmClearForMe) {
+      throw new Error('Cambió lo que hace el servidor al vaciar: cerrá este aviso y volvé a intentarlo.')
+    }
     const res = await c.rpc('chat_clear', ref.kind === 'team' ? { p_team: ref.id } : { p_thread: ref.id })
     check(res, 'No se pudo vaciar la conversación.')
   })
@@ -1150,7 +1162,7 @@ let codeLimits = false
     part: (): ChatDataPart => {
       const teams = lists.teams.map(withPhoto)
       const unreadTotal = teams.reduce((n, t) => n + t.unread, 0) + lists.threads.reduce((n, t) => n + t.unread, 0)
-      return { connection, teams, threads: lists.threads, invites: lists.invites, unreadTotal, extras, listsLoaded }
+      return { connection, teams, threads: lists.threads, invites: lists.invites, unreadTotal, extras, dmClearForMe, listsLoaded }
     },
 
     start: async (): Promise<void> => {
@@ -1203,6 +1215,7 @@ let codeLimits = false
       extras = false
       viaCol = false
       codeLimits = false
+      dmClearForMe = false
       typingThrottle.clear()
       // removeAllChannels (al cerrar «sloth-inbox») cierra también los canales rápidos.
       topics.clear()

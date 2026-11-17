@@ -230,6 +230,8 @@ export interface ChatSnapshot {
   unreadTotal: number
   /** El servidor tiene la 0004: editar, borrar, responder, reaccionar, «escribiendo…», «visto», borrado automático y vaciar. */
   extras: boolean
+  /** El servidor tiene la 0008: vaciar un DM lo oculta solo para quien vacía. Sin ella se borra para los dos. */
+  dmClearForMe: boolean
   /** Ya llegaron las listas del servidor al menos una vez en esta sesión (hasta entonces vienen vacías). */
   listsLoaded: boolean
 }

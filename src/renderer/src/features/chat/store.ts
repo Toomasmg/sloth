@@ -360,6 +360,10 @@ export function useExtras(): boolean {
   return useSyncExternalStore(subscribe, () => snap?.extras === true)
 }
 
+export function useDmClearForMe(): boolean {
+  return useSyncExternalStore(subscribe, () => snap?.dmClearForMe === true)
+}
+
 /** Hay snapshot y el servidor no tiene la 0004. */
 export function useExtrasMissing(): boolean {
   return useSyncExternalStore(subscribe, () => !!snap && snap.auth.status === 'signedIn' && !snap.extras)
@@ -535,11 +539,12 @@ function putUpdate(m: ChatMessage): void {
 }
 
 /**
- * Vacía la conversación para todos. Lo de la caché se va ya; el aviso llega por realtime y, por si
- * no llega, se vuelve a pedir la última página. Los errores los muestra quien llama.
+ * Vacía la conversación: el equipo para todos y el DM según `forMe`, que es lo que confirmó la persona
+ * (main lo rechaza si el servidor hace otra cosa). Lo de la caché se va ya y se vuelve a pedir la última
+ * página, porque en un DM vaciado para uno no llega aviso. Los errores los muestra quien llama.
  */
-export async function clearConversation(conv: ChatConvRef): Promise<void> {
-  await call('clear', conv)
+export async function clearConversation(conv: ChatConvRef, forMe: boolean): Promise<void> {
+  await call('clear', conv, forMe)
   const key = convKey(conv)
   msgs.set(key, (msgs.get(key) ?? []).filter((m) => m.status !== 'sent'))
   meta.set(key, { more: false })
