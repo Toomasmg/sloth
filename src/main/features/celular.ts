@@ -11,7 +11,7 @@ import type { HookEventPayload } from '../hooks'
 import { PUERTO_POR_DEFECTO, type CelularVista, type RemotoVista } from '../../shared/celular'
 import { enlaceCelu, secretoValido } from '../../shared/celu-remoto'
 import { LIMITES_ARCHIVO } from '../statusline-core'
-import { armarEstado, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type TipoAviso } from './celular-core'
+import { armarEstado, claveValida, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type TipoAviso } from './celular-core'
 import { crearFuenteWifi, type FuenteDeEstado, type ProveedorDeEstado } from './celular-servidor'
 import { crearFuenteRemota, type CambioRemoto } from './celular-remoto'
 import { sesionChat } from './chat'
@@ -21,8 +21,8 @@ import { currentSettings } from './settings'
 
 /**
  * Función «celular»: un visor en el celu con el estado de las sesiones y el uso de cada cuenta.
- * v1: servidor HTTP en el Wi-Fi de casa con un token de 32 bytes que va en el QR. Apagado por
- * defecto; aprobar desde el celu y los avisos por ntfy, también.
+ * v1: servidor HTTP en el Wi-Fi de casa con los cuerpos sellados (AES-256-CTR + HMAC) con una clave
+ * de 32 bytes que va en el QR, en el `#` para que no viaje en ningún pedido. Apagado por defecto; aprobar desde el celu y los avisos por ntfy, también.
  * Persiste en userData/features/celular.json (escritura atómica).
  *
  * Límites conocidos (v1): la página es http, así que no hay wake lock ni service worker (la pantalla
@@ -32,7 +32,7 @@ import { currentSettings } from './settings'
 interface Config {
   encendido: boolean
   puerto: number
-  token: string
+  clave: string
   aprobar: boolean
   ntfy: { encendido: boolean; tema: string; servidor: string; token?: string; temaRenovado?: boolean }
   remoto: { encendido: boolean; aprobar: boolean; secreto: string }
@@ -45,20 +45,21 @@ const nuevoToken = (): string => randomBytes(32).toString('base64url')
 const nuevoTema = (): string => `sloth-${randomBytes(12).toString('hex')}`
 
 function porDefecto(): Config {
-  return { encendido: false, puerto: PUERTO_POR_DEFECTO, token: nuevoToken(), aprobar: false, ntfy: { encendido: false, tema: nuevoTema(), servidor: NTFY_POR_DEFECTO }, remoto: { encendido: false, aprobar: false, secreto: nuevoToken() } }
+  return { encendido: false, puerto: PUERTO_POR_DEFECTO, clave: nuevoToken(), aprobar: false, ntfy: { encendido: false, tema: nuevoTema(), servidor: NTFY_POR_DEFECTO }, remoto: { encendido: false, aprobar: false, secreto: nuevoToken() } }
 }
 
-function cargar(): Config {
+function cargar(): { cfg: Config; claveNueva: boolean } {
   const base = porDefecto()
   const raw = leerJson(file(), { validar: (v) => (esObjeto(v) ? (v as Partial<Config>) : undefined), porDefecto: (): Partial<Config> => ({}) }).valor
   const temaGuardado = raw.ntfy?.tema
   const temaOk = temaValido(temaGuardado)
   const token = tokenNtfyValido(raw.ntfy?.token) ? raw.ntfy.token : undefined
   const renovado = raw.ntfy?.temaRenovado === true || (!temaOk && temaGuardado !== undefined)
-  return {
+  const claveNueva = !claveValida(raw.clave)
+  const cfg: Config = {
     encendido: raw.encendido === true,
     puerto: puertoValido(raw.puerto) ? raw.puerto : base.puerto,
-    token: typeof raw.token === 'string' && raw.token.length >= 43 ? raw.token : base.token,
+    clave: claveValida(raw.clave) ? raw.clave : base.clave,
     aprobar: raw.aprobar === true,
     ntfy: {
       encendido: temaOk && raw.ntfy?.encendido === true,
@@ -73,6 +74,7 @@ function cargar(): Config {
       secreto: secretoValido(raw.remoto?.secreto) ? raw.remoto.secreto : base.remoto.secreto
     }
   }
+  return { cfg, claveNueva }
 }
 
 function guardarConfig(c: Config): void {
@@ -86,8 +88,9 @@ let detenerTodo: (() => Promise<void>) | null = null
 const feature: Feature = {
   name: 'celular',
   register(ctx: FeatureContext) {
-    let cfg = cargar()
-    if (!existsSync(file()) || cfg.ntfy.temaRenovado) {
+    const cargada = cargar()
+    const cfg = cargada.cfg
+    if (!existsSync(file()) || cargada.claveNueva || cfg.ntfy.temaRenovado) {
       try {
         guardarConfig(cfg)
       } catch (e) {
@@ -98,6 +101,7 @@ const feature: Feature = {
     let ipServida: string | null = null
     let ipCambio = false
     let error: string | null = null
+    let errorDePuerto = false
     let revisor: NodeJS.Timeout | null = null
     let icono: Buffer | null | undefined
     const enviados = new Map<string, number>()
@@ -131,7 +135,7 @@ const feature: Feature = {
       escuchando: !!fuente,
       ip: ipServida ?? ipActual(),
       puerto: cfg.puerto,
-      enlace: fuente && ipServida ? `http://${ipServida}:${cfg.puerto}/?t=${cfg.token}` : null,
+      enlace: fuente && ipServida ? `http://${ipServida}:${cfg.puerto}/#k=${cfg.clave}` : null,
       aprobar: cfg.aprobar,
       ntfy: {
         encendido: cfg.ntfy.encendido,
@@ -201,7 +205,7 @@ const feature: Feature = {
         ctx.log(`permiso ${decision === 'allow' ? 'aprobado' : 'rechazado'} desde el celu`)
       },
       puedeAprobar: () => cfg.aprobar,
-      token: () => cfg.token,
+      clave: () => cfg.clave,
       icono: leerIcono
     }
 
@@ -215,6 +219,7 @@ const feature: Feature = {
     async function iniciar(): Promise<void> {
       await detener()
       error = null
+      errorDePuerto = false
       if (!cfg.encendido) return
       const ip = ipActual()
       if (!ip) {
@@ -228,6 +233,7 @@ const feature: Feature = {
         ipServida = ip
       } catch (e) {
         const code = (e as NodeJS.ErrnoException).code
+        errorDePuerto = code === 'EADDRINUSE' || code === 'EACCES'
         error =
           code === 'EADDRINUSE'
             ? `El puerto ${cfg.puerto} ya lo usa otro programa. Elegí otro.`
@@ -264,6 +270,19 @@ const feature: Feature = {
       programarRevision()
       avisar()
       return vista()
+    }
+
+    // Si el usuario prendió o cambió el puerto y no se pudo abrir, no queda «encendido» reintentando a ciegas.
+    async function aplicarYApagarSiNoAbre(): Promise<CelularVista> {
+      const v = await aplicar()
+      if (cfg.encendido && !fuente && errorDePuerto) {
+        cfg.encendido = false
+        guardar()
+        programarRevision()
+        avisar()
+        return vista()
+      }
+      return v
     }
 
     async function detenerRemota(): Promise<void> {
@@ -344,20 +363,20 @@ const feature: Feature = {
       cfg.encendido = on
       ipCambio = false
       guardar()
-      return aplicar()
+      return aplicarYApagarSiNoAbre()
     })
 
     ctx.handle('puerto', async (p: unknown) => {
       if (!puertoValido(p)) throw new Error('El puerto tiene que ser un número entre 1024 y 65535.')
       cfg.puerto = p
       guardar()
-      return aplicar()
+      return aplicarYApagarSiNoAbre()
     })
 
     ctx.handle('regenerar', () => {
-      cfg.token = nuevoToken()
+      cfg.clave = nuevoToken()
       guardar()
-      ctx.log('token regenerado: los celus anteriores quedan afuera')
+      ctx.log('clave regenerada: los celus anteriores quedan afuera')
       avisar()
       return vista()
     })

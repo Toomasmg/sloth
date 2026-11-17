@@ -141,7 +141,7 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
                   <p className="f-cel-ok">
                     Abierto en <span className="f-cel-mono">{`${v.ip}:${v.puerto}`}</span>
                   </p>
-                  <p className="f-cel-nota">Escaneá el QR con la cámara del celu. Tiene que estar en el mismo Wi-Fi que la PC.</p>
+                  <p className="f-cel-nota">Escaneá el QR con la cámara del celu. Tiene que estar en el mismo Wi-Fi que la PC. El QR contiene la clave: no lo compartas.</p>
                   <p className="f-cel-nota">Para tenerlo como app: en el navegador del celu, «Agregar a pantalla de inicio».</p>
                   <Button size="sm" variant="secondary" onClick={() => void copiar(v.enlace as string, 'Enlace')}>
                     Copiar enlace
@@ -181,7 +181,7 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
                     variant="danger"
                     onClick={() => {
                       setConfirmar(false)
-                      void hacer('regenerar').then(() => toast({ tone: 'success', message: 'Código nuevo. Los celus de antes quedaron afuera.' }))
+                      void hacer('regenerar').then(() => toast({ tone: 'success', message: 'Clave nueva. Los celus de antes tienen que escanear el QR de nuevo.' }))
                     }}
                   >
                     Regenerar código
@@ -203,10 +203,10 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
               Aprobar o rechazar desde el celu
             </Switch>
             <p className={v.aprobar ? 'f-cel-aviso' : 'f-cel-nota'}>
-              Cualquiera en tu Wi-Fi que tenga el enlace del QR podría aprobar comandos de Claude. Prendelo solo en una red de confianza. Apagado, el celu muestra el pedido pero lo respondés en la PC.
+              Cualquiera con el QR (o la clave) podría aprobar comandos de Claude. Prendelo solo en una red de confianza. Apagado, el celu muestra el pedido pero lo respondés en la PC.
             </p>
             <p className="f-cel-aviso" role="note">
-              La conexión por Wi-Fi no va cifrada: alguien en la misma red puede leer lo que va entre el celu y la PC (incluido el enlace del QR) y, con «Aprobar» prendido, aprobar por vos. Usalo solo en una red propia, nunca en un Wi-Fi público, de hotel o compartido.
+              Lo que va entre el celu y la PC viaja cifrado en tu Wi-Fi, con una clave que está solo en el QR. Aun así la página no puede verificarse: alguien que manipule tu red a propósito podría robarte la clave. Usalo en una red propia; en una pública, de hotel o compartida, usá «Desde cualquier red», que va cifrado de punta a punta.
             </p>
           </section>
 

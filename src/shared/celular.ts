@@ -62,7 +62,7 @@ export interface CelularVista {
   escuchando: boolean
   ip: string | null
   puerto: number
-  /** http://<ip>:<puerto>/?t=<token>, o null si no hay IP o está apagado. */
+  /** http://<ip>:<puerto>/#k=<clave>, o null si no hay IP o está apagado. */
   enlace: string | null
   aprobar: boolean
   ntfy: { encendido: boolean; tema: string; servidor: string; conToken: boolean; temaRenovado?: boolean }
