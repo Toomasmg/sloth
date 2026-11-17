@@ -167,3 +167,39 @@ export class Throttle {
     this.last.clear()
   }
 }
+
+/**
+ * Como Throttle, pero lo que no pasa no se pierde: queda uno pendiente por clave para el final de la
+ * ventana. `ask` da 'now' (mandalo ya), los ms que faltan (programalo y llamá a `fired` al mandarlo)
+ * o null (ya hay uno programado, que cubre este).
+ */
+export class TrailingThrottle {
+  private last = new Map<string, number>()
+  private pending = new Set<string>()
+  private minMs: number
+
+  constructor(minMs: number) {
+    this.minMs = minMs
+  }
+
+  ask(key: string, at: number): 'now' | number | null {
+    if (this.pending.has(key)) return null
+    const prev = this.last.get(key)
+    if (prev === undefined || at - prev >= this.minMs) {
+      this.last.set(key, at)
+      return 'now'
+    }
+    this.pending.add(key)
+    return this.minMs - (at - prev)
+  }
+
+  fired(key: string, at: number): void {
+    this.pending.delete(key)
+    this.last.set(key, at)
+  }
+
+  clear(): void {
+    this.last.clear()
+    this.pending.clear()
+  }
+}

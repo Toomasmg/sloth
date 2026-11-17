@@ -79,6 +79,7 @@ import {
   rowFromBroadcast,
   SeenIds,
   Throttle,
+  TrailingThrottle,
   TYPING_EVENT,
   typingFromBroadcast,
   UPDATE_EVENT,
@@ -146,6 +147,7 @@ export interface ChatDataDeps {
 const REFRESH_MIN_MS = 30_000
 const NOTIFY_MIN_MS = 5_000
 const MENTION_MIN_MS = 2_000
+const READ_MIN_MS = 2_000
 const PROFILE_CACHE_MAX = 500
 const PHOTO_CACHE_MAX = 50
 const UNREAD_CAP = 99
@@ -207,6 +209,9 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
   let codeLimits = false
   let dmClearForMe = false
   const typingThrottle = new Throttle()
+  // Mirando una conversación activa llega un mark_read por mensaje: se juntan en uno cada READ_MIN_MS.
+  const readThrottle = new TrailingThrottle(READ_MIN_MS)
+  const readTimers = new Set<ReturnType<typeof setTimeout>>()
   let purgeTimer: ReturnType<typeof setInterval> | undefined
 
   const cols = (): string => `${extras ? MSG_COLS_EXTRAS : MSG_COLS_BASE}${viaCol ? ', via' : ''}`
@@ -568,7 +573,20 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
   }
 
   const markReadQuiet = (ref: ChatConvRef): void => {
-    markReadRemote(ref).catch(() => ctx.log('chat: no se pudo marcar como leído.'))
+    const send = (): void => {
+      markReadRemote(ref).catch(() => ctx.log('chat: no se pudo marcar como leído.'))
+    }
+    const key = convKey(ref)
+    const wait = readThrottle.ask(key, now())
+    if (wait === null) return
+    if (wait === 'now') return send()
+    const g = gen
+    const timer = setTimeout(() => {
+      readTimers.delete(timer)
+      readThrottle.fired(key, now())
+      if (g === gen && running) send()
+    }, wait)
+    readTimers.add(timer)
   }
 
   // ---------- realtime ----------
@@ -1217,6 +1235,9 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       codeLimits = false
       dmClearForMe = false
       typingThrottle.clear()
+      for (const t of readTimers) clearTimeout(t)
+      readTimers.clear()
+      readThrottle.clear()
       // removeAllChannels (al cerrar «sloth-inbox») cierra también los canales rápidos.
       topics.clear()
       const close = closeInbox

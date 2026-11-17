@@ -9,6 +9,7 @@ import {
   rowFromBroadcast,
   SeenIds,
   Throttle,
+  TrailingThrottle,
   topicOf,
   typingFromBroadcast,
   versionKey,
@@ -152,6 +153,20 @@ test('Throttle: repite recién a los 3 s y por clave', () => {
   assert.equal(th.ok('a', 3999), false)
   assert.equal(th.ok('b', 3999), true)
   assert.equal(th.ok('a', 4000), true)
+})
+
+test('TrailingThrottle: lo que llega dentro de la ventana se junta en uno al final', () => {
+  const th = new TrailingThrottle(2000)
+  assert.equal(th.ask('a', 1000), 'now')
+  assert.equal(th.ask('a', 1500), 1500)
+  assert.equal(th.ask('a', 1800), null)
+  assert.equal(th.ask('b', 1800), 'now')
+  th.fired('a', 3000)
+  assert.equal(th.ask('a', 3500), 1500)
+  th.fired('a', 5000)
+  assert.equal(th.ask('a', 7000), 'now')
+  th.clear()
+  assert.equal(th.ask('a', 7001), 'now')
 })
 
 test('la marca vía Claude llega por Broadcast solo si es exacta', () => {
