@@ -882,6 +882,7 @@ export function App(): React.JSX.Element {
     <UiContext.Provider value={uiCtx}>
       <div className={`sl-shell ${docVisible ? '' : 'doc-hidden'}`}>
         <header className="sl-top">
+          <h1 className="sr-only">Sloth</h1>
           <div className="sl-top-left">
             <IconButton
               label={sideShown ? 'Ocultar la barra lateral' : 'Mostrar la barra lateral'}
