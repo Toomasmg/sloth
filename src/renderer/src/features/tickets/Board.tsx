@@ -416,7 +416,7 @@ export function Board(): React.JSX.Element {
         </>
       }
     >
-      <main className="f-tickets-main">
+      <div className="f-tickets-main">
         <div>
           <h1 id="f-tickets-title" className="f-tickets-h1">
             {etiquetaTablero(snap)}
@@ -700,7 +700,7 @@ export function Board(): React.JSX.Element {
             </section>
           </div>
         )}
-      </main>
+      </div>
 
       {toast && (
         <div className="f-tickets-toast" role="status">
