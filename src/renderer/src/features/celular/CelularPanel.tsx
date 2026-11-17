@@ -192,6 +192,9 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
             <p className={v.aprobar ? 'f-cel-aviso' : 'f-cel-nota'}>
               Cualquiera en tu Wi-Fi que tenga el enlace del QR podría aprobar comandos de Claude. Prendelo solo en una red de confianza. Apagado, el celu muestra el pedido pero lo respondés en la PC.
             </p>
+            <p className="f-cel-aviso" role="note">
+              La conexión por Wi-Fi no va cifrada: alguien en la misma red puede leer lo que va entre el celu y la PC (incluido el enlace del QR) y, con «Aprobar» prendido, aprobar por vos. Usalo solo en una red propia, nunca en un Wi-Fi público, de hotel o compartido.
+            </p>
           </section>
 
           <section className="f-cel-sec" aria-labelledby="f-cel-ntfy">
