@@ -77,6 +77,10 @@ export interface TicketsConfig {
   confirmRefresh: boolean
   /** cuentaId → conectorId → prefijo elegido cuando hay más de un servidor posible. */
   servidores?: Record<string, Record<string, string>>
+  /** Tope de vueltas de cada consulta a Claude (entero de 1 a 200); sin valor, el de la app. */
+  maxTurns?: number
+  /** Tope de costo en dólares de cada consulta (0,01 a 100); sin valor, sin tope. */
+  maxCostUsd?: number
 }
 
 export type EstadoMcp = 'connected' | 'needs-auth' | 'failed' | 'pending' | 'otro'
@@ -182,7 +186,21 @@ export interface Corrida {
   tokens?: number
   costUsd?: number
   durationMs?: number
+  numTurns?: number
+  maxTurns?: number
+  /** Qué cortó la consulta, si la cortó un tope. */
+  tope?: 'vueltas' | 'costo'
 }
+
+export interface UsoAcum {
+  corridas: number
+  costUsd: number
+  vueltas: number
+  durationMs: number
+}
+
+/** Día local `YYYY-MM-DD` → id de conector → lo gastado ese día. */
+export type UsoPorDia = Record<string, Record<string, UsoAcum>>
 
 /** conectorId de «todavía no elegiste conector» (usuarios nuevos). */
 export const SIN_CONECTOR = ''
@@ -197,6 +215,7 @@ export interface TicketsSnapshot {
   fetchedAt?: number
   fetchedBy?: string
   lastRun?: Corrida
+  uso?: UsoPorDia
   /** Solo errores de la consulta. */
   lastError?: string
   /** Sobre el guardado de tickets.json (no se guarda, falló o se reemplazó). No es de conexión. */
