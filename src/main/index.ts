@@ -11,6 +11,7 @@ import { installInto, stateForEvent, writeHookScript, type HookEventPayload } fr
 import { esFalsoFinal, pendientes, registrar as registrarFondo, venceEn, type Fondo } from './segundo-plano-core'
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
 import { claudeWithPrompt } from './shell-args'
+import { nextAgentState, type AgentInput } from './agent-machine'
 import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
 import { clipboardForPaste } from './clipboard-paste'
 import { createWorktree } from './git'
@@ -51,6 +52,15 @@ function send(channel: string, ...args: unknown[]): void {
 function setAgent(wsId: string, status: AgentStatus): void {
   agents.set(wsId, status)
   send('agent:status', wsId, status)
+}
+
+/** Aplica una entrada del ciclo de vida (agent-machine.ts). Devuelve el estado nuevo, o undefined si no cambió nada. */
+function moveAgent(wsId: string, input: AgentInput, extra: { detail?: string; at?: number } = {}): AgentStatus | undefined {
+  const state = nextAgentState(agents.get(wsId)?.state, input)
+  if (!state) return undefined
+  const status = { state, detail: extra.detail, at: extra.at ?? Date.now() }
+  setAgent(wsId, status)
+  return status
 }
 
 app.setName('Sloth')
@@ -135,9 +145,8 @@ app.whenReady().then(async () => {
     const { state, detail } = p.enFondo
       ? { state: 'working' as const, detail: p.enFondo === 1 ? 'Shell en segundo plano' : `${p.enFondo} shells en segundo plano` }
       : stateForEvent(p)
-    const status = { state, detail, at: p.at ?? ahora }
-    setAgent(ws.id, status)
-    if (p.enFondo) {
+    const status = moveAgent(ws.id, { hook: state }, { detail, at: p.at ?? ahora })
+    if (status && p.enFondo) {
       const vence = venceEn(fondos, ws.id, ahora)
       // Si el aviso del shell nunca llega, no queda «trabajando» para siempre.
       if (vence !== null)
@@ -189,7 +198,7 @@ app.whenReady().then(async () => {
           send('pty:exit', id, code)
           for (const l of exitListeners) safe('pty-exit', () => l(id, code))
           // Un espacio dormido sigue «Dormido» (su terminal se cerró a propósito).
-          if (store.workspace(id) && agents.get(id)?.state !== 'sleeping') setAgent(id, { state: 'exited', at: Date.now() })
+          if (store.workspace(id)) moveAgent(id, 'exit')
         })
         b.on('hook', onHook)
         b.on('permission', onPermission)
@@ -323,7 +332,7 @@ app.whenReady().then(async () => {
     for (const x of sessions) {
       if (!x.running) continue
       send('pty:exit', x.id, -1)
-      if (store.workspace(x.id)) setAgent(x.id, { state: 'exited', at: Date.now() })
+      if (store.workspace(x.id)) moveAgent(x.id, 'exit')
     }
   })
 
@@ -464,7 +473,7 @@ app.whenReady().then(async () => {
       ? toSpawnSpec({ cwd: homedir(), env: {} }, cols, rows, shellChoice)
       : toSpawnSpec(specFor(id, b), cols, rows, shellChoice)
     const result = await b.start(id, spawn)
-    if (store.workspace(id) && !agents.has(id)) setAgent(id, { state: 'idle', at: Date.now() })
+    if (store.workspace(id)) moveAgent(id, 'start')
     return result
   })
   ipcMain.on('pty:write', (_e, id: string, data: string) => {
@@ -474,7 +483,7 @@ app.whenReady().then(async () => {
   ipcMain.on('pty:resize', (_e, id: string, cols: number, rows: number) => term?.resize(id, cols, rows))
   ipcMain.handle('pty:kill', async (_e, id: string) => {
     await (await backend()).kill(id)
-    if (store.workspace(id)) setAgent(id, { state: 'exited', at: Date.now() })
+    if (store.workspace(id)) moveAgent(id, 'exit')
   })
 
   // Texto, rutas de archivos copiados o una imagen guardada como PNG (src/main/clipboard-paste.ts).
