@@ -39,6 +39,7 @@ const files = process.argv.slice(2)
 for (const f of files) await db.exec(readFileSync(f, 'utf8'))
 const withBroadcast = files.some((f) => f.includes('0003_realtime_broadcast'))
 const withCelu = files.some((f) => f.includes('0006_celu_remoto'))
+const withExpulsar = files.some((f) => f.includes('0007_expulsar'))
 console.log('migraciones OK')
 
 const U = {
@@ -203,6 +204,33 @@ if (withCelu) {
   ok((await as(null, 'select * from realtime.messages', [], tAna)).length === 0, 'anon no lee el celu')
   await throws(as(null, pub, [tAna], tAna), 'anon no publica en el celu')
   await throws(as(null, 'select public.can_use_celu_topic($1)', [tAna]), 'anon no ejecuta can_use_celu_topic')
+}
+
+if (withExpulsar) {
+  const t2 = (await as(U.ana, "select public.create_team('Expulsar', '') as id"))[0].id
+  const code2 = (await as(U.ana, 'select code from public.team_invite_codes where team_id=$1', [t2]))[0].code
+  await as(U.bruno, 'select public.join_team_by_code($1)', [code2])
+  await as(U.evil, 'select public.join_team_by_code($1)', [code2])
+  await as(U.ana, 'insert into public.team_invites(team_id, github_login_lower) values ($1, $2)', [t2, 'evil'])
+  const members = async () => (await as(U.ana, 'select user_id from public.team_members where team_id=$1', [t2])).map((r) => r.user_id)
+  await throws(as(U.bruno, 'select public.remove_member($1, $2)', [t2, U.evil]), 'un member no expulsa')
+  await throws(as(U.mail, 'select public.remove_member($1, $2)', [t2, U.evil]), 'alguien de afuera no expulsa')
+  await throws(as(null, 'select public.remove_member($1, $2)', [t2, U.evil]), 'anon no ejecuta remove_member')
+  await throws(as(U.ana, 'select public.remove_member($1, $2)', [t2, U.ana]), 'el owner no se expulsa a sí mismo')
+  await throws(as(U.ana, 'select public.remove_member($1, $2)', [t2, U.mail]), 'no se expulsa a quien no está')
+  ok((await members()).length === 3, 'los intentos fallidos no tocaron a nadie')
+  const nuevo = (await as(U.ana, 'select public.remove_member($1, $2) as c', [t2, U.evil]))[0].c
+  ok(/^[0-9a-f]{16}$/.test(nuevo ?? '') && nuevo !== code2, 'expulsar devuelve un código nuevo')
+  ok(!(await members()).includes(U.evil), 'el expulsado ya no es miembro')
+  ok((await as(U.ana, 'select * from public.team_invites where team_id=$1', [t2])).length === 0, 'se borran sus invitaciones pendientes')
+  ok((await as(U.ana, 'select code from public.team_invite_codes where team_id=$1', [t2]))[0].code === nuevo, 'el código guardado es el nuevo')
+  await throws(as(U.evil, 'select public.join_team_by_code($1)', [code2]), 'el expulsado no vuelve a entrar con el código viejo')
+  ok(!(await members()).includes(U.evil), 'sigue afuera')
+  ok((await as(U.evil, 'select * from public.messages where team_id=$1', [t2])).length === 0, 'el expulsado no lee el equipo')
+  await throws(as(U.evil, 'select public.regenerate_invite_code($1)', [t2]), 'alguien de afuera no regenera ni lee el código')
+  ok((await as(U.ana, 'select code from public.team_invite_codes where team_id=$1', [t2]))[0].code === nuevo, 'el código no cambió por el intento de afuera')
+  await as(U.ana, 'delete from public.team_members where team_id=$1 and user_id=$2', [t2, U.bruno])
+  ok(!(await members()).includes(U.bruno), 'el DELETE directo de antes sigue andando (apps viejas)')
 }
 
 await throws(as(null, 'select * from public.messages'), 'anon sin acceso a messages')

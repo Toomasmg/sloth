@@ -433,6 +433,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
                       )}
                       {st === 'ya' && <div className="f-ei-muted f-ei-fix">Ya está en Sloth.</div>}
                       {st === 'saltear' && s.motivo && <div className="f-ei-muted f-ei-fix">{s.motivo}</div>}
+                      {s.aviso && <div className="f-ei-warnText f-ei-fix">{s.aviso}</div>}
                       {choices.espacios[String(s.index)]?.carpeta && s.status === 'faltante' && (
                         <div className="f-ei-okText f-ei-fix">Carpeta lista en esta PC</div>
                       )}

@@ -4,13 +4,15 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Feature, FeatureContext } from './context'
 import type { ChatAuth, ChatConfigView, ChatInviteJoin, ChatInvitePreview, ChatInviteResult, ChatProfile, ChatSnapshot, ChatTeam } from '../../shared/chat'
 import { CHAT_CALLBACK_PATH, CHAT_CALLBACK_PORTS } from '../../shared/chat'
+import { hostNoSupabase, inviteConfirmation } from '../../shared/chat-text'
 import { keyHash, keyPreview, parseChatServerConfig, type ChatServerConfig } from './chat-config'
 import { createSessionStore, type SessionStore } from './chat-session'
 import { githubEnSettings, startGithubLogin, type GithubLogin } from './chat-auth'
 import { readTeamConfig, repoKey } from './team-config-core'
 import { registerChatData, type ChatData, type ChatCoreHandle } from './chat-data'
 import { buildInvitation, decideInvite, looksLikeInvitation, parseInvitation, type ChatInvitation } from './chat-invite'
-import { escribirJsonAtomico, leerJson } from '../json-file'
+import { escribirJsonAtomico, leerJson, respaldar } from '../json-file'
+import { avisar } from '../avisos'
 import { registerChatMcp } from './chat-mcp'
 
 /**
@@ -55,7 +57,11 @@ export function sesionChat(): SesionChat | null {
 interface SavedFile {
   config?: ChatServerConfig
   accepted?: { repo: string; supabaseUrl: string; keyHash: string }
+  /** Host fuera de supabase.co que la persona ya vio avisado (o confirmó al cargarlo). */
+  avisadoHost?: string
 }
+
+const hostPropio = (cfg: ChatServerConfig | undefined): string | undefined => (cfg ? hostNoSupabase(cfg.supabaseUrl) : undefined)
 
 interface Active {
   cfg: ChatServerConfig
@@ -110,12 +116,32 @@ const feature: Feature = {
       if (raw.config !== undefined)
         try {
           out.config = parseChatServerConfig(raw.config)
-        } catch {
-          ctx.log('chat: la configuración guardada no es válida; se ignora.')
+        } catch (e) {
+          // Se ignora, pero el próximo guardado reescribe chat.json sin ella: antes queda una copia.
+          try {
+            avisar(`La configuración guardada del chat no es válida (${msg(e)}) y no se usa. Quedó una copia en ${respaldar(configFile)}.`)
+          } catch (eb) {
+            ctx.log(`chat: la configuración guardada no es válida y no se pudo respaldar: ${msg(eb)}`)
+          }
         }
       const a = raw.accepted
       if (isObj(a) && typeof a.repo === 'string' && typeof a.supabaseUrl === 'string' && typeof a.keyHash === 'string')
         out.accepted = { repo: a.repo, supabaseUrl: a.supabaseUrl, keyHash: a.keyHash }
+      const propio = hostPropio(out.config)
+      if (propio && raw.avisadoHost === propio) out.avisadoHost = propio
+      else if (propio) {
+        // Una config guardada antes de que Sloth avisara los servidores propios: se avisa una vez y se marca, con copia de antes.
+        out.avisadoHost = propio
+        try {
+          respaldar(configFile)
+          escribirJsonAtomico(configFile, out)
+        } catch (e) {
+          ctx.log(`chat: no se pudo marcar el aviso del servidor propio: ${msg(e)}`)
+        }
+        avisar(
+          `El chat usa ${propio}, que no es un proyecto de Supabase (supabase.co). Tu sesión de GitHub y lo que escribas en el chat pasan por ese servidor. Si no lo reconocés, borralo en Configuración › Chat.`
+        )
+      }
       return out
     }
 
@@ -423,8 +449,9 @@ const feature: Feature = {
       const inv = parseInvitation(text)
       const { decision, host } = inviteState(inv)
       if (decision === 'confirmNew' || decision === 'confirmReplace') {
-        if (confirmed !== decision) throw new Error(`Confirmá que querés conectarte a ${host} antes de seguir.`)
+        if (confirmed !== inviteConfirmation(decision, host)) throw new Error(`Confirmá que querés conectarte a ${host} antes de seguir.`)
         saved.config = inv.cfg
+        saved.avisadoHost = hostPropio(inv.cfg)
         persist()
         refresh()
       }
@@ -475,6 +502,7 @@ const feature: Feature = {
 
     ctx.handle('setConfig', (input: unknown): ChatConfigView => {
       saved.config = input === null ? undefined : parseChatServerConfig(input)
+      saved.avisadoHost = hostPropio(saved.config)
       persist()
       refresh()
       return view()

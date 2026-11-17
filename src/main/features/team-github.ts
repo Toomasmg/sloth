@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { parseGithubRemote, parsePrList, REPO_RE, type TeamPr } from './team-core'
+import { GIT_SAFE_ENV } from './git-run'
 
 /**
  * GitHub para la vista «Equipo», solo lectura: `git remote get-url origin` de cada repo y
@@ -15,6 +16,7 @@ const PARALLEL = 4
 
 const ENV = {
   ...process.env,
+  ...GIT_SAFE_ENV,
   GIT_TERMINAL_PROMPT: '0',
   GCM_INTERACTIVE: 'never',
   GH_PROMPT_DISABLED: '1',

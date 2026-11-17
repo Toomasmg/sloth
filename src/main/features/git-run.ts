@@ -21,13 +21,96 @@ export interface RunOpts {
   maxBytes?: number
   /** Al abortarla se corta el proceso y se rechaza con motivo 'cancelada'. */
   signal?: AbortSignal
+  /** Variables que se suman al entorno de siempre (p. ej. las de gitSafeEnv). */
+  env?: Record<string, string>
+}
+
+type ConfigPar = readonly [string, string]
+
+/** Config por entorno (GIT_CONFIG_COUNT, git ≥ 2.31): pisa al .git/config igual que un -c. */
+export function gitConfigEnv(pares: readonly ConfigPar[]): Record<string, string> {
+  const env: Record<string, string> = { GIT_CONFIG_COUNT: String(pares.length) }
+  pares.forEach(([k, v], i) => {
+    env[`GIT_CONFIG_KEY_${i}`] = k
+    env[`GIT_CONFIG_VALUE_${i}`] = v
+  })
+  return env
 }
 
 /**
  * Un repo ajeno (zip, USB, carpeta compartida) puede traer core.fsmonitor = <comando> en su .git/config,
  * y git lo ejecuta en cualquier status. Sloth corre git solo, antes de que nadie confíe en la carpeta.
+ * Con log.showSignature y un commit firmado, `git log` correría el gpg.program del repo.
  */
-export const GIT_SAFE_ENV = { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.fsmonitor', GIT_CONFIG_VALUE_0: 'false' }
+const SAFE_CONFIG: readonly ConfigPar[] = [
+  ['core.fsmonitor', 'false'],
+  ['log.showSignature', 'false']
+]
+export const GIT_SAFE_ENV = gitConfigEnv(SAFE_CONFIG)
+
+// Solo estos firman o verifican firmas con la config de la persona. El resto nunca llama a gpg: un
+// programa vacío no rompe nada y uno puesto por el repo no se ejecuta.
+const FIRMAN: ReadonlySet<string> = new Set(['commit', 'pull', 'merge', 'rebase', 'cherry-pick', 'revert', 'tag', 'am'])
+const SIN_GPG: readonly ConfigPar[] = ['gpg.program', 'gpg.ssh.program', 'gpg.x509.program'].map((k) => [k, ''] as const)
+
+/** GIT_SAFE_ENV más, salvo en los que firman, los gpg.*.program vacíos; `extra` suma otros (los filtros). */
+export function gitSafeEnv(args: readonly string[], extra: readonly ConfigPar[] = []): Record<string, string> {
+  return gitConfigEnv([...SAFE_CONFIG, ...(FIRMAN.has(args[0] ?? '') ? [] : SIN_GPG), ...extra])
+}
+
+// status y diff contra el árbol de trabajo pasan cada archivo cambiado por el filtro clean del repo.
+const CORREN_FILTROS: ReadonlySet<string> = new Set(['status', 'diff'])
+
+// Lo que instala `git lfs install`: con estos comandos exactos el filtro «lfs» se respeta.
+const LFS: Readonly<Record<string, string>> = {
+  'filter.lfs.clean': 'git-lfs clean -- %f',
+  'filter.lfs.smudge': 'git-lfs smudge -- %f',
+  'filter.lfs.process': 'git-lfs filter-process',
+  'filter.lfs.required': 'true'
+}
+
+/**
+ * Config que apaga los filtros del repo (salida de `git config -z --get-regexp ^filter\.`): un
+ * `.git/config` puede traer `filter.x.clean = <comando>` y un `.gitattributes` que lo use, y git lo
+ * correría en un `status`. Se deja el de git-lfs si es el estándar.
+ */
+export function filtrosApagados(configZ: string): ConfigPar[] {
+  const ultimo = new Map<string, string>()
+  for (const entrada of configZ.split('\0')) {
+    if (!entrada) continue
+    const nl = entrada.indexOf('\n')
+    ultimo.set(nl < 0 ? entrada : entrada.slice(0, nl), nl < 0 ? '' : entrada.slice(nl + 1))
+  }
+  const drivers = new Map<string, boolean>()
+  for (const [clave, valor] of ultimo) {
+    const m = /^filter\.(.+)\.([^.]+)$/i.exec(clave)
+    if (!m) continue
+    const estandar = LFS[clave.toLowerCase()] === valor.trim()
+    drivers.set(m[1], (drivers.get(m[1]) ?? true) && estandar)
+  }
+  const out: ConfigPar[] = []
+  for (const [nombre, estandar] of drivers) {
+    if (estandar) continue
+    for (const k of ['clean', 'smudge', 'process']) out.push([`filter.${nombre}.${k}`, ''])
+    out.push([`filter.${nombre}.required`, 'false'])
+  }
+  return out
+}
+
+const FILTROS_TTL_MS = 10_000
+const filtrosCache = new Map<string, { at: number; pares: ConfigPar[] }>()
+
+/** Los filtros a apagar cuando `args` es un status o un diff automático (ver filtrosApagados). */
+export async function filtrosDe(cwd: string, args: readonly string[]): Promise<ConfigPar[]> {
+  if (!CORREN_FILTROS.has(args[0] ?? '')) return []
+  const hit = filtrosCache.get(cwd)
+  if (hit && Date.now() - hit.at < FILTROS_TTL_MS) return hit.pares
+  const r = await run('git', ['-C', cwd, 'config', '-z', '--get-regexp', '^filter\\.'], { timeoutMs: 10000, env: gitSafeEnv(['config']) })
+  // 1 = ningún filtro; otro error (carpeta que no existe, config rota) hace fallar igual al comando que sigue.
+  const pares = r.code === 0 ? filtrosApagados(r.stdout) : []
+  filtrosCache.set(cwd, { at: Date.now(), pares })
+  return pares
+}
 
 const ENV = {
   ...process.env,
@@ -53,7 +136,7 @@ export function run(cmd: 'git' | 'gh', args: string[], opts: RunOpts = {}): Prom
     try {
       child = spawn(cmd, args, {
         cwd: opts.cwd,
-        env: ENV,
+        env: opts.env ? { ...ENV, ...opts.env } : ENV,
         windowsHide: true,
         shell: false,
         stdio: ['pipe', 'pipe', 'pipe']
@@ -143,14 +226,15 @@ export function readable(r: RunResult, what: string): string {
 
 /** git con -C <cwd>; tira GitError legible si falla. */
 export async function git(cwd: string, args: string[], opts: Omit<RunOpts, 'cwd'> = {}): Promise<string> {
-  const r = await run('git', ['-C', cwd, '-c', 'core.quotepath=false', ...args], opts)
+  const r = await gitRaw(cwd, args, opts)
   if (r.code !== 0) throw new GitError(readable(r, `git ${args[0]}`))
   return r.stdout
 }
 
 /** git que devuelve el resultado crudo (para comandos donde el código distinto de 0 significa "no"). */
-export function gitRaw(cwd: string, args: string[], opts: Omit<RunOpts, 'cwd'> = {}): Promise<RunResult> {
-  return run('git', ['-C', cwd, '-c', 'core.quotepath=false', ...args], opts)
+export async function gitRaw(cwd: string, args: string[], opts: Omit<RunOpts, 'cwd'> = {}): Promise<RunResult> {
+  const env = gitSafeEnv(args, await filtrosDe(cwd, args))
+  return run('git', ['-C', cwd, '-c', 'core.quotepath=false', ...args], { ...opts, env: { ...env, ...opts.env } })
 }
 
 export function isDir(p: unknown): p is string {

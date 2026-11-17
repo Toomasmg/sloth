@@ -7,6 +7,7 @@ import { isAbsolute } from 'node:path'
 import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
 import { randomUUID } from 'node:crypto'
 import type { NewWorkspaceInput } from '../../shared/types'
+import { initialPromptProblem } from '../../shared/initial-prompt'
 import {
   applyVars,
   BRANCH_VARS,
@@ -125,6 +126,8 @@ export function sanitizeTemplate(raw: unknown, accountIds: Set<string>, prev?: T
   }
   checkVars(namePattern, 'Nombre del espacio')
   checkVars(initialPrompt, 'Primer mensaje')
+  const promptProblem = initialPrompt ? initialPromptProblem(initialPrompt) : undefined
+  if (promptProblem) fail(promptProblem)
   if (r.autoStartClaude !== undefined && typeof r.autoStartClaude !== 'boolean') fail('autoStartClaude inválido.')
   if (r.resume !== undefined && typeof r.resume !== 'boolean') fail('resume inválido.')
   return {
@@ -166,6 +169,8 @@ export function buildInput(t: Template, vars: TemplateVars, accountId: string, n
   if (!name) fail('El nombre del espacio quedó vacío.')
   const initialPrompt = t.initialPrompt ? applyVars(t.initialPrompt, full) : undefined
   if (initialPrompt && initialPrompt.length > 4000) fail('El primer mensaje es demasiado largo.')
+  const appliedProblem = initialPrompt ? initialPromptProblem(initialPrompt) : undefined
+  if (appliedProblem) fail(appliedProblem)
   return {
     n,
     input: {

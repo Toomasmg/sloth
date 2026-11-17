@@ -1,4 +1,5 @@
 /** Cómo se le pasa a cada shell el comando inicial de Claude. Puro: se prueba con Node. */
+import { mightBeSubcommand } from '../shared/initial-prompt'
 
 /** Familia de sintaxis de la shell: cambia cómo se pasa el comando inicial. */
 export type ShellFamily = 'ps' | 'cmd' | 'posix'
@@ -7,15 +8,22 @@ export type ShellFamily = 'ps' | 'cmd' | 'posix'
 const PLAIN = /^[A-Za-z0-9_\-./:=\\]+$/
 // PowerShell cierra un string de comilla simple también con las tipográficas (‘ ’ ‚ ‛): se duplican todas.
 export const psArg = (s: string): string => (PLAIN.test(s) ? s : `'${s.replace(/['\u2018\u2019\u201a\u201b]/g, '$&$&')}'`)
-export const posixArg = (s: string): string => (PLAIN.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`)
+// En bash la barra invertida sin comillas es un escape: una ruta de Windows va siempre entre comillas.
+export const posixArg = (s: string): string => (PLAIN.test(s) && !s.includes('\\') ? s : `'${s.replace(/'/g, `'\\''`)}'`)
 // cmd no tiene escape confiable: se quitan las comillas y los caracteres especiales del prompt.
 export const cmdArg = (s: string): string => (PLAIN.test(s) ? s : `"${s.replace(/["&|<>^%!()]/g, '')}"`)
+
+/** El primer mensaje en una sola línea y sin caracteres de control (un ESC cortaría el pegado). */
+export function promptLine(s: string): string {
+  return s.replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ')
+}
 
 /**
  * argv de Claude con un prompt inicial. El prompt puede venir de un team.json o de un archivo importado:
  * va después de «--» para que uno que empiece con guion (--permission-mode=…, --settings=…) no se lea como opción.
+ * shellLaunch lo saca de ahí: nunca llega escrito a la línea de la shell.
  */
-export const claudeWithPrompt = (prompt: string): string[] => ['claude', '--', prompt.replace(/[\r\n]+/g, ' ')]
+export const claudeWithPrompt = (prompt: string): string[] => ['claude', '--', promptLine(prompt)]
 
 /** Argumentos de la shell: solo la shell, o la shell corriendo el comando de Claude y quedándose abierta. */
 export function shellArgs(family: ShellFamily, claude?: string[]): string[] {
@@ -27,5 +35,88 @@ export function shellArgs(family: ShellFamily, claude?: string[]): string[] {
       return ['/k', claude.map(cmdArg).join(' ')]
     case 'posix':
       return ['--login', '-i', '-c', `${claude.map(posixArg).join(' ')}; exec bash --login -i`]
+  }
+}
+
+export interface ShellLaunch {
+  args: string[]
+  /** Variables que se suman al entorno de la terminal. */
+  env: Record<string, string>
+  /** Texto que hay que pegar en Claude cuando arranque (cuando no se pudo pasar como argumento). */
+  paste?: string
+}
+
+export const PROMPT_VAR = 'SLOTH_PROMPT'
+export const PASTE_START = '\x1b[200~'
+export const PASTE_END = '\x1b[201~'
+
+// En cmd la ruta de claude.exe va sin comillas: node-pty escapa las comillas con \" y cmd no lo entiende.
+const CMD_PLAIN = /^[A-Za-z0-9_\-.:\\@]+$/
+const CMD_NO_CWD = 'NoDefaultCurrentDirectoryInExePath'
+
+/** Contenido de un argumento entre comillas según las reglas de CommandLineToArgvW (las comillas de afuera las pone quien lo usa). */
+export function windowsArgBody(s: string): string {
+  return s.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1')
+}
+
+/** Un script de PowerShell como -EncodedCommand: nunca se vuelve a parsear como línea de comandos. */
+export function psEncoded(script: string): string {
+  return Buffer.from(script, 'utf16le').toString('base64')
+}
+
+/** Valor de SLOTH_PROMPT para PowerShell: ya entre comillas, así el modo Legacy lo pasa sin tocarlo. */
+export function psPromptValue(prompt: string): string {
+  return `"${windowsArgBody(prompt)}"`
+}
+
+export function pastePayload(text: string): string {
+  return PASTE_START + promptLine(text) + PASTE_END
+}
+
+/** Separa el primer mensaje que armó claudeWithPrompt (el único operando después de «--»). */
+function splitPrompt(claude: string[]): { argv: string[]; prompt?: string } {
+  const i = claude.indexOf('--')
+  if (i < 1 || i !== claude.length - 2) return { argv: claude }
+  return { argv: claude.slice(0, i), prompt: promptLine(claude[i + 1]) }
+}
+
+/**
+ * Lo que se le pasa a la shell para correr Claude y quedarse abierta. El primer mensaje va por
+ * SLOTH_PROMPT, que la shell expande como un solo argumento después de `--`. Eso solo es seguro
+ * lanzando claude.exe directo: un claude.cmd pasaría otra vez por cmd. En cmd, sin claude.exe o si el
+ * mensaje podría tomarse como subcomando, se pega en Claude cuando arranca.
+ */
+export function shellLaunch(family: ShellFamily, claude?: string[], claudeExe?: string): ShellLaunch {
+  if (!claude?.length) return { args: shellArgs(family), env: {} }
+  const split = splitPrompt(claude)
+  let exe = claudeExe && /\.exe$/i.test(claudeExe) ? claudeExe : undefined
+  if (family === 'cmd' && exe && !CMD_PLAIN.test(exe)) exe = undefined
+  const argv = exe && split.argv[0] === 'claude' ? [exe, ...split.argv.slice(1)] : split.argv
+  const prompt = split.prompt
+  const viaEnv = prompt !== undefined && exe !== undefined && family !== 'cmd' && !mightBeSubcommand(prompt)
+  const paste = prompt !== undefined && !viaEnv ? prompt : undefined
+  switch (family) {
+    case 'ps': {
+      const head = `& ${argv.map(psArg).join(' ')}`
+      if (!viaEnv) return { args: ['-NoLogo', '-NoExit', '-EncodedCommand', psEncoded(head)], env: {}, paste }
+      // PowerShell 7.3+ en modo Windows vuelve a entrecomillar a su manera; Legacy (el de 5.1) pasa tal
+      // cual un valor que ya viene entre comillas. El bloque { } deja la variable solo para esta línea.
+      const script = `& { $PSNativeCommandArgumentPassing = 'Legacy'; $p = $env:${PROMPT_VAR}; Remove-Item Env:${PROMPT_VAR} -ErrorAction Ignore; ${head} -- $p }`
+      return { args: ['-NoLogo', '-NoExit', '-EncodedCommand', psEncoded(script)], env: { [PROMPT_VAR]: psPromptValue(prompt) } }
+    }
+    case 'cmd': {
+      const line = argv.map((a, i) => (i === 0 && a === exe ? a : cmdArg(a))).join(' ')
+      if (exe) return { args: ['/k', line], env: {}, paste }
+      // Sin ruta, cmd buscaría `claude` primero en la carpeta del repo. Solo esta línea deja de mirar ahí:
+      // en todo el entorno rompería los .bat locales (gradlew, mvnw) que corren los scripts de npm.
+      return { args: ['/k', `set ${CMD_NO_CWD}=1& ${line}& set ${CMD_NO_CWD}=`], env: {}, paste }
+    }
+    case 'posix': {
+      // MSYS convierte en ruta de Windows todo argumento que parezca una ruta POSIX («/ticket X»).
+      const head = `MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' ${argv.map(posixArg).join(' ')}`
+      if (!viaEnv) return { args: ['--login', '-i', '-c', `${head}; exec bash --login -i`], env: {}, paste }
+      const cmd = `p=$${PROMPT_VAR}; unset ${PROMPT_VAR}; ${head} -- "$p"; unset p; exec bash --login -i`
+      return { args: ['--login', '-i', '-c', cmd], env: { [PROMPT_VAR]: prompt } }
+    }
   }
 }
