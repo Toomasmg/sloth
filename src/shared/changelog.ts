@@ -9,6 +9,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.28',
+    date: '2026-11-17',
+    title: 'Más seguro por dentro',
+    items: [
+      'Al actualizar, las terminales abiertas se cierran una sola vez: Sloth y su servicio de terminales ahora se verifican entre sí antes de hablar.',
+      'El aviso de Windows solo ofrece «Permitir» cuando el comando es corto y se ve entero; si no, lo revisás en Sloth.',
+      'Celular: el tema de ntfy tiene que ser largo (botón «Generar otro»), y podés usar tu propio servidor ntfy con token.',
+      '«Claude en el chat» no ofrece «leer siempre» en cuentas que corren sin pedir permisos.',
+      'Las imágenes pegadas se borran a las 24 horas, y el settings.json de cada cuenta se respalda antes de que Sloth lo toque.',
+      'Chat: «Vaciar para mí» en un mensaje directo borra solo tu lado. Los códigos de invitación vencen a los 7 días o a los 50 usos, y quien sale del equipo deja de ver el chat al instante. Hace falta aplicar la migración 0008.'
+    ]
+  },
+  {
     version: '0.6.27',
     date: '2026-11-17',
     title: 'Más seguro con repos ajenos',
