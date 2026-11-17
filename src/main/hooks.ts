@@ -6,7 +6,7 @@ import type { AgentState } from '../shared/types'
 import { HOOK_EVENTS, type HookEventPayload } from '../shared/daemon-protocol'
 import { HOOK_MARKER, HOOK_SCRIPT, LEGACY_HOOK_MARKERS } from '../daemon/hook-script'
 import { envolverStatusline, STATUSLINE_SCRIPT } from './statusline-core'
-import { respaldarUnaVez } from './respaldo'
+import { respaldarAntesDeReemplazar, respaldarUnaVez } from './respaldo'
 
 export type { HookEventPayload }
 
@@ -120,8 +120,15 @@ export function installInto(configDir: string, base?: Record<string, unknown>): 
   settings.hooks = hooks
   // El % real de los límites solo llega en la entrada de la statusline: se envuelve para leerlo (función «celular»).
   if (hayNode()) settings.statusLine = envolverStatusline(settings.statusLine, statuslineScriptPath())
-  respaldarUnaVez(file)
+  const texto = JSON.stringify(settings, null, 2)
+  // Un respaldo que no se pudo hacer no frena la terminal: queda en el log.
+  try {
+    respaldarUnaVez(file)
+    if (base) respaldarAntesDeReemplazar(file, texto)
+  } catch (e) {
+    console.warn(`[hooks] no se pudo respaldar ${file}: ${(e as Error).message}`)
+  }
   const tmp = `${file}.tmp`
-  writeFileSync(tmp, JSON.stringify(settings, null, 2), 'utf8')
+  writeFileSync(tmp, texto, 'utf8')
   renameSync(tmp, file)
 }
