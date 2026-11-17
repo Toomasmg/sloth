@@ -84,3 +84,8 @@ test('windowsArgBody sigue las reglas de CommandLineToArgvW', () => {
   assert.equal(windowsArgBody('fin\\'), 'fin\\\\')
   assert.equal(windowsArgBody('C:\\x\\y'), 'C:\\x\\y')
 })
+
+test('baseEnv saca credenciales y obliga a cmd a no buscar en la carpeta actual', () => {
+  const env = baseEnv({ PATH: 'C:\\x', ANTHROPIC_API_KEY: 'k', SLOTH_TOKEN: 't', nodefaultcurrentdirectoryinexepath: '0', CLAUDE_CODE_X: '1' })
+  assert.deepEqual(env, { PATH: 'C:\\x', TERM_PROGRAM: 'Sloth', NoDefaultCurrentDirectoryInExePath: '1' })
+})

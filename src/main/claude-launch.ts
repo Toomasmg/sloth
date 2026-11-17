@@ -101,6 +101,7 @@ export function baseEnv(source: Record<string, string | undefined> = process.env
       key === 'CLAUDE_CONFIG_DIR' ||
       key === 'ANTHROPIC_API_KEY' ||
       key === 'ANTHROPIC_AUTH_TOKEN' ||
+      key === 'NODEFAULTCURRENTDIRECTORYINEXEPATH' ||
       key.startsWith('ELECTRON_') ||
       key.startsWith('ANTIREA_') ||
       key.startsWith('SLOTH_')
@@ -109,5 +110,7 @@ export function baseEnv(source: Record<string, string | undefined> = process.env
     env[k] = v
   }
   env.TERM_PROGRAM = 'Sloth'
+  // Sin esto, cmd busca `claude` primero en la carpeta del repo: un claude.cmd del repo se ejecutaría solo.
+  env.NoDefaultCurrentDirectoryInExePath = '1'
   return env
 }
