@@ -10,6 +10,9 @@ import { accountStatus, createAccount } from './accounts'
 import { installInto, stateForEvent, writeHookScript, type HookEventPayload } from './hooks'
 import { esFalsoFinal, pendientes, registrar as registrarFondo, venceEn, type Fondo } from './segundo-plano-core'
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
+import { pastePayload } from './claude-launch'
+import { resolveClaudeExe } from './features/tickets/claude-run'
+import { initialPromptProblem } from '../shared/initial-prompt'
 import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
 import { clipboardForPaste } from './clipboard-paste'
 import { createWorktree } from './git'
@@ -111,6 +114,8 @@ app.whenReady().then(async () => {
   const prepareListeners: ((acc: Account) => void)[] = []
   const removeListeners: ((acc: Account) => void)[] = []
   const commandOverrides: ((ws: Workspace, acc: Account) => string | undefined)[] = []
+  /** Primer mensaje que no se pudo pasar como argumento: se pega en el primer SessionStart del espacio. */
+  const pendingPaste = new Map<string, { text: string; until: number }>()
   const safe = (name: string, fn: () => void): void => {
     try {
       fn()
@@ -128,6 +133,7 @@ app.whenReady().then(async () => {
     // Con un shell de fondo corriendo, terminar el turno no es «terminó» ni «te espera»: no se avisa.
     if (esFalsoFinal(p, n)) p = { ...p, enFondo: n }
     for (const l of hookListeners) safe('hook', () => l(p))
+    if (p.event === 'SessionStart') pasteInitialPrompt(p.ws)
     const ws = store.workspace(p.ws)
     if (!ws) return
     const { state, detail } = p.enFondo
@@ -253,21 +259,34 @@ app.whenReady().then(async () => {
     }
   }
 
-  /** argv de Claude para la terminal del espacio (la shell lo quota según su sintaxis en ptys.ts). */
-  function claudeCommand(ws: Workspace, acc: Account): string[] | undefined {
+  function pasteInitialPrompt(wsId: string): void {
+    const s = pendingPaste.get(wsId)
+    if (!s) return
+    pendingPaste.delete(wsId)
+    if (Date.now() > s.until) return
+    setTimeout(() => {
+      void backend().then((b) => {
+        b.write(wsId, pastePayload(s.text))
+        setTimeout(() => b.write(wsId, '\r'), 300)
+      })
+    }, 1500)
+  }
+
+  /** argv de Claude para la terminal del espacio y, aparte, el primer mensaje (ptys.ts decide cómo pasarlo). */
+  function claudeCommand(ws: Workspace, acc: Account): { argv?: string[]; prompt?: string } {
     // Los reemplazos (p. ej. retomar tras mover de cuenta) se aplican aunque el espacio no abra Claude solo.
     for (const o of commandOverrides) {
       let cmd: string | undefined
       safe('override', () => (cmd = o(ws, acc)))
-      if (cmd) return cmd.trim().split(/\s+/)
+      if (cmd) return { argv: cmd.trim().split(/\s+/) }
     }
-    if (!ws.autoStartClaude) return undefined
+    if (!ws.autoStartClaude) return {}
     if (ws.initialPrompt && !ws.initialPromptUsed) {
       store.updateWorkspace(ws.id, { initialPromptUsed: true })
-      return ['claude', ws.initialPrompt.replace(/[\r\n]+/g, ' ')]
+      if (!initialPromptProblem(ws.initialPrompt)) return { argv: ['claude'], prompt: ws.initialPrompt }
     }
-    if (ws.resume !== false && hasPreviousConversation(acc, ws.cwd)) return ['claude', '--continue']
-    return ['claude']
+    if (ws.resume !== false && hasPreviousConversation(acc, ws.cwd)) return { argv: ['claude', '--continue'] }
+    return { argv: ['claude'] }
   }
 
   function specFor(paneId: string, b: TerminalBackend): PtySpec {
@@ -275,7 +294,7 @@ app.whenReady().then(async () => {
       const acc = requireAccount(accountIdFromLoginPane(paneId))
       prepareAccount(acc)
       // Primer arranque de Claude con esta carpeta: pide tema y login.
-      return { cwd: homedir(), env: accountEnv(acc), claude: ['claude'] }
+      return { cwd: homedir(), env: accountEnv(acc), claude: ['claude'], claudeExe: resolveClaudeExe() }
     }
     const ws = store.workspace(paneId)
     if (!ws) throw new Error('Ese espacio ya no existe.')
@@ -288,7 +307,8 @@ app.whenReady().then(async () => {
       SLOTH_HOOK_URL: b.hookUrl,
       SLOTH_TOKEN: b.hookToken
     }
-    return { cwd: ws.cwd, env, claude: claudeCommand(ws, acc) }
+    const cmd = claudeCommand(ws, acc)
+    return { cwd: ws.cwd, env, claude: cmd.argv, prompt: cmd.prompt, claudeExe: cmd.argv ? resolveClaudeExe() : undefined }
   }
 
   ipcMain.handle('state:get', async () => {
@@ -372,6 +392,8 @@ app.whenReady().then(async () => {
     if (input.ticket?.trim() && !ticket) throw new Error('El ticket solo lleva letras, números, guiones, puntos o _ (p. ej. PROJ-123 o 123).')
     const initialPrompt = input.initialPrompt?.trim() || undefined
     if (initialPrompt && initialPrompt.length > 4000) throw new Error('El prompt inicial es demasiado largo.')
+    const promptProblem = initialPrompt ? initialPromptProblem(initialPrompt) : undefined
+    if (promptProblem) throw new Error(promptProblem)
     const branch = input.branch?.trim() || undefined
     const baseBranch = input.baseBranch?.trim() || undefined
     if (baseBranch && !validBranch(baseBranch)) throw new Error('La rama base no es un nombre válido.')
@@ -457,9 +479,10 @@ app.whenReady().then(async () => {
     const b = await backend()
     // Si ya corre (siguió viva en el daemon), solo se reconecta: no se rearma la cuenta ni el comando.
     const shellChoice = currentSettings().terminal.shell
-    const spawn = b.isRunning(id)
+    const { spawn, paste } = b.isRunning(id)
       ? toSpawnSpec({ cwd: homedir(), env: {} }, cols, rows, shellChoice)
       : toSpawnSpec(specFor(id, b), cols, rows, shellChoice)
+    if (paste) pendingPaste.set(id, { text: paste, until: Date.now() + 2 * 60 * 1000 })
     const result = await b.start(id, spawn)
     if (store.workspace(id) && !agents.has(id)) setAgent(id, { state: 'idle', at: Date.now() })
     return result

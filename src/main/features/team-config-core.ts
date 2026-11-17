@@ -9,6 +9,7 @@ import { closeSync, existsSync, openSync, readSync, statSync } from 'node:fs'
 import { isAbsolute, join, normalize, relative, resolve, sep } from 'node:path'
 import { applyVars, SUGGESTED, today, validBranch, varsIn } from './templates-core'
 import { BRANCH_VARS, TEMPLATE_VARS } from '../../shared/templates-shared'
+import { initialPromptProblem } from '../../shared/initial-prompt'
 import { parseChatServerConfig, type ChatServerConfig } from './chat-config'
 
 export const TEAM_FORMAT = 'sloth-team'
@@ -130,6 +131,8 @@ function parseTemplate(raw: unknown, i: number): TeamTemplate {
   const initialPrompt = text(raw.initialPrompt, 4000, `${label}: initialPrompt`)
   checkVars(namePattern, `${label}: namePattern`)
   checkVars(initialPrompt, `${label}: initialPrompt`)
+  const promptProblem = initialPrompt ? initialPromptProblem(initialPrompt) : undefined
+  if (promptProblem) fail(`${label}: ${promptProblem}`)
   let useWorktree: TeamTemplate['useWorktree']
   if (raw.useWorktree !== undefined && raw.useWorktree !== null && raw.useWorktree !== false) {
     if (!isObj(raw.useWorktree)) fail(`${label}: useWorktree tiene que ser { "branchPattern": "…" }.`)

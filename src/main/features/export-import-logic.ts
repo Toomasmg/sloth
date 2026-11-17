@@ -14,6 +14,7 @@
  */
 import type { Account, Workspace } from '../../shared/types'
 import { TEMPLATE_COLOR_KEYS } from '../../shared/templates-shared'
+import { initialPromptProblem } from '../../shared/initial-prompt'
 import { normalizeSupabaseUrl } from './chat-config'
 import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, THEMES, UI_FONT, SHORTCUT_IDS, canonicalCombo, type AccentChoice } from './settings-model'
 import { decryptText, type Encrypted, WRONG_PASSWORD } from './export-crypto'
@@ -345,6 +346,8 @@ export function parseImport(text: string): ParsedImport {
       } else e.ruta = str(w, 'repoPath', where, 1024, true)!
       const initialPrompt = str(w, 'initialPrompt', where, 4000, false)
       const ticket = str(w, 'ticket', where, 40, false)
+      const promptProblem = initialPrompt ? initialPromptProblem(initialPrompt) : undefined
+      if (promptProblem) throw new Error(`${where}: ${promptProblem}`)
       if (initialPrompt) e.initialPrompt = initialPrompt
       if (ticket) e.ticket = ticket
     }
@@ -372,6 +375,8 @@ export function parseImport(text: string): ParsedImport {
     const initialPrompt = str(t, 'initialPrompt', where, 4000, false)
     if (cuenta) e.cuenta = cuenta
     if (namePattern) e.namePattern = namePattern
+    const promptProblem = initialPrompt ? initialPromptProblem(initialPrompt) : undefined
+    if (promptProblem) throw new Error(`${where}: ${promptProblem}`)
     if (initialPrompt) e.initialPrompt = initialPrompt
     if (t.useWorktree !== undefined && t.useWorktree !== null) {
       if (!isObj(t.useWorktree)) throw new Error(`${where}: «useWorktree» inválido.`)
