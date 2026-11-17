@@ -2,12 +2,12 @@ import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
-import { GIT_SAFE_ENV } from './features/git-run'
+import { gitSafeEnv } from './features/git-run'
 
 const run = promisify(execFile)
 
 async function git(cwd: string, args: string[]): Promise<string> {
-  const { stdout } = await run('git', ['-C', cwd, ...args], { windowsHide: true, env: { ...process.env, ...GIT_SAFE_ENV } })
+  const { stdout } = await run('git', ['-C', cwd, ...args], { windowsHide: true, env: { ...process.env, ...gitSafeEnv(args) } })
   return stdout.trim()
 }
 

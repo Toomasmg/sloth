@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { createReadStream, existsSync, openSync, readSync, closeSync, statSync, unlinkSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
-import { git, gitRaw, GitError, GIT_SAFE_ENV, PROTECTED, readable, run, validBranchName } from './git-run'
+import { filtrosDe, git, gitRaw, GitError, gitSafeEnv, PROTECTED, readable, run, validBranchName } from './git-run'
 
 /** Lógica de git/gh de la función «git», sin Electron (se prueba con Node). */
 
@@ -156,7 +156,7 @@ export async function status(cwd: string): Promise<StatusResult> {
   if (truncated) files = files.slice(0, MAX_FILES)
   for (const f of files) f.staged = f.xy[0] !== ' ' && f.xy[0] !== '?' && f.xy[0] !== '!'
   // Las rutas de status son relativas al top del repo; numstat también si se corre desde el top.
-  const num = await gitRaw(info.top, ['diff', info.hasHead ? 'HEAD' : EMPTY_TREE, '--numstat', '-z', '-M', '--no-ext-diff'], {
+  const num = await gitRaw(info.top, ['diff', info.hasHead ? 'HEAD' : EMPTY_TREE, '--numstat', '-z', '-M', '--no-ext-diff', '--no-textconv'], {
     timeoutMs: 20000
   })
   const stats = num.code === 0 ? parseNumstat(num.stdout) : new Map()
@@ -210,12 +210,13 @@ function clip(s: string): string {
 }
 
 /** Lee como mucho `limit` líneas de un proceso, cortándolo cuando ya alcanza. */
-function streamLines(cwd: string, args: string[], limit: number, timeoutMs = 20000): Promise<{ lines: string[]; more: boolean; code: number; stderr: string }> {
+async function streamLines(cwd: string, args: string[], limit: number, timeoutMs = 20000): Promise<{ lines: string[]; more: boolean; code: number; stderr: string }> {
+  const safe = gitSafeEnv(args, await filtrosDe(cwd, args))
   return new Promise((res, rej) => {
     const child = spawn('git', ['-C', cwd, '-c', 'core.quotepath=false', ...args], {
       windowsHide: true,
       shell: false,
-      env: { ...process.env, ...GIT_SAFE_ENV, GIT_TERMINAL_PROMPT: '0', NO_COLOR: '1', LC_ALL: 'C' }
+      env: { ...process.env, ...safe, GIT_TERMINAL_PROMPT: '0', NO_COLOR: '1', LC_ALL: 'C' }
     })
     const lines: string[] = []
     let rest = ''
@@ -340,7 +341,7 @@ export async function diffFile(top: string, file: FileChange, hasHead: boolean, 
     return { kind: 'text', lines: [...header, ...r.lines], truncated: r.more, size }
   }
   const paths = file.orig ? [file.orig, file.path] : [file.path]
-  const r = await streamLines(top, ['diff', hasHead ? 'HEAD' : EMPTY_TREE, '-M', '--no-color', '--no-ext-diff', '--', ...paths], limit + 6)
+  const r = await streamLines(top, ['diff', hasHead ? 'HEAD' : EMPTY_TREE, '-M', '--no-color', '--no-ext-diff', '--no-textconv', '--', ...paths], limit + 6)
   if (r.code !== 0 && !r.more) throw new GitError(`git diff falló: ${r.stderr.trim().split(/\r?\n/)[0] ?? ''}`)
   if (r.lines.some((l) => /^Binary files .* differ$/.test(l) || l === 'GIT binary patch'))
     return { kind: 'binary', lines: [], truncated: false, size }
@@ -424,7 +425,7 @@ export async function commitStaged(cwd: string, message: string): Promise<string
   if (!info.isRepo || !info.top) throw new GitError('La carpeta no es un repositorio git.')
   if (info.branch === null) throw new GitError('HEAD está separado (detached): creá una rama antes de commitear.')
   if (isProtected(info.branch)) throw new GitError(`No se commitea directo en ${info.branch}. Creá una rama nueva.`)
-  const staged = await git(info.top, ['diff', '--cached', '--name-only', '-z'], { timeoutMs: 20000 })
+  const staged = await git(info.top, ['diff', '--cached', '--name-only', '-z', '--no-ext-diff', '--no-textconv'], { timeoutMs: 20000 })
   if (!staged.replace(/\0/g, '').trim()) throw new GitError('No hay archivos preparados. Marcá al menos uno para confirmarlo.')
   const r = await gitRaw(info.top, ['commit', '-F', '-'], { timeoutMs: 120000, input: message })
   if (r.code !== 0) throw new GitError(readable(r, 'git commit'))
@@ -545,7 +546,7 @@ export interface CommitFile {
 
 export async function commitFiles(cwd: string, sha: string): Promise<CommitFile[]> {
   if (!SHA.test(sha)) throw new GitError('Commit inválido.')
-  const out = await git(cwd, ['show', '--numstat', '-z', '--format=', '-M', '--no-ext-diff', sha], { timeoutMs: 20000 })
+  const out = await git(cwd, ['show', '--numstat', '-z', '--format=', '-M', '--no-ext-diff', '--no-textconv', sha], { timeoutMs: 20000 })
   return [...parseNumstat(out)].map(([path, s]) => ({ path, add: s.add, del: s.del, binary: s.binary }))
 }
 
@@ -653,7 +654,7 @@ export async function findStash(cwd: string): Promise<StashEntry | null> {
     const [sha, ref, subject = ''] = line.split('\t')
     if (!sha || !subject.includes(STASH_TAG)) continue
     const m = /sloth-stash\|([^|]*)\|/.exec(subject)
-    const tracked = await git(cwd, ['stash', 'show', '--name-only', sha], { timeoutMs: 15000 })
+    const tracked = await git(cwd, ['stash', 'show', '--name-only', '--no-ext-diff', '--no-textconv', sha], { timeoutMs: 15000 })
     let untracked = 0
     if (await hasRef(cwd, `${sha}^3`)) {
       untracked = (await git(cwd, ['ls-tree', '-r', '--name-only', `${sha}^3`], { timeoutMs: 15000 })).split('\n').filter(Boolean).length
