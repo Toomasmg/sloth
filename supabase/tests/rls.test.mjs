@@ -324,8 +324,24 @@ if (withAbuso) {
     await tick()
   }
   ok(true, 'mark_read 40 veces seguidas no tira')
-  const reads = (await db.query("select count(*)::int as n from realtime.messages where id > $1 and event = 'read' and topic = $2", [maxId, `thread:${dm}`])).rows[0].n
-  ok(reads > 0 && reads <= 30, `«visto» publicado ${reads} veces (≤ 30)`)
+  const readsIn = async (from) =>
+    (await db.query("select count(*)::int as n from realtime.messages where id > $1 and event = 'read' and topic = $2", [from, `thread:${dm}`])).rows[0].n
+  ok((await readsIn(maxId)) === 40, '40 «visto» en un minuto se publican todos')
+  const lastReadA = async () => (await db.query('select last_read_a, last_read_b, user_a from public.dm_threads where id=$1', [dm])).rows[0]
+  await db.exec("update public.chat_rate set n = 120 where kind = 'read'")
+  const maxId2 = (await db.query('select coalesce(max(id), 0) as m from realtime.messages')).rows[0].m
+  const r0 = await lastReadA()
+  const mine = (r) => (r.user_a === U.ana ? r.last_read_a : r.last_read_b).getTime()
+  await tick()
+  await as(U.ana, 'select public.mark_read(null, $1)', [dm])
+  ok(mine(await lastReadA()) > mine(r0), 'pasado el tope de «visto», mark_read igual guarda la marca')
+  ok((await readsIn(maxId2)) === 0, 'pasado el tope de «visto», no se publica')
+  await db.exec("update public.chat_rate set n = 1000 where kind = 'read'")
+  const tr0 = (await db.query('select last_read_at from public.team_members where team_id=$1 and user_id=$2', [team, U.ana])).rows[0].last_read_at.getTime()
+  await tick()
+  await as(U.ana, 'select public.mark_read($1, null)', [team])
+  const tr1 = (await db.query('select last_read_at from public.team_members where team_id=$1 and user_id=$2', [team, U.ana])).rows[0].last_read_at.getTime()
+  ok(tr1 > tr0, 'mark_read de un equipo no tiene tope')
 
   await reset()
   for (let i = 1; i <= 50; i++) {
@@ -381,12 +397,31 @@ if (withAbuso) {
   ok((await codeRow()).uses_left === 50, 'expulsar también repone los usos')
 
   await reset()
+  const bOld = (await send(U.bruno, 'thread_id', dm, 'viejo de bruno'))[0].id
+  const bOld2 = (await send(U.bruno, 'thread_id', dm, 'otro viejo de bruno'))[0].id
+  const aOld = (await send(U.ana, 'thread_id', dm, 'viejo de ana'))[0].id
+  await addR(U.bruno, aOld)
   await db.query('delete from public.team_members where user_id=$1 and team_id <> $2', [U.bruno, team])
   await as(U.ana, 'select public.remove_member($1, $2)', [team, U.bruno])
   const removed = (await db.query("select payload from realtime.messages where topic=$1 and event='member_removed' order by id desc limit 1", [tTeam])).rows[0]
   ok(removed?.payload?.user_id === U.bruno && removed?.payload?.team_id === team, 'remove_member avisa member_removed en el tópico del equipo')
   await throws(send(U.bruno, 'thread_id', dm), 'sin equipo en común no se escribe en el DM')
   ok((await as(U.bruno, 'select * from public.messages where thread_id=$1', [dm])).length > 0, 'pero el DM se sigue leyendo')
+  await throws(as(U.bruno, 'update public.messages set body=$2 where id=$1', [bOld, 'acoso']), 'sin equipo en común no se edita un mensaje del DM')
+  await throws(as(U.ana, 'update public.messages set body=$2 where id=$1', [aOld, 'cambio']), 'tampoco del otro lado')
+  ok((await db.query('select body from public.messages where id=$1', [bOld])).rows[0].body === 'viejo de bruno', 'el texto no cambió')
+  await as(U.bruno, 'update public.messages set deleted_at=now() where id=$1', [bOld2])
+  ok((await db.query('select deleted_at from public.messages where id=$1', [bOld2])).rows[0].deleted_at !== null, 'sin equipo en común sí se borra un mensaje propio')
+  await throws(as(U.bruno, "insert into public.message_reactions(message_id, emoji) values ($1, '😀')", [aOld]), 'sin equipo en común no se reacciona en el DM')
+  await delR(U.bruno, aOld)
+  ok((await db.query('select * from public.message_reactions where message_id=$1', [aOld])).rows.length === 0, 'sin equipo en común sí se saca una reacción propia')
+  const maxT = (await db.query('select coalesce(max(id), 0) as m from realtime.messages')).rows[0].m
+  await db.query('delete from public.chat_typing_last where user_id=$1', [U.bruno])
+  await as(U.bruno, 'select public.chat_typing(null, $1)', [dm])
+  const typed = (await db.query("select count(*)::int as n from realtime.messages where id > $1 and event = 'typing'", [maxT])).rows[0].n
+  ok(typed === 0, 'sin equipo en común «escribiendo…» no se publica ni tira')
+  await as(U.ana, 'select public.chat_typing($1, null)', [team])
+  ok((await db.query("select count(*)::int as n from realtime.messages where id > $1 and event = 'typing'", [maxT])).rows[0].n === 1, '«escribiendo…» en el equipo sigue andando')
 
   const rows = await as(U.ana, 'select topic from realtime.messages', [], tTeam)
   ok(rows.length > 0 && rows.every((r) => r.topic === tTeam), 'con el canal del equipo solo se leen filas de ese tópico')

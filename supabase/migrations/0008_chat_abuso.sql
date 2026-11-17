@@ -1,21 +1,26 @@
 -- =====================================================================
 -- Sloth · Chat del equipo — 0008: abusos
 -- Correr en el SQL Editor DESPUÉS de 0001–0007. Es idempotente. Se aplica a mano.
+-- Si volvés a correr cualquiera de 0001–0007, corré esta otra vez después: aquellas pisan funciones
+-- y políticas de esta, y vuelven los topes viejos, el vaciado de DM para los dos y los DMs sin equipo.
 --
 -- Qué cierra:
 --  * Los topes de mensajes, ediciones y reacciones contaban filas: vaciar o borrar los reiniciaba.
---    Ahora van en chat_rate, que nadie lee ni escribe por la API. También hay topes para «visto»,
---    vaciar, borrado automático, invitaciones, entrar a equipos y abrir DMs nuevos.
+--    Ahora van en chat_rate, que nadie lee ni escribe por la API. También hay topes para el aviso de
+--    «visto», vaciar, borrado automático, invitaciones y abrir DMs nuevos. Entrar a un equipo tiene
+--    tope para los intentos que entran; los códigos falsos no lo gastan (el código tiene 64 bits).
 --  * Vaciar un DM borraba la conversación del otro. Ahora la oculta solo para quien vacía; las filas
 --    se borran de verdad cuando vaciaron los dos (hasta la marca más vieja).
---  * Un DM con alguien que ya no comparte equipo se puede leer, pero no escribir.
+--  * Un DM con alguien que ya no comparte equipo se puede leer, pero no escribir, editar, reaccionar
+--    ni avisar «escribiendo…».
 --  * Las invitaciones vencen a los 7 días (tope de 50 pendientes por equipo). El código vence a los
 --    7 días y sirve para 50 altas; regenerarlo o expulsar a alguien lo repone.
 --  * El SELECT de Broadcast queda atado al tópico del canal, y al expulsar a alguien la base avisa
 --    'member_removed' en el tópico del equipo para que su app cierre el canal.
 --
 -- Cliente viejo:
---  * Vaciar un DM lo vacía solo para quien lo hace y ya no deja el aviso «se vació».
+--  * Vaciar un DM lo vacía solo para quien lo hace y ya no deja el aviso «se vació», aunque su botón
+--    diga «Vaciar para todos».
 --  * Las invitaciones y los códigos vencidos fallan con un mensaje que dice qué pasó.
 --  * El evento 'member_removed' lo ignora: el expulsado sigue con el canal abierto hasta reconectar.
 --
@@ -63,10 +68,18 @@ revoke execute on function public.chat_rate_hit(text, integer, integer) from pub
 -- Mensajes
 -- ---------------------------------------------------------------------
 
+-- Falso si el otro participante del DM ya no comparte equipo con quien llama. Sin usuario o sin ser
+-- participante da verdadero: eso lo frenan la RLS y los otros chequeos.
+create or replace function public.dm_writable(p_thread uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select coalesce((select public.shares_team(case when t.user_a = auth.uid() then t.user_b else t.user_a end)
+                     from public.dm_threads t
+                     where t.id = p_thread and auth.uid() in (t.user_a, t.user_b)), true)
+$$;
+revoke execute on function public.dm_writable(uuid) from public, anon, authenticated;
+
 create or replace function public.guard_message() returns trigger
 language plpgsql security definer set search_path = '' as $$
-declare
-  v_other uuid;
 begin
   new.created_at := now();
   new.author_id := auth.uid();
@@ -75,13 +88,8 @@ begin
   if not public.chat_rate_hit('msg', 30, 60) or not public.chat_rate_hit('msg_h', 500, 3600) then
     raise exception 'Demasiados mensajes seguidos: esperá un minuto.';
   end if;
-  if new.thread_id is not null and auth.uid() is not null then
-    select case when t.user_a = auth.uid() then t.user_b else t.user_a end into v_other
-      from public.dm_threads t
-      where t.id = new.thread_id and auth.uid() in (t.user_a, t.user_b);
-    if v_other is not null and not public.shares_team(v_other) then
-      raise exception 'Ya no comparten equipo: no se pueden mandar mensajes directos.';
-    end if;
+  if new.thread_id is not null and not public.dm_writable(new.thread_id) then
+    raise exception 'Ya no comparten equipo: no se pueden mandar mensajes directos.';
   end if;
   if new.reply_to is not null and not exists (
     select 1 from public.messages r
@@ -109,6 +117,11 @@ begin
   end if;
   if old.kind <> 'text' then
     raise exception 'Los avisos de la conversación no se editan.';
+  end if;
+  -- Borrar un mensaje propio queda libre; cambiarle el texto le llega al otro como uno nuevo.
+  if old.thread_id is not null and new.deleted_at is null and new.body is distinct from old.body
+     and not public.dm_writable(old.thread_id) then
+    raise exception 'Ya no comparten equipo: no se pueden editar mensajes directos.';
   end if;
   if not public.chat_rate_hit('edit', 30, 60) then
     raise exception 'Demasiadas ediciones seguidas: esperá un minuto.';
@@ -143,6 +156,10 @@ language plpgsql security definer set search_path = '' as $$
 begin
   new.user_id := auth.uid();
   new.created_at := now();
+  if exists (select 1 from public.messages m
+             where m.id = new.message_id and m.thread_id is not null and not public.dm_writable(m.thread_id)) then
+    raise exception 'Ya no comparten equipo: no se puede reaccionar en mensajes directos.';
+  end if;
   if not public.chat_rate_hit('react', 60, 60) then
     raise exception 'Demasiadas reacciones seguidas: esperá un minuto.';
   end if;
@@ -169,20 +186,83 @@ create trigger reaction_guard_delete before delete on public.message_reactions
 -- «Visto», DMs nuevos y borrado automático
 -- ---------------------------------------------------------------------
 
--- Pasado el tope no falla: la app lo llama solo y no tiene nada que mostrar.
+-- La marca se guarda siempre: si no, vuelven los no leídos de lo que ya se leyó. El tope es solo para el
+-- aviso «visto» que le llega al otro del DM, y pasado el tope no falla porque la app lo llama sola.
 create or replace function public.mark_read(p_team uuid default null, p_thread uuid default null) returns void
 language plpgsql security definer set search_path = '' as $$
 begin
   if auth.uid() is null then raise exception 'Iniciá sesión.'; end if;
-  if not public.chat_rate_hit('read', 30, 60) then
-    return;
-  end if;
   if p_team is not null then
     update public.team_members set last_read_at = now() where team_id = p_team and user_id = auth.uid();
   end if;
   if p_thread is not null then
+    if not public.chat_rate_hit('read', 120, 60) then
+      perform set_config('sloth.read_quiet', 'on', true);
+    end if;
     update public.dm_threads set last_read_a = now() where id = p_thread and user_a = auth.uid();
     update public.dm_threads set last_read_b = now() where id = p_thread and user_b = auth.uid();
+    perform set_config('sloth.read_quiet', '', true);
+  end if;
+end
+$$;
+
+-- Igual que en 0004, salvo que no avisa cuando mark_read pasó su tope.
+create or replace function public.broadcast_read() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if current_setting('sloth.read_quiet', true) = 'on' then
+    return null;
+  end if;
+  begin
+    if new.last_read_a is distinct from old.last_read_a then
+      perform realtime.send(
+        jsonb_build_object('user_id', new.user_a, 'at', new.last_read_a),
+        'read', 'thread:' || new.id::text, true);
+    end if;
+    if new.last_read_b is distinct from old.last_read_b then
+      perform realtime.send(
+        jsonb_build_object('user_id', new.user_b, 'at', new.last_read_b),
+        'read', 'thread:' || new.id::text, true);
+    end if;
+  exception when others then
+    raise warning 'sloth: broadcast_read falló (%)', sqlstate;
+  end;
+  return null;
+end
+$$;
+
+-- Igual que en 0004, salvo que un DM sin equipo en común no recibe «escribiendo…». Sin error: la app lo llama sola.
+create or replace function public.chat_typing(p_team uuid default null, p_thread uuid default null) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Iniciá sesión.';
+  end if;
+  if num_nonnulls(p_team, p_thread) <> 1 then
+    raise exception 'Conversación inválida.';
+  end if;
+  if p_team is not null then
+    if not public.is_team_member(p_team) then
+      raise exception 'No sos miembro de ese equipo.';
+    end if;
+  else
+    if not public.is_thread_participant(p_thread) then
+      raise exception 'No participás de esa conversación.';
+    end if;
+    if not public.dm_writable(p_thread) then
+      return;
+    end if;
+  end if;
+  insert into public.chat_typing_last (user_id, at) values (auth.uid(), now())
+    on conflict (user_id) do update set at = excluded.at
+    where public.chat_typing_last.at <= now() - interval '2 seconds';
+  if not found then
+    return;
+  end if;
+  if p_team is not null then
+    perform realtime.send(jsonb_build_object('user_id', auth.uid()), 'typing', 'team:' || p_team::text, true);
+  else
+    perform realtime.send(jsonb_build_object('user_id', auth.uid()), 'typing', 'thread:' || p_thread::text, true);
   end if;
 end
 $$;
@@ -489,6 +569,7 @@ revoke execute on function
   public.guard_message_update(),
   public.guard_reaction(),
   public.guard_reaction_delete(),
+  public.broadcast_read(),
   public.guard_invite(),
   public.reset_invite_code(),
   public.broadcast_member_removed()
