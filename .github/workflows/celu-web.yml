@@ -7,6 +7,7 @@ on:
     paths:
       - 'src/celu-web/**'
       - 'src/main/features/celular-pagina.ts'
+      - 'src/main/features/celular-sello-web.ts'
       - 'src/shared/celu-remoto.ts'
       - 'scripts/build-celu-web.mjs'
       - 'package-lock.json'
