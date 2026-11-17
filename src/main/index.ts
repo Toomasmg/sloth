@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, net, protocol, session, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, net, powerMonitor, protocol, session, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import { pathToFileURL } from 'node:url'
 import { normalize, sep } from 'node:path'
 import { existsSync, readdirSync, statSync } from 'node:fs'
@@ -12,6 +12,10 @@ import { esFalsoFinal, pendientes, registrar as registrarFondo, venceEn, type Fo
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
 import { claudeWithPrompt, pastePayload } from './shell-args'
 import { avisar } from './avisos'
+import { iniciarLogger, logger } from './logger-global'
+import { marcarCrashPrevio } from './diag/estado'
+import { cerrarSesion, iniciarSesion } from './sesion-marcador'
+import { textoSeguro } from './diag/texto-seguro'
 import { resolveClaudeExe } from './features/tickets/claude-run'
 import { initialPromptProblem } from '../shared/initial-prompt'
 import { nextAgentState, type AgentInput } from './agent-machine'
@@ -68,12 +72,62 @@ function moveAgent(wsId: string, input: AgentInput, extra: { detail?: string; at
   return status
 }
 
+const textoLog = (a: unknown[]): string => a.map((x) => (typeof x === 'string' ? x : x instanceof Error ? x.message : textoSeguro(x))).join(' ')
+
 app.setName('Sloth')
 // Sin el AUMID del acceso directo, Windows descarta las notificaciones del sistema en silencio.
 if (process.platform === 'win32') app.setAppUserModelId(APP_ID)
 // Instancia de prueba al lado de la instalada: otra carpeta de datos = otro lock, otro daemon, otras cuentas.
 if (process.env.SLOTH_USER_DATA) app.setPath('userData', process.env.SLOTH_USER_DATA)
-if (!app.requestSingleInstanceLock()) app.quit()
+const instanciaUnica = app.requestSingleInstanceLock()
+if (!instanciaUnica) app.quit()
+
+// Antes de whenReady para que queden registrados también los errores de arranque. La segunda instancia
+// (la que cierra enseguida) no toca el log ni el marcador: son de la primera.
+const logsDir = join(app.getPath('userData'), 'logs')
+let inicioSesion = Date.now()
+if (instanciaUnica) {
+  iniciarLogger(logsDir)
+  const sesion = iniciarSesion(logsDir)
+  inicioSesion = sesion.inicio
+  marcarCrashPrevio(sesion.crashPrevio)
+  logger.info('main', `Sloth ${app.getVersion()} arrancó${sesion.crashPrevio ? ' (la sesión anterior no cerró limpia)' : ''}`)
+}
+
+let errorMostrado = false
+// Un throw dentro de estos handlers mata el proceso sin diálogo, peor que no haber registrado nada.
+function sinLanzar(fn: () => void): void {
+  try {
+    fn()
+  } catch (e) {
+    console.error('[diagnóstico] falló el registro de un error:', e)
+  }
+}
+process.on('uncaughtException', (e) =>
+  sinLanzar(() => {
+    logger.error('main', e)
+    if (errorMostrado) return
+    errorMostrado = true
+    dialog.showErrorBox('Sloth tuvo un error inesperado', 'Quedó registrado en el log. Podés copiar el diagnóstico desde la paleta (Ctrl+K).')
+  })
+)
+process.on('unhandledRejection', (e) =>
+  sinLanzar(() => {
+    // Con un listener propio Node deja de imprimir el rechazo: en desarrollo lo seguimos viendo en la consola.
+    if (!app.isPackaged) console.error(e)
+    logger.error('main', e)
+  })
+)
+app.on('render-process-gone', (_e, _wc, d) =>
+  sinLanzar(() => {
+    if (d.reason !== 'clean-exit') logger.error('renderer', `se cayó el proceso de la ventana (${d.reason}, código ${d.exitCode})`)
+  })
+)
+app.on('child-process-gone', (_e, d) =>
+  sinLanzar(() => {
+    if (d.reason !== 'clean-exit') logger.error('proceso-hijo', `se cayó ${d.type}${d.name ? ` ${d.name}` : ''} (${d.reason}, código ${d.exitCode})`)
+  })
+)
 
 // Bajo consumo: apagamos lo que Chromium trae y Sloth no usa (renderer de repuesto precargado,
 // media, traducción, autocompletado). Menos procesos y menos RAM en PCs modestas.
@@ -140,6 +194,7 @@ app.whenReady().then(async () => {
       fn()
     } catch (e) {
       console.error(`[función] ${name}:`, e)
+      logger.error(name, e)
     }
   }
   const uiCommand = (cmd: UiCommand): void => send('ui:command', cmd)
@@ -200,7 +255,10 @@ app.whenReady().then(async () => {
         appVersion: app.getVersion(),
         resourcesDir: app.isPackaged ? process.resourcesPath : undefined,
         projectRoot: app.isPackaged ? undefined : app.getAppPath(),
-        log: (...a: unknown[]) => console.log('[terminales]', ...a)
+        log: (...a: unknown[]) => {
+          console.log('[terminales]', ...a)
+          logger.info('terminales', textoLog(a))
+        }
       }).then(async (b) => {
         term = b
         b.on('data', (id: string, chunks: PtyChunk[]) => {
@@ -219,6 +277,7 @@ app.whenReady().then(async () => {
         b.on('disconnect', () => {
           // Se perdió el daemon y no se pudo relanzar: el próximo pedido crea otro backend.
           console.warn('[terminales] desconectado del daemon')
+          logger.aviso('terminales', 'desconectado del daemon')
           if (term === b) {
             term = undefined
             termPromise = undefined
@@ -263,7 +322,11 @@ app.whenReady().then(async () => {
   function prepareAccount(acc: Account): void {
     installInto(acc.configDir, baseSettingsFor(acc))
     const report = syncSharedSetup(acc, !accountBusy(acc.id))
-    if (report.skipped.length) console.warn(`[setup] ${acc.label}:`, report.skipped.join('; '))
+    if (report.skipped.length) {
+      console.warn(`[setup] ${acc.label}:`, report.skipped.join('; '))
+      // Sin el label: la gente le pone su nombre y el diagnóstico se comparte.
+      logger.aviso('setup', `cuenta ${store.accounts.indexOf(acc) + 1}: ${report.skipped.join('; ')}`)
+    }
     for (const l of prepareListeners) safe('preparar cuenta', () => l(acc))
   }
 
@@ -588,12 +651,16 @@ app.whenReady().then(async () => {
         uiCommand({ type: 'restart-pane', id })
       },
       addClaudeCommandOverride: (fn) => commandOverrides.push(fn),
-      log: (...a) => console.log(`[${f.name}]`, ...a)
+      log: (...a) => {
+        console.log(`[${f.name}]`, ...a)
+        logger.info(f.name, textoLog(a))
+      }
     }
     try {
       await f.register(ctx)
     } catch (e) {
       console.error(`[función ${f.name}] no se pudo registrar:`, e)
+      logger.error(f.name, e)
     }
   }
 
@@ -603,8 +670,16 @@ app.whenReady().then(async () => {
     for (const f of FEATURES) safe(f.name, () => f.dispose?.())
     b?.dispose()
   }
+  // Se marca limpio apenas se decide cerrar: el instalador del updater o el apagado de Windows pueden matar
+  // el proceso durante la espera del shutdown, y eso no es un cierre inesperado.
+  const marcarCierreLimpio = (): void => {
+    if (instanciaUnica) cerrarSesion(logsDir, inicioSesion)
+  }
+  // Windows no emite before-quit al apagar, reiniciar o cerrar sesión: solo estos dos avisos.
+  powerMonitor.on('shutdown', marcarCierreLimpio)
   app.on('before-quit', (e) => {
     if (quitPrepared) return
+    marcarCierreLimpio()
     const b = term
     // En proceso no hay daemon que las conserve: se espera el cierre ordenado igual (ver daemon/shutdown.ts).
     if (b && (!currentSettings().keepTerminalsAlive || b.info().mode === 'inprocess')) {
@@ -689,12 +764,14 @@ function createWindow(onShown?: () => void): void {
   })
   trackWindowState(win)
 
+  win.on('session-end', () => cerrarSesion(logsDir, inicioSesion))
   win.on('closed', () => (win = null))
   for (const cb of windowListeners) {
     try {
       cb(win)
     } catch (e) {
       console.error('[función] onWindow:', e)
+      logger.error('onWindow', e)
     }
   }
 }

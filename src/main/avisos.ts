@@ -1,4 +1,5 @@
 import { basename } from 'node:path'
+import { logger } from './logger-global'
 
 let pendientes: string[] = []
 const oyentes = new Set<() => void>()
@@ -6,6 +7,7 @@ const oyentes = new Set<() => void>()
 export function avisar(texto: string): void {
   if (pendientes.includes(texto)) return
   pendientes.push(texto)
+  logger.aviso('avisos', texto)
   for (const f of oyentes) f()
 }
 
