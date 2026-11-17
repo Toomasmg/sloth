@@ -994,7 +994,7 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
       <div className="f-set-card f-set-row">
         <div className="f-set-row-text">
           <span className="f-set-row-title">Sesión de GitHub</span>
-          <span className="f-set-hint">{signedIn ? `Conectado como ${auth.me.login}` : signingIn ? 'Esperando la respuesta del navegador' : 'No conectado · necesario para el chat'}</span>
+          <span className="f-set-hint">{signedIn ? `Conectado como ${auth.me.login}` : auth?.status === 'signingIn' ? (auth.aviso ?? 'Esperando la respuesta del navegador') : 'No conectado · necesario para el chat'}</span>
         </div>
         <div className="f-set-row-ctl">
           {signingIn && (

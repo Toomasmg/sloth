@@ -30,6 +30,8 @@ export interface SessionStore {
   readonly persistent: boolean
   /** Olvida la sesión en memoria y borra el archivo. */
   clear(): void
+  /** Copia los code_verifier de PKCE y devuelve con qué volver a ponerlos (auth-js los borra tras cada canje). */
+  preservarVerificador(): () => void
 }
 
 const MAX_FILE_BYTES = 256 * 1024
@@ -101,6 +103,18 @@ export function createSessionStore(opts: { file: string; crypto: CryptoLike; log
     clear: () => {
       map.clear()
       removeFile()
+    },
+    preservarVerificador: () => {
+      const copia = [...map].filter(([k]) => k.endsWith('-code-verifier'))
+      return () => {
+        let cambio = false
+        for (const [k, v] of copia) {
+          if (map.get(k) === v) continue
+          map.set(k, v)
+          cambio = true
+        }
+        if (cambio) persist()
+      }
     }
   }
 }
