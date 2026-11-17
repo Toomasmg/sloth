@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   convOfTopic,
   diffTopics,
+  memberRemovedFromBroadcast,
   reactionFromBroadcast,
   readFromBroadcast,
   rowFromBroadcast,
@@ -151,4 +152,21 @@ test('Throttle: repite recién a los 3 s y por clave', () => {
   assert.equal(th.ok('a', 3999), false)
   assert.equal(th.ok('b', 3999), true)
   assert.equal(th.ok('a', 4000), true)
+})
+
+test('la marca vía Claude llega por Broadcast solo si es exacta', () => {
+  const team = { kind: 'team' as const, id: T }
+  assert.equal(rowFromBroadcast({ ...teamRow, via: 'claude' }, team)?.via, 'claude')
+  for (const via of ['x', undefined, null, 1]) {
+    const r = rowFromBroadcast({ ...teamRow, via }, team)
+    assert.ok(r)
+    assert.equal('via' in r, false)
+  }
+})
+
+test('member_removed: solo del mismo equipo y con user_id válido', () => {
+  assert.deepEqual(memberRemovedFromBroadcast({ team_id: T, user_id: D }, T), { userId: D })
+  assert.equal(memberRemovedFromBroadcast({ team_id: D, user_id: D }, T), undefined)
+  assert.equal(memberRemovedFromBroadcast({ team_id: T, user_id: 'x' }, T), undefined)
+  assert.equal(memberRemovedFromBroadcast('x', T), undefined)
 })

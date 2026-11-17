@@ -70,6 +70,8 @@ import {
   BROADCAST_EVENT,
   convOfTopic,
   diffTopics,
+  MEMBER_REMOVED_EVENT,
+  memberRemovedFromBroadcast,
   reactionFromBroadcast,
   READ_EVENT,
   REACTION_EVENT,
@@ -202,6 +204,8 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
   let broadcastWarned = false
   let extras = false
   let viaCol = false
+/** 0008: vencimiento y usos del código de invitación. */
+let codeLimits = false
   const typingThrottle = new Throttle()
   let purgeTimer: ReturnType<typeof setInterval> | undefined
 
@@ -282,6 +286,24 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
   function checkVia(c: SupabaseClient, g: number): Promise<void> {
     return detectVia(c).catch((e: unknown) => {
       if (g === gen) ctx.log('chat: no se pudo comprobar la actualización 0005:', msgOf(e))
+    })
+  }
+
+  async function detectCodeLimits(c: SupabaseClient): Promise<void> {
+    const r = await c.from('team_invite_codes').select('expires_at, uses_left').limit(1)
+    if (r.error && !MISSING_SCHEMA.has(r.error.code ?? '')) {
+      ctx.log('chat: no se pudo comprobar la actualización 0008:', r.error.code ?? '?')
+      return
+    }
+    const next = !r.error
+    if (next === codeLimits) return
+    codeLimits = next
+    onChange()
+  }
+
+  function checkCodeLimits(c: SupabaseClient, g: number): Promise<void> {
+    return detectCodeLimits(c).catch((e: unknown) => {
+      if (g === gen) ctx.log('chat: no se pudo comprobar la actualización 0008:', msgOf(e))
     })
   }
 
@@ -399,7 +421,9 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
         ? c.from('teams').select(extras ? 'id, name, description, photo_path, retention_hours' : 'id, name, description, photo_path').in('id', allTeamIds)
         : none,
       memberTeamIds.length ? c.from('team_members').select('team_id').in('team_id', memberTeamIds) : none,
-      adminTeamIds.length ? c.from('team_invite_codes').select('team_id, code').in('team_id', adminTeamIds) : none
+      adminTeamIds.length
+        ? c.from('team_invite_codes').select(codeLimits ? 'team_id, code, expires_at, uses_left' : 'team_id, code').in('team_id', adminTeamIds)
+        : none
     ])
     check(teamsRes, 'No se pudieron leer los equipos.')
     check(countRes, 'No se pudieron leer los miembros.')
@@ -413,8 +437,17 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       counts.set(id, (counts.get(id) ?? 0) + 1)
     }
     const codes = new Map<string, string>()
-    for (const r of (codesRes.data ?? []) as Array<{ team_id: unknown; code: unknown }>) {
-      if (typeof r.code === 'string') codes.set(s(r.team_id), r.code)
+    const codeExpires = new Map<string, number>()
+    const codeUses = new Map<string, number>()
+    for (const r of (codesRes.data ?? []) as Array<{ team_id: unknown; code: unknown; expires_at?: unknown; uses_left?: unknown }>) {
+      if (typeof r.code !== 'string') continue
+      const id = s(r.team_id)
+      codes.set(id, r.code)
+      if (typeof r.expires_at === 'string') {
+        const ms = Date.parse(r.expires_at)
+        if (!Number.isNaN(ms)) codeExpires.set(id, ms)
+      }
+      if (typeof r.uses_left === 'number') codeUses.set(id, r.uses_left)
     }
     const unread = unreadIndex(unr.data ?? [])
 
@@ -434,7 +467,9 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
         memberCount: counts.get(id) ?? 0,
         unread: u?.unread ?? 0,
         lastMessageAt: u?.lastMessageAt,
-        inviteCode: codes.get(id)
+        inviteCode: codes.get(id),
+        inviteExpiresAt: codeExpires.get(id),
+        inviteUsesLeft: codeUses.get(id)
       })
       if (!t) continue
       teams.push(t)
@@ -540,7 +575,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       if (subscribedOnce) {
         failedTopics.clear()
         const cl = core.client() as SupabaseClient | null
-        const check0 = cl ? Promise.all([checkExtras(cl, g), checkVia(cl, g)]) : Promise.resolve()
+        const check0 = cl ? Promise.all([checkExtras(cl, g), checkVia(cl, g), checkCodeLimits(cl, g)]) : Promise.resolve()
         void check0.then(() => (g === gen ? refreshLists(true) : undefined))
       }
       subscribedOnce = true
@@ -650,6 +685,19 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     ctx.emit('read', { conv, userId: ev.userId, at: ev.at } satisfies ChatReadEvent)
   }
 
+  /** Realtime no echa al suscripto hasta que se renueva el JWT: al expulsado se le cierra el canal ya. */
+  function onMemberRemoved(g: number, conv: ChatConvRef, payload: unknown): void {
+    const ev = memberRemovedFromBroadcast(payload, conv.id)
+    if (g !== gen || !ev) return
+    if (ev.userId === core.me()?.id) {
+      failedTopics.add(`team:${conv.id}`)
+      closeTopic(`team:${conv.id}`)
+      void refreshLists(true)
+    } else {
+      void refreshLists(false)
+    }
+  }
+
   function closeTopic(topic: string): void {
     const close = topics.get(topic)
     topics.delete(topic)
@@ -686,7 +734,8 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
             [TYPING_EVENT]: (payload) => {
               onTyping(g, conv, payload).catch(() => ctx.log('chat: no se pudo procesar un aviso de escritura.'))
             },
-            [READ_EVENT]: (payload) => onRead(g, conv, payload)
+            [READ_EVENT]: (payload) => onRead(g, conv, payload),
+            ...(conv.kind === 'team' ? { [MEMBER_REMOVED_EVENT]: (payload: unknown) => onMemberRemoved(g, conv, payload) } : {})
           },
           (st) => onTopicStatus(g, t, st)
         )
@@ -1008,6 +1057,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     const r = await c.rpc('regenerate_invite_code', { p_team: teamId })
     check(r, 'No se pudo cambiar el código.')
     if (typeof r.data !== 'string' || !/^[0-9a-f]{16}$/.test(r.data)) throw new Error('No se pudo cambiar el código.')
+    void refreshLists(true)
     return r.data
   })
 
@@ -1120,7 +1170,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
         onStatus: (st) => onStatus(g, st)
       })
       onChange()
-      await Promise.all([checkExtras(c, g), checkVia(c, g)])
+      await Promise.all([checkExtras(c, g), checkVia(c, g), checkCodeLimits(c, g)])
       await refreshLists(true)
       if (g !== gen) return
       purgeExpired(c)
@@ -1152,6 +1202,7 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
       broadcastWarned = false
       extras = false
       viaCol = false
+      codeLimits = false
       typingThrottle.clear()
       // removeAllChannels (al cerrar «sloth-inbox») cierra también los canales rápidos.
       topics.clear()

@@ -71,7 +71,7 @@ export function RetentionDialog({ team, onClose }: { team: ChatTeam; onClose(): 
   )
 }
 
-/** Confirmación de «Vaciar conversación»: se borra para todos y no tiene vuelta atrás. */
+/** Confirmación de «Vaciar conversación»: en un equipo se borra para todos; en un DM, solo de tu lado. */
 export function ClearDialog({ conv, title, onClose }: { conv: ChatConvRef; title: string; onClose(): void }): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string>()
@@ -101,15 +101,22 @@ export function ClearDialog({ conv, title, onClose }: { conv: ChatConvRef; title
             Cancelar
           </Button>
           <Button variant="danger" onClick={() => void clear()} loading={busy}>
-            Vaciar para todos
+            {conv.kind === 'dm' ? 'Vaciar para mí' : 'Vaciar para todos'}
           </Button>
         </>
       }
     >
       <div className="f-chat-settings">
-        <p>
-          Se borran todos los mensajes de <strong>{title}</strong> para todos los participantes. No se puede deshacer.
-        </p>
+        {conv.kind === 'dm' ? (
+          <p>
+            Se borran los mensajes de <strong>{title}</strong> de tu lado. La otra persona los sigue viendo. Si el servidor del chat
+            no tiene la actualización 0008, se borran para los dos.
+          </p>
+        ) : (
+          <p>
+            Se borran todos los mensajes de <strong>{title}</strong> para todos los participantes. No se puede deshacer.
+          </p>
+        )}
         {err && <InlineAlert tone="danger">{err}</InlineAlert>}
       </div>
     </Modal>

@@ -108,6 +108,9 @@ export interface ChatTeam {
   role: ChatRole
   /** Solo para owner/admin. */
   inviteCode?: string
+  /** Solo con la 0008. */
+  inviteExpiresAt?: number
+  inviteUsesLeft?: number
   memberCount: number
   unread: number
   lastMessageAt?: number
