@@ -751,6 +751,15 @@ export function NotificationsSection({ onClose }: { onClose(): void }): React.JS
 
 /* ---------- Equipo y chat ---------- */
 
+const hostOfUrl = (u: string): string => {
+  try {
+    return new URL(u.trim()).host.toLowerCase()
+  } catch {
+    return ''
+  }
+}
+const isSupabaseHost = (host: string): boolean => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.supabase\.co$/.test(host)
+
 export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element {
   const ui = useUi()
   const [snap, setSnap] = useState<ChatSnapshot | null>(null)
@@ -764,6 +773,9 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
   const [confirmDel, setConfirmDel] = useState(false)
   const [tried, setTried] = useState(false)
   const [testRes, setTestRes] = useState<{ ok: boolean; text: string } | null>(null)
+  const [ownServer, setOwnServer] = useState(false)
+  const typedHost = hostOfUrl(url)
+  const outsideSupabase = typedHost !== '' && !isSupabaseHost(typedHost)
 
   /** Consulta real a Supabase con la configuración guardada (feat:chat:test, con 8 s de tope). */
   const runTest = (): void => {
@@ -786,6 +798,8 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
         (c) => {
           setCfg(c)
           setUrl((u) => u || c.active?.supabaseUrl || '')
+          const activeHost = c.active ? hostOfUrl(c.active.supabaseUrl) : ''
+          if (activeHost && !isSupabaseHost(activeHost)) setOwnServer(true)
         },
         (e) => setMsg({ ok: false, text: errText(e) })
       ),
@@ -822,8 +836,10 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
     if (!supabaseUrl) return setMsg({ ok: false, text: 'Falta la URL del proyecto.' })
     if (!/^https:\/\//.test(supabaseUrl)) return setMsg({ ok: false, text: 'La URL tiene que empezar con https://.' })
     if (!anonKey) return setMsg({ ok: false, text: 'Falta la clave publicable.' })
+    if (outsideSupabase && !ownServer)
+      return setMsg({ ok: false, text: `«${typedHost}» no es un proyecto de supabase.co. Si es un servidor propio de tu equipo, marcá «Servidor propio».` })
     void act(async () => {
-      await ui.invoke('feat:chat:setConfig', { supabaseUrl, anonKey })
+      await ui.invoke('feat:chat:setConfig', { supabaseUrl, anonKey, ...(outsideSupabase ? { selfHosted: true } : {}) })
       setKey('')
     }, 'Guardado.')
   }
@@ -941,6 +957,19 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
           <span className="f-set-hint">URL del proyecto de Supabase</span>
           <Input mono type="url" value={url} placeholder="https://xxxx.supabase.co" autoComplete="off" spellCheck={false} aria-invalid={tried && !url.trim()} onChange={(e) => setUrl(e.target.value)} />
         </label>
+        {outsideSupabase && (
+          <>
+            <label className="f-set-inline">
+              <input type="checkbox" checked={ownServer} onChange={(e) => setOwnServer(e.target.checked)} />
+              <span>Servidor propio (no está en supabase.co)</span>
+            </label>
+            {ownServer && (
+              <p className="f-set-note warn" role="alert">
+                Vas a usar <strong className="mono">{typedHost}</strong>. Tu inicio de sesión con GitHub, todo lo que escribas en el chat y lo que Claude lea de él pasan por ese servidor. Marcalo solo si es de tu equipo y lo administra alguien de confianza.
+              </p>
+            )}
+          </>
+        )}
         <label className="f-set-stack">
           <span className="f-set-hint">Clave publicable (la que empieza con sb_publishable)</span>
           <span className="f-set-inline">

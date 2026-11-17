@@ -236,6 +236,8 @@ export interface ChatConfigInput {
   supabaseUrl: string
   /** La anon / publishable key. NUNCA la service_role / secret (main la rechaza). */
   anonKey: string
+  /** Servidor propio fuera de supabase.co: sin esto main solo acepta https://<ref>.supabase.co. */
+  selfHosted?: boolean
 }
 
 export interface ChatConfigView {

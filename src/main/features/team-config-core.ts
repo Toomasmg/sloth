@@ -220,7 +220,7 @@ export function parseTeamConfig(textIn: string): TeamConfig {
   if (ajustes) cfg.ajustes = ajustes
   if (data.chat !== undefined && data.chat !== null) {
     try {
-      cfg.chat = parseChatServerConfig(data.chat)
+      cfg.chat = parseChatServerConfig(data.chat, { allowSelfHosted: false })
     } catch (e) {
       fail(`chat: ${e instanceof Error ? e.message : 'configuración inválida.'}`)
     }
