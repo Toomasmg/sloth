@@ -152,7 +152,13 @@ for (let i = 0; i < 31; i++) {
 ok(hit, 'tope de 30 por minuto')
 await throws(as(U.ana, "insert into public.messages(team_id, client_id, body) values ($1, gen_random_uuid(), '   ')", [team]), 'mensaje vacío')
 
-await as(U.ana, 'update public.teams set name=$2, created_by=$3 where id=$1', [team, 'Acme AI', U.bruno])
+// Desde 0004 el permiso de update es por columna y tocar created_by ni siquiera pasa.
+try {
+  await as(U.ana, 'update public.teams set name=$2, created_by=$3 where id=$1', [team, 'Acme AI', U.bruno])
+} catch (e) {
+  if (!/permission denied/.test(e.message)) throw e
+  await as(U.ana, 'update public.teams set name=$2 where id=$1', [team, 'Acme AI'])
+}
 const t = (await as(U.ana, 'select name, created_by from public.teams where id=$1', [team]))[0]
 ok(t.name === 'Acme AI' && t.created_by === U.ana, 'owner renombra, created_by no cambia')
 await as(U.bruno, 'update public.teams set name=$2 where id=$1', [team, 'hack'])
