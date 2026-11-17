@@ -101,3 +101,5 @@ export function fmtHoras(min: number): string {
   if (h && m) return `${h} h ${m} min`
   return h ? `${h} h` : `${m} min`
 }
+
+export { fmtCosto, resumenUso, textoUltimaConsulta } from '../../../../shared/tickets-uso'
