@@ -162,8 +162,13 @@ test('parseCombo y canonicalCombo', () => {
   assert.deepEqual(parseCombo('ctrl Enter'), { ctrl: true, alt: false, shift: false, key: 'Enter' })
 })
 
-test('parseCombo normaliza la tecla sin importar mayúsculas', { todo: 'las teclas de varias letras (enter, space, f5) solo se aceptan con la capitalización exacta, a diferencia de las de una letra' }, () => {
+test('parseCombo normaliza la tecla sin importar mayúsculas', () => {
   assert.deepEqual(parseCombo('ctrl enter'), { ctrl: true, alt: false, shift: false, key: 'Enter' })
+  assert.deepEqual(parseCombo('alt pageup'), { ctrl: false, alt: true, shift: false, key: 'PageUp' })
+  assert.deepEqual(parseCombo('ctrl f5'), { ctrl: true, alt: false, shift: false, key: 'F5' })
+  assert.deepEqual(parseCombo('f5'), { ctrl: false, alt: false, shift: false, key: 'F5' })
+  assert.equal(parseCombo('ctrl f13'), null)
+  assert.equal(parseCombo('ctrl esc'), null)
 })
 
 test('resetSection restaura solo su sección', () => {

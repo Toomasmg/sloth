@@ -189,6 +189,7 @@ export const cloneSettings = (s: SlothSettings): SlothSettings => ({
 /* ---------- Atajos: formato canónico «Ctrl Alt Shift Tecla» ---------- */
 
 const MODIFIERS = ['Ctrl', 'Alt', 'Shift'] as const
+const NAMED_KEYS = ['Enter', 'Space', 'Tab', 'Backspace', 'Delete', 'Home', 'End', 'PageUp', 'PageDown', 'Insert']
 const KEY_TOKEN = /^(?:[A-Z0-9]|F(?:[1-9]|1[0-2])|Enter|Space|Tab|Backspace|Delete|Home|End|PageUp|PageDown|Insert|←|→|↑|↓|,|\.|;|-|=|\/)$/
 
 export interface ParsedCombo {
@@ -198,13 +199,19 @@ export interface ParsedCombo {
   key: string
 }
 
+function canonicalKey(raw: string): string {
+  if (raw.length === 1) return raw.toUpperCase()
+  if (/^f\d{1,2}$/i.test(raw)) return raw.toUpperCase()
+  return NAMED_KEYS.find((k) => k.toLowerCase() === raw.toLowerCase()) ?? raw
+}
+
 /** Lee «Ctrl Shift k» o «Ctrl Shift K» → partes. null si no es una combinación válida. */
 export function parseCombo(raw: string): ParsedCombo | null {
   const tokens = raw.trim().split(/\s+/).filter(Boolean)
   // Una tecla de función sola (F2) también es una combinación válida.
-  if (tokens.length === 1 && /^F(?:[1-9]|1[0-2])$/.test(tokens[0])) return { ctrl: false, alt: false, shift: false, key: tokens[0] }
+  if (tokens.length === 1 && /^F(?:[1-9]|1[0-2])$/.test(canonicalKey(tokens[0]))) return { ctrl: false, alt: false, shift: false, key: canonicalKey(tokens[0]) }
   if (tokens.length < 2) return null
-  const key = tokens[tokens.length - 1].length === 1 ? tokens[tokens.length - 1].toUpperCase() : tokens[tokens.length - 1]
+  const key = canonicalKey(tokens[tokens.length - 1])
   if (!KEY_TOKEN.test(key)) return null
   const mods = tokens.slice(0, -1)
   const seen = new Set<string>()
