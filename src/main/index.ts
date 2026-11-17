@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, net, protocol, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, net, protocol, session, shell } from 'electron'
 import { pathToFileURL } from 'node:url'
 import { normalize, sep } from 'node:path'
 import { existsSync, readdirSync, statSync } from 'node:fs'
@@ -28,6 +28,7 @@ import { APP_ID } from '../shared/app-id'
 import { currentSettings, initialChrome } from './features/settings'
 import { validateWorkspacePatch } from './workspace-patch'
 import { loadWindowState, trackWindowState } from './window-state'
+import { origenConfiable, permisoChromium } from './ipc-guard'
 import { zoomFor } from './zoom-keys'
 import type { FeatureContext } from './features/context'
 import type { UiCommand } from '../shared/features'
@@ -106,6 +107,11 @@ function serveRenderer(): void {
 
 app.whenReady().then(async () => {
   serveRenderer()
+  const devUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined
+  session.defaultSession.setPermissionRequestHandler((_wc, permiso, cb, d) => cb(permisoChromium(permiso, origenConfiable(d.requestingUrl, devUrl), 'mediaTypes' in d ? d.mediaTypes : undefined)))
+  session.defaultSession.setPermissionCheckHandler((_wc, permiso, origin, d) =>
+    permisoChromium(permiso, origenConfiable(d.requestingUrl ?? origin, devUrl), 'mediaType' in d && d.mediaType ? [d.mediaType] : undefined)
+  )
   const store = new Store()
   // La ventana se crea antes que nada más: el primer render no espera a daemon, escaneos ni registros.
   // Los handlers de las funciones se registran en este mismo turno (antes de que el renderer pida nada).
