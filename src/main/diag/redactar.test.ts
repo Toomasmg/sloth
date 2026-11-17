@@ -224,3 +224,33 @@ test('acotar corta y avisa, y no parte un par sustituto', () => {
   assert.equal(acotar(emoji, 3), 'ab…[cortado]')
   assert.equal(acotar(emoji, 4), 'ab😀…[cortado]')
 })
+
+test('claves de Google y GitLab', () => {
+  const g = 'AIza' + 'Sy' + 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q'
+  assert.equal(g.length, 39)
+  sinSecreto(`maps usó ${g} ayer`, g, ['maps usó', 'ayer'])
+  const gl = 'glpat-' + 'Ab12Cd34Ef56Gh78Ij90'
+  sinSecreto(`clone con ${gl} ok`, gl, ['clone con', 'ok'])
+})
+
+test('pass, *_KEY, session id y tema en asignaciones', () => {
+  sinSecreto('pass=hunter2 listo', 'hunter2', ['listo'])
+  sinSecreto('password=hunter3', 'hunter3')
+  sinSecreto('SUPABASE_KEY=abc123xyz y más', 'abc123xyz', ['y más'])
+  sinSecreto('MI_TOKEN=zzz999 fin', 'zzz999', ['fin'])
+  sinSecreto('session_id: s3cr3t7', 's3cr3t7')
+  sinSecreto('{"tema":"mi-canal-privado"}', 'mi-canal-privado')
+})
+
+test('no se pasa de rosca con palabras parecidas', () => {
+  assert.equal(redactar('passed: 5 tests', ctx), 'passed: 5 tests')
+  assert.equal(redactar('compass bypass listo', ctx), 'compass bypass listo')
+  assert.equal(redactar('la sesión: iniciada', ctx), 'la sesión: iniciada')
+  assert.equal(redactar('key: valor', ctx), 'key: valor')
+})
+
+test('token como usuario en una URL, sin contraseña', () => {
+  const t = 'Zq8Xw7Ee6Rr5Tt4Yy3Uu2Ii1'
+  sinSecreto(`git clone https://${t}@github.com/a/b`, t, ['github.com/a/b'])
+  assert.equal(redactar('https://ana@localhost/a/b', ctx), 'https://ana@localhost/a/b')
+})

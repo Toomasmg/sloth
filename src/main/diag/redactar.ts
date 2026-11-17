@@ -9,6 +9,10 @@ const CLAVES = [
   'password',
   'passwd',
   'pwd',
+  'pass(?![a-z])',
+  'session[_-]?(?:id|key|secret)',
+  '_key',
+  'tema',
   'api[_-]?key',
   'authorization',
   'cookie',
@@ -42,6 +46,8 @@ const TOKENS: RegExp[] = [
   /sb_(?:secret|publishable)_[A-Za-z0-9_-]{10,}/g,
   /xox[abprs]-[A-Za-z0-9-]{10,}/g,
   /AKIA[0-9A-Z]{16}/g,
+  /AIza[0-9A-Za-z_-]{35}/g,
+  /glpat-[\w-]{20,}/g,
   /(?<![\w-])eyJ[\w-]+\.[\w-]+\.[\w-]+/g,
   /sloth-[0-9a-f]{16,}/g
 ]
@@ -49,6 +55,7 @@ const TOKENS: RegExp[] = [
 const BEARER = /\bBearer\s{1,20}[^\s"'<>,;}]{1,2000}/gi
 const BASIC = /\bBasic\s{1,20}[A-Za-z0-9+/=]{8,2000}/gi
 const CREDENCIALES_URL = /(:\/\/)[^\s/:@]{1,200}:[^\s/@]{1,200}@/g
+const TOKEN_COMO_USUARIO = /(:\/\/)[^\s/:@]{20,200}@/g
 const CLAVE_CELU = /([#?&]k=)[^\s&#"']{1,500}/g
 const LARGO_OPACO = /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{40,}/g
 const EMAIL = /[\w.+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,10}\.[A-Za-z]{2,24}/g
@@ -102,6 +109,7 @@ export function redactar(texto: string, ctx: ContextoRedaccion): string {
     .replace(BEARER, 'Bearer [token]')
     .replace(BASIC, 'Basic [token]')
     .replace(CREDENCIALES_URL, '$1[redactado]@')
+    .replace(TOKEN_COMO_USUARIO, '$1[redactado]@')
     .replace(CLAVE_CELU, '$1[redactado]')
   t = t.replace(PARES, '$1[redactado]')
   return t.replace(EMAIL, '[email]').replace(LARGO_OPACO, opaco)
