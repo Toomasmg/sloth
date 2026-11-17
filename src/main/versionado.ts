@@ -48,3 +48,7 @@ export function migrar(datos: unknown, migraciones: Migraciones, versionActual: 
   }
   return { datos: { ...copia, version: versionActual }, desde: version, hasta: versionActual, estado: 'migrado' }
 }
+
+export function esFutura(datos: unknown, versionActual: number): boolean {
+  return esObj(datos) && typeof datos.version === 'number' && Number.isInteger(datos.version) && datos.version > versionActual
+}

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { migrar, type Migraciones } from './versionado'
+import { esFutura, migrar, type Migraciones } from './versionado'
 
 test('sin version con actual 1: migrado, trae version 1 y no pierde campos', () => {
   const entrada = { accounts: [{ id: 'a' }], extra: { x: 1 } }
@@ -109,4 +109,14 @@ test('lo que no es un objeto es inválido', () => {
 
 test('un número enorme es una versión futura, no un error', () => {
   assert.equal(migrar({ version: 1e300 }, {}, 1).estado, 'futura')
+})
+
+test('esFutura: ausente, igual, mayor, string y no objeto', () => {
+  assert.equal(esFutura({}, 1), false)
+  assert.equal(esFutura({ version: 1 }, 1), false)
+  assert.equal(esFutura({ version: 2 }, 1), true)
+  assert.equal(esFutura({ version: '2' }, 1), false)
+  assert.equal(esFutura({ version: 1.5 }, 1), false)
+  assert.equal(esFutura(null, 1), false)
+  assert.equal(esFutura([{ version: 9 }], 1), false)
 })

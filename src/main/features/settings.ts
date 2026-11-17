@@ -1,6 +1,8 @@
 import { app, dialog, nativeTheme, type BrowserWindow } from 'electron'
 import { join } from 'node:path'
-import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
+import { escribirJsonAtomico, leerJson, respaldar } from '../json-file'
+import { avisar, avisoVersionFutura } from '../avisos'
+import { migrar } from '../versionado'
 import type { Feature, FeatureContext } from './context'
 import {
   applyPatch,
@@ -20,10 +22,38 @@ import { SURFACE } from '../../shared/surfaces'
  */
 const file = (): string => join(app.getPath('userData'), 'features', 'settings.json')
 
-const validar = (v: unknown): SlothSettings | undefined => (esObjeto(v) ? normalize(v) : undefined)
+export const VERSION_SETTINGS = 1
+
+let soloLectura = false
+let porRespaldar = false
+
+const validar = (v: unknown): SlothSettings | undefined => {
+  const r = migrar(v, {}, VERSION_SETTINGS)
+  if (r.estado === 'invalida') return undefined
+  soloLectura = r.estado === 'futura'
+  porRespaldar = r.estado === 'migrado'
+  return normalize(r.datos)
+}
 
 function read(): SlothSettings {
-  return leerJson(file(), { validar, porDefecto: () => normalize(undefined) }).valor
+  const valor = leerJson(file(), { validar, porDefecto: () => normalize(undefined) }).valor
+  if (soloLectura) avisoVersionFutura(file())
+  return valor
+}
+
+function guardar(): void {
+  if (soloLectura) return
+  if (porRespaldar) {
+    try {
+      respaldar(file())
+      porRespaldar = false
+    } catch (e) {
+      soloLectura = true
+      avisar(`No pude respaldar settings.json antes de actualizarlo (${e instanceof Error ? e.message : String(e)}); no voy a guardar cambios hasta que reinicies Sloth.`)
+      return
+    }
+  }
+  escribirJsonAtomico(file(), { version: VERSION_SETTINGS, ...settings })
 }
 
 /** Colores de la barra de título que dibuja Windows (los botones de ventana): el fondo es el --surface del tema (src/shared/surfaces.ts). */
@@ -104,7 +134,7 @@ function applyLoginItem(): void {
 function commit(next: SlothSettings): SettingsPayload {
   const loginChanged = next.openAtLogin !== settings.openAtLogin
   settings = next
-  escribirJsonAtomico(file(), settings)
+  guardar()
   applyNative()
   if (loginChanged) applyLoginItem()
   const p = payload()
