@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
 import { CloseIcon } from '../../icons/SlothIcons'
-import { SIN_CONECTOR, type ConectorPropioVista, type ConectorResumen } from '../../../../shared/tickets'
-import { setSnapshot, type Snapshot } from './model'
+import { SIN_CONECTOR, type ConectorPropioVista, type ConectorResumen, type UsoAcum } from '../../../../shared/tickets'
+import { fmtCosto, resumenUso, setSnapshot, type Snapshot } from './model'
 import { CuentasConectores, textoDisponibilidad } from './CuentasConectores'
 import { aceptarYUsar, AvisoHerramientas, deDondeViene, etiquetaOrigen, Propios } from './Propios'
 import { Button, Select } from '../../ui'
@@ -24,6 +24,64 @@ const ningunaLoTiene = (snap: Snapshot, c: ConectorResumen): boolean => {
   if (c.via !== 'mcp') return false
   const revisadas = Object.values(snap.cuentas).filter((v) => v.revisadaEn)
   return revisadas.length > 0 && revisadas.every((v) => v.conectores[c.id]?.tipo === 'falta')
+}
+
+const hoyLocal = (): string => {
+  const f = new Date()
+  const dos = (n: number): string => String(n).padStart(2, '0')
+  return `${f.getFullYear()}-${dos(f.getMonth() + 1)}-${dos(f.getDate())}`
+}
+
+function CampoTope({ etiqueta, valor, vacio, min, max, paso, nota, onGuardar }: {
+  etiqueta: string
+  valor: number | undefined
+  vacio: string
+  min: number
+  max: number
+  paso: number
+  nota?: string
+  onGuardar: (v: number | null) => void
+}): React.JSX.Element {
+  const [txt, setTxt] = useState(valor === undefined ? '' : String(valor))
+  const [previo, setPrevio] = useState(valor)
+  if (previo !== valor) {
+    setPrevio(valor)
+    setTxt(valor === undefined ? '' : String(valor))
+  }
+  const guardar = (): void => {
+    const t = txt.trim().replace(',', '.')
+    if (t === '') return valor === undefined ? undefined : onGuardar(null)
+    const n = Number(t)
+    if (!Number.isFinite(n) || n < min || n > max) return setTxt(valor === undefined ? '' : String(valor))
+    if (n !== valor) onGuardar(n)
+  }
+  return (
+    <label className="field f-tickets-ajustes-campo">
+      <span>{etiqueta}</span>
+      <input
+        type="number"
+        inputMode="decimal"
+        value={txt}
+        min={min}
+        max={max}
+        step={paso}
+        placeholder={vacio}
+        onChange={(e) => setTxt(e.target.value)}
+        onBlur={guardar}
+        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+      />
+      {nota && <small className="f-tickets-ajustes-nota">{nota}</small>}
+    </label>
+  )
+}
+
+function resumenDeUso(snap: Snapshot): { total: ReturnType<typeof resumenUso>; porConector: { id: string; nombre: string; hoy: UsoAcum; semana: UsoAcum }[] } | null {
+  const uso = snap.uso
+  if (!uso || Object.keys(uso).length === 0) return null
+  const hoy = hoyLocal()
+  const ids = [...new Set(Object.values(uso).flatMap((d) => Object.keys(d)))]
+  const porConector = ids.map((id) => ({ id, nombre: snap.conectores.find((c) => c.id === id)?.nombre ?? id, ...resumenUso(uso, hoy, id) }))
+  return { total: resumenUso(uso, hoy), porConector: porConector.length > 1 ? porConector : [] }
 }
 
 /** De qué sistema salen los tickets y, según la vía, con qué cuenta de Claude o qué repo de GitHub. */
@@ -84,6 +142,8 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => voi
     const p = await window.sloth.pickFolder()
     if (p) set({ defaultRepo: p })
   }
+
+  const resumen = resumenDeUso(snap)
 
   return (
     <section className="f-tickets-ajustes" aria-label="Ajustes de tickets">
@@ -168,7 +228,45 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => voi
         )}
       </div>
 
+      {via === 'mcp' && (
+        <div className="f-tickets-ajustes-fila">
+          <CampoTope
+            etiqueta="Tope de vueltas por consulta"
+            valor={snap.config.maxTurns}
+            vacio="40"
+            min={1}
+            max={200}
+            paso={1}
+            onGuardar={(v) => set({ maxTurns: v })}
+          />
+          <CampoTope
+            etiqueta="Tope de costo por consulta (US$)"
+            valor={snap.config.maxCostUsd}
+            vacio="Sin tope"
+            min={0.01}
+            max={100}
+            paso={0.01}
+            nota="Claude lo revisa entre vueltas: puede pasarse un poco."
+            onGuardar={(v) => set({ maxCostUsd: v })}
+          />
+        </div>
+      )}
+
       {via === 'mcp' && <CuentasConectores snap={snap} />}
+
+      {resumen && (
+        <div className="f-tickets-uso" aria-label="Uso estimado">
+          <span title="Con suscripción de Claude no se paga por consulta: el número es nominal, para comparar.">
+            Uso (costo estimado) · Hoy: {fmtCosto(resumen.total.hoy.costUsd)} en {resumen.total.hoy.corridas} {resumen.total.hoy.corridas === 1 ? 'consulta' : 'consultas'} · Últimos 7 días:{' '}
+            {fmtCosto(resumen.total.semana.costUsd)}
+          </span>
+          {resumen.porConector.map((c) => (
+            <span key={c.id}>
+              {c.nombre}: hoy {fmtCosto(c.hoy.costUsd)} · 7 días {fmtCosto(c.semana.costUsd)}
+            </span>
+          ))}
+        </div>
+      )}
 
       <details className="f-tickets-propios" onToggle={(e) => e.currentTarget.open && setPropiosVistos(true)}>
         <summary>Conectores propios</summary>

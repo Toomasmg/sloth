@@ -16,6 +16,7 @@ import {
   prioRank,
   setBoardOpen,
   setSnapshot,
+  textoUltimaConsulta,
   timeAgo,
   useSnapshot,
   type Accion,
@@ -205,13 +206,13 @@ export function Board(): React.JSX.Element {
   const countLabel = visible.length === 1 ? '1 ticket' : `${visible.length} tickets`
 
   // ---------- acciones ----------
-  const refresh = async (): Promise<void> => {
+  const refresh = async (vueltas?: number): Promise<void> => {
     setConfirming(false)
     setInfo(null)
     setErr(null)
     setBusy('refresh')
     try {
-      const r = await ui.invoke<{ count: number }>('feat:tickets:refresh')
+      const r = await ui.invoke<{ count: number }>('feat:tickets:refresh', undefined, vueltas)
       setInfo(`${n} trajo ${r.count} ${r.count === 1 ? 'ticket' : 'tickets'}.`)
     } catch (e) {
       setErr(cleanError(e))
@@ -324,7 +325,10 @@ export function Board(): React.JSX.Element {
     tone = 'ok'
     connText = `Conectado con ${porGh ? 'gh' : (accLabel(snap.fetchedBy) ?? 'una cuenta')} · actualizado ${timeAgo(snap.fetchedAt)}`
   }
-  const offline = Boolean(snap?.lastError) && !running && !unavailable
+  const topeVueltas = Boolean(snap?.lastError) && !running && !unavailable && snap?.lastRun?.tope === 'vueltas'
+  const offline = Boolean(snap?.lastError) && !running && !unavailable && !topeVueltas
+  const vueltasActuales = snap?.lastRun?.maxTurns ?? 40
+  const ultimaConsulta = snap?.lastRun ? textoUltimaConsulta(snap.lastRun) : ''
 
   const bodyLoading = !snap || (running && tickets.length === 0)
   const showRows = !bodyLoading && visible.length > 0
@@ -448,7 +452,7 @@ export function Board(): React.JSX.Element {
             {err}
           </p>
         )}
-        {info && !err && !offline && (
+        {info && !err && !offline && !topeVueltas && (
           <p className="f-tickets-ok" role="status">
             {info}
           </p>
@@ -555,6 +559,11 @@ export function Board(): React.JSX.Element {
 
               <div className="f-tickets-countbar">
                 <span role="status">{snap ? countLabel : ''}</span>
+                {ultimaConsulta && (
+                  <span className="f-tickets-uso" title="Con suscripción de Claude no se paga por consulta: el número es nominal, para comparar.">
+                    {ultimaConsulta}
+                  </span>
+                )}
               </div>
 
               <div aria-busy={running} className="f-tickets-body">
@@ -569,6 +578,23 @@ export function Board(): React.JSX.Element {
                     <span className="f-tickets-alert-text">{snap?.lastError}</span>
                     <button type="button" className="f-tickets-b f-tickets-b--xs f-tickets-b--solid-danger" onClick={elegirConector}>
                       Elegir conector
+                    </button>
+                  </div>
+                )}
+
+                {topeVueltas && (
+                  <div className="f-tickets-alert f-tickets-offline" role="alert">
+                    <span className="f-tickets-alert-text">
+                      Cortada por tope de vueltas
+                      <span className="f-tickets-alert-detail">{snap?.lastError}</span>
+                    </span>
+                    <button
+                      type="button"
+                      className="f-tickets-b f-tickets-b--xs f-tickets-b--solid-danger"
+                      onClick={() => void refresh(Math.min(200, 2 * vueltasActuales))}
+                      disabled={running || vueltasActuales >= 200}
+                    >
+                      Continuar con más vueltas
                     </button>
                   </div>
                 )}
