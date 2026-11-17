@@ -3,10 +3,10 @@ import assert from 'node:assert/strict'
 import { safeGitArgs, safeGitEnv } from './git-safe'
 
 test('safeGitArgs apaga fsmonitor y untrackedCache y no toma locks opcionales', () => {
-  assert.deepEqual(safeGitArgs('C:\repo', ['status', '--porcelain']), [
+  assert.deepEqual(safeGitArgs('C:\\repo', ['status', '--porcelain']), [
     '--no-optional-locks',
     '-C',
-    'C:\repo',
+    'C:\\repo',
     '-c',
     'core.fsmonitor=false',
     '-c',
