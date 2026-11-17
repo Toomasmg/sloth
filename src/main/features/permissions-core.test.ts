@@ -57,7 +57,7 @@ test('las reglas de comando y de dominio siguen siendo exactas', () => {
   assert.equal(findRule([cmd], { ...pedido('Bash', { command: 'npm test' }), ws: 'otro' }, CWD), undefined)
 })
 
-test('permitirDesdeAviso: solo comandos cortos de una línea, redes y otros; nunca ediciones', () => {
+test('permitirDesdeAviso: solo comandos cortos que se ven enteros', () => {
   assert.equal(permitirDesdeAviso('cmd', { command: 'npm test' }), true)
   assert.equal(permitirDesdeAviso('cmd', { command: 'x'.repeat(80) }), true)
   assert.equal(permitirDesdeAviso('cmd', { command: 'x'.repeat(81) }), false)
@@ -65,6 +65,11 @@ test('permitirDesdeAviso: solo comandos cortos de una línea, redes y otros; nun
   assert.equal(permitirDesdeAviso('cmd', { command: 'ls\rrm' }), false)
   assert.equal(permitirDesdeAviso('cmd', {}), false)
   assert.equal(permitirDesdeAviso('edit', { file_path: 'a.ts' }), false)
-  assert.equal(permitirDesdeAviso('net', { url: 'https://a.com' }), true)
-  assert.equal(permitirDesdeAviso('other', {}), true)
+  assert.equal(permitirDesdeAviso('cmd', { command: 'git commit -m "acción"' }), true)
+  assert.equal(permitirDesdeAviso('cmd', { command: 'ls\trm' }), false)
+  assert.equal(permitirDesdeAviso('cmd', { command: 'echo ‮gnp.exe' }), false)
+  assert.equal(permitirDesdeAviso('cmd', { command: 'rm​ -rf x' }), false)
+  assert.equal(permitirDesdeAviso('cmd', { command: 'ls\u001b[2K' }), false)
+  assert.equal(permitirDesdeAviso('net', { url: 'https://a.com' }), false)
+  assert.equal(permitirDesdeAviso('other', {}), false)
 })

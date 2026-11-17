@@ -143,12 +143,18 @@ export function labelOf(kind: PermissionKind, tool: string, input: Record<string
   return otherName(tool)
 }
 
-/** El aviso de Windows corta el texto: «Permitir» ahí solo es honesto si lo que se aprueba se ve entero. */
+// Controles, bidi, ancho cero y separadores de línea: hacen que el aviso muestre algo distinto de lo que corre.
+const INVISIBLES = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u
+
+/**
+ * El aviso de Windows corta el texto: «Permitir» ahí solo es honesto si lo que se aprueba se ve entero. Solo
+ * un comando corto lo cumple: de MCP y otras herramientas el aviso muestra el nombre sin el input, y de una
+ * red solo el host.
+ */
 export function permitirDesdeAviso(kind: PermissionKind, input: Record<string, unknown>): boolean {
-  if (kind === 'edit') return false
-  if (kind !== 'cmd') return true
+  if (kind !== 'cmd') return false
   const c = str(input.command)
-  return c !== undefined && c.length <= 80 && !/[\r\n]/.test(c)
+  return c !== undefined && c.length <= 80 && !INVISIBLES.test(c)
 }
 
 /** Texto del botón «Permitir siempre» según el tipo. */
