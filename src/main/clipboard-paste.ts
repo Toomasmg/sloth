@@ -5,9 +5,9 @@ import { joinPaths, quotePath } from '../shared/paste-paths'
 import { pathsFromUriList } from './paste-paths'
 
 const PASTED_DIR = (): string => join(app.getPath('temp'), 'Sloth', 'pegados')
-const KEEP_MS = 7 * 24 * 60 * 60 * 1000
+const KEEP_MS = 24 * 60 * 60 * 1000
 
-/** Borra imágenes pegadas de hace más de una semana (Claude ya las leyó). */
+/** Borra imágenes pegadas de hace más de un día (Claude ya las leyó). */
 async function sweep(dir: string): Promise<void> {
   const now = Date.now()
   for (const f of await readdir(dir).catch(() => [] as string[])) {
