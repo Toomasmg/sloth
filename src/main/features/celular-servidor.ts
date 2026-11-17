@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { EstadoCelular } from '../../shared/celular'
-import { tokenIgual } from './celular-core'
+import { abrirPedido, crearRepetidos, derivarClaves, fechaValida, sellarRespuesta } from './celular-sello'
 import { manifiesto, PAGINA_CSS, PAGINA_HTML, PAGINA_JS } from './celular-pagina'
 
 /** Lo que la PC le da a cualquier fuente: el estado y cómo responder un permiso. */
@@ -9,14 +9,14 @@ export interface ProveedorDeEstado {
   /** Lanza con un mensaje para el celu si no se pudo (venció, ya se respondió). */
   decidir(id: string, decision: 'allow' | 'deny'): void
   puedeAprobar(): boolean
-  token(): string
+  clave(): string
   icono(): Buffer | null
 }
 
 /**
- * Por dónde le llega el estado al celu. Hoy, un servidor HTTP en el Wi-Fi de casa; cuando haya
- * cuentas, se suma una por Supabase realtime (como chat-realtime) que publique el mismo
- * EstadoCelular y reciba las mismas decisiones, así la página del celu no cambia.
+ * Por dónde le llega el estado al celu. Hoy, un servidor HTTP en el Wi-Fi de casa con los cuerpos
+ * sellados; la fuente por Supabase realtime (como chat-realtime) publica el mismo
+ * EstadoCelular y recibe las mismas decisiones, así la página del celu no cambia.
  */
 export interface FuenteDeEstado {
   readonly nombre: string
@@ -24,7 +24,7 @@ export interface FuenteDeEstado {
   detener(): Promise<void>
 }
 
-const MAX_CUERPO = 4096
+const MAX_CUERPO = 8192
 
 const SEGURIDAD = {
   'cache-control': 'no-store',
@@ -51,8 +51,6 @@ function enviar(res: ServerResponse, status: number, tipo: string | null, cuerpo
   res.writeHead(status, headers).end(cuerpo)
 }
 
-const json = (res: ServerResponse, status: number, data: unknown): void => enviar(res, status, 'application/json; charset=utf-8', JSON.stringify(data))
-
 function leerCuerpo(req: IncomingMessage): Promise<string | null> {
   return new Promise((resolve) => {
     const partes: Buffer[] = []
@@ -75,10 +73,11 @@ export interface OpcionesWifi {
   log?: (...args: unknown[]) => void
 }
 
-/** El servidor del Wi-Fi. Las rutas de datos piden el token en `x-sloth-token`; sin él, 401 y nada más. */
+/** El servidor del Wi-Fi. Las rutas de datos van con cuerpos sellados con la clave del QR; sin clave válida, 401 y nada más. */
 export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): number } {
   let server: Server | null = null
   let puertoReal = o.puerto
+  const repetidos = crearRepetidos()
 
   async function atender(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const ruta = (req.url ?? '/').split('?')[0]
@@ -86,28 +85,33 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
     const esGet = metodo === 'GET' || metodo === 'HEAD'
 
     if (ruta === '/api/estado' || ruta === '/api/permiso') {
-      if (!tokenIgual(req.headers['x-sloth-token'], o.proveedor.token())) return enviar(res, 401, null)
-      if (ruta === '/api/estado') {
-        if (!esGet) return enviar(res, 405, null, undefined, { allow: 'GET' })
-        return json(res, 200, await o.proveedor.estado())
-      }
       if (metodo !== 'POST') return enviar(res, 405, null, undefined, { allow: 'POST' })
-      if (!o.proveedor.puedeAprobar()) return json(res, 403, { error: 'Aprobar desde el celu está apagado en Sloth.' })
+      const claves = derivarClaves(o.proveedor.clave())
+      if (!claves) return enviar(res, 500, null)
       const texto = await leerCuerpo(req)
-      if (texto === null) return json(res, 413, { error: 'Pedido demasiado grande.' })
-      let p: { id?: unknown; decision?: unknown }
+      if (texto === null) return enviar(res, 413, null)
+      const ab = abrirPedido(claves, ruta, texto)
+      if (!ab) return enviar(res, 401, null)
+      let sobre: { t?: unknown; b?: unknown } | null = null
       try {
-        p = JSON.parse(texto) as { id?: unknown; decision?: unknown }
+        sobre = JSON.parse(ab.json) as { t?: unknown; b?: unknown } | null
       } catch {
-        return json(res, 400, { error: 'Pedido inválido.' })
+        sobre = null
       }
-      if (!p || typeof p.id !== 'string' || p.id.length > 100 || (p.decision !== 'allow' && p.decision !== 'deny')) return json(res, 400, { error: 'Pedido inválido.' })
+      if (!sobre || typeof sobre !== 'object' || !fechaValida(sobre.t, Date.now())) return enviar(res, 401, null)
+      if (repetidos.vistoAntes(ab.iv, Date.now())) return enviar(res, 401, null)
+      const sellado = (status: number, data: unknown): void => enviar(res, status, 'text/plain; charset=utf-8', sellarRespuesta(claves, ab.iv, JSON.stringify(data)))
+
+      if (ruta === '/api/estado') return sellado(200, await o.proveedor.estado())
+      if (!o.proveedor.puedeAprobar()) return sellado(403, { error: 'Aprobar desde el celu está apagado en Sloth.' })
+      const p = sobre.b as { id?: unknown; decision?: unknown } | null
+      if (!p || typeof p !== 'object' || typeof p.id !== 'string' || p.id.length > 100 || (p.decision !== 'allow' && p.decision !== 'deny')) return sellado(400, { error: 'Pedido inválido.' })
       try {
         o.proveedor.decidir(p.id, p.decision)
       } catch (e) {
-        return json(res, 409, { error: (e as Error).message })
+        return sellado(409, { error: (e as Error).message })
       }
-      return json(res, 200, { ok: true })
+      return sellado(200, { ok: true })
     }
 
     if (!esGet) return enviar(res, 405, null, undefined, { allow: 'GET' })

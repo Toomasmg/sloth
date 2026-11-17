@@ -1,3 +1,5 @@
+import { SELLO_JS } from './celular-sello-web'
+
 /**
  * La página del celu: HTML, CSS y JS sin dependencias, servidos por la PC. Acostado es el visor
  * (tablero de auto: dos relojes a los costados y lo urgente en el medio); parado, la lista completa.
@@ -190,7 +192,7 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 }
 `
 
-export const PAGINA_JS = `(function () {
+export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   'use strict';
   var NS = 'http://www.w3.org/2000/svg';
   var CADA_MS = 1500;
@@ -206,11 +208,38 @@ export const PAGINA_JS = `(function () {
   var $ = function (id) { return document.getElementById(id); };
   var guardar = function (k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } };
   var leer = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
-  // La versión remota define window.slothFetch: se busca en cada pedido, no al cargar.
-  var pedirApi = function (u, o) { return window.slothFetch ? window.slothFetch(u, o) : fetch(u, o); };
+  // La versión remota define window.slothFetch: se busca en cada pedido, no al cargar. En el Wi-Fi
+  // los pedidos van sellados con la clave del QR (window.slothSello).
+  var sellado = function (ruta, objeto) {
+    return new Promise(function (resolve, reject) {
+      var claves = window.slothSello.abrirClave(token);
+      if (!claves) { resolve({ ok: false, status: 401 }); return; }
+      var s = window.slothSello.sellarPedido(claves, ruta, objeto);
+      fetch(ruta, { method: 'POST', cache: 'no-store', headers: { 'content-type': 'text/plain' }, body: s.sobre })
+        .then(function (r) {
+          if (r.status !== 200 && r.status !== 400 && r.status !== 403 && r.status !== 409) return { ok: false, status: r.status };
+          return r.text().then(function (texto) {
+            var plano = window.slothSello.abrirRespuesta(claves, s.iv, texto);
+            if (plano === null) throw new Error('respuesta sin sellar');
+            return { ok: r.ok, status: r.status, json: function () { return Promise.resolve(JSON.parse(plano)); } };
+          });
+        })
+        .then(resolve, reject);
+    });
+  };
+  var pedirApi = function (ruta, objeto) {
+    if (window.slothFetch) return window.slothFetch(ruta, objeto ? { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json' }, body: JSON.stringify(objeto) } : { cache: 'no-store' });
+    return sellado(ruta, objeto || {});
+  };
 
-  var token = new URLSearchParams(location.search).get('t');
-  if (token) guardar('sloth-token', token); else token = leer('sloth-token');
+  var viejo = leer('sloth-token');
+  var enlace = new URLSearchParams(location.hash.slice(1)).get('k');
+  if (enlace) {
+    guardar('sloth-clave', enlace);
+    try { history.replaceState(null, '', location.pathname); } catch (e) { /* sin historial */ }
+  }
+  var token = viejo === 'remoto' ? viejo : enlace || leer('sloth-clave');
+  if (viejo && viejo !== 'remoto') guardar('sloth-token', null);
   var cuentaElegida = leer('sloth-cuenta');
   var ultimo = null, desfase = 0, ultimoOk = 0, timer = null, enviando = false, errorPedido = '';
 
@@ -331,7 +360,7 @@ export const PAGINA_JS = `(function () {
     enviando = true;
     errorPedido = '';
     pintar();
-    pedirApi('/api/permiso', { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json', 'x-sloth-token': token }, body: JSON.stringify({ id: id, decision: decision }) })
+    pedirApi('/api/permiso', { id: id, decision: decision })
       .then(function (r) {
         if (r.ok) return null;
         return r.json().then(function (j) { return j && j.error ? j.error : 'No se pudo responder.'; }, function () { return 'No se pudo responder.'; });
@@ -436,11 +465,12 @@ export const PAGINA_JS = `(function () {
 
   function consultar() {
     clearTimeout(timer);
-    if (!token) return sinToken();
-    pedirApi('/api/estado', { cache: 'no-store', headers: { 'x-sloth-token': token } })
+    if (!token) return sinToken(viejo ? 'Hay que volver a emparejar este celu: escaneá el QR de nuevo en Sloth.' : undefined);
+    pedirApi('/api/estado')
       .then(function (r) {
         if (r.status === 401) {
           guardar('sloth-token', null);
+          guardar('sloth-clave', null);
           token = null;
           sinToken('Este celu ya no está autorizado (se regeneró el código en Sloth). Escaneá el QR de nuevo.');
           return null;
