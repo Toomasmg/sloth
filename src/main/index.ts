@@ -10,6 +10,7 @@ import { accountStatus, createAccount } from './accounts'
 import { installInto, stateForEvent, writeHookScript, type HookEventPayload } from './hooks'
 import { esFalsoFinal, pendientes, registrar as registrarFondo, venceEn, type Fondo } from './segundo-plano-core'
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
+import { claudeWithPrompt } from './shell-args'
 import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
 import { clipboardForPaste } from './clipboard-paste'
 import { createWorktree } from './git'
@@ -265,7 +266,7 @@ app.whenReady().then(async () => {
     if (!ws.autoStartClaude) return undefined
     if (ws.initialPrompt && !ws.initialPromptUsed) {
       store.updateWorkspace(ws.id, { initialPromptUsed: true })
-      return ['claude', ws.initialPrompt.replace(/[\r\n]+/g, ' ')]
+      return claudeWithPrompt(ws.initialPrompt)
     }
     if (ws.resume !== false && hasPreviousConversation(acc, ws.cwd)) return ['claude', '--continue']
     return ['claude']

@@ -194,8 +194,9 @@ const feature: Feature = {
 
     /** Pedido nuevo: si una regla lo cubre se aprueba solo; si no, aviso (la tarjeta la muestra la UI). */
     function onRequest(b: TerminalBackend, req: PendingPermission): void {
-      if (!ctx.store.workspace(req.ws)) return
-      const rule = findRule(state.rules, req)
+      const ws = ctx.store.workspace(req.ws)
+      if (!ws) return
+      const rule = findRule(state.rules, req, ws.cwd)
       if (rule) {
         try {
           b.answerPermission(req.id, decisionFor('allow'))

@@ -65,6 +65,8 @@ export function baseEnv(): Record<string, string> {
     env[k] = v
   }
   env.TERM_PROGRAM = 'Sloth'
+  // cmd.exe busca primero en la carpeta actual: sin esto, un claude.cmd que venga en el repo se ejecuta solo.
+  env.NoDefaultCurrentDirectoryInExePath = '1'
   return env
 }
 

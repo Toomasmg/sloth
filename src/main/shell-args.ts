@@ -11,6 +11,12 @@ export const posixArg = (s: string): string => (PLAIN.test(s) ? s : `'${s.replac
 // cmd no tiene escape confiable: se quitan las comillas y los caracteres especiales del prompt.
 export const cmdArg = (s: string): string => (PLAIN.test(s) ? s : `"${s.replace(/["&|<>^%!()]/g, '')}"`)
 
+/**
+ * argv de Claude con un prompt inicial. El prompt puede venir de un team.json o de un archivo importado:
+ * va después de «--» para que uno que empiece con guion (--permission-mode=…, --settings=…) no se lea como opción.
+ */
+export const claudeWithPrompt = (prompt: string): string[] => ['claude', '--', prompt.replace(/[\r\n]+/g, ' ')]
+
 /** Argumentos de la shell: solo la shell, o la shell corriendo el comando de Claude y quedándose abierta. */
 export function shellArgs(family: ShellFamily, claude?: string[]): string[] {
   if (!claude?.length) return family === 'ps' ? ['-NoLogo'] : family === 'posix' ? ['--login', '-i'] : []

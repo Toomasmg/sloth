@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { createReadStream, existsSync, openSync, readSync, closeSync, statSync, unlinkSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
-import { git, gitRaw, GitError, PROTECTED, readable, run, validBranchName } from './git-run'
+import { git, gitRaw, GitError, GIT_SAFE_ENV, PROTECTED, readable, run, validBranchName } from './git-run'
 
 /** Lógica de git/gh de la función «git», sin Electron (se prueba con Node). */
 
@@ -215,7 +215,7 @@ function streamLines(cwd: string, args: string[], limit: number, timeoutMs = 200
     const child = spawn('git', ['-C', cwd, '-c', 'core.quotepath=false', ...args], {
       windowsHide: true,
       shell: false,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0', NO_COLOR: '1', LC_ALL: 'C' }
+      env: { ...process.env, ...GIT_SAFE_ENV, GIT_TERMINAL_PROMPT: '0', NO_COLOR: '1', LC_ALL: 'C' }
     })
     const lines: string[] = []
     let rest = ''

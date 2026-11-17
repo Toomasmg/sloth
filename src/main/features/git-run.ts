@@ -23,8 +23,15 @@ export interface RunOpts {
   signal?: AbortSignal
 }
 
+/**
+ * Un repo ajeno (zip, USB, carpeta compartida) puede traer core.fsmonitor = <comando> en su .git/config,
+ * y git lo ejecuta en cualquier status. Sloth corre git solo, antes de que nadie confíe en la carpeta.
+ */
+export const GIT_SAFE_ENV = { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.fsmonitor', GIT_CONFIG_VALUE_0: 'false' }
+
 const ENV = {
   ...process.env,
+  ...GIT_SAFE_ENV,
   // Nada de prompts interactivos: si git o gh quieren preguntar algo, fallan con un mensaje.
   GIT_TERMINAL_PROMPT: '0',
   GCM_INTERACTIVE: 'never',
