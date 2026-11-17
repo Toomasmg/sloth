@@ -1,5 +1,5 @@
 import { app, Notification, type BrowserWindow } from 'electron'
-import { realpathSync } from 'node:fs'
+import { lstatSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
@@ -23,7 +23,7 @@ import {
   type PermissionKind,
   type PermissionRule
 } from './permissions-core'
-import { editInsideRepo } from './permissions-paths'
+import { editInsideRepo, type PathFs } from './permissions-paths'
 
 /**
  * Función «permissions» (lado main): pedidos de permiso de Claude, reglas «Permitir siempre» por
@@ -50,6 +50,7 @@ interface State {
   history: DecisionEntry[]
 }
 
+const DISK: PathFs = { real: (p) => realpathSync.native(p), lstat: (p) => lstatSync(p) }
 const MAX_HISTORY = 300
 const MAX_RULES = 200
 const MAX_MESSAGE = 1000
@@ -110,7 +111,7 @@ const feature: Feature = {
     const editScope: EditScope = (rule, req) => {
       const cwd = rule.cwd ?? ctx.store.workspace(req.ws)?.cwd
       const files = filesOf(req.tool, req.input)
-      return !!cwd && files.length > 0 && files.every((f) => editInsideRepo(f, cwd, realpathSync.native))
+      return !!cwd && files.length > 0 && files.every((f) => editInsideRepo(f, cwd, DISK))
     }
 
     const remember = (e: Omit<DecisionEntry, 'id' | 'at'>): DecisionEntry => {

@@ -1,28 +1,43 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { lstatSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { editInsideRepo, realPathOf } from './permissions-paths'
+import { editInsideRepo, realPathInside, type PathFs } from './permissions-paths'
 import { alwaysLabel, checkRule, findRule, ruleFor, ruleWarning, type EditScope, type PermissionRule } from './permissions-core'
 
 const w = path.win32
 const REPO = 'C:\\Users\\ana\\repo'
 
-// Disco falso: existen estas carpetas (en minúsculas, como compara Windows) y `links` son junctions.
-function fakeReal(existing: string[], links: Record<string, string> = {}): (p: string) => string {
-  const have = new Set(existing.map((e) => e.toLowerCase()))
-  return (p) => {
-    const key = p.toLowerCase()
-    for (const [from, to] of Object.entries(links)) {
-      if (key === from.toLowerCase() || key.startsWith(from.toLowerCase() + '\\')) return to + p.slice(from.length)
-    }
-    if (!have.has(key)) throw Object.assign(new Error('no existe'), { code: 'ENOENT' })
-    return p
-  }
+const missing = (): never => {
+  throw Object.assign(new Error('no existe'), { code: 'ENOENT' })
 }
 
-const disk = fakeReal(['C:\\', 'C:\\Users', 'C:\\Users\\ana', REPO, `${REPO}\\src`, `${REPO}\\.git`, `${REPO}\\.git\\hooks`])
+// Disco falso: existen estas rutas (comparadas en minúsculas, como Windows; realpath devuelve la
+// forma canónica) y `links` son enlaces o junctions; con destino null, colgantes.
+function fakeFs(existing: string[], links: Record<string, string | null> = {}): PathFs {
+  const have = new Map(existing.map((e) => [e.toLowerCase(), e]))
+  const linkOf = (p: string): [string, string | null] | undefined => {
+    const key = p.toLowerCase()
+    return Object.entries(links).find(([from]) => key === from.toLowerCase() || key.startsWith(from.toLowerCase() + '\\'))
+  }
+  const real = (p: string): string => {
+    const l = linkOf(p)
+    if (!l) return have.get(p.toLowerCase()) ?? missing()
+    const [from, to] = l
+    return to === null ? missing() : real(to + p.slice(from.length))
+  }
+  const lstat = (p: string): { isSymbolicLink(): boolean } => {
+    const l = linkOf(p)
+    if (l && l[0].toLowerCase() === p.toLowerCase()) return { isSymbolicLink: () => true }
+    real(p)
+    return { isSymbolicLink: () => false }
+  }
+  return { real, lstat }
+}
+
+const BASE = ['C:\\', 'C:\\Users', 'C:\\Users\\ana', REPO, `${REPO}\\src`, `${REPO}\\.git`, `${REPO}\\.git\\hooks`]
+const disk = fakeFs(BASE)
 
 test('adentro del repo sí, aunque el archivo sea nuevo o cambien las mayúsculas', () => {
   assert.equal(editInsideRepo(`${REPO}\\README.md`, REPO, disk, w), true)
@@ -47,19 +62,43 @@ test('las carpetas protegidas no entran, con cualquier mayúscula, punto final o
   }
 })
 
-test('un junction del repo que apunta afuera o a .git no cuenta como adentro', () => {
-  const real = fakeReal(['C:\\', 'C:\\Users', 'C:\\Users\\ana', REPO, 'C:\\Windows'], { [`${REPO}\\afuera`]: 'C:\\Windows', [`${REPO}\\ganchos`]: `${REPO}\\.git\\hooks` })
-  assert.equal(editInsideRepo(`${REPO}\\afuera\\x.dll`, REPO, real, w), false)
-  assert.equal(editInsideRepo(`${REPO}\\ganchos\\pre-commit`, REPO, real, w), false)
+test('un junction del repo que apunta afuera, a .git o a otra carpeta del repo no cuenta como adentro', () => {
+  const fs = fakeFs([...BASE, 'C:\\Windows'], { [`${REPO}\\afuera`]: 'C:\\Windows', [`${REPO}\\ganchos`]: `${REPO}\\.git\\hooks`, [`${REPO}\\atajo`]: `${REPO}\\src` })
+  assert.equal(editInsideRepo(`${REPO}\\afuera\\x.dll`, REPO, fs, w), false)
+  assert.equal(editInsideRepo(`${REPO}\\ganchos\\pre-commit`, REPO, fs, w), false)
+  assert.equal(editInsideRepo(`${REPO}\\atajo\\x.ts`, REPO, fs, w), false)
+})
+
+test('un enlace colgante del repo no aprueba, ni como archivo ni como carpeta', () => {
+  const fs = fakeFs(BASE, { [`${REPO}\\notas.md`]: null, [`${REPO}\\src\\gen`]: null })
+  assert.equal(editInsideRepo(`${REPO}\\notas.md`, REPO, fs, w), false)
+  assert.equal(editInsideRepo(`${REPO}\\src\\gen\\nuevo\\a.ts`, REPO, fs, w), false)
+  assert.equal(editInsideRepo(`${REPO}\\src\\otro.md`, REPO, fs, w), true)
+})
+
+test('el repo abierto a través de un junction sí vale', () => {
+  const fs = fakeFs(['C:\\', 'C:\\D', 'C:\\D\\repo', 'C:\\D\\repo\\src', 'C:\\Users', 'C:\\Users\\ana'], { [REPO]: 'C:\\D\\repo' })
+  assert.equal(editInsideRepo(`${REPO}\\src\\a.ts`, REPO, fs, w), true)
+  assert.equal(editInsideRepo('C:\\D\\repo\\b.ts', REPO, fs, w), true)
 })
 
 test('un error que no es «no existe» no aprueba', () => {
-  const real = (): string => {
-    throw Object.assign(new Error('sin permiso'), { code: 'EPERM' })
+  const fs: PathFs = {
+    real: (p) => p,
+    lstat: () => {
+      throw Object.assign(new Error('sin permiso'), { code: 'EPERM' })
+    }
   }
-  assert.equal(realPathOf(`${REPO}\\x`, real, w), undefined)
-  assert.equal(editInsideRepo(`${REPO}\\x`, REPO, real, w), false)
+  assert.equal(realPathInside(`${REPO}\\x`, REPO, fs, w), undefined)
+  assert.equal(editInsideRepo(`${REPO}\\x`, REPO, fs, w), false)
 })
+
+test('nombres con ~ que no son cortos 8.3 sí entran', () => {
+  assert.equal(editInsideRepo(`${REPO}\\informe~2.docx`, REPO, disk, w), true)
+  assert.equal(editInsideRepo(`${REPO}\\src\\VSCODE~1\\x`, REPO, disk, w), false)
+})
+
+const DISK: PathFs = { real: (p) => realpathSync.native(p), lstat: (p) => lstatSync(p) }
 
 test('junction real en disco', { skip: process.platform !== 'win32' }, () => {
   const base = mkdtempSync(path.join(tmpdir(), 'sloth-junction-'))
@@ -70,8 +109,28 @@ test('junction real en disco', { skip: process.platform !== 'win32' }, () => {
     mkdirSync(outside)
     writeFileSync(path.join(repo, 'a.txt'), '')
     symlinkSync(outside, path.join(repo, 'link'), 'junction')
-    assert.equal(editInsideRepo(path.join(repo, 'a.txt'), repo, realpathSync.native), true)
-    assert.equal(editInsideRepo(path.join(repo, 'link', 'x.txt'), repo, realpathSync.native), false)
+    symlinkSync(path.join(base, 'no-existe'), path.join(repo, 'colgante'), 'junction')
+    assert.equal(editInsideRepo(path.join(repo, 'a.txt'), repo, DISK), true)
+    assert.equal(editInsideRepo(path.join(repo, 'nuevo', 'b.txt'), repo, DISK), true)
+    assert.equal(editInsideRepo(path.join(repo, 'link', 'x.txt'), repo, DISK), false)
+    assert.equal(editInsideRepo(path.join(repo, 'colgante', 'x.txt'), repo, DISK), false)
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
+})
+
+test('symlink de archivo colgante real en disco', (t) => {
+  const base = mkdtempSync(path.join(tmpdir(), 'sloth-symlink-'))
+  try {
+    const repo = path.join(base, 'repo')
+    mkdirSync(repo)
+    try {
+      symlinkSync(path.join(base, 'afuera', 'x.cmd'), path.join(repo, 'notas.md'), 'file')
+    } catch (e) {
+      if ((e as { code?: unknown }).code === 'EPERM') return t.skip('sin permiso para crear symlinks')
+      throw e
+    }
+    assert.equal(editInsideRepo(path.join(repo, 'notas.md'), repo, DISK), false)
   } finally {
     rmSync(base, { recursive: true, force: true })
   }
