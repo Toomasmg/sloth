@@ -7,11 +7,9 @@ import { currentSettings } from './settings'
 import { huboCrashPrevio, tomarCrashPrevio } from '../diag/estado'
 import { textoDiagnostico, type DatosDiagnostico } from '../diag/diagnostico-texto'
 import { crearLimite } from '../diag/limite'
-import { acotar, redactar } from '../diag/redactar'
+import { leerErrorRenderer } from '../diag/error-renderer'
+import { redactar } from '../diag/redactar'
 import { logger } from '../logger-global'
-
-const MAX_MENSAJE = 1000
-const MAX_STACK = 4000
 
 function ajustesBooleanos(): Record<string, boolean> {
   const salida: Record<string, boolean> = {}
@@ -23,15 +21,6 @@ function ajustesBooleanos(): Record<string, boolean> {
   }
   recorrer(currentSettings(), '', 0)
   return salida
-}
-
-/** Lo que manda la UI desde window.onerror / unhandledrejection; llega sin validar. */
-function leerErrorRenderer(payload: unknown): string | undefined {
-  if (!payload || typeof payload !== 'object') return undefined
-  const { mensaje, stack } = payload as { mensaje?: unknown; stack?: unknown }
-  if (typeof mensaje !== 'string' || mensaje.length === 0) return undefined
-  const cabeza = acotar(mensaje, MAX_MENSAJE)
-  return typeof stack === 'string' && stack.length > 0 ? `${cabeza}\n${acotar(stack, MAX_STACK)}` : cabeza
 }
 
 /**

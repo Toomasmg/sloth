@@ -1,3 +1,8 @@
+import { acotar } from './redactar'
+
+// Cada entrada puede venir con un stack de 4000: acotada acá el texto que se copia no pasa de unos pocos KB.
+const MAX_ENTRADA = 600
+
 export interface EntradaLog {
   t: number
   nivel: 'error' | 'aviso' | 'info'
@@ -43,7 +48,7 @@ export function textoDiagnostico(d: DatosDiagnostico, ahora: number): string {
     ...(ajustes.length ? ajustes : ['  (sin datos)']),
     '',
     `Últimos errores y avisos (${errores.length + avisos.length})`,
-    ...(errores.length ? errores.map((e) => `[${iso(e.t)}] ${e.origen}: ${e.msg}`) : ['(sin errores)']),
+    ...(errores.length ? errores.map((e) => `[${iso(e.t)}] ${e.origen}: ${acotar(e.msg, MAX_ENTRADA)}`) : ['(sin errores)']),
     ...(avisos.length ? avisos.map((a) => `[aviso] ${a}`) : ['(sin avisos)'])
   ]
   if (d.crashPrevio) lineas.push('', 'La sesión anterior terminó de forma inesperada.')
