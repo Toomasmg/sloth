@@ -10,8 +10,7 @@ import { githubEnSettings, startGithubLogin, type GithubLogin } from './chat-aut
 import { readTeamConfig, repoKey } from './team-config-core'
 import { registerChatData, type ChatData, type ChatCoreHandle } from './chat-data'
 import { buildInvitation, decideInvite, looksLikeInvitation, parseInvitation, type ChatInvitation } from './chat-invite'
-import { writeJsonAtomic } from './tray-settings'
-import { leerJson } from '../json-file'
+import { escribirJsonAtomico, leerJson } from '../json-file'
 import { registerChatMcp } from './chat-mcp'
 
 /**
@@ -120,7 +119,9 @@ const feature: Feature = {
       return out
     }
 
-    const persist = (): void => writeJsonAtomic(configFile, saved)
+    const persist = (): void => {
+      escribirJsonAtomico(configFile, saved)
+    }
 
     const snapshot = (): ChatSnapshot => ({ auth, ...data.part() })
     const emit = (): void => ctx.emit('snapshot', snapshot())

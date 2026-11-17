@@ -1,10 +1,10 @@
 import { app } from 'electron'
 import { randomBytes } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { esObjeto, leerJson } from '../json-file'
+import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
 import { networkInterfaces } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import type { PendingPermission } from '../daemon-client'
 import type { HookEventPayload } from '../hooks'
@@ -70,11 +70,7 @@ function cargar(): Config {
 }
 
 function guardarConfig(c: Config): void {
-  const f = file()
-  mkdirSync(dirname(f), { recursive: true })
-  const tmp = `${f}.${process.pid}.tmp`
-  writeFileSync(tmp, JSON.stringify(c, null, 2), 'utf8')
-  renameSync(tmp, f)
+  escribirJsonAtomico(file(), c)
 }
 
 const ipActual = (): string | null => elegirIp(networkInterfaces())

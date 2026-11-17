@@ -12,7 +12,6 @@ const DEFAULTS: TraySettings = { closeToTray: false }
 export const featuresDir = (): string => join(app.getPath('userData'), 'features')
 const file = (): string => join(featuresDir(), 'tray.json')
 
-export const writeJsonAtomic = escribirJsonAtomico
 
 export function readTraySettings(): TraySettings {
   return leerJson(file(), {
@@ -22,5 +21,5 @@ export function readTraySettings(): TraySettings {
 }
 
 export function writeTraySettings(s: TraySettings): void {
-  writeJsonAtomic(file(), s)
+  escribirJsonAtomico(file(), s)
 }

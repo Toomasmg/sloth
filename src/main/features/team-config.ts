@@ -2,7 +2,7 @@ import { app, shell } from 'electron'
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
-import { writeJsonAtomic } from './tray-settings'
+import { escribirJsonAtomico } from '../json-file'
 import {
   buildTeamExport,
   planImport,
@@ -123,7 +123,9 @@ const feature: Feature = {
   name: 'team-config',
   register(ctx: FeatureContext) {
     let st = loadState()
-    const save = (): void => writeJsonAtomic(stateFile(), st)
+    const save = (): void => {
+      escribirJsonAtomico(stateFile(), st)
+    }
     const entry = (repo: string): TeamEntry => (st.teams[repoKey(repo)] ??= { repoPath: repo, mapping: {}, updatedAt: Date.now() })
 
     const statusOf = (repo: string): TeamStatus | null => {

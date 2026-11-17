@@ -3,8 +3,9 @@ import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import type { HookEventPayload } from '../hooks'
 import { currentSettings } from './settings'
-import { featuresDir, writeJsonAtomic } from './tray-settings'
-import { esObjeto, leerJson } from '../json-file'
+import { featuresDir } from './tray-settings'
+import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
+import { podarSegunStore } from '../poda'
 
 /**
  * Dormir espacios inactivos: cierra el Claude de un espacio que lleva un rato sin uso (libera su
@@ -36,7 +37,10 @@ const feature: Feature = {
   name: 'sleep',
   register(ctx: FeatureContext) {
     /** Dormidos: su terminal está cerrada y al abrirlos se retoma con --continue. Sobrevive a reiniciar Sloth. */
-    const asleep = new Set(readAsleep().filter((id) => ctx.store.workspace(id)))
+    const p = podarSegunStore(readAsleep(), (id) => Boolean(ctx.store.workspace(id)), ctx.store.confiable)
+    const asleep = new Set(p.vista)
+    /** Con el store incompleto, los que no aparecen se conservan en el archivo en vez de podarse. */
+    const ajenos = p.guardar.filter((id) => !asleep.has(id))
     /** Último evento de Claude por espacio (para saber si está quieto y desde cuándo). */
     const lastEvent = new Map<string, HookEventPayload>()
     /** Última actividad (hook que no sea el aviso de inactividad, o algo escrito en la terminal). */
@@ -46,7 +50,7 @@ const feature: Feature = {
 
     const save = (): void => {
       try {
-        writeJsonAtomic(file(), { asleep: [...asleep] })
+        escribirJsonAtomico(file(), { asleep: [...asleep, ...ajenos] })
       } catch (e) {
         ctx.log('no se pudo guardar sleep.json:', (e as Error).message)
       }
