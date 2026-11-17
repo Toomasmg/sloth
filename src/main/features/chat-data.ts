@@ -16,6 +16,7 @@ import {
   type ChatProfile,
   type ChatReactionEvent,
   type ChatReadEvent,
+  type ChatRemoveResult,
   type ChatTypingEvent,
   type ChatSnapshot,
   type ChatTeam,
@@ -85,6 +86,7 @@ import {
 import { containsText, escapeLike, mentionsLogin } from '../../shared/chat-text'
 import { canManageConv, parseRetention } from '../../shared/chat-retention'
 import { currentSettings } from './settings'
+import { faltaLaFuncion, resultadoExpulsar } from './chat-expulsar'
 
 /**
  * Datos del chat (equipos, DMs, mensajes, no leídos, realtime, fotos, avisos). Contrato entre
@@ -1053,19 +1055,28 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
     await refreshLists(true)
   })
 
-  ctx.handle('removeMember', async (rawTeam: unknown, rawUser: unknown): Promise<void> => {
+  // remove_member (0007) saca a la persona y cambia el código en una sola transacción. Sin la 0007, en dos pasos.
+  ctx.handle('removeMember', async (rawTeam: unknown, rawUser: unknown): Promise<ChatRemoveResult> => {
     const c = clientNow()
     const me = meNow()
     const teamId = parseUuid(rawTeam, 'Equipo inválido.')
     const userId = parseUuid(rawUser, 'Persona inválida.')
     if (userId === me.id) throw new Error('Para salir usá «Salir del equipo».')
+    const rpc = await c.rpc('remove_member', { p_team: teamId, p_user: userId })
+    if (!faltaLaFuncion(rpc.error)) {
+      check(rpc, 'No podés sacar a esa persona.')
+      await refreshLists(true)
+      return resultadoExpulsar({ conRpc: true, codigoNuevo: true })
+    }
+    ctx.log('chat: el servidor no tiene remove_member (falta la migración 0007).')
     const r = await c.from('team_members').delete().eq('team_id', teamId).eq('user_id', userId).eq('role', 'member').select('user_id')
     check(r, 'No podés sacar a esa persona.')
     if ((r.data ?? []).length === 0) throw new Error('No podés sacar a esa persona.')
     // Con el código de antes, quien salió vuelve a entrar con la misma invitación: se cambia en el mismo paso.
     const code = await c.rpc('regenerate_invite_code', { p_team: teamId })
+    if (code.error) ctx.log('chat: no se pudo cambiar el código después de expulsar:', code.error.message ?? code.error.code ?? '')
     await refreshLists(true)
-    if (code.error) throw new Error('La persona ya no está en el equipo, pero no se pudo cambiar el código de invitación. Cambialo desde «Invitar».')
+    return resultadoExpulsar({ conRpc: false, codigoNuevo: !code.error })
   })
 
   ctx.handle('openDm', async (rawUser: unknown): Promise<ChatThread> => {

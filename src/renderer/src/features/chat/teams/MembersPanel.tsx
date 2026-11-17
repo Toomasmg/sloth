@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import { ChatCircle, Crown, ShieldCheck, SignOut, Users, UserMinus } from '@phosphor-icons/react'
-import type { ChatMember, ChatSnapshot, ChatTeam, ChatThread } from '../../../../../shared/chat'
+import type { ChatMember, ChatRemoveResult, ChatSnapshot, ChatTeam, ChatThread } from '../../../../../shared/chat'
+import { InlineAlert } from '../../../ui'
 import { useUi } from '../../host'
 import { cleanError } from '../../../format'
 import { Avatar, canManage, ConfirmInline, roleLabel, TeamModal } from './shared'
@@ -29,6 +30,7 @@ export function MembersPanel({
   const [confirm, setConfirm] = useState<Confirm>(null)
   const [err, setErr] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
+  const [warn, setWarn] = useState<string | null>(null)
 
   const reload = async (): Promise<void> => {
     try {
@@ -65,6 +67,7 @@ export function MembersPanel({
   const runConfirm = async (c: Exclude<Confirm, null>): Promise<void> => {
     setErr(null)
     setStatus(null)
+    setWarn(null)
     setBusyKey('confirm')
     try {
       if (c.kind === 'leave') {
@@ -72,9 +75,11 @@ export function MembersPanel({
         onLeft()
         return
       }
-      await ui.invoke('feat:chat:removeMember', team.id, c.member.profile.id)
+      const r = await ui.invoke<ChatRemoveResult>('feat:chat:removeMember', team.id, c.member.profile.id)
       setConfirm(null)
-      setStatus(`Sacaste a ${c.member.profile.login} del equipo.`)
+      // Si el código no cambió, la persona puede volver a entrar: es una advertencia, no un éxito.
+      if (r.codigoNuevo) setStatus(`Sacaste a ${c.member.profile.login} del equipo. ${r.aviso}`)
+      else setWarn(`Sacaste a ${c.member.profile.login} del equipo. ${r.aviso}`)
       await reload()
     } catch (e) {
       setErr(cleanError(e))
@@ -159,6 +164,7 @@ export function MembersPanel({
           {err}
         </p>
       )}
+      {warn && <InlineAlert tone="warning">{warn}</InlineAlert>}
       {status && (
         <p className="f-chat-team-status" role="status">
           {status}
