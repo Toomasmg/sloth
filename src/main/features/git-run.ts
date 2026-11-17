@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
-import { safeGitArgs, safeGitEnv } from '../git-safe'
+import { filterOverrides, RUNS_FILTERS, safeGitArgs, safeGitEnv } from '../git-safe'
 
 /**
  * Corre git / gh sin shell (array de argumentos), oculto en Windows y con timeout.
@@ -135,16 +135,33 @@ export function readable(r: RunResult, what: string): string {
   return `${what} falló${text ? `: ${text}` : ` (código ${r.code}).`}`
 }
 
+const FILTERS_TTL_MS = 10_000
+const filtersCache = new Map<string, { at: number; extra: string[] }>()
+
+/** Los `-c` que apagan los filtros del repo cuando `args` es un status o un diff (ver filterOverrides). */
+export async function filterGuard(cwd: string, args: readonly string[]): Promise<string[]> {
+  if (!RUNS_FILTERS.has(args[0] ?? '')) return []
+  const hit = filtersCache.get(cwd)
+  if (hit && Date.now() - hit.at < FILTERS_TTL_MS) return hit.extra
+  const r = await run('git', safeGitArgs(cwd, ['config', '-z', '--get-regexp', '^filter\\.']), { timeoutMs: 10000 })
+  // 1 = ningún filtro; otro error (carpeta que no existe, config rota) hace fallar igual al comando que sigue.
+  if (r.code !== 0) return []
+  const extra = filterOverrides(r.stdout)
+  if (!extra) throw new GitError('El repo tiene un filtro de git con un nombre que Sloth no puede apagar; no lo lee solo.')
+  filtersCache.set(cwd, { at: Date.now(), extra })
+  return extra
+}
+
 /** git con -C <cwd>; tira GitError legible si falla. */
 export async function git(cwd: string, args: string[], opts: Omit<RunOpts, 'cwd'> = {}): Promise<string> {
-  const r = await run('git', safeGitArgs(cwd, args), opts)
+  const r = await run('git', safeGitArgs(cwd, args, await filterGuard(cwd, args)), opts)
   if (r.code !== 0) throw new GitError(readable(r, `git ${args[0]}`))
   return r.stdout
 }
 
 /** git que devuelve el resultado crudo (para comandos donde el código distinto de 0 significa "no"). */
-export function gitRaw(cwd: string, args: string[], opts: Omit<RunOpts, 'cwd'> = {}): Promise<RunResult> {
-  return run('git', safeGitArgs(cwd, args), opts)
+export async function gitRaw(cwd: string, args: string[], opts: Omit<RunOpts, 'cwd'> = {}): Promise<RunResult> {
+  return run('git', safeGitArgs(cwd, args, await filterGuard(cwd, args)), opts)
 }
 
 export function isDir(p: unknown): p is string {
