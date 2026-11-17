@@ -1,5 +1,4 @@
 import { app, clipboard, Notification, safeStorage, shell, type BrowserWindow } from 'electron'
-import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Feature, FeatureContext } from './context'
@@ -12,6 +11,7 @@ import { readTeamConfig, repoKey } from './team-config-core'
 import { registerChatData, type ChatData, type ChatCoreHandle } from './chat-data'
 import { buildInvitation, decideInvite, looksLikeInvitation, parseInvitation, type ChatInvitation } from './chat-invite'
 import { writeJsonAtomic } from './tray-settings'
+import { leerJson } from '../json-file'
 import { registerChatMcp } from './chat-mcp'
 
 /**
@@ -106,24 +106,18 @@ const feature: Feature = {
     })
 
     function loadSaved(): SavedFile {
-      try {
-        if (!existsSync(configFile)) return {}
-        const raw = JSON.parse(readFileSync(configFile, 'utf8').replace(/^﻿/, '')) as unknown
-        if (!isObj(raw)) return {}
-        const out: SavedFile = {}
-        if (raw.config !== undefined)
-          try {
-            out.config = parseChatServerConfig(raw.config)
-          } catch {
-            ctx.log('chat: la configuración guardada no es válida; se ignora.')
-          }
-        const a = raw.accepted
-        if (isObj(a) && typeof a.repo === 'string' && typeof a.supabaseUrl === 'string' && typeof a.keyHash === 'string')
-          out.accepted = { repo: a.repo, supabaseUrl: a.supabaseUrl, keyHash: a.keyHash }
-        return out
-      } catch {
-        return {}
-      }
+      const raw = leerJson(configFile, { validar: (v) => (isObj(v) ? v : undefined), porDefecto: (): Record<string, unknown> => ({}) }).valor
+      const out: SavedFile = {}
+      if (raw.config !== undefined)
+        try {
+          out.config = parseChatServerConfig(raw.config)
+        } catch {
+          ctx.log('chat: la configuración guardada no es válida; se ignora.')
+        }
+      const a = raw.accepted
+      if (isObj(a) && typeof a.repo === 'string' && typeof a.supabaseUrl === 'string' && typeof a.keyHash === 'string')
+        out.accepted = { repo: a.repo, supabaseUrl: a.supabaseUrl, keyHash: a.keyHash }
+      return out
     }
 
     const persist = (): void => writeJsonAtomic(configFile, saved)

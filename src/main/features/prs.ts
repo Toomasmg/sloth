@@ -1,5 +1,5 @@
 import { app, shell } from 'electron'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
 import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import { git, gitRaw, GitError, isDir, normPath, readable, run, validBranchName } from './git-run'
@@ -54,36 +54,29 @@ function stateFile(): string {
 }
 
 function load(): void {
-  try {
-    const j = JSON.parse(readFileSync(stateFile(), 'utf8')) as Partial<Saved>
-    // Con otra forma de PrRow el caché rompería la vista: se descarta y se vuelve a leer de GitHub.
-    if (j?.version !== VERSION) return
-    const s = j.snapshot
-    if (s && Array.isArray(s.repos) && typeof s.at === 'number') {
-      snapshot = {
-        problem: s.problem === 'no-gh' || s.problem === 'no-login' || s.problem === 'no-repos' ? s.problem : null,
-        login: typeof s.login === 'string' ? s.login : null,
-        repos: s.repos.filter((r) => validRepo(r?.repo) && Array.isArray(r.prs) && Array.isArray(r.repoPaths)),
-        at: s.at,
-        refreshing: false
-      }
+  const j = leerJson(stateFile(), { validar: (v) => (esObjeto(v) ? (v as Partial<Saved>) : undefined), porDefecto: (): Partial<Saved> => ({}) }).valor
+  // Con otra forma de PrRow el caché rompería la vista: se descarta y se vuelve a leer de GitHub.
+  if (j?.version !== VERSION) return
+  const s = j.snapshot
+  if (s && Array.isArray(s.repos) && typeof s.at === 'number') {
+    snapshot = {
+      problem: s.problem === 'no-gh' || s.problem === 'no-login' || s.problem === 'no-repos' ? s.problem : null,
+      login: typeof s.login === 'string' ? s.login : null,
+      repos: s.repos.filter((r) => validRepo(r?.repo) && Array.isArray(r.prs) && Array.isArray(r.repoPaths)),
+      at: s.at,
+      refreshing: false
     }
-    if (j?.ids && typeof j.ids === 'object') {
-      ids = new Map(Object.entries(j.ids).filter((e): e is [string, string] => typeof e[1] === 'string'))
-    }
-  } catch {
-    /* primera vez */
+  }
+  if (j?.ids && typeof j.ids === 'object') {
+    ids = new Map(Object.entries(j.ids).filter((e): e is [string, string] => typeof e[1] === 'string'))
   }
 }
 
 function persist(): void {
   try {
-    mkdirSync(join(app.getPath('userData'), 'features'), { recursive: true })
     const { refreshing: _r, ...rest } = snapshot
     const data: Saved = { version: VERSION, snapshot: rest, ids: Object.fromEntries(ids) }
-    const tmp = `${stateFile()}.tmp`
-    writeFileSync(tmp, JSON.stringify(data), 'utf8')
-    renameSync(tmp, stateFile())
+    escribirJsonAtomico(stateFile(), data)
   } catch (e) {
     ctx.log('no se pudo guardar prs.json', e)
   }

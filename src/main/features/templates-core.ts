@@ -2,8 +2,9 @@
  * Plantillas de espacio: validación, variables y archivo JSON. Sin Electron a propósito
  * (solo node:*), así se prueba con Node y un userData falso.
  */
-import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
-import { dirname, isAbsolute } from 'node:path'
+import { existsSync, statSync } from 'node:fs'
+import { isAbsolute } from 'node:path'
+import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
 import { randomUUID } from 'node:crypto'
 import type { NewWorkspaceInput } from '../../shared/types'
 import {
@@ -222,30 +223,16 @@ export class TemplateFile {
   }
 
   private load(): Template[] {
-    if (!existsSync(this.file)) return []
-    try {
-      const data = JSON.parse(readFileSync(this.file, 'utf8').replace(/^﻿/, '')) as Partial<FileShape>
-      this.def = typeof data.defaultId === 'string' ? data.defaultId : null
-      return Array.isArray(data.templates)
-        ? data.templates.filter(isTemplate).map((t) => ({ ...t, counter: Number.isFinite(t.counter) ? t.counter : 0 }))
-        : []
-    } catch {
-      // Archivo roto: se aparta (no se pisa) y se arranca vacío.
-      try {
-        renameSync(this.file, `${this.file}.roto-${Date.now()}`)
-      } catch {
-        /* sin permisos: se pisa al guardar */
-      }
-      return []
-    }
+    const data = leerJson(this.file, { validar: (v) => (esObjeto(v) ? (v as Partial<FileShape>) : undefined), porDefecto: (): Partial<FileShape> => ({}) }).valor
+    this.def = typeof data.defaultId === 'string' ? data.defaultId : null
+    return Array.isArray(data.templates)
+      ? data.templates.filter(isTemplate).map((t) => ({ ...t, counter: Number.isFinite(t.counter) ? t.counter : 0 }))
+      : []
   }
 
   private persist(): void {
-    mkdirSync(dirname(this.file), { recursive: true })
-    const tmp = `${this.file}.${process.pid}.tmp`
     const data: FileShape = { version: 1, templates: this.list, defaultId: this.def }
-    writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8')
-    renameSync(tmp, this.file)
+    escribirJsonAtomico(this.file, data)
   }
 
   all(): Template[] {

@@ -1,6 +1,6 @@
 import { app, dialog, nativeTheme, type BrowserWindow } from 'electron'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
+import { escribirJsonAtomico as writeJsonAtomic, esObjeto, leerJson } from '../json-file'
 import type { Feature, FeatureContext } from './context'
 import {
   applyPatch,
@@ -20,20 +20,8 @@ import { SURFACE } from '../../shared/surfaces'
  */
 const file = (): string => join(app.getPath('userData'), 'features', 'settings.json')
 
-/** Escritura atómica: tmp + rename (nunca queda un JSON a medias). */
-function writeJsonAtomic(path: string, data: unknown): void {
-  mkdirSync(dirname(path), { recursive: true })
-  const tmp = `${path}.${process.pid}.tmp`
-  writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8')
-  renameSync(tmp, path)
-}
-
 function read(): SlothSettings {
-  try {
-    return normalize(JSON.parse(readFileSync(file(), 'utf8').replace(/^﻿/, '')))
-  } catch {
-    return normalize(undefined)
-  }
+  return leerJson(file(), { validar: (v) => (esObjeto(v) ? normalize(v) : undefined), porDefecto: () => normalize(undefined) }).valor
 }
 
 /** Colores de la barra de título que dibuja Windows (los botones de ventana): el fondo es el --surface del tema (src/shared/surfaces.ts). */

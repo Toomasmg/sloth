@@ -1,7 +1,8 @@
 import { app, Notification, type BrowserWindow } from 'electron'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { mkdirSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { esObjeto, leerJson } from '../json-file'
 import type { Feature, FeatureContext } from './context'
 import type { TerminalBackend, PendingPermission } from '../daemon-client'
 import type { HookEventPayload } from '../hooks'
@@ -60,21 +61,16 @@ function writeAtomic(path: string, data: unknown): void {
   renameSync(tmp, path)
 }
 
-/** Lectura tolerante: lo que no se entiende se descarta (nunca tira). */
+/** Lectura tolerante: las entradas que no se entienden se descartan; un archivo ilegible se aparta. */
 function load(): State {
-  const empty: State = { rules: [], history: [] }
-  try {
-    const raw = JSON.parse(readFileSync(file(), 'utf8').replace(/^﻿/, '')) as Partial<State>
-    const rules = Array.isArray(raw.rules)
-      ? raw.rules.filter((r): r is PermissionRule => !!r && typeof r.id === 'string' && typeof r.workspaceId === 'string').slice(0, MAX_RULES)
-      : []
-    const history = Array.isArray(raw.history)
-      ? raw.history.filter((h): h is DecisionEntry => !!h && typeof h.id === 'string' && typeof h.at === 'number').slice(0, MAX_HISTORY)
-      : []
-    return { rules, history }
-  } catch {
-    return empty
-  }
+  const raw = leerJson(file(), { validar: (v) => (esObjeto(v) ? (v as Partial<State>) : undefined), porDefecto: (): Partial<State> => ({}) }).valor
+  const rules = Array.isArray(raw.rules)
+    ? raw.rules.filter((r): r is PermissionRule => !!r && typeof r.id === 'string' && typeof r.workspaceId === 'string').slice(0, MAX_RULES)
+    : []
+  const history = Array.isArray(raw.history)
+    ? raw.history.filter((h): h is DecisionEntry => !!h && typeof h.id === 'string' && typeof h.at === 'number').slice(0, MAX_HISTORY)
+    : []
+  return { rules, history }
 }
 
 const startOfToday = (): number => {

@@ -1,8 +1,9 @@
 import { app, dialog, shell, type SaveDialogOptions } from 'electron'
-import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import { currentSettings } from './settings'
+import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
 import {
   listRecentSessions,
   listSessions,
@@ -43,19 +44,14 @@ const samePath = (a: string, b: string): boolean =>
 const prefsFile = (): string => join(app.getPath('userData'), 'features', 'history.json')
 
 function readPrefs(): HistoryPrefs {
-  try {
-    return parseHistoryPrefs(JSON.parse(readFileSync(prefsFile(), 'utf8').replace(/^﻿/, '')))
-  } catch {
-    return { pinned: [], hidden: [] }
-  }
+  return leerJson(prefsFile(), {
+    validar: (v) => (esObjeto(v) ? parseHistoryPrefs(v) : undefined),
+    porDefecto: (): HistoryPrefs => ({ pinned: [], hidden: [] })
+  }).valor
 }
 
 function writePrefs(p: HistoryPrefs): void {
-  const path = prefsFile()
-  mkdirSync(dirname(path), { recursive: true })
-  const tmp = `${path}.${process.pid}.tmp`
-  writeFileSync(tmp, JSON.stringify(p, null, 2), 'utf8')
-  renameSync(tmp, path)
+  escribirJsonAtomico(prefsFile(), p)
 }
 
 export interface OpenResult {
