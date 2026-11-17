@@ -4,10 +4,11 @@
  * Módulo puro (lo corre `node --test` con type stripping): sin enums, namespaces ni parameter
  * properties, y los tipos se importan con `type`.
  */
-import { MODELOS, SIN_CONECTOR, type Corrida, type EstadoBase, type Modelo, type Ticket, type TicketsConfig, type Yo } from '../../../shared/tickets'
+import { MODELOS, SIN_CONECTOR, type Corrida, type EstadoBase, type Modelo, type Ticket, type TicketsConfig, type UsoPorDia, type Yo } from '../../../shared/tickets'
 import { ID_CONECTOR_RE, ID_MAX, ID_SEGURO_RE, PREFIJO_RE, regexDePersona, type ConectorDef } from './conector'
 import { CONECTOR_LEGADO } from './conectores'
 import { idValido, normalizeEstados, normEstado, normYo } from './motor'
+import { costoValido, sanearUso, vueltasValidas } from './uso'
 
 /** 'error': el archivo está pero no se pudo leer (bloqueado, sin permiso…); no es lo mismo que corrupto. */
 export type Lectura = { kind: 'falta' } | { kind: 'corrupto' } | { kind: 'error'; mensaje: string } | { kind: 'ok'; json: unknown; mtimeMs: number }
@@ -23,6 +24,8 @@ export interface TicketsState {
   /** Prefijo del servidor MCP con el que se leyó la lista: el detalle y las escrituras van al mismo. */
   leidoCon?: string
   lastRun?: Corrida
+  /** Lo gastado por día y conector, para el acumulado de Ajustes. */
+  uso?: UsoPorDia
   lastError?: string
   /** gruvMtimeMs: el mtime del gruv.json migrado; si gruv.json cambia, se vuelve a migrar. */
   migradoDe?: { archivo: 'gruv.json'; en: number; gruvMtimeMs?: number }
@@ -120,7 +123,9 @@ function sanearConfig(raw: unknown, buscar: Buscar): TicketsConfig {
     defaultRepo: noVacio(c.defaultRepo),
     projectRepos: Object.fromEntries(Object.entries(repos).filter((e): e is [string, string] => typeof e[1] === 'string')),
     confirmRefresh: c.confirmRefresh !== false,
-    servidores: sanearServidores(c.servidores)
+    servidores: sanearServidores(c.servidores),
+    maxTurns: vueltasValidas(c.maxTurns),
+    maxCostUsd: costoValido(c.maxCostUsd)
   })
 }
 
@@ -139,7 +144,14 @@ function sanearTickets(raw: unknown, def: ConectorDef | undefined): Ticket[] {
 
 function sanearCorrida(raw: unknown): Corrida | undefined {
   if (!esObjeto(raw)) return undefined
-  return sinVacios({ tokens: numero(raw.tokens), costUsd: numero(raw.costUsd), durationMs: numero(raw.durationMs) })
+  return sinVacios({
+    tokens: numero(raw.tokens),
+    costUsd: numero(raw.costUsd),
+    durationMs: numero(raw.durationMs),
+    numTurns: numero(raw.numTurns),
+    maxTurns: vueltasValidas(raw.maxTurns),
+    tope: raw.tope === 'vueltas' ? ('vueltas' as const) : raw.tope === 'costo' ? ('costo' as const) : undefined
+  })
 }
 
 function armar(o: Obj, config: TicketsConfig, buscar: Buscar, migradoDe: unknown): TicketsState {
@@ -155,6 +167,7 @@ function armar(o: Obj, config: TicketsConfig, buscar: Buscar, migradoDe: unknown
     fetchedBy: noVacio(o.fetchedBy),
     leidoCon: typeof o.leidoCon === 'string' && o.leidoCon.length <= 64 && PREFIJO_RE.test(o.leidoCon) ? o.leidoCon : undefined,
     lastRun: sanearCorrida(o.lastRun),
+    uso: sanearUso(o.uso),
     lastError: noVacio(o.lastError),
     migradoDe: m === undefined ? undefined : sinVacios({ archivo: 'gruv.json' as const, en: m, gruvMtimeMs }),
     config
@@ -174,9 +187,9 @@ export function migrarDeGruv(raw: unknown, buscar: Buscar, ahora: number, gruvMt
   return armar(raw, config, buscar, { archivo: 'gruv.json', en: ahora, gruvMtimeMs })
 }
 
-/** Lo leído (tickets, columnas, quién sos, la última consulta) fuera; la config queda igual. */
+/** Lo leído (tickets, columnas, quién sos, la última consulta) fuera; la config y lo gastado quedan igual. */
 export function sinLista(s: TicketsState): TicketsState {
-  return sinVacios({ version: 2, tickets: [], migradoDe: s.migradoDe, config: s.config })
+  return sinVacios({ version: 2, tickets: [], uso: s.uso, migradoDe: s.migradoDe, config: s.config })
 }
 
 /**
