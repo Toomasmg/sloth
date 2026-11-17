@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
+import { esperarCierre, matarArbol, spawnOptsArbol } from '../kill-tree'
+import { depsReales } from '../kill-tree-real'
 
 /**
  * Corre git / gh sin shell (array de argumentos), oculto en Windows y con timeout.
@@ -139,6 +141,7 @@ export function run(cmd: 'git' | 'gh', args: string[], opts: RunOpts = {}): Prom
         env: opts.env ? { ...ENV, ...opts.env } : ENV,
         windowsHide: true,
         shell: false,
+        ...spawnOptsArbol(process.platform),
         stdio: ['pipe', 'pipe', 'pipe']
       })
     } catch (e) {
@@ -154,17 +157,20 @@ export function run(cmd: 'git' | 'gh', args: string[], opts: RunOpts = {}): Prom
       clearTimeout(timer)
       signal?.removeEventListener('abort', alAbortar)
     }
+    // Se rechaza recién cuando el árbol murió (tope 3 s): si no, el llamador sigue con ssh o hooks vivos tocando el repo.
+    const cortar = (error: GitError): void => {
+      terminar()
+      void matarArbol(child.pid, depsReales())
+        .then(() => esperarCierre(child, 3000))
+        .then(() => reject(error))
+    }
     const alAbortar = (): void => {
       if (done) return
-      terminar()
-      child.kill()
-      reject(new GitError('Consulta cancelada.', 'cancelada'))
+      cortar(new GitError('Consulta cancelada.', 'cancelada'))
     }
     const timer = setTimeout(() => {
       if (done) return
-      terminar()
-      child.kill()
-      reject(new GitError(`${cmd} tardó demasiado y se canceló (${Math.round((opts.timeoutMs ?? 30000) / 1000)} s).`, 'tiempo'))
+      cortar(new GitError(`${cmd} tardó demasiado y se canceló (${Math.round((opts.timeoutMs ?? 30000) / 1000)} s).`, 'tiempo'))
     }, opts.timeoutMs ?? 30000)
     child.stdout.on('data', (b: Buffer) => {
       if (outLen >= maxBytes) return
