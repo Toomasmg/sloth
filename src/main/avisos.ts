@@ -23,6 +23,10 @@ export function avisoSoloLectura(archivo: string, motivo: string): void {
   )
 }
 
+export function avisoVersionFutura(archivo: string): void {
+  avisar(`${basename(archivo)} lo guardó una versión más nueva de Sloth: lo abrí en solo lectura y no lo voy a reescribir. Actualizá Sloth para poder guardar cambios.`)
+}
+
 /** Devuelve los avisos pendientes y los olvida: cada uno se muestra una sola vez. */
 export function tomarAvisos(): string[] {
   const r = pendientes

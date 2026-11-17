@@ -1,6 +1,9 @@
 import { app, dialog, nativeTheme, type BrowserWindow } from 'electron'
 import { join } from 'node:path'
-import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
+import { escribirJsonAtomico, leerJson, respaldar } from '../json-file'
+import { avisar, avisoVersionFutura } from '../avisos'
+import { migrar, type EstadoVersion } from '../versionado'
+import { armarArchivo, leerSettings, type ArchivoSettings } from './settings-archivo'
 import type { Feature, FeatureContext } from './context'
 import {
   applyPatch,
@@ -20,10 +23,52 @@ import { SURFACE } from '../../shared/surfaces'
  */
 const file = (): string => join(app.getPath('userData'), 'features', 'settings.json')
 
-const validar = (v: unknown): SlothSettings | undefined => (esObjeto(v) ? normalize(v) : undefined)
+const VERSION_SETTINGS = 1
+
+let soloLectura = false
+let futura = false
+let porRespaldar = false
+let resto: Record<string, unknown> = {}
+
+interface Lectura extends ArchivoSettings {
+  estado: EstadoVersion
+}
+
+// Solo devuelve: los flags del módulo los asigna read(), así una consulta (initialChrome) no los toca.
+const validar = (v: unknown): Lectura | undefined => {
+  const r = migrar(v, {}, VERSION_SETTINGS)
+  if (r.estado === 'invalida') return undefined
+  return { ...leerSettings(r.datos), estado: r.estado }
+}
+
+const sinArchivo = (): Lectura => ({ settings: normalize(undefined), resto: {}, estado: 'actual' })
 
 function read(): SlothSettings {
-  return leerJson(file(), { validar, porDefecto: () => normalize(undefined) }).valor
+  const l = leerJson(file(), { validar, porDefecto: sinArchivo }).valor
+  futura = l.estado === 'futura'
+  soloLectura = futura
+  porRespaldar = l.estado === 'migrado'
+  resto = l.resto
+  if (futura) avisoVersionFutura(file())
+  return l.settings
+}
+
+function guardar(): void {
+  if (soloLectura) {
+    if (futura) avisoVersionFutura(file())
+    return
+  }
+  if (porRespaldar) {
+    try {
+      respaldar(file())
+      porRespaldar = false
+    } catch (e) {
+      soloLectura = true
+      avisar(`No pude respaldar settings.json antes de actualizarlo (${e instanceof Error ? e.message : String(e)}); no voy a guardar cambios hasta que reinicies Sloth.`)
+      return
+    }
+  }
+  escribirJsonAtomico(file(), armarArchivo(settings, resto, VERSION_SETTINGS))
 }
 
 /** Colores de la barra de título que dibuja Windows (los botones de ventana): el fondo es el --surface del tema (src/shared/surfaces.ts). */
@@ -41,7 +86,7 @@ const chromeFor = (theme: ThemeChoice, dark: boolean): { bg: string; symbol: str
  */
 export function initialChrome(): { bg: string; symbol: string; dark: boolean } {
   try {
-    const s = settings ?? leerJson(file(), { validar, porDefecto: () => normalize(undefined), soloConsulta: true }).valor
+    const s = settings ?? leerJson(file(), { validar, porDefecto: sinArchivo, soloConsulta: true }).valor.settings
     nativeTheme.themeSource = themeSource(s.theme)
     const dark = resolveDark(s.theme, nativeTheme.shouldUseDarkColors)
     return { ...chromeFor(s.theme, dark), dark }
@@ -104,7 +149,7 @@ function applyLoginItem(): void {
 function commit(next: SlothSettings): SettingsPayload {
   const loginChanged = next.openAtLogin !== settings.openAtLogin
   settings = next
-  escribirJsonAtomico(file(), settings)
+  guardar()
   applyNative()
   if (loginChanged) applyLoginItem()
   const p = payload()

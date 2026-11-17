@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { corregirRutasViejas, decidirCarga, estadoVacio, validarCuenta, validarEspacio, validarEstado, type EstadoValidado } from './store-core'
 
 const cuenta = { id: 'a1', label: 'A', configDir: 'C:\\datos\\accounts\\a1', createdAt: 1 }
@@ -78,7 +79,8 @@ test('listas ausentes o que no son listas quedan vacías sin contar descartes; l
     espaciosDescartados: 0,
     cuentasRepetidas: 0,
     espaciosRepetidos: 0,
-    versionFutura: false
+    versionFutura: false,
+    migrado: true
   })
   assert.equal(validarEstado(null), undefined)
   assert.equal(validarEstado([]), undefined)
@@ -144,10 +146,75 @@ test('M5: solo rutas corregidas: respalda y guarda en silencio y sigue siendo co
   assert.equal(d.aviso, undefined)
 })
 
-test('M5 / M2: versión futura: respalda pero no reescribe, y avisa que cualquier cambio lo reescribe', () => {
+test('M5 / M2: versión futura: respalda, queda en solo lectura, no guarda y no es confiable', () => {
   const d = decidirCarga({ v: leido({ version: 2, accounts: [cuenta] }) }, false)
+  assert.equal(d.soloLectura, true)
   assert.equal(d.respaldar, true)
   assert.equal(d.guardar, false)
+  assert.equal(d.confiable, false)
+  assert.match(d.aviso?.('bak') ?? '', /versión más nueva.*guardé el original como bak.*solo lectura.*no voy a guardar/)
+})
+
+test('versión futura con rutas viejas o descartes: sigue sin guardar', () => {
+  const d = decidirCarga({ v: leido({ version: 9, accounts: [cuenta, null] }) }, true)
+  assert.equal(d.soloLectura, true)
+  assert.equal(d.guardar, false)
+})
+
+test('sin version: se migra, así que respalda y guarda en silencio y el store sigue confiable', () => {
+  const d = decidirCarga({ v: leido({ accounts: [cuenta], workspaces: [espacio] }) }, false)
+  assert.equal(d.soloLectura, false)
+  assert.equal(d.respaldar, true)
+  assert.equal(d.guardar, true)
   assert.equal(d.confiable, true)
-  assert.match(d.aviso?.('bak') ?? '', /versión más nueva.*abrir o cerrar un panel/)
+  assert.equal(d.aviso, undefined)
+})
+
+const fixtureV1 = readFileSync(new URL('./fixtures/sloth-state-v1.json', import.meta.url), 'utf8')
+
+test('fixture v1 con version explícita: sin descartes, sin migrar y listas idénticas al archivo', () => {
+  const crudo = JSON.parse(fixtureV1)
+  const v = leido(crudo)
+  assert.equal(v.estado.version, 1)
+  assert.equal(v.migrado, false)
+  assert.equal(v.versionFutura, false)
+  assert.equal(v.cuentasDescartadas + v.espaciosDescartados, 0)
+  assert.deepEqual(v.estado, crudo)
+  assert.deepEqual(decidirCarga({ v }, false), { soloLectura: false, respaldar: false, guardar: false, confiable: true })
+})
+
+test('fixture v1 sin version (formato anterior): se lee sin pérdida y queda migrado con version 1', () => {
+  const crudo = JSON.parse(fixtureV1)
+  delete crudo.version
+  const v = leido(crudo)
+  assert.equal(v.estado.version, 1)
+  assert.equal(v.migrado, true)
+  assert.equal(v.cuentasDescartadas + v.espaciosDescartados, 0)
+  assert.deepEqual(v.estado, { ...JSON.parse(fixtureV1) })
+  assert.equal(JSON.stringify(Object.keys(v.estado).sort()), JSON.stringify(['accounts', 'openPanes', 'version', 'workspaces']))
+  assert.deepEqual(decidirCarga({ v }, false), { soloLectura: false, respaldar: true, guardar: true, confiable: true, aviso: undefined })
+})
+
+test('versión futura: el estado leído conserva los campos nuevos y no se toca la entrada', () => {
+  const crudo = { version: 2, accounts: [{ ...cuenta, nuevo: { n: 1 } }], workspaces: [], openPanes: [], sync: { id: 'x' } }
+  const copia = structuredClone(crudo)
+  const v = leido(crudo)
+  assert.equal(v.versionFutura, true)
+  assert.deepEqual(v.estado.accounts[0], { ...cuenta, nuevo: { n: 1 } })
+  assert.deepEqual(crudo, copia)
+})
+
+test('campos desconocidos en la raíz se conservan al migrar', () => {
+  const v = leido({ accounts: [cuenta], preferencia: { a: [1, 2] } })
+  assert.deepEqual((v.estado as unknown as Record<string, unknown>).preferencia, { a: [1, 2] })
+})
+
+test('version que no se entiende deja el archivo inválido (se aparta): texto, fraccionaria, cero, negativa, null', () => {
+  for (const version of ['x', '1', 1.5, 0, -1, null, true]) {
+    assert.equal(validarEstado({ version, accounts: [cuenta] }), undefined, JSON.stringify(version))
+  }
+})
+
+test('JSON corrupto o de otra forma: la raíz que no es objeto no sirve', () => {
+  for (const x of [undefined, null, 'no es json', 42, [], [cuenta]]) assert.equal(validarEstado(x), undefined)
 })

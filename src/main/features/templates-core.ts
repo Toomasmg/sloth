@@ -3,8 +3,10 @@
  * (solo node:*), así se prueba con Node y un userData falso.
  */
 import { existsSync, statSync } from 'node:fs'
-import { isAbsolute } from 'node:path'
-import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
+import { basename, isAbsolute } from 'node:path'
+import { escribirJsonAtomico, esObjeto, leerJson, respaldar } from '../json-file'
+import { avisar, avisoVersionFutura } from '../avisos'
+import { migrar } from '../versionado'
 import { randomUUID } from 'node:crypto'
 import type { NewWorkspaceInput } from '../../shared/types'
 import { initialPromptProblem } from '../../shared/initial-prompt'
@@ -193,8 +195,10 @@ export function pickSuggested(accounts: { id: string }[], loggedIn: (id: string)
   return [...pool].sort((a, b) => used5h(a.id) - used5h(b.id))[0]?.id
 }
 
+const VERSION_PLANTILLAS = 1
+
 interface FileShape {
-  version: 1
+  version: number
   templates: Template[]
   /** Plantilla predeterminada del Nuevo espacio. */
   defaultId?: string | null
@@ -222,13 +226,30 @@ export class TemplateFile {
   private list: Template[]
   private def: string | null = null
   private readonly file: string
+  private resto: Record<string, unknown> = {}
+  private soloLectura = false
+  private futura = false
+  private porRespaldar = false
   constructor(file: string) {
     this.file = file
     this.list = this.load()
   }
 
   private load(): Template[] {
-    const data = leerJson(this.file, { validar: (v) => (esObjeto(v) ? (v as Partial<FileShape>) : undefined), porDefecto: (): Partial<FileShape> => ({}) }).valor
+    const data = leerJson(this.file, {
+      validar: (v) => {
+        const r = migrar(v, {}, VERSION_PLANTILLAS)
+        if (r.estado === 'invalida') return undefined
+        this.futura = r.estado === 'futura'
+        this.soloLectura = this.futura
+        this.porRespaldar = r.estado === 'migrado'
+        return r.datos as Partial<FileShape>
+      },
+      porDefecto: (): Partial<FileShape> => ({})
+    }).valor
+    if (this.futura) avisoVersionFutura(this.file)
+    const { version: _v, templates: _t, defaultId: _d, ...resto } = data
+    this.resto = resto
     this.def = typeof data.defaultId === 'string' ? data.defaultId : null
     return Array.isArray(data.templates)
       ? data.templates.filter(isTemplate).map((t) => ({ ...t, counter: Number.isFinite(t.counter) ? t.counter : 0 }))
@@ -236,7 +257,21 @@ export class TemplateFile {
   }
 
   private persist(): void {
-    const data: FileShape = { version: 1, templates: this.list, defaultId: this.def }
+    if (this.soloLectura) {
+      if (this.futura) avisoVersionFutura(this.file)
+      return
+    }
+    if (this.porRespaldar) {
+      try {
+        respaldar(this.file)
+        this.porRespaldar = false
+      } catch (e) {
+        this.soloLectura = true
+        avisar(`No pude respaldar ${basename(this.file)} antes de actualizarlo (${e instanceof Error ? e.message : String(e)}); no voy a guardar cambios hasta que reinicies Sloth.`)
+        return
+      }
+    }
+    const data: FileShape = { ...this.resto, version: VERSION_PLANTILLAS, templates: this.list, defaultId: this.def }
     escribirJsonAtomico(this.file, data)
   }
 

@@ -139,6 +139,14 @@ async function removeOne(path: string, force: boolean): Promise<RemoveResult> {
   if (row.isMain) return { path, ok: false, error: 'La copia principal no se quita.', closedSpaces: [] }
   if (row.locked) return { path, ok: false, error: 'La carpeta está bloqueada (git worktree lock).', closedSpaces: [] }
   const spaces = ctx.store.workspaces.filter((w) => key(w.cwd) === key(row.path))
+  // Con espacios, quitar la carpeta también los quita del estado: sin poder guardar, no se toca nada.
+  if (spaces.length) {
+    try {
+      ctx.store.exigirEscritura()
+    } catch (e) {
+      return { path, ok: false, error: e instanceof Error ? e.message : String(e), closedSpaces: [] }
+    }
+  }
   if (!row.exists) {
     // La carpeta ya no está: se limpia el registro de git.
     const pr = await gitRaw(repo.mainPath, ['worktree', 'prune'], { timeoutMs: 30000 })
