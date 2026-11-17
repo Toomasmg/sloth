@@ -23,7 +23,8 @@ import type { Feature, FeatureContext } from '../context'
 import { accountStatus } from '../../accounts'
 import { baseEnv } from '../../ptys'
 import { readTeamConfig, repoKey, TEAM_DIR } from '../team-config-core'
-import { writeJsonAtomic } from '../tray-settings'
+import { escribirJsonAtomico } from '../../json-file'
+import { podarSegunStore } from '../../poda'
 import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, ticketId } from './acciones'
 import { resolveClaudeExe, runClaude } from './claude-run'
 import type { ConectorDef, ConectorGh, ConectorMcp } from './conector'
@@ -238,7 +239,7 @@ function recargarPropios(config?: ConfigCruda): void {
 
 function guardarArchivo(a: ArchivoPropios): void {
   if (propiosIlegible) throw new Error('No puedo guardar: el archivo de tus conectores propios no se pudo leer o es de una versión más nueva de Sloth.')
-  writeJsonAtomic(propiosFile(), a)
+  escribirJsonAtomico(propiosFile(), a)
   archivoPropios = a
 }
 
@@ -279,7 +280,7 @@ function cargarCuentas(): void {
 
 function guardarCuentas(): void {
   const ids = new Set(ctx.store.accounts.map((a) => a.id))
-  const cuentas = Object.fromEntries(Object.entries(cuentasCache).filter(([id]) => ids.has(id)))
+  const cuentas = Object.fromEntries(podarSegunStore(Object.entries(cuentasCache), ([id]) => ids.has(id), ctx.store.confiable).guardar)
   const file = cuentasFile()
   const tmp = `${file}.${process.pid}.tmp`
   try {

@@ -3,7 +3,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import type { Feature } from './context'
-import { writeJsonAtomic } from './tray-settings'
+import { escribirJsonAtomico } from '../json-file'
 import { checkEnvironment, DOCS, repoCandidates, type DocKey, type EnvReport } from './onboarding-env'
 
 /**
@@ -66,7 +66,7 @@ const feature: Feature = {
       ...state,
       steps: STEPS,
       // Se muestra solo la primera vez: sin cuentas y sin haberlo terminado o salteado.
-      show: !state.completed && ctx.store.accounts.length === 0
+      show: !state.completed && ctx.store.accounts.length === 0 && !ctx.store.soloLectura
     }))
 
     ctx.handle('save', (patch: unknown) => {
@@ -87,7 +87,7 @@ const feature: Feature = {
       }
       if (p.repoPath !== undefined) next.repoPath = p.repoPath === null ? undefined : checkRepoArg(p.repoPath)
       state = next
-      writeJsonAtomic(file(), state)
+      escribirJsonAtomico(file(), state)
       return state
     })
 

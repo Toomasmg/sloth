@@ -146,7 +146,7 @@ export function labelOf(kind: PermissionKind, tool: string, input: Record<string
 /** Texto del botón «Permitir siempre» según el tipo. */
 export function alwaysLabel(kind: PermissionKind): string {
   if (kind === 'cmd') return 'Permitir siempre aquí'
-  if (kind === 'edit') return 'Permitir siempre ediciones aquí'
+  if (kind === 'edit') return 'Permitir siempre ediciones en este repo'
   if (kind === 'net') return 'Permitir siempre este dominio aquí'
   return 'Permitir siempre aquí'
 }
@@ -161,19 +161,60 @@ export function ruleFor(req: PermissionRequestLike): Omit<PermissionRule, 'id' |
   return { workspaceId: req.ws, kind, tool: req.tool, match: '*', label }
 }
 
-/** ¿La regla cubre este pedido? Mismo espacio, mismo tipo y, según el tipo, mismo comando o dominio. */
-export function ruleMatches(rule: PermissionRule, req: PermissionRequestLike): boolean {
+// Carpetas del repo donde un archivo escrito termina ejecutándose solo (hooks de git, de Claude, tareas del editor).
+const CARPETAS_SENSIBLES: ReadonlySet<string> = new Set(['.git', '.claude', '.vscode', '.husky'])
+
+/** Segmentos de una ruta absoluta, con «.» y «..» resueltos; null si no es absoluta o sale de la raíz. */
+function segmentos(ruta: string): string[] | null {
+  const partes = ruta.replace(/\\/g, '/').split('/')
+  if (partes[0] !== '' && !/^[A-Za-z]:$/.test(partes[0])) return null
+  const out: string[] = [partes[0].toLowerCase()]
+  for (const p of partes.slice(1)) {
+    if (p === '' || p === '.') continue
+    if (p === '..') {
+      if (out.length === 1) return null
+      out.pop()
+      // Windows ignora los puntos y espacios finales: «.git.» y «.git » son .git.
+    } else out.push(p.toLowerCase().replace(/[. ]+$/, ''))
+  }
+  return out
+}
+
+/**
+ * ¿El archivo cae dentro de la carpeta del espacio y fuera de sus carpetas sensibles? Es lo único
+ * que cubre «Permitir siempre ediciones»: sin esto la regla aprobaba escribir en cualquier ruta del
+ * disco (Inicio de Windows, el perfil de PowerShell, los hooks de ~/.claude).
+ */
+export function dentroDelRepo(archivo: string, cwd: string): boolean {
+  const base = segmentos(cwd)
+  const esAbsoluta = /^([A-Za-z]:)?[\\/]/.test(archivo)
+  const ruta = segmentos(esAbsoluta ? archivo : `${cwd}/${archivo}`)
+  if (!base || !ruta || ruta.length <= base.length) return false
+  if (base.some((s, i) => ruta[i] !== s)) return false
+  // «:» abre un flujo alterno de NTFS y «git~1» es el nombre corto de .git: ninguno pasa por regla.
+  return ruta.slice(base.length).every((s) => s !== '' && !CARPETAS_SENSIBLES.has(s) && !s.includes(':') && !/^git~\d/.test(s))
+}
+
+/**
+ * ¿La regla cubre este pedido? Mismo espacio, mismo tipo y, según el tipo, mismo comando o dominio.
+ * Las ediciones además necesitan `cwd`, la carpeta del espacio: fuera de ella vuelve a preguntar.
+ */
+export function ruleMatches(rule: PermissionRule, req: PermissionRequestLike, cwd?: string): boolean {
   if (!rule.on || rule.workspaceId !== req.ws) return false
   const kind = kindOf(req.tool)
   if (rule.kind !== kind) return false
   if (kind === 'cmd') return rule.match !== '' && (str(req.input.command) ?? '') === rule.match
   if (kind === 'net') return rule.match !== '' && hostOf(req.input) === rule.match
-  if (kind === 'edit') return FILE_EDIT_TOOLS.has(req.tool) && rule.match === '*'
+  if (kind === 'edit') {
+    if (!FILE_EDIT_TOOLS.has(req.tool) || rule.match !== '*' || !cwd) return false
+    const archivos = filesOf(req.tool, req.input)
+    return archivos.length > 0 && archivos.every((f) => dentroDelRepo(f, cwd))
+  }
   return rule.tool === req.tool
 }
 
-export function findRule(rules: readonly PermissionRule[], req: PermissionRequestLike): PermissionRule | undefined {
-  return rules.find((r) => ruleMatches(r, req))
+export function findRule(rules: readonly PermissionRule[], req: PermissionRequestLike, cwd?: string): PermissionRule | undefined {
+  return rules.find((r) => ruleMatches(r, req, cwd))
 }
 
 /** Regla validada, lista para guardar (sin id, sin espacio, sin estado). */

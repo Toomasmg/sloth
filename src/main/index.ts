@@ -10,9 +10,12 @@ import { accountStatus, createAccount } from './accounts'
 import { installInto, stateForEvent, writeHookScript, type HookEventPayload } from './hooks'
 import { esFalsoFinal, pendientes, registrar as registrarFondo, venceEn, type Fondo } from './segundo-plano-core'
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
+import { claudeWithPrompt } from './shell-args'
+import { nextAgentState, type AgentInput } from './agent-machine'
 import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
 import { clipboardForPaste } from './clipboard-paste'
 import { createWorktree } from './git'
+import { validBranchName } from './features/git-run'
 import { normTicketId, TEMPLATE_COLOR_KEYS, validBranch } from '../shared/templates-shared'
 import { baseSettingsFor, syncSharedSetup, unshareSetup } from './setup'
 import { UsageScanner } from './usage'
@@ -49,6 +52,15 @@ function send(channel: string, ...args: unknown[]): void {
 function setAgent(wsId: string, status: AgentStatus): void {
   agents.set(wsId, status)
   send('agent:status', wsId, status)
+}
+
+/** Aplica una entrada del ciclo de vida (agent-machine.ts). Devuelve el estado nuevo, o undefined si no cambió nada. */
+function moveAgent(wsId: string, input: AgentInput, extra: { detail?: string; at?: number } = {}): AgentStatus | undefined {
+  const state = nextAgentState(agents.get(wsId)?.state, input)
+  if (!state) return undefined
+  const status = { state, detail: extra.detail, at: extra.at ?? Date.now() }
+  setAgent(wsId, status)
+  return status
 }
 
 app.setName('Sloth')
@@ -133,9 +145,8 @@ app.whenReady().then(async () => {
     const { state, detail } = p.enFondo
       ? { state: 'working' as const, detail: p.enFondo === 1 ? 'Shell en segundo plano' : `${p.enFondo} shells en segundo plano` }
       : stateForEvent(p)
-    const status = { state, detail, at: p.at ?? ahora }
-    setAgent(ws.id, status)
-    if (p.enFondo) {
+    const status = moveAgent(ws.id, { hook: state }, { detail, at: p.at ?? ahora })
+    if (status && p.enFondo) {
       const vence = venceEn(fondos, ws.id, ahora)
       // Si el aviso del shell nunca llega, no queda «trabajando» para siempre.
       if (vence !== null)
@@ -187,7 +198,7 @@ app.whenReady().then(async () => {
           send('pty:exit', id, code)
           for (const l of exitListeners) safe('pty-exit', () => l(id, code))
           // Un espacio dormido sigue «Dormido» (su terminal se cerró a propósito).
-          if (store.workspace(id) && agents.get(id)?.state !== 'sleeping') setAgent(id, { state: 'exited', at: Date.now() })
+          if (store.workspace(id)) moveAgent(id, 'exit')
         })
         b.on('hook', onHook)
         b.on('permission', onPermission)
@@ -264,7 +275,7 @@ app.whenReady().then(async () => {
     if (!ws.autoStartClaude) return undefined
     if (ws.initialPrompt && !ws.initialPromptUsed) {
       store.updateWorkspace(ws.id, { initialPromptUsed: true })
-      return ['claude', ws.initialPrompt.replace(/[\r\n]+/g, ' ')]
+      return claudeWithPrompt(ws.initialPrompt)
     }
     if (ws.resume !== false && hasPreviousConversation(acc, ws.cwd)) return ['claude', '--continue']
     return ['claude']
@@ -298,7 +309,7 @@ app.whenReady().then(async () => {
       const b = await backend().catch(() => undefined)
       openPanes = b ? openPanes.filter((id) => b.isRunning(id)) : []
     }
-    return { accounts: store.accounts, workspaces: store.workspaces, openPanes, agents: Object.fromEntries(agents) }
+    return { accounts: store.accounts, workspaces: store.workspaces, openPanes, agents: Object.fromEntries(agents), soloLectura: store.soloLectura }
   })
 
   ipcMain.handle('permission:pending', () =>
@@ -321,11 +332,12 @@ app.whenReady().then(async () => {
     for (const x of sessions) {
       if (!x.running) continue
       send('pty:exit', x.id, -1)
-      if (store.workspace(x.id)) setAgent(x.id, { state: 'exited', at: Date.now() })
+      if (store.workspace(x.id)) moveAgent(x.id, 'exit')
     }
   })
 
   ipcMain.handle('accounts:add', (_e, label: string) => {
+    store.exigirEscritura()
     const acc = { ...createAccount(String(label ?? '')), shareSetup: true }
     store.addAccount(acc)
     prepareAccount(acc)
@@ -360,6 +372,7 @@ app.whenReady().then(async () => {
   )
 
   async function addWorkspace(input: NewWorkspaceInput): Promise<Workspace> {
+    store.exigirEscritura()
     const name = String(input?.name ?? '').trim()
     const repoPath = String(input?.repoPath ?? '').trim()
     if (!name) throw new Error('Poné un nombre.')
@@ -371,6 +384,7 @@ app.whenReady().then(async () => {
     const initialPrompt = input.initialPrompt?.trim() || undefined
     if (initialPrompt && initialPrompt.length > 4000) throw new Error('El prompt inicial es demasiado largo.')
     const branch = input.branch?.trim() || undefined
+    if (branch && !validBranchName(branch)) throw new Error('La rama no es un nombre válido.')
     const baseBranch = input.baseBranch?.trim() || undefined
     if (baseBranch && !validBranch(baseBranch)) throw new Error('La rama base no es un nombre válido.')
     const color = input.color === undefined || input.color === null || input.color === '' ? undefined : String(input.color)
@@ -459,7 +473,7 @@ app.whenReady().then(async () => {
       ? toSpawnSpec({ cwd: homedir(), env: {} }, cols, rows, shellChoice)
       : toSpawnSpec(specFor(id, b), cols, rows, shellChoice)
     const result = await b.start(id, spawn)
-    if (store.workspace(id) && !agents.has(id)) setAgent(id, { state: 'idle', at: Date.now() })
+    if (store.workspace(id)) moveAgent(id, 'start')
     return result
   })
   ipcMain.on('pty:write', (_e, id: string, data: string) => {
@@ -469,7 +483,7 @@ app.whenReady().then(async () => {
   ipcMain.on('pty:resize', (_e, id: string, cols: number, rows: number) => term?.resize(id, cols, rows))
   ipcMain.handle('pty:kill', async (_e, id: string) => {
     await (await backend()).kill(id)
-    if (store.workspace(id)) setAgent(id, { state: 'exited', at: Date.now() })
+    if (store.workspace(id)) moveAgent(id, 'exit')
   })
 
   // Texto, rutas de archivos copiados o una imagen guardada como PNG (src/main/clipboard-paste.ts).
@@ -600,7 +614,8 @@ function createWindow(onShown?: () => void): void {
     wc.setZoomLevel(next)
   })
 
-  if (process.env.ELECTRON_RENDERER_URL) void win.loadURL(process.env.ELECTRON_RENDERER_URL)
+  // Solo en desarrollo: el instalado nunca carga la interfaz desde una URL del entorno.
+  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) void win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else void win.loadURL('app://ui/index.html')
 
   // Se muestra cuando ya pintó (la pantalla de carga de index.html), maximizada si quedó así.

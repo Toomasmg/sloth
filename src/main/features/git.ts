@@ -1,5 +1,5 @@
 import { app, shell } from 'electron'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
 import { basename, join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import { GitError, isDir, normPath, validBranchName } from './git-run'
@@ -62,20 +62,13 @@ function stateFile(): string {
 }
 
 function load(): void {
-  try {
-    const j = JSON.parse(readFileSync(stateFile(), 'utf8')) as Partial<Saved>
-    if (j && typeof j.bases === 'object' && j.bases) saved = { bases: j.bases as Record<string, string> }
-  } catch {
-    /* primera vez */
-  }
+  const j = leerJson(stateFile(), { validar: (v) => (esObjeto(v) ? (v as Partial<Saved>) : undefined), porDefecto: (): Partial<Saved> => ({}) }).valor
+  if (esObjeto(j.bases)) saved = { bases: Object.fromEntries(Object.entries(j.bases).filter((e): e is [string, string] => typeof e[1] === 'string')) }
 }
 
 function persist(): void {
   try {
-    mkdirSync(join(app.getPath('userData'), 'features'), { recursive: true })
-    const tmp = `${stateFile()}.tmp`
-    writeFileSync(tmp, JSON.stringify(saved, null, 2), 'utf8')
-    renameSync(tmp, stateFile())
+    escribirJsonAtomico(stateFile(), saved)
   } catch (e) {
     ctx.log('no se pudo guardar git.json', e)
   }

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { AccountUsage, AgentStatus } from '../../shared/types'
-import { aMs, armarEstado, debeAvisar, elegirIp, leerLimites, puertoValido, temaValido, textoAviso, tokenIgual, type Entrada } from './celular-core'
+import { aMs, armarEstado, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, temaValido, textoAviso, tokenIgual, type Entrada } from './celular-core'
 
 const v4 = (address: string, internal = false) => ({ address, family: 'IPv4', internal })
 
@@ -137,4 +137,10 @@ test('debeAvisar no repite el mismo aviso dentro de la ventana', () => {
   assert.equal(debeAvisar(m, 'w1:termino', 5000), false)
   assert.equal(debeAvisar(m, 'w2:termino', 5000), true)
   assert.equal(debeAvisar(m, 'w1:termino', 10_000), true)
+})
+
+test('resumenPermiso no lleva el comando ni la ruta', () => {
+  assert.equal(resumenPermiso('cmd'), 'Claude quiere correr un comando.')
+  assert.equal(resumenPermiso('edit'), 'Claude quiere editar archivos.')
+  assert.equal(resumenPermiso('otra'), 'Claude quiere usar una herramienta.')
 })

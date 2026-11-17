@@ -1,6 +1,6 @@
 import { app, dialog, nativeTheme, type BrowserWindow } from 'electron'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
+import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
 import type { Feature, FeatureContext } from './context'
 import {
   applyPatch,
@@ -20,20 +20,10 @@ import { SURFACE } from '../../shared/surfaces'
  */
 const file = (): string => join(app.getPath('userData'), 'features', 'settings.json')
 
-/** Escritura atómica: tmp + rename (nunca queda un JSON a medias). */
-function writeJsonAtomic(path: string, data: unknown): void {
-  mkdirSync(dirname(path), { recursive: true })
-  const tmp = `${path}.${process.pid}.tmp`
-  writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8')
-  renameSync(tmp, path)
-}
+const validar = (v: unknown): SlothSettings | undefined => (esObjeto(v) ? normalize(v) : undefined)
 
 function read(): SlothSettings {
-  try {
-    return normalize(JSON.parse(readFileSync(file(), 'utf8').replace(/^﻿/, '')))
-  } catch {
-    return normalize(undefined)
-  }
+  return leerJson(file(), { validar, porDefecto: () => normalize(undefined) }).valor
 }
 
 /** Colores de la barra de título que dibuja Windows (los botones de ventana): el fondo es el --surface del tema (src/shared/surfaces.ts). */
@@ -50,10 +40,15 @@ const chromeFor = (theme: ThemeChoice, dark: boolean): { bg: string; symbol: str
  * hay un destello oscuro al abrir con tema claro. Sincrónico, nunca tira.
  */
 export function initialChrome(): { bg: string; symbol: string; dark: boolean } {
-  const s = read()
-  nativeTheme.themeSource = themeSource(s.theme)
-  const dark = resolveDark(s.theme, nativeTheme.shouldUseDarkColors)
-  return { ...chromeFor(s.theme, dark), dark }
+  try {
+    const s = settings ?? leerJson(file(), { validar, porDefecto: () => normalize(undefined), soloConsulta: true }).valor
+    nativeTheme.themeSource = themeSource(s.theme)
+    const dark = resolveDark(s.theme, nativeTheme.shouldUseDarkColors)
+    return { ...chromeFor(s.theme, dark), dark }
+  } catch (e) {
+    console.warn('[settings] no se pudo leer el tema antes de abrir la ventana:', e instanceof Error ? e.message : e)
+    return { ...CHROME.dark, dark: true }
+  }
 }
 
 /** «Según Windows» sigue al sistema en vivo (evento nativeTheme «updated»); los demás fijan el tema. */
@@ -109,7 +104,7 @@ function applyLoginItem(): void {
 function commit(next: SlothSettings): SettingsPayload {
   const loginChanged = next.openAtLogin !== settings.openAtLogin
   settings = next
-  writeJsonAtomic(file(), settings)
+  escribirJsonAtomico(file(), settings)
   applyNative()
   if (loginChanged) applyLoginItem()
   const p = payload()

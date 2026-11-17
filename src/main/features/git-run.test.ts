@@ -1,6 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { GitError, run } from './git-run'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, sep } from 'node:path'
+import { git, GitError, run } from './git-run'
 
 test('con la señal ya abortada, run rechaza enseguida como cancelada', async () => {
   const ac = new AbortController()
@@ -20,4 +23,17 @@ test('sin abortar, run termina normal', async () => {
   const ac = new AbortController()
   const r = await run('git', ['--version'], { signal: ac.signal })
   assert.equal(r.code, 0)
+})
+
+test('un core.fsmonitor del repo no se ejecuta cuando Sloth corre git status', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sloth-fsmonitor-'))
+  try {
+    const marca = join(dir, 'ejecutado.txt').split(sep).join('/')
+    await git(dir, ['init', '-q'])
+    await git(dir, ['config', 'core.fsmonitor', `echo x > "${marca}"`])
+    await git(dir, ['status', '--porcelain'])
+    assert.equal(existsSync(marca), false)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
