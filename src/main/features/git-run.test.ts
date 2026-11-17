@@ -19,6 +19,28 @@ test('abortar a mitad de camino corta git y rechaza como cancelada', async () =>
   await assert.rejects(p, (e: unknown) => e instanceof GitError && e.motivo === 'cancelada')
 })
 
+test('al cancelar, run rechaza recién después de matar el árbol con las deps inyectadas', async () => {
+  const eventos: string[] = []
+  const matarDespues = async (pid: number): Promise<boolean> => {
+    await new Promise((r) => setTimeout(r, 100))
+    eventos.push('matado')
+    process.kill(pid, 'SIGKILL')
+    return true
+  }
+  const matar = {
+    platform: process.platform,
+    taskkill: matarDespues,
+    killGroup: (pid: number) => void matarDespues(pid),
+    killOne: (pid: number) => void matarDespues(pid)
+  }
+  const ac = new AbortController()
+  const p = run('git', ['-c', 'alias.espera=!sleep 10', 'espera'], { signal: ac.signal, timeoutMs: 20_000, matar })
+  setTimeout(() => ac.abort(), 50)
+  await assert.rejects(p, (e: unknown) => e instanceof GitError && e.motivo === 'cancelada')
+  eventos.push('rechazado')
+  assert.deepEqual(eventos, ['matado', 'rechazado'])
+})
+
 test('sin abortar, run termina normal', async () => {
   const ac = new AbortController()
   const r = await run('git', ['--version'], { signal: ac.signal })

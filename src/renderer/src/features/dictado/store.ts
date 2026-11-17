@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { porcentajeModelo } from '../../../../shared/dictado'
 import type { ErrorDictado, EstadoDictado, ResultadoDictado } from '../../../../shared/dictado'
 import { cleanError } from '../../format'
 import { grabar, type Grabacion } from './grabador'
@@ -11,6 +12,8 @@ export interface VistaDictado {
   error?: ErrorDictado
   /** Se terminó y no se escuchó nada. */
   vacio?: boolean
+  /** Avance (0-100) de la bajada del modelo, solo la primera vez que se dicta. */
+  progreso?: number
 }
 
 const INACTIVO: VistaDictado = { estado: 'inactivo' }
@@ -131,6 +134,11 @@ export async function terminar(paneId: string, onTexto: (texto: string) => void)
   const { grab } = activa
   activa = null
   set(paneId, { estado: 'transcribiendo' })
+  const off = window.sloth.feat.on('feat:dictado:modelo', (p: unknown) => {
+    if (vistas.get(paneId)?.estado !== 'transcribiendo') return
+    const progreso = porcentajeModelo(p)
+    set(paneId, progreso === null ? { estado: 'transcribiendo' } : { estado: 'transcribiendo', progreso })
+  })
   try {
     const wav = await grab.terminar()
     if (!wav) return set(paneId, { estado: 'inactivo', vacio: true })
@@ -140,6 +148,8 @@ export async function terminar(paneId: string, onTexto: (texto: string) => void)
     set(paneId, r.texto ? INACTIVO : { estado: 'inactivo', vacio: true })
   } catch (e) {
     set(paneId, { estado: 'inactivo', error: { tipo: 'otro', mensaje: `No se pudo transcribir (${cleanError(e)}).`, ajustes: false } })
+  } finally {
+    off()
   }
 }
 

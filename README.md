@@ -136,6 +136,7 @@ Electron, React y TypeScript.
 | `npm test` | Tests unitarios de los módulos puros con `node --test` (Node ≥ 22.18) |
 | `npm run build` | electron-vite más el daemon |
 | `npm run test:e2e` | Build más las pruebas visuales con Playwright |
+| `npm run fetch-whisper` | Baja a `vendor/whisper` el modelo de dictado (190 MB, verificado por hash) para dev y e2e; el build no lo baja y el instalador no lo lleva |
 | `npm run dist` | Instalador `.exe` en `dist/` |
 
 Para una instancia de prueba al lado de la instalada, sin tocar tus datos: `SLOTH_USER_DATA=<carpeta> npm run dev`.
