@@ -40,7 +40,10 @@ function Global(): React.JSX.Element | null {
       <InlineAlert tone="danger">
         <strong>Sloth no está guardando cambios.</strong> Motivo: {soloLectura.motivo}. El archivo quedó como estaba en{' '}
         <span className="f-avisos-ruta">{soloLectura.archivo}</span>. Las cuentas y espacios que crees ahora se perderían, así que
-        no te dejo crearlos: cerrá lo que esté usando ese archivo (antivirus, OneDrive) y reiniciá Sloth.
+        no te dejo crearlos:{' '}
+        {soloLectura.causa === 'version-futura'
+          ? 'actualizá Sloth, esta versión es más vieja que tus datos.'
+          : 'cerrá lo que esté usando ese archivo (antivirus, OneDrive) y reiniciá Sloth.'}
       </InlineAlert>
     </div>
   )

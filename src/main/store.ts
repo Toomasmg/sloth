@@ -35,6 +35,8 @@ function migrateFromAntiRea(): void {
 export interface SoloLecturaStore {
   motivo: string
   archivo: string
+  /** Con 'version-futura' reiniciar no arregla nada: hay que actualizar Sloth. */
+  causa: 'version-futura' | 'io'
 }
 
 const mensaje = (e: unknown): string => (e instanceof Error ? e.message : String(e))
@@ -43,6 +45,7 @@ export class Store {
   private state: PersistedState = estadoVacio().estado
   private readonly file: string
   private soloLecturaMotivo: string | undefined
+  private soloLecturaCausa: SoloLecturaStore['causa'] = 'io'
   private cargaConfiable = false
 
   constructor() {
@@ -60,7 +63,7 @@ export class Store {
 
   /** Si no se pudo leer, respaldar o guardar sloth-state.json: los cambios de esta sesión no se guardan. */
   get soloLectura(): SoloLecturaStore | undefined {
-    return this.soloLecturaMotivo ? { motivo: this.soloLecturaMotivo, archivo: this.file } : undefined
+    return this.soloLecturaMotivo ? { motivo: this.soloLecturaMotivo, archivo: this.file, causa: this.soloLecturaCausa } : undefined
   }
 
   /** Cuentas y espacios cargaron enteros: solo entonces se poda lo de otras funciones según el store. */
@@ -70,8 +73,12 @@ export class Store {
 
   /** Para crear cuentas o espacios: en solo lectura se perderían al cerrar, mejor no dejar crearlos. */
   exigirEscritura(): void {
-    if (this.soloLecturaMotivo)
-      throw new Error(`No se va a guardar: ${this.soloLecturaMotivo}. Reiniciá Sloth cuando sloth-state.json se pueda leer.`)
+    if (!this.soloLecturaMotivo) return
+    const consejo =
+      this.soloLecturaCausa === 'version-futura'
+        ? 'Actualizá Sloth: esta versión es más vieja que tus datos.'
+        : 'Reiniciá Sloth cuando sloth-state.json se pueda leer.'
+    throw new Error(`No se va a guardar: ${this.soloLecturaMotivo}. ${consejo}`)
   }
 
   private load(): PersistedState {
@@ -81,7 +88,10 @@ export class Store {
       !r.soloLectura && corregirRutasViejas(v.estado.accounts, join(app.getPath('appData'), 'AntiRea'), app.getPath('userData'))
     const d = decidirCarga({ v, apartado: r.apartado, soloLectura: r.soloLectura, motivo: r.motivo }, rutasCorregidas)
     this.cargaConfiable = d.confiable
-    if (d.soloLectura) this.soloLecturaMotivo = `sloth-state.json ${r.motivo ?? 'no se pudo leer'}`
+    if (d.soloLectura) {
+      this.soloLecturaMotivo = r.motivo ? `sloth-state.json ${r.motivo}` : 'sloth-state.json es de una versión más nueva de Sloth'
+      this.soloLecturaCausa = r.motivo ? 'io' : 'version-futura'
+    }
     let bak: string | undefined
     if (d.respaldar) {
       try {
@@ -89,6 +99,8 @@ export class Store {
       } catch (e) {
         console.warn('[store] no se pudo respaldar sloth-state.json:', mensaje(e))
         this.soloLecturaMotivo = `no se pudo respaldar sloth-state.json (${mensaje(e)})`
+        this.soloLecturaCausa = 'io'
+        avisar(`No pude respaldar sloth-state.json antes de actualizarlo (${mensaje(e)}). No voy a guardar cambios hasta que reinicies Sloth.`)
       }
     }
     if (d.guardar && bak) {
@@ -97,6 +109,7 @@ export class Store {
         escribirJsonAtomico(this.file, this.state)
       } catch (e) {
         this.soloLecturaMotivo = `no se pudo guardar sloth-state.json (${mensaje(e)})`
+        this.soloLecturaCausa = 'io'
         avisar(`No pude guardar sloth-state.json (${mensaje(e)}). No voy a guardar cambios hasta que reinicies Sloth.`)
       }
     }
@@ -146,6 +159,7 @@ export class Store {
     return ws
   }
   removeAccount(id: string): void {
+    this.exigirEscritura()
     this.state.accounts = this.state.accounts.filter((a) => a.id !== id)
     this.save()
   }
@@ -155,6 +169,7 @@ export class Store {
     this.save()
   }
   removeWorkspace(id: string): void {
+    this.exigirEscritura()
     this.state.workspaces = this.state.workspaces.filter((w) => w.id !== id)
     this.state.openPanes = this.state.openPanes.filter((p) => p !== id)
     this.save()

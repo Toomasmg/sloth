@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "accounts": [
+    {
+      "id": "cuenta-demo",
+      "label": "Cuenta demo",
+      "configDir": "C:\\Users\\demo\\AppData\\Roaming\\Sloth\\accounts\\cuenta-demo\\claude",
+      "createdAt": 1760000000000,
+      "shareSetup": false
+    }
+  ],
+  "workspaces": [
+    {
+      "id": "espacio-minimo",
+      "name": "Repo de ejemplo",
+      "repoPath": "C:\\Users\\demo\\proyectos\\ejemplo",
+      "cwd": "C:\\Users\\demo\\proyectos\\ejemplo",
+      "accountId": "cuenta-demo",
+      "autoStartClaude": true,
+      "createdAt": 1760000100000
+    },
+    {
+      "id": "espacio-completo",
+      "name": "Rama con ticket",
+      "repoPath": "C:\\Users\\demo\\proyectos\\ejemplo",
+      "cwd": "C:\\Users\\demo\\proyectos\\ejemplo-wt\\rama-demo",
+      "branch": "feat/rama-demo",
+      "accountId": "cuenta-demo",
+      "autoStartClaude": false,
+      "createdAt": 1760000200000,
+      "initialPrompt": "/ticket DEMO-1",
+      "initialPromptUsed": true,
+      "resume": true,
+      "ticket": "DEMO-1",
+      "icon": "🦥",
+      "color": "cielo"
+    }
+  ],
+  "openPanes": ["espacio-completo", "espacio-minimo"]
+}

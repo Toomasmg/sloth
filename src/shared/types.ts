@@ -106,7 +106,7 @@ export interface AppState {
   openPanes: string[]
   agents: Record<string, AgentStatus>
   /** sloth-state.json no se pudo leer o respaldar: lo que se cambie en esta sesión no se guarda. */
-  soloLectura?: { motivo: string; archivo: string }
+  soloLectura?: { motivo: string; archivo: string; causa: 'version-futura' | 'io' }
 }
 
 export interface PtyChunk {

@@ -467,6 +467,7 @@ app.whenReady().then(async () => {
     if (!idValido(id)) throw new Error('Pedido inválido.')
     const used = store.workspaces.filter((w) => w.accountId === id)
     if (used.length) throw new Error(`La usan ${used.length} espacio(s): ${used.map((w) => w.name).join(', ')}`)
+    store.exigirEscritura()
     await (await backend()).kill(loginPaneId(id))
     const acc = store.account(id)
     if (acc) for (const l of removeListeners) safe('borrar cuenta', () => l(acc))
@@ -522,6 +523,7 @@ app.whenReady().then(async () => {
 
   handle('workspaces:remove', async (_e, id: unknown) => {
     if (!idValido(id)) throw new Error('Pedido inválido.')
+    store.exigirEscritura()
     // El worktree queda en disco a propósito: puede tener trabajo sin commitear.
     await (await backend()).kill(id)
     agents.delete(id)
@@ -638,6 +640,7 @@ app.whenReady().then(async () => {
       setAgent,
       addWorkspace,
       removeWorkspace: async (id) => {
+        store.exigirEscritura()
         await (await backend()).kill(id)
         agents.delete(id)
         store.removeWorkspace(id)
