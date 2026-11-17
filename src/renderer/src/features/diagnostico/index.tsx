@@ -1,10 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { api } from '../../api'
 import { ReportIcon } from '../../icons/SlothIcons'
 import { toast } from '../../ui'
 import { useUi, type Command, type FeatureUi } from '../host'
 import { onCopiarDiagnostico, pedirCopiarDiagnostico } from './bus'
-import { payloadDeEvento, payloadDeRazon, type ErrorPayload } from './payload'
+import { esRuido, payloadDeEvento, payloadDeRazon, type ErrorPayload } from './payload'
 
 type Invoke = (canal: string, ...args: unknown[]) => Promise<unknown>
 
@@ -19,11 +19,19 @@ export async function copiarDiagnostico(invoke: Invoke): Promise<void> {
   }
 }
 
+// A nivel de módulo: el efecto de Global puede correr varias veces (StrictMode, re-render de App) y el
+// aviso se pide una sola vez, sin descartar la respuesta cuando el efecto se limpia.
+let avisoPedido = false
+
 function Global(): null {
   const ui = useUi()
+  const invokeRef = useRef<Invoke>((canal, ...args) => ui.invoke(canal, ...args))
+  invokeRef.current = (canal, ...args) => ui.invoke(canal, ...args)
+
   useEffect(() => {
-    const invoke: Invoke = (canal, ...args) => ui.invoke(canal, ...args)
+    const invoke: Invoke = (canal, ...args) => invokeRef.current(canal, ...args)
     const reportar = (p: ErrorPayload): void => {
+      if (esRuido(p.mensaje)) return
       // Si falla el canal de errores no hay a dónde avisar.
       invoke('feat:diagnostico:errorRenderer', { mensaje: p.mensaje, stack: p.stack }).catch(() => {})
     }
@@ -33,28 +41,29 @@ function Global(): null {
     window.addEventListener('unhandledrejection', onRechazo)
     const soltar = onCopiarDiagnostico(() => void copiarDiagnostico(invoke))
 
-    let vivo = true
-    invoke('feat:diagnostico:crashPrevio')
-      .then((previo) => {
-        if (!vivo || previo !== true) return
-        toast({
-          tone: 'warning',
-          message: 'Sloth se cerró inesperadamente la última vez.',
-          duration: 0,
-          actionLabel: 'Copiar diagnóstico',
-          onAction: () => void copiarDiagnostico(invoke)
+    if (!avisoPedido) {
+      avisoPedido = true
+      invoke('feat:diagnostico:crashPrevio')
+        .then((previo) => {
+          if (previo !== true) return
+          toast({
+            tone: 'warning',
+            message: 'Sloth se cerró inesperadamente la última vez.',
+            duration: 0,
+            actionLabel: 'Copiar diagnóstico',
+            onAction: () => void copiarDiagnostico(invoke)
+          })
         })
-      })
-      .catch(() => {
-        // Es un aviso de cortesía: sin el dato no hay nada útil que mostrar.
-      })
+        .catch(() => {
+          // Es un aviso de cortesía: sin el dato no hay nada útil que mostrar.
+        })
+    }
     return () => {
-      vivo = false
       soltar()
       window.removeEventListener('error', onError)
       window.removeEventListener('unhandledrejection', onRechazo)
     }
-  }, [ui])
+  }, [])
   return null
 }
 

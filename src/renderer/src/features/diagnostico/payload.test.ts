@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { payloadDeEvento, payloadDeRazon } from './payload'
+import { esRuido, payloadDeEvento, payloadDeRazon } from './payload'
 
 test('Error: mensaje y stack', () => {
   const e = new Error('roto')
@@ -33,4 +33,11 @@ test('evento sin Error usa el mensaje del evento', () => {
 test('evento con Error trae el stack', () => {
   const e = new Error('x')
   assert.equal(payloadDeEvento('ignorado', e).stack, e.stack)
+})
+
+test('esRuido: solo el aviso de ResizeObserver', () => {
+  assert.equal(esRuido('ResizeObserver loop completed with undelivered notifications.'), true)
+  assert.equal(esRuido('ResizeObserver loop limit exceeded'), true)
+  assert.equal(esRuido('TypeError: x is undefined'), false)
+  assert.equal(esRuido('falló un ResizeObserver loop completed with undelivered notifications'), false)
 })
