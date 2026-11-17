@@ -85,6 +85,8 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
     const esGet = metodo === 'GET' || metodo === 'HEAD'
 
     if (ruta === '/api/estado' || ruta === '/api/permiso') {
+      // 401 a los GET para que una página vieja ya abierta (con x-sloth-token) pida volver a escanear en vez de quedar en «sin conexión».
+      if (esGet) return enviar(res, 401, null)
       if (metodo !== 'POST') return enviar(res, 405, null, undefined, { allow: 'POST' })
       const claves = derivarClaves(o.proveedor.clave())
       if (!claves) return enviar(res, 500, null)
@@ -98,9 +100,11 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
       } catch {
         sobre = null
       }
-      if (!sobre || typeof sobre !== 'object' || !fechaValida(sobre.t, Date.now())) return enviar(res, 401, null)
-      if (repetidos.vistoAntes(ab.iv, Date.now())) return enviar(res, 401, null)
       const sellado = (status: number, data: unknown): void => enviar(res, status, 'text/plain; charset=utf-8', sellarRespuesta(claves, ab.iv, JSON.stringify(data)))
+      // El MAC ya pasó: la clave es buena. La hora corrida y el reenvío se contestan sellados (no 401) para que el celu no se desempareje.
+      if (!sobre || typeof sobre !== 'object') return enviar(res, 401, null)
+      if (!fechaValida(sobre.t, Date.now())) return sellado(409, { error: 'reloj' })
+      if (repetidos.vistoAntes(ab.iv, Date.now())) return sellado(409, { error: 'repetido' })
 
       if (ruta === '/api/estado') return sellado(200, await o.proveedor.estado())
       if (!o.proveedor.puedeAprobar()) return sellado(403, { error: 'Aprobar desde el celu está apagado en Sloth.' })

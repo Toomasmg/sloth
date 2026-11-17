@@ -83,26 +83,32 @@ test('la respuesta de un pedido no abre con el iv de otro', async () => {
   })
 })
 
-test('el mismo sobre dos veces: la segunda es 401', async () => {
+test('el mismo sobre dos veces: la segunda es un 409 sellado «repetido», no un 401', async () => {
   await conServidor({}, async (base) => {
     const sobre = sellarPedido(claves, '/api/estado', JSON.stringify({ t: Date.now(), b: {} }))
     assert.equal((await enviarSobre(base, '/api/estado', sobre)).status, 200)
-    assert.equal((await enviarSobre(base, '/api/estado', sobre)).status, 401)
+    const otra = await enviarSobre(base, '/api/estado', sobre)
+    assert.equal(otra.status, 409)
+    assert.notEqual(await otra.text(), '')
   })
 })
 
-test('un pedido con la hora a 10 minutos de la PC: 401', async () => {
+test('un pedido con la hora a 10 minutos de la PC: 409 sellado «reloj», no 401', async () => {
   await conServidor({}, async (base) => {
-    assert.equal((await postSellado(base, '/api/estado', {}, { t: Date.now() - 10 * 60_000 })).status, 401)
-    assert.equal((await postSellado(base, '/api/estado', {}, { t: Date.now() + 10 * 60_000 })).status, 401)
+    for (const t of [Date.now() - 10 * 60_000, Date.now() + 10 * 60_000]) {
+      const r = await postSellado(base, '/api/estado', {}, { t })
+      assert.equal(r.status, 409)
+      assert.deepEqual(r.cuerpo, { error: 'reloj' })
+    }
   })
 })
 
-test('GET a las rutas de datos: 405; el viejo x-sloth-token con la clave no sirve', async () => {
+test('GET a las rutas de datos: 401 (para que una página vieja pida re-escanear); el viejo x-sloth-token con la clave no sirve', async () => {
   await conServidor({}, async (base) => {
     const g = await fetch(`${base}/api/estado`)
-    assert.equal(g.status, 405)
-    assert.equal(g.headers.get('allow'), 'POST')
+    assert.equal(g.status, 401)
+    assert.equal(await g.text(), '')
+    assert.equal((await fetch(`${base}/api/estado`, { method: 'PUT' })).status, 405)
     const viejo = await fetch(`${base}/api/estado`, { method: 'POST', headers: { 'x-sloth-token': CLAVE }, body: '{}' })
     assert.equal(viejo.status, 401)
     assert.equal(await viejo.text(), '')

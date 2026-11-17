@@ -181,7 +181,7 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
                     variant="danger"
                     onClick={() => {
                       setConfirmar(false)
-                      void hacer('regenerar').then(() => toast({ tone: 'success', message: 'Clave nueva. Los celus de antes tienen que escanear el QR de nuevo.' }))
+                      void hacer('regenerar').then(() => toast({ tone: 'success', message: 'Código nuevo. Los celus de antes tienen que escanear el QR de nuevo.' }))
                     }}
                   >
                     Regenerar código
