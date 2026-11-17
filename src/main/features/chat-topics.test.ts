@@ -3,11 +3,13 @@ import assert from 'node:assert/strict'
 import {
   convOfTopic,
   diffTopics,
+  memberRemovedFromBroadcast,
   reactionFromBroadcast,
   readFromBroadcast,
   rowFromBroadcast,
   SeenIds,
   Throttle,
+  TrailingThrottle,
   topicOf,
   typingFromBroadcast,
   versionKey,
@@ -151,4 +153,35 @@ test('Throttle: repite recién a los 3 s y por clave', () => {
   assert.equal(th.ok('a', 3999), false)
   assert.equal(th.ok('b', 3999), true)
   assert.equal(th.ok('a', 4000), true)
+})
+
+test('TrailingThrottle: lo que llega dentro de la ventana se junta en uno al final', () => {
+  const th = new TrailingThrottle(2000)
+  assert.equal(th.ask('a', 1000), 'now')
+  assert.equal(th.ask('a', 1500), 1500)
+  assert.equal(th.ask('a', 1800), null)
+  assert.equal(th.ask('b', 1800), 'now')
+  th.fired('a', 3000)
+  assert.equal(th.ask('a', 3500), 1500)
+  th.fired('a', 5000)
+  assert.equal(th.ask('a', 7000), 'now')
+  th.clear()
+  assert.equal(th.ask('a', 7001), 'now')
+})
+
+test('la marca vía Claude llega por Broadcast solo si es exacta', () => {
+  const team = { kind: 'team' as const, id: T }
+  assert.equal(rowFromBroadcast({ ...teamRow, via: 'claude' }, team)?.via, 'claude')
+  for (const via of ['x', undefined, null, 1]) {
+    const r = rowFromBroadcast({ ...teamRow, via }, team)
+    assert.ok(r)
+    assert.equal('via' in r, false)
+  }
+})
+
+test('member_removed: solo del mismo equipo y con user_id válido', () => {
+  assert.deepEqual(memberRemovedFromBroadcast({ team_id: T, user_id: D }, T), { userId: D })
+  assert.equal(memberRemovedFromBroadcast({ team_id: D, user_id: D }, T), undefined)
+  assert.equal(memberRemovedFromBroadcast({ team_id: T, user_id: 'x' }, T), undefined)
+  assert.equal(memberRemovedFromBroadcast('x', T), undefined)
 })

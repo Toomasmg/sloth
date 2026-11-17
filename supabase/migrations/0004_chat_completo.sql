@@ -493,7 +493,8 @@ $$;
 revoke execute on function public.chat_purge_expired_all() from public, anon, authenticated;
 
 -- Con pg_cron la purga corre sola cada hora; sin él alcanza con la que piden los clientes.
--- Si pg_cron se activa después, hay que volver a correr este bloque (o toda la 0004) para agendarla.
+-- Si pg_cron se activa después, corré solo el bloque `do $$ … $$` de abajo para agendarla: correr toda
+-- la 0004 deshace la 0008.
 do $$
 begin
   if exists (select 1 from pg_catalog.pg_extension where extname = 'pg_cron') then

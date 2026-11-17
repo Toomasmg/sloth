@@ -1,6 +1,7 @@
 // Prueba de las migraciones de supabase/migrations sobre PGlite (Postgres en WASM) con stubs de
-// auth/storage/realtime/roles de Supabase. Uso: node rls.test.mjs <0001_chat.sql> [0002…] [0003…]
-// Las pruebas de Broadcast corren solo si se pasa 0003_realtime_broadcast.sql; las del celu, con 0006_celu_remoto.sql.
+// auth/storage/realtime/roles de Supabase. Uso: node rls.test.mjs <0001_chat.sql> [0002…] … [0008…]
+// Las pruebas de Broadcast corren solo si se pasa 0003_realtime_broadcast.sql; las del celu, con 0006_celu_remoto.sql;
+// las de abusos, con 0008_chat_abuso.sql (pide 0001–0007 antes).
 import { PGlite } from '@electric-sql/pglite'
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto'
 import { readFileSync } from 'node:fs'
@@ -40,6 +41,7 @@ for (const f of files) await db.exec(readFileSync(f, 'utf8'))
 const withBroadcast = files.some((f) => f.includes('0003_realtime_broadcast'))
 const withCelu = files.some((f) => f.includes('0006_celu_remoto'))
 const withExpulsar = files.some((f) => f.includes('0007_expulsar'))
+const withAbuso = files.some((f) => f.includes('0008_chat_abuso'))
 console.log('migraciones OK')
 
 const U = {
@@ -152,7 +154,13 @@ for (let i = 0; i < 31; i++) {
 ok(hit, 'tope de 30 por minuto')
 await throws(as(U.ana, "insert into public.messages(team_id, client_id, body) values ($1, gen_random_uuid(), '   ')", [team]), 'mensaje vacío')
 
-await as(U.ana, 'update public.teams set name=$2, created_by=$3 where id=$1', [team, 'Acme AI', U.bruno])
+// Desde 0004 el permiso de update es por columna y tocar created_by ni siquiera pasa.
+try {
+  await as(U.ana, 'update public.teams set name=$2, created_by=$3 where id=$1', [team, 'Acme AI', U.bruno])
+} catch (e) {
+  if (!/permission denied/.test(e.message)) throw e
+  await as(U.ana, 'update public.teams set name=$2 where id=$1', [team, 'Acme AI'])
+}
 const t = (await as(U.ana, 'select name, created_by from public.teams where id=$1', [team]))[0]
 ok(t.name === 'Acme AI' && t.created_by === U.ana, 'owner renombra, created_by no cambia')
 await as(U.bruno, 'update public.teams set name=$2 where id=$1', [team, 'hack'])
@@ -231,6 +239,197 @@ if (withExpulsar) {
   ok((await as(U.ana, 'select code from public.team_invite_codes where team_id=$1', [t2]))[0].code === nuevo, 'el código no cambió por el intento de afuera')
   await as(U.ana, 'delete from public.team_members where team_id=$1 and user_id=$2', [t2, U.bruno])
   ok(!(await members()).includes(U.bruno), 'el DELETE directo de antes sigue andando (apps viejas)')
+}
+
+if (withAbuso) {
+  await db.exec(`create or replace function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void
+    language sql security definer as $$ insert into realtime.messages(topic, extension, payload, event, private) values (topic, 'broadcast', payload, event, private) $$`)
+  const reset = () => db.exec('delete from public.chat_rate')
+  // created_at sale del reloj: sin la pausa, un mensaje y un vaciado pueden caer en el mismo milisegundo.
+  const tick = () => new Promise((r) => setTimeout(r, 5))
+  const send = (user, col, id, body = 'x') =>
+    as(user, `insert into public.messages(${col}, client_id, body) values ($1, gen_random_uuid(), $2) returning id`, [id, body])
+  const tTeam = `team:${team}`
+
+  await db.exec(readFileSync(files.find((f) => f.includes('0008_chat_abuso')), 'utf8'))
+  ok(true, '0008 corre dos veces seguidas')
+
+  await reset()
+  await send(U.bruno, 'thread_id', dm, 'antes 1')
+  await send(U.bruno, 'thread_id', dm, 'antes 2')
+  await tick()
+  await as(U.ana, 'select public.chat_clear(null, $1)', [dm])
+  await tick()
+  ok((await as(U.ana, 'select * from public.messages where thread_id=$1', [dm])).length === 0, 'ana vacía el DM y no ve nada')
+  ok((await as(U.bruno, 'select * from public.messages where thread_id=$1', [dm])).length >= 2, 'bruno sigue viendo el DM que vació ana')
+  const dmRow = (await as(U.ana, 'select * from public.unread_counts()')).find((r) => r.kind === 'dm' && r.id === dm)
+  ok(dmRow?.unread === 0 && dmRow?.last_at === null, 'ana no tiene no leídos ni último mensaje en el DM vaciado')
+  ok((await db.query("select * from public.messages where thread_id=$1 and kind='clear'", [dm])).rows.length === 0, 'vaciar un DM no deja aviso')
+
+  await reset()
+  for (let i = 0; i < 30; i++) await send(U.bruno, 'thread_id', dm)
+  await tick()
+  await as(U.bruno, 'select public.chat_clear(null, $1)', [dm])
+  await throws(send(U.bruno, 'thread_id', dm), 'vaciar el DM no reinicia el tope de 30 por minuto')
+  const before = (await db.query('select m.id from public.messages m join public.dm_threads t on t.id = m.thread_id where t.id=$1 and m.created_at <= least(t.cleared_a, t.cleared_b)', [dm])).rows
+  ok(before.length === 0, 'vaciado por los dos: lo anterior a las dos marcas se borra de verdad')
+  ok((await db.query("select * from public.messages where thread_id=$1 and body='x'", [dm])).rows.length === 30, 'lo posterior al vaciado de ana sigue guardado')
+  ok((await as(U.ana, "select * from public.messages where thread_id=$1 and body='x'", [dm])).length === 30, 'ana ve lo que llegó después de vaciar')
+  ok((await as(U.bruno, 'select * from public.messages where thread_id=$1', [dm])).length === 0, 'bruno ya no ve nada tras vaciar')
+  await tick()
+  await reset()
+  await send(U.ana, 'thread_id', dm, 'después')
+
+  await reset()
+  const mid = (await send(U.bruno, 'team_id', team, 'editame'))[0].id
+  let edits = 0
+  for (let i = 0; i < 30; i++) {
+    await as(U.bruno, 'update public.messages set body=$2 where id=$1', [mid, 'e' + i])
+    edits++
+  }
+  ok(edits === 30, '30 ediciones pasan')
+  await throws(as(U.bruno, 'update public.messages set body=$2 where id=$1', [mid, 'e31']), 'la edición 31 en un minuto tira')
+
+  await reset()
+  const rid = (await send(U.ana, 'team_id', team, 'reaccioname'))[0].id
+  const addR = (user, id) => as(user, "insert into public.message_reactions(message_id, emoji) values ($1, '👍')", [id])
+  const delR = (user, id) => as(user, "delete from public.message_reactions where message_id=$1 and emoji='👍'", [id])
+  let toggles = 0
+  for (let i = 0; i < 60; i++) {
+    await (i % 2 === 0 ? addR(U.bruno, rid) : delR(U.bruno, rid))
+    toggles++
+  }
+  ok(toggles === 60, 'poner y sacar 60 veces pasa')
+  await throws(addR(U.bruno, rid), 'la reacción 61 (poner o sacar) en un minuto tira')
+
+  await reset()
+  const sid = (await send(U.bruno, 'team_id', team, 'borrame'))[0].id
+  await addR(U.ana, sid)
+  await addR(U.bruno, sid)
+  await db.exec("update public.chat_rate set n = 60 where kind = 'react'")
+  await as(U.bruno, 'update public.messages set deleted_at=now() where id=$1', [sid])
+  ok((await db.query('select * from public.message_reactions where message_id=$1', [sid])).rows.length === 0, 'borrar un mensaje con reacciones ajenas no choca con el tope de reacciones')
+  await reset()
+  const cid = (await send(U.bruno, 'team_id', team, 'vaciame'))[0].id
+  await addR(U.ana, cid)
+  await addR(U.bruno, cid)
+  await db.exec("update public.chat_rate set n = 60 where kind = 'react'")
+  await as(U.ana, 'select public.chat_clear($1, null)', [team])
+  ok((await db.query('select * from public.messages where id=$1', [cid])).rows.length === 0, 'vaciar el equipo con reacciones no choca con el tope de reacciones')
+
+  await reset()
+  const maxId = (await db.query('select coalesce(max(id), 0) as m from realtime.messages')).rows[0].m
+  for (let i = 0; i < 40; i++) {
+    await as(U.ana, 'select public.mark_read(null, $1)', [dm])
+    await tick()
+  }
+  ok(true, 'mark_read 40 veces seguidas no tira')
+  const readsIn = async (from) =>
+    (await db.query("select count(*)::int as n from realtime.messages where id > $1 and event = 'read' and topic = $2", [from, `thread:${dm}`])).rows[0].n
+  ok((await readsIn(maxId)) === 40, '40 «visto» en un minuto se publican todos')
+  const lastReadA = async () => (await db.query('select last_read_a, last_read_b, user_a from public.dm_threads where id=$1', [dm])).rows[0]
+  await db.exec("update public.chat_rate set n = 120 where kind = 'read'")
+  const maxId2 = (await db.query('select coalesce(max(id), 0) as m from realtime.messages')).rows[0].m
+  const r0 = await lastReadA()
+  const mine = (r) => (r.user_a === U.ana ? r.last_read_a : r.last_read_b).getTime()
+  await tick()
+  await as(U.ana, 'select public.mark_read(null, $1)', [dm])
+  ok(mine(await lastReadA()) > mine(r0), 'pasado el tope de «visto», mark_read igual guarda la marca')
+  ok((await readsIn(maxId2)) === 0, 'pasado el tope de «visto», no se publica')
+  await db.exec("update public.chat_rate set n = 1000 where kind = 'read'")
+  const tr0 = (await db.query('select last_read_at from public.team_members where team_id=$1 and user_id=$2', [team, U.ana])).rows[0].last_read_at.getTime()
+  await tick()
+  await as(U.ana, 'select public.mark_read($1, null)', [team])
+  const tr1 = (await db.query('select last_read_at from public.team_members where team_id=$1 and user_id=$2', [team, U.ana])).rows[0].last_read_at.getTime()
+  ok(tr1 > tr0, 'mark_read de un equipo no tiene tope')
+
+  await reset()
+  for (let i = 1; i <= 50; i++) {
+    if (i % 20 === 0) await reset()
+    await as(U.ana, 'insert into public.team_invites(team_id, github_login_lower) values ($1, $2)', [team, 'u' + i])
+  }
+  ok(true, '50 invitaciones pendientes en un equipo pasan')
+  await reset()
+  await throws(as(U.ana, 'insert into public.team_invites(team_id, github_login_lower) values ($1, $2)', [team, 'u51']), 'la invitación 51 tira')
+  await db.query("delete from public.team_invites where team_id=$1 and github_login_lower like 'u%'", [team])
+  await reset()
+  for (let i = 0; i < 20; i++) await as(U.ana, 'insert into public.team_invites(team_id, github_login_lower) values ($1, $2)', [team, 'r' + i])
+  await throws(as(U.ana, 'insert into public.team_invites(team_id, github_login_lower) values ($1, $2)', [team, 'r20']), 'más de 20 invitaciones por hora tira')
+  await db.query("delete from public.team_invites where team_id=$1 and github_login_lower like 'r%'", [team])
+
+  await reset()
+  await as(U.ana, 'insert into public.team_invites(team_id, github_login_lower) values ($1, $2)', [team, 'evil'])
+  const evilInv = (await as(U.evil, 'select id from public.team_invites'))[0]?.id
+  ok(!!evilInv, 'evil ve su invitación vigente')
+  await db.query("update public.team_invites set expires_at = now() - interval '1 minute' where id=$1", [evilInv])
+  ok((await as(U.evil, 'select * from public.team_invites')).length === 0, 'la invitación vencida no se ve')
+  ok((await as(U.evil, 'select * from public.teams where id=$1', [team])).length === 0, 'con la invitación vencida no se ve el equipo')
+  ok((await as(U.evil, 'select * from public.profiles where id=$1', [U.ana])).length === 0, 'con la invitación vencida no se ve el perfil de quien invitó')
+  await throws(as(U.evil, 'select public.accept_invite($1)', [evilInv]), 'accept_invite de una vencida tira')
+  ok(!(await as(U.ana, 'select user_id from public.team_members where team_id=$1', [team])).some((r) => r.user_id === U.evil), 'evil no entró')
+  await as(U.ana, 'insert into public.team_invites(team_id, github_login_lower) values ($1, $2)', [team, 'evil'])
+  ok((await as(U.evil, 'select * from public.team_invites')).length === 1, 'reinvitar con una vencida no choca')
+  await db.query("delete from public.team_invites where team_id=$1 and github_login_lower='evil'", [team])
+
+  const caro = '00000000-0000-0000-0000-000000000005'
+  await db.query('insert into auth.users(id, raw_user_meta_data) values ($1, $2)', [caro, { user_name: 'caro' }])
+  await db.query("insert into auth.identities(user_id, provider, identity_data) values ($1,'github',$2)", [
+    caro,
+    { user_name: 'caro', avatar_url: 'https://avatars.githubusercontent.com/u/1', full_name: 'caro' }
+  ])
+  await reset()
+  const codeRow = async () => (await db.query('select code, uses_left, expires_at from public.team_invite_codes where team_id=$1', [team])).rows[0]
+  const c1 = (await codeRow()).code
+  await db.query("update public.team_invite_codes set expires_at = now() - interval '1 minute' where team_id=$1", [team])
+  await throws(as(U.evil, 'select public.join_team_by_code($1)', [c1]), 'código vencido tira')
+  const c2 = (await as(U.ana, 'select public.regenerate_invite_code($1) as c', [team]))[0].c
+  const r2 = await codeRow()
+  const days = (new Date(r2.expires_at).getTime() - Date.now()) / 86400000
+  ok(r2.code === c2 && r2.uses_left === 50 && days > 6.9 && days <= 7, 'regenerar repone 50 usos y vence en 7 días')
+  await db.query('update public.team_invite_codes set uses_left = 1 where team_id=$1', [team])
+  await as(U.bruno, 'select public.join_team_by_code($1)', [c2])
+  ok((await codeRow()).uses_left === 1, 'un miembro que ya estaba no gasta uso')
+  await as(U.evil, 'select public.join_team_by_code($1)', [c2])
+  ok((await codeRow()).uses_left === 0, 'el primero entra y gasta el uso')
+  await throws(as(caro, 'select public.join_team_by_code($1)', [c2]), 'sin usos el segundo tira')
+  await reset()
+  await as(U.ana, 'select public.remove_member($1, $2)', [team, U.evil])
+  ok((await codeRow()).uses_left === 50, 'expulsar también repone los usos')
+
+  await reset()
+  const bOld = (await send(U.bruno, 'thread_id', dm, 'viejo de bruno'))[0].id
+  const bOld2 = (await send(U.bruno, 'thread_id', dm, 'otro viejo de bruno'))[0].id
+  const aOld = (await send(U.ana, 'thread_id', dm, 'viejo de ana'))[0].id
+  await addR(U.bruno, aOld)
+  await db.query('delete from public.team_members where user_id=$1 and team_id <> $2', [U.bruno, team])
+  await as(U.ana, 'select public.remove_member($1, $2)', [team, U.bruno])
+  const removed = (await db.query("select payload from realtime.messages where topic=$1 and event='member_removed' order by id desc limit 1", [tTeam])).rows[0]
+  ok(removed?.payload?.user_id === U.bruno && removed?.payload?.team_id === team, 'remove_member avisa member_removed en el tópico del equipo')
+  await throws(send(U.bruno, 'thread_id', dm), 'sin equipo en común no se escribe en el DM')
+  ok((await as(U.bruno, 'select * from public.messages where thread_id=$1', [dm])).length > 0, 'pero el DM se sigue leyendo')
+  await throws(as(U.bruno, 'update public.messages set body=$2 where id=$1', [bOld, 'acoso']), 'sin equipo en común no se edita un mensaje del DM')
+  await throws(as(U.ana, 'update public.messages set body=$2 where id=$1', [aOld, 'cambio']), 'tampoco del otro lado')
+  ok((await db.query('select body from public.messages where id=$1', [bOld])).rows[0].body === 'viejo de bruno', 'el texto no cambió')
+  await as(U.bruno, 'update public.messages set deleted_at=now() where id=$1', [bOld2])
+  ok((await db.query('select deleted_at from public.messages where id=$1', [bOld2])).rows[0].deleted_at !== null, 'sin equipo en común sí se borra un mensaje propio')
+  await throws(as(U.bruno, "insert into public.message_reactions(message_id, emoji) values ($1, '😀')", [aOld]), 'sin equipo en común no se reacciona en el DM')
+  await delR(U.bruno, aOld)
+  ok((await db.query('select * from public.message_reactions where message_id=$1', [aOld])).rows.length === 0, 'sin equipo en común sí se saca una reacción propia')
+  const maxT = (await db.query('select coalesce(max(id), 0) as m from realtime.messages')).rows[0].m
+  await db.query('delete from public.chat_typing_last where user_id=$1', [U.bruno])
+  await as(U.bruno, 'select public.chat_typing(null, $1)', [dm])
+  const typed = (await db.query("select count(*)::int as n from realtime.messages where id > $1 and event = 'typing'", [maxT])).rows[0].n
+  ok(typed === 0, 'sin equipo en común «escribiendo…» no se publica ni tira')
+  await as(U.ana, 'select public.chat_typing($1, null)', [team])
+  ok((await db.query("select count(*)::int as n from realtime.messages where id > $1 and event = 'typing'", [maxT])).rows[0].n === 1, '«escribiendo…» en el equipo sigue andando')
+
+  const rows = await as(U.ana, 'select topic from realtime.messages', [], tTeam)
+  ok(rows.length > 0 && rows.every((r) => r.topic === tTeam), 'con el canal del equipo solo se leen filas de ese tópico')
+
+  await throws(as(U.ana, "select public.chat_rate_hit('msg', 1, 1)"), 'authenticated no ejecuta chat_rate_hit')
+  await throws(as(null, "select public.chat_rate_hit('msg', 1, 1)"), 'anon no ejecuta chat_rate_hit')
+  await throws(as(U.ana, 'select * from public.chat_rate'), 'authenticated no lee chat_rate')
+  await throws(as(null, 'select * from public.chat_rate'), 'anon no lee chat_rate')
 }
 
 await throws(as(null, 'select * from public.messages'), 'anon sin acceso a messages')

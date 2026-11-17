@@ -137,7 +137,12 @@ test('login: un canje que termina después de cancelar cierra esa sesión', asyn
   const f = clienteFalso(60)
   const l = await startGithubLogin({ client: f.client, host: 'x.supabase.co', ports: [53725, 53726], path: '/auth/callback', openExternal: async () => undefined })
   const r = pegar(53725, '?code=bueno')
-  await new Promise((res) => setTimeout(res, 20))
+  // En Windows la primera conexión puede tardar más que la demora del canje: se cancela recién con el canje en curso.
+  const hasta = Date.now() + 2000
+  while (f.canjes.length === 0) {
+    if (Date.now() > hasta) assert.fail('el canje no empezó en 2 s')
+    await new Promise((res) => setTimeout(res, 5))
+  }
   l.cancel()
   assert.deepEqual(await l.done, { kind: 'cancelled' })
   await r.catch(() => undefined)
