@@ -36,7 +36,7 @@
  *   acceptInvite(inviteId: string)          → ChatTeam
  *   declineInvite(inviteId: string)         → void
  *   leaveTeam(teamId: string)               → void
- *   removeMember(teamId: string, userId: string) → void
+ *   removeMember(teamId: string, userId: string) → ChatRemoveResult (regenera el código de invitación)
  *   openDm(userId: string)                  → ChatThread           (solo con gente con la que compartís un equipo)
  *   inviteText(teamId: string, code?: string) → string              (invitación completa: servidor + clave publicable + código)
  *   previewInvite(text: string)             → ChatInvitePreview   (valida y dice qué va a pasar; no cambia nada)
@@ -248,6 +248,13 @@ export interface ChatConfigView {
 }
 
 export type ChatInviteDecision = 'confirmNew' | 'confirmReplace' | 'signIn' | 'redeem'
+
+export interface ChatRemoveResult {
+  /** Si el código de invitación del equipo cambió (la invitación vieja ya no sirve). */
+  codigoNuevo: boolean
+  /** Qué hacer ahora: reenviar invitaciones y, sin la migración 0007, aplicarla. */
+  aviso: string
+}
 
 /** Lo que se muestra antes de usar una invitación. Nunca trae la clave. */
 export interface ChatInvitePreview {

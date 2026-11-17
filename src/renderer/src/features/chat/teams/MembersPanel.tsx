@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react'
 import { ChatCircle, Crown, ShieldCheck, SignOut, Users, UserMinus } from '@phosphor-icons/react'
-import type { ChatMember, ChatSnapshot, ChatTeam, ChatThread } from '../../../../../shared/chat'
+import type { ChatMember, ChatRemoveResult, ChatSnapshot, ChatTeam, ChatThread } from '../../../../../shared/chat'
 import { useUi } from '../../host'
 import { cleanError } from '../../../format'
 import { Avatar, canManage, ConfirmInline, roleLabel, TeamModal } from './shared'
@@ -72,9 +72,9 @@ export function MembersPanel({
         onLeft()
         return
       }
-      await ui.invoke('feat:chat:removeMember', team.id, c.member.profile.id)
+      const r = await ui.invoke<ChatRemoveResult>('feat:chat:removeMember', team.id, c.member.profile.id)
       setConfirm(null)
-      setStatus(`Sacaste a ${c.member.profile.login} del equipo.`)
+      setStatus(`Sacaste a ${c.member.profile.login} del equipo. ${r.aviso}`)
       await reload()
     } catch (e) {
       setErr(cleanError(e))
@@ -146,7 +146,7 @@ export function MembersPanel({
       {confirm?.kind === 'remove' && (
         <ConfirmInline
           id={`${titleId}-remove`}
-          message={`¿Sacar a ${confirm.member.profile.login} de ${team.name}? Deja de ver los mensajes del equipo.`}
+          message={`¿Sacar a ${confirm.member.profile.login} de ${team.name}? Deja de ver los mensajes del equipo y el código de invitación cambia: vas a tener que reenviar la invitación a quienes todavía no entraron.`}
           confirmLabel="Sacar del equipo"
           busy={busyKey !== null}
           onConfirm={() => void runConfirm(confirm)}
