@@ -1,12 +1,11 @@
 import { app } from 'electron'
-import { copyFileSync, existsSync, renameSync, mkdirSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { existsSync, renameSync, mkdirSync } from 'node:fs'
+import { join } from 'node:path'
 import type { Account, Workspace } from '../shared/types'
 import { avisar } from './avisos'
-import { escribirJsonAtomico, leerJson, rutaLibre } from './json-file'
-import { corregirRutasViejas, validarEstado, VERSION_ESTADO, type EstadoValidado, type PersistedState } from './store-core'
+import { escribirJsonAtomico, leerJson, respaldar } from './json-file'
+import { corregirRutasViejas, decidirCarga, estadoVacio, validarEstado, type PersistedState } from './store-core'
 
-const EMPTY: PersistedState = { version: VERSION_ESTADO, accounts: [], workspaces: [], openPanes: [] }
 
 /**
  * La app antes se llamaba AntiRea: si existe %APPDATA%\AntiRea y todavía no hay %APPDATA%\Sloth,
@@ -33,71 +32,80 @@ function migrateFromAntiRea(): void {
   }
 }
 
+export interface SoloLecturaStore {
+  motivo: string
+  archivo: string
+}
+
+const mensaje = (e: unknown): string => (e instanceof Error ? e.message : String(e))
+
 export class Store {
-  private state: PersistedState = structuredClone(EMPTY)
+  private state: PersistedState = estadoVacio().estado
   private readonly file: string
-  private soloLectura = false
+  private soloLecturaMotivo: string | undefined
+  private cargaConfiable = false
 
   constructor() {
     migrateFromAntiRea()
     mkdirSync(app.getPath('userData'), { recursive: true })
     this.file = join(app.getPath('userData'), 'sloth-state.json')
     const legacy = join(app.getPath('userData'), 'antirea-state.json')
-    if (!existsSync(this.file) && existsSync(legacy)) renameSync(legacy, this.file)
+    try {
+      if (!existsSync(this.file) && existsSync(legacy)) renameSync(legacy, this.file)
+    } catch (e) {
+      console.warn('[store] no se pudo renombrar antirea-state.json:', mensaje(e))
+    }
     this.state = this.load()
   }
 
-  /** Sin respaldo no se reescribe: si la copia falla, el store queda en solo lectura. */
-  private respaldar(): string | undefined {
-    const bak = rutaLibre(`${this.file}.bak-${Date.now()}`)
-    try {
-      copyFileSync(this.file, bak)
-      return bak
-    } catch (e) {
-      console.warn('[store] no se pudo respaldar sloth-state.json:', (e as Error).message)
-      this.soloLectura = true
-      return undefined
-    }
+  /** Si no se pudo leer, respaldar o guardar sloth-state.json: los cambios de esta sesión no se guardan. */
+  get soloLectura(): SoloLecturaStore | undefined {
+    return this.soloLecturaMotivo ? { motivo: this.soloLecturaMotivo, archivo: this.file } : undefined
   }
 
-  private respaldoTexto(bak: string | undefined): string {
-    return bak ? `guardé el original como ${basename(bak)}` : 'no pude respaldarlo, así que no voy a guardar cambios hasta que reinicies'
+  /** Cuentas y espacios cargaron enteros: solo entonces se poda lo de otras funciones según el store. */
+  get confiable(): boolean {
+    return this.cargaConfiable && !this.soloLecturaMotivo
+  }
+
+  /** Para crear cuentas o espacios: en solo lectura se perderían al cerrar, mejor no dejar crearlos. */
+  exigirEscritura(): void {
+    if (this.soloLecturaMotivo)
+      throw new Error(`No se va a guardar: ${this.soloLecturaMotivo}. Reiniciá Sloth cuando sloth-state.json se pueda leer.`)
   }
 
   private load(): PersistedState {
-    let v: EstadoValidado
-    try {
-      v = leerJson(this.file, {
-        validar: validarEstado,
-        porDefecto: () => ({ estado: structuredClone(EMPTY), cuentasDescartadas: 0, espaciosDescartados: 0, versionFutura: false })
-      }).valor
-    } catch (e) {
-      // Puede estar sano (permisos, antivirus): arrancar vacío y sin guardar, para no pisarlo.
-      this.soloLectura = true
-      avisar(`No pude leer sloth-state.json (${(e as Error).message}). Arranqué sin cuentas ni espacios y no voy a guardar cambios hasta que reinicies.`)
-      return structuredClone(EMPTY)
+    const r = leerJson(this.file, { validar: validarEstado, porDefecto: estadoVacio, silencioso: true })
+    const v = r.valor
+    const rutasCorregidas =
+      !r.soloLectura && corregirRutasViejas(v.estado.accounts, join(app.getPath('appData'), 'AntiRea'), app.getPath('userData'))
+    const d = decidirCarga({ v, apartado: r.apartado, soloLectura: r.soloLectura, motivo: r.motivo }, rutasCorregidas)
+    this.cargaConfiable = d.confiable
+    if (d.soloLectura) this.soloLecturaMotivo = `sloth-state.json ${r.motivo ?? 'no se pudo leer'}`
+    let bak: string | undefined
+    if (d.respaldar) {
+      try {
+        bak = respaldar(this.file)
+      } catch (e) {
+        console.warn('[store] no se pudo respaldar sloth-state.json:', mensaje(e))
+        this.soloLecturaMotivo = `no se pudo respaldar sloth-state.json (${mensaje(e)})`
+      }
     }
-    const estado = v.estado
-    const rutasCorregidas = corregirRutasViejas(estado.accounts, join(app.getPath('appData'), 'AntiRea'), app.getPath('userData'))
-    if (v.versionFutura) {
-      const bak = this.respaldar()
-      avisar(`sloth-state.json lo guardó una versión más nueva de Sloth: ${this.respaldoTexto(bak)}. Si guardás cambios, lo que esta versión no conoce puede perderse.`)
-      return estado
+    if (d.guardar && bak) {
+      this.state = v.estado
+      try {
+        escribirJsonAtomico(this.file, this.state)
+      } catch (e) {
+        this.soloLecturaMotivo = `no se pudo guardar sloth-state.json (${mensaje(e)})`
+        avisar(`No pude guardar sloth-state.json (${mensaje(e)}). No voy a guardar cambios hasta que reinicies Sloth.`)
+      }
     }
-    const descartados = v.cuentasDescartadas + v.espaciosDescartados
-    if (descartados === 0 && !rutasCorregidas) return estado
-    const bak = this.respaldar()
-    this.state = estado
-    this.save()
-    if (descartados > 0)
-      avisar(
-        `sloth-state.json tenía ${v.cuentasDescartadas} cuenta(s) y ${v.espaciosDescartados} espacio(s) dañados. Los saqué y ${this.respaldoTexto(bak)}.`
-      )
-    return estado
+    if (d.aviso) avisar(d.aviso(bak))
+    return v.estado
   }
 
   private save(): void {
-    if (this.soloLectura) return
+    if (this.soloLecturaMotivo) return
     escribirJsonAtomico(this.file, this.state)
   }
 
@@ -119,6 +127,7 @@ export class Store {
   }
 
   addAccount(account: Account): void {
+    this.exigirEscritura()
     this.state.accounts.push(account)
     this.save()
   }
@@ -141,6 +150,7 @@ export class Store {
     this.save()
   }
   addWorkspace(ws: Workspace): void {
+    this.exigirEscritura()
     this.state.workspaces.push(ws)
     this.save()
   }

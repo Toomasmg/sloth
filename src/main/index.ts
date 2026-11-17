@@ -298,7 +298,7 @@ app.whenReady().then(async () => {
       const b = await backend().catch(() => undefined)
       openPanes = b ? openPanes.filter((id) => b.isRunning(id)) : []
     }
-    return { accounts: store.accounts, workspaces: store.workspaces, openPanes, agents: Object.fromEntries(agents) }
+    return { accounts: store.accounts, workspaces: store.workspaces, openPanes, agents: Object.fromEntries(agents), soloLectura: store.soloLectura }
   })
 
   ipcMain.handle('permission:pending', () =>
@@ -326,6 +326,7 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('accounts:add', (_e, label: string) => {
+    store.exigirEscritura()
     const acc = { ...createAccount(String(label ?? '')), shareSetup: true }
     store.addAccount(acc)
     prepareAccount(acc)
@@ -360,6 +361,7 @@ app.whenReady().then(async () => {
   )
 
   async function addWorkspace(input: NewWorkspaceInput): Promise<Workspace> {
+    store.exigirEscritura()
     const name = String(input?.name ?? '').trim()
     const repoPath = String(input?.repoPath ?? '').trim()
     if (!name) throw new Error('Poné un nombre.')

@@ -11,11 +11,23 @@ export interface PersistedState {
 
 export interface EstadoValidado {
   estado: PersistedState
+  /** Dañadas más repetidas. */
   cuentasDescartadas: number
   espaciosDescartados: number
+  cuentasRepetidas: number
+  espaciosRepetidos: number
   /** El archivo lo escribió una versión de Sloth más nueva (puede traer campos que esta no conoce). */
   versionFutura: boolean
 }
+
+export const estadoVacio = (): EstadoValidado => ({
+  estado: { version: VERSION_ESTADO, accounts: [], workspaces: [], openPanes: [] },
+  cuentasDescartadas: 0,
+  espaciosDescartados: 0,
+  cuentasRepetidas: 0,
+  espaciosRepetidos: 0,
+  versionFutura: false
+})
 
 type Obj = Record<string, unknown>
 const esObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -47,18 +59,23 @@ export function validarEspacio(v: unknown): Workspace | undefined {
   return o as unknown as Workspace
 }
 
-function filtrar<T extends { id: string }>(lista: unknown, validar: (v: unknown) => T | undefined): { ok: T[]; descartados: number } {
-  if (!Array.isArray(lista)) return { ok: [], descartados: 0 }
+function filtrar<T extends { id: string }>(
+  lista: unknown,
+  validar: (v: unknown) => T | undefined
+): { ok: T[]; descartados: number; repetidos: number } {
+  if (!Array.isArray(lista)) return { ok: [], descartados: 0, repetidos: 0 }
   const ok: T[] = []
   const ids = new Set<string>()
+  let repetidos = 0
   for (const v of lista) {
     const x = validar(v)
-    if (x && !ids.has(x.id)) {
+    if (x && ids.has(x.id)) repetidos++
+    else if (x) {
       ids.add(x.id)
       ok.push(x)
     }
   }
-  return { ok, descartados: lista.length - ok.length }
+  return { ok, descartados: lista.length - ok.length, repetidos }
 }
 
 /** Devuelve undefined si la raíz no es un objeto (el archivo entero no sirve). */
@@ -71,6 +88,8 @@ export function validarEstado(raw: unknown): EstadoValidado | undefined {
     estado: { version: VERSION_ESTADO, accounts: cuentas.ok, workspaces: espacios.ok, openPanes },
     cuentasDescartadas: cuentas.descartados,
     espaciosDescartados: espacios.descartados,
+    cuentasRepetidas: cuentas.repetidos,
+    espaciosRepetidos: espacios.repetidos,
     versionFutura: typeof raw.version === 'number' && raw.version > VERSION_ESTADO
   }
 }
@@ -86,4 +105,91 @@ export function corregirRutasViejas(accounts: Account[], oldRoot: string, newRoo
     }
   }
   return changed
+}
+
+export interface LecturaEstado {
+  v: EstadoValidado
+  /** Ruta del archivo roto que se apartó (arranca vacío). */
+  apartado?: string
+  /** No se pudo leer ni apartar: puede estar sano. */
+  soloLectura?: boolean
+  motivo?: string
+}
+
+export interface DecisionCarga {
+  /** No escribir sobre el archivo en esta sesión. */
+  soloLectura: boolean
+  respaldar: boolean
+  guardar: boolean
+  /**
+   * Cuentas y espacios cargaron enteros: recién ahí otras funciones pueden podar lo suyo según el
+   * store (reglas de permisos, dormidos). Con el store vacío por un fallo, podar borraría datos sanos.
+   */
+  confiable: boolean
+  /** Recibe la ruta del respaldo, o undefined si no se pudo respaldar. */
+  aviso?: (respaldo: string | undefined) => string
+}
+
+const plural = (n: number, uno: string, varios: string): string => `${n} ${n === 1 ? uno : varios}`
+
+function describirDescartes(v: EstadoValidado): string {
+  const partes: string[] = []
+  const cuentasDanadas = v.cuentasDescartadas - v.cuentasRepetidas
+  const espaciosDanados = v.espaciosDescartados - v.espaciosRepetidos
+  if (cuentasDanadas) partes.push(plural(cuentasDanadas, 'cuenta dañada', 'cuentas dañadas'))
+  if (v.cuentasRepetidas) partes.push(plural(v.cuentasRepetidas, 'cuenta repetida', 'cuentas repetidas'))
+  if (espaciosDanados) partes.push(plural(espaciosDanados, 'espacio dañado', 'espacios dañados'))
+  if (v.espaciosRepetidos) partes.push(plural(v.espaciosRepetidos, 'espacio repetido', 'espacios repetidos'))
+  return partes.join(', ')
+}
+
+export function textoRespaldo(respaldo: string | undefined): string {
+  return respaldo
+    ? `guardé el original como ${respaldo}`
+    : 'no pude respaldarlo, así que no voy a guardar cambios hasta que se pueda (reiniciá Sloth para reintentar)'
+}
+
+/** Qué hacer con sloth-state.json según cómo se leyó: respaldar, reescribir, quedar en solo lectura y qué avisar. */
+export function decidirCarga(l: LecturaEstado, rutasCorregidas: boolean): DecisionCarga {
+  if (l.soloLectura) {
+    return {
+      soloLectura: true,
+      respaldar: false,
+      guardar: false,
+      confiable: false,
+      aviso: () =>
+        `sloth-state.json ${l.motivo ?? 'no se pudo leer'}. Arranqué sin cuentas ni espacios y no voy a guardar cambios hasta que reinicies Sloth; el archivo quedó como estaba.`
+    }
+  }
+  if (l.apartado) {
+    const apartado = l.apartado
+    return {
+      soloLectura: false,
+      respaldar: false,
+      guardar: false,
+      confiable: false,
+      aviso: () => `sloth-state.json estaba dañado: lo guardé como ${apartado} y arranqué sin cuentas ni espacios.`
+    }
+  }
+  const v = l.v
+  const descartes = v.cuentasDescartadas + v.espaciosDescartados
+  const detalle = descartes > 0 ? ` Además saqué ${describirDescartes(v)}.` : ''
+  if (v.versionFutura) {
+    return {
+      soloLectura: false,
+      respaldar: true,
+      guardar: false,
+      confiable: descartes === 0,
+      aviso: (bak) =>
+        `sloth-state.json lo guardó una versión más nueva de Sloth: ${textoRespaldo(bak)}. Cualquier cambio (también abrir o cerrar un panel) lo reescribe con el formato de esta versión y puede perder lo que esta no conoce.${detalle}`
+    }
+  }
+  if (descartes === 0 && !rutasCorregidas) return { soloLectura: false, respaldar: false, guardar: false, confiable: true }
+  return {
+    soloLectura: false,
+    respaldar: true,
+    guardar: true,
+    confiable: descartes === 0,
+    aviso: descartes > 0 ? (bak) => `sloth-state.json tenía ${describirDescartes(v)}. Los saqué y ${textoRespaldo(bak)}.` : undefined
+  }
 }
