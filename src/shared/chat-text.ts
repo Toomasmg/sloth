@@ -54,3 +54,13 @@ export function escapeLike(q: string): string {
 export function containsText(body: string, q: string): boolean {
   return body.toLowerCase().includes(q.toLowerCase())
 }
+
+/**
+ * ¿El host es el de un proyecto de Supabase en la nube (`<ref>.supabase.co`)? Una invitación o un
+ * team.json puede apuntar a cualquier servidor https, y uno parecido (`acme.supabase.co.otro.com`)
+ * vería todo lo que se escribe. Los que no pasan se muestran con una advertencia; no se rechazan,
+ * porque un Supabase propio es válido.
+ */
+export function esHostSupabase(host: string): boolean {
+  return /^[a-z0-9]{8,40}\.supabase\.co$/.test(host.toLowerCase())
+}

@@ -179,7 +179,6 @@ export function Drawer(): React.JSX.Element | null {
           </div>
         )}
         {!st && !loadErr && <p className="g-loading">Cargando…</p>}
-        {!st && loadErr && <p className="form-error f-git-err">{loadErr}</p>}
 
         {toast && (
           <div role="status" className="g-toast">

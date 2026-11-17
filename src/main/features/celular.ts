@@ -11,7 +11,7 @@ import type { HookEventPayload } from '../hooks'
 import { PUERTO_POR_DEFECTO, type CelularVista, type RemotoVista } from '../../shared/celular'
 import { enlaceCelu, secretoValido } from '../../shared/celu-remoto'
 import { LIMITES_ARCHIVO } from '../statusline-core'
-import { armarEstado, debeAvisar, elegirIp, leerLimites, puertoValido, temaValido, textoAviso, type TipoAviso } from './celular-core'
+import { armarEstado, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, temaValido, textoAviso, type TipoAviso } from './celular-core'
 import { crearFuenteWifi, type FuenteDeEstado, type ProveedorDeEstado } from './celular-servidor'
 import { crearFuenteRemota, type CambioRemoto } from './celular-remoto'
 import { sesionChat } from './chat'
@@ -320,7 +320,7 @@ const feature: Feature = {
       else if (p.event === 'Notification' && p.notificationType !== 'permission_prompt') ntfyEnFondo('teNecesita', p.ws, p.message)
     })
     void ctx.backend().then(
-      (b) => b.on('permission', (req: PendingPermission) => ntfyEnFondo('permiso', req.ws, labelOf(kindOf(req.tool), req.tool, req.input))),
+      (b) => b.on('permission', (req: PendingPermission) => ntfyEnFondo('permiso', req.ws, resumenPermiso(kindOf(req.tool)))),
       () => undefined
     )
 

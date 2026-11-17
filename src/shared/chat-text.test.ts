@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { applyMention, containsText, escapeLike, mentionQueryAt, mentionsLogin, splitMentions } from './chat-text'
+import { applyMention, containsText, escapeLike, esHostSupabase, mentionQueryAt, mentionsLogin, splitMentions } from './chat-text'
 
 test('menciones: separa texto y logins', () => {
   assert.deepEqual(splitMentions('hola @Tomy, ¿venís?'), [
@@ -45,4 +45,11 @@ test('escapar comodines de LIKE', () => {
   assert.equal(escapeLike('a*b'), 'a_b')
   assert.equal(containsText('Hola A*B chau', 'a*b'), true)
   assert.equal(containsText('axb', 'a*b'), false)
+})
+
+test('esHostSupabase: solo <ref>.supabase.co, no un host parecido', () => {
+  assert.equal(esHostSupabase('abcdefghijklmnopqrst.supabase.co'), true)
+  assert.equal(esHostSupabase('ABCDEFGHIJ.SUPABASE.CO'), true)
+  for (const h of ['acme.supabase.co.evil.example', 'supabase.co', 'evil-supabase.co', 'a.b.supabase.co', 'abcdefghij.supabase.co:8443', 'chat.miempresa.com', ''])
+    assert.equal(esHostSupabase(h), false, h)
 })

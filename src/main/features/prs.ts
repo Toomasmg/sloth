@@ -336,6 +336,7 @@ const prs: Feature = {
     ctx.handle('openUrl', async (x: unknown, url: unknown) => {
       const { row } = rowOf(x)
       if (typeof url !== 'string' || (url !== row.url && !row.failing.some((f) => f.url === url))) throw new Error('Ese link no es de este PR.')
+      if (!url.startsWith('https://')) throw new Error('Solo se abren links https.')
       await shell.openExternal(url)
     })
 
