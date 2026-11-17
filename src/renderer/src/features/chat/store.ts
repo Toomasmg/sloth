@@ -233,6 +233,9 @@ function onRealtime(m: ChatMessage): void {
     mergeInto(m.conv, [mergeUpdate(prev, { ...m, reactions: undefined })], 'oldest')
     return
   }
+  // Una edición o un borrado de algo que no está en caché es de una página sin cargar o de un DM que
+  // vaciaste para vos (Broadcast no pasa por la RLS): no se agrega.
+  if (m.editedAt !== undefined || m.deletedAt !== undefined) return
   mergeInto(m.conv, [mergeUpdate(undefined, m)], 'oldest')
   clearTyping(key, m.author.id)
   if (m.notice) {
@@ -242,7 +245,6 @@ function onRealtime(m: ChatMessage): void {
     }
     return
   }
-  if (m.deletedAt !== undefined) return
   alertIncoming(m)
   if (m.author.id === meId()) return
   if (nav.open && nav.conv && convKey(nav.conv) === key) {
