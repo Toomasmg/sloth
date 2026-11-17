@@ -63,6 +63,11 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
     if (temaVista !== undefined) setTema(temaVista)
   }, [temaVista])
 
+  const servidorVista = v?.ntfy.servidor
+  useEffect(() => {
+    if (servidorVista !== undefined) setServidor(servidorVista)
+  }, [servidorVista])
+
   // Sin `disabled` mientras guarda: un botón con foco que se deshabilita le tira el foco al body.
   const hacer = async (op: string, ...args: unknown[]): Promise<boolean> => {
     if (ocupado) return false
@@ -260,6 +265,7 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
                 }}
               />
             </div>
+            {v.ntfy.conToken && <p className="f-cel-nota">El token guardado es de este servidor: si lo cambiás, se borra y hay que cargarlo de nuevo.</p>}
             <form
               className="f-cel-fila"
               onSubmit={(e) => {

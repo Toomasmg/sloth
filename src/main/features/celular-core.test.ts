@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { AccountUsage, AgentStatus } from '../../shared/types'
-import { aMs, armarEstado, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, temaValido, textoAviso, tokenIgual, tokenNtfyValido, type Entrada } from './celular-core'
+import { aMs, armarEstado, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, temaValido, textoAviso, tokenIgual, tokenNtfyTras, tokenNtfyValido, type Entrada } from './celular-core'
 
 const v4 = (address: string, internal = false) => ({ address, family: 'IPv4', internal })
 
@@ -172,4 +172,12 @@ test('resumenPermiso no lleva el comando ni la ruta', () => {
   assert.equal(resumenPermiso('cmd'), 'Claude quiere correr un comando.')
   assert.equal(resumenPermiso('edit'), 'Claude quiere editar archivos.')
   assert.equal(resumenPermiso('otra'), 'Claude quiere usar una herramienta.')
+})
+
+test('tokenNtfyTras: cambiar de servidor sin token nuevo borra el guardado', () => {
+  const actual = { servidor: 'https://ntfy.miempresa.com/', token: 'tk_a' }
+  assert.equal(tokenNtfyTras(actual, 'https://ntfy.miempresa.com/', undefined), 'tk_a')
+  assert.equal(tokenNtfyTras(actual, 'https://ntfy.sh/', undefined), undefined)
+  assert.equal(tokenNtfyTras(actual, 'https://ntfy.sh/', 'tk_b'), 'tk_b')
+  assert.equal(tokenNtfyTras(actual, 'https://ntfy.miempresa.com/', null), undefined)
 })

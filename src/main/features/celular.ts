@@ -11,7 +11,7 @@ import type { HookEventPayload } from '../hooks'
 import { PUERTO_POR_DEFECTO, type CelularVista, type RemotoVista } from '../../shared/celular'
 import { enlaceCelu, secretoValido } from '../../shared/celu-remoto'
 import { LIMITES_ARCHIVO } from '../statusline-core'
-import { armarEstado, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyValido, type TipoAviso } from './celular-core'
+import { armarEstado, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type TipoAviso } from './celular-core'
 import { crearFuenteWifi, type FuenteDeEstado, type ProveedorDeEstado } from './celular-servidor'
 import { crearFuenteRemota, type CambioRemoto } from './celular-remoto'
 import { sesionChat } from './chat'
@@ -380,13 +380,13 @@ const feature: Feature = {
       if (srv === null) throw new Error('El servidor tiene que ser una dirección https:// sin usuario, parámetros ni #.')
       if (token !== undefined && token !== null && !tokenNtfyValido(token)) throw new Error('El token solo puede llevar letras, números, punto, guion y guion bajo (hasta 200).')
       const cambiaTema = generarTema === true || (tema !== undefined && tema !== cfg.ntfy.tema)
-      const tokenFinal = token === undefined ? cfg.ntfy.token : (token ?? undefined)
+      const tokenFinal = tokenNtfyTras(cfg.ntfy, srv, token as string | null | undefined)
       cfg.ntfy = {
         encendido: encendido ?? cfg.ntfy.encendido,
         tema: generarTema === true ? nuevoTema() : (tema ?? cfg.ntfy.tema),
         servidor: srv,
         ...(tokenFinal !== undefined && { token: tokenFinal }),
-        ...(!cambiaTema && cfg.ntfy.temaRenovado && { temaRenovado: true })
+        ...(!cambiaTema && encendido !== true && cfg.ntfy.temaRenovado && { temaRenovado: true })
       }
       guardar()
       avisar()

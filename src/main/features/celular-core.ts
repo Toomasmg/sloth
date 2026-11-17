@@ -64,6 +64,12 @@ export function servidorNtfy(u: unknown): string | null {
 
 export const tokenNtfyValido = (t: unknown): t is string => typeof t === 'string' && /^[A-Za-z0-9_.-]{1,200}$/.test(t)
 
+/** El token es de un servidor: si cambia el servidor y no llega uno nuevo, el guardado no viaja al otro. */
+export function tokenNtfyTras(actual: { servidor: string; token?: string }, servidor: string, token: string | null | undefined): string | undefined {
+  if (token !== undefined) return token ?? undefined
+  return servidor === actual.servidor ? actual.token : undefined
+}
+
 /** `resets_at` llega como segundos o milisegundos desde 1970, o como fecha ISO. */
 export function aMs(v: unknown): number | null {
   if (typeof v === 'number' && Number.isFinite(v) && v > 0) return v < 1e12 ? v * 1000 : v
