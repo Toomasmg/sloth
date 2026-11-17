@@ -175,6 +175,10 @@ body.is-resizing-row * {
 .pane-sep:focus-visible .pane-sep-line {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
 }
+.pane-sep:focus-visible .pane-sep-line {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
 
 /* Guía mientras se arrastra un separador: el tamaño real se aplica al soltar. */
 .pane-guide {
