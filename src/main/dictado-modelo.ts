@@ -181,6 +181,7 @@ export async function asegurarModelo(o: OpcionesModelo, d: ModeloDeps): Promise<
   const part = `${o.destino}.part`
   const intentos = o.intentos ?? 3
   let ultimo: ModeloError | null = null
+  let hashFallos = 0
   for (let i = 0; i < intentos; i++) {
     if (i > 0) await d.sleep(ESPERAS_MS[i - 1] ?? ESPERAS_MS[ESPERAS_MS.length - 1])
     try {
@@ -192,8 +193,11 @@ export async function asegurarModelo(o: OpcionesModelo, d: ModeloDeps): Promise<
       }
       return
     } catch (e) {
-      await d.rm(part)
+      // Un antivirus puede tener el .part abierto: que el rm falle no tiene que tapar el error de la bajada.
+      await d.rm(part).catch(() => undefined)
       if (!(e instanceof ModeloError)) throw e
+      // Si el hash falla dos veces el servidor sirve otra cosa: repetir solo gasta otros 190 MB.
+      if (e.tipo === 'hash' && ++hashFallos >= 2) throw e
       if (!e.reintentable) throw e
       ultimo = e
     }

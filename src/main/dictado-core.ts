@@ -95,5 +95,6 @@ export function errorDictado(tipo: TipoErrorDictado, detalle?: string): ErrorDic
   let mensaje = MENSAJES[tipo]
   if (tipo === 'otro' && detalle) mensaje = `${MENSAJES.otro} (${detalle.slice(0, 80)})`
   if (tipo === 'sin-modelo' && detalle === 'disco') mensaje = 'No hay espacio para bajar el modelo de dictado (190 MB).'
+  if (tipo === 'sin-modelo' && detalle === 'servidor') mensaje = 'El servidor del modelo de dictado respondió algo inesperado. Actualizá Sloth o probá más tarde.'
   return { tipo, mensaje, ajustes: tipo in AJUSTES_DICTADO }
 }

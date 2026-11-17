@@ -2,7 +2,7 @@ import { app, shell } from 'electron'
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { access, mkdir, open, rename, rm, writeFile } from 'node:fs/promises'
+import { rm, writeFile } from 'node:fs/promises'
 import { availableParallelism, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
@@ -20,7 +20,7 @@ import {
   whisperArgs
 } from '../dictado-core'
 import { ModeloError, asegurarModelo } from '../dictado-modelo'
-import type { ModeloDeps } from '../dictado-modelo'
+import { depsModeloReales } from '../dictado-modelo-real'
 import type { ProgresoModelo, ResultadoDictado, TipoErrorDictado } from '../../shared/dictado'
 
 /**
@@ -52,28 +52,6 @@ function buscarModelo(): string | null {
   return null
 }
 
-const depsReales: ModeloDeps = {
-  fetch: (url, init) => fetch(url, init),
-  mkdir: async (dir) => {
-    await mkdir(dir, { recursive: true })
-  },
-  abrir: async (path) => {
-    const fh = await open(path, 'w')
-    return {
-      write: (chunk) => fh.writeFile(chunk),
-      close: () => fh.close()
-    }
-  },
-  rename,
-  rm: (path) => rm(path, { force: true }),
-  existe: (path) =>
-    access(path).then(
-      () => true,
-      () => false
-    ),
-  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 /** Una sola bajada a la vez: los dictados que llegan mientras tanto esperan la misma promesa. */
 let bajando: Promise<string> | null = null
 
@@ -89,7 +67,7 @@ function bajarModelo(c: FeatureContext): Promise<string> {
   }
   bajando = asegurarModelo(
     { url: MODELO_URL, sha256: MODELO_SHA256, destino, hosts: MODELO_HOSTS, maxBytes: MAX_MODELO_BYTES, bytesAprox: MODELO_BYTES, onProgreso: avisar },
-    depsReales
+    depsModeloReales
   )
     .then(() => destino)
     .finally(() => {
@@ -102,7 +80,8 @@ function bajarModelo(c: FeatureContext): Promise<string> {
 function errorDeModelo(err: unknown): ResultadoDictado {
   if (err instanceof ModeloError) {
     if (err.tipo === 'escritura') return { ok: false, error: errorDictado('otro', 'no se pudo guardar el modelo') }
-    return { ok: false, error: errorDictado('sin-modelo', err.tipo === 'disco' ? 'disco' : undefined) }
+    const detalle = err.tipo === 'disco' ? 'disco' : err.tipo === 'hash' || err.tipo === 'http' ? 'servidor' : undefined
+    return { ok: false, error: errorDictado('sin-modelo', detalle) }
   }
   return { ok: false, error: errorDictado('otro') }
 }

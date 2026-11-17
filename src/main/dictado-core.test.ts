@@ -49,4 +49,5 @@ test('errorDictado arma el mensaje y dice si hay ajustes para abrir', () => {
   assert.equal(errorDictado('sin-modelo').ajustes, false)
   assert.match(errorDictado('sin-modelo').mensaje, /sin conexión/)
   assert.match(errorDictado('sin-modelo', 'disco').mensaje, /espacio/)
+  assert.doesNotMatch(errorDictado('sin-modelo', 'servidor').mensaje, /sin conexión/)
 })

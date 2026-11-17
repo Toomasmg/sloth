@@ -105,13 +105,13 @@ test('descarga bien: renombra el .part al destino y avisa el progreso', async ()
   assert.deepEqual(avances.at(-1), [CONTENIDO.length, CONTENIDO.length])
 })
 
-test('hash incorrecto: borra el .part, reintenta y al agotar falla sin dejar el destino', async () => {
+test('hash incorrecto: borra el .part, reintenta una sola vez y al agotar falla sin dejar el destino', async () => {
   const roto = new TextEncoder().encode('otro contenido distinto')
   const f = falso([() => resp(200, roto)])
   assert.equal(await tipoDe(asegurarModelo(opciones(), f.deps)), 'hash')
-  assert.equal(f.pedidos.length, 3)
+  assert.equal(f.pedidos.length, 2)
   assert.equal(f.fs.size, 0)
-  assert.deepEqual(f.esperas, [1000, 3000])
+  assert.deepEqual(f.esperas, [1000])
 })
 
 test('hash incorrecto una vez y bien la siguiente: queda el contenido bueno', async () => {
@@ -264,4 +264,12 @@ test('una URL inicial fuera de la lista falla sin pedir nada', async () => {
   const f = falso([() => resp(200, CONTENIDO)])
   assert.equal(await tipoDe(asegurarModelo(opciones({ url: 'https://evil.com/m.bin' }), f.deps)), 'http')
   assert.equal(f.pedidos.length, 0)
+})
+
+test('si el rm del .part falla, se propaga el error de la bajada y no el del rm', async () => {
+  const f = falso([() => resp(404, null)])
+  f.deps.rm = async () => {
+    throw Object.assign(new Error('EBUSY'), { code: 'EBUSY' })
+  }
+  assert.equal(await tipoDe(asegurarModelo(opciones(), f.deps)), 'http')
 })
