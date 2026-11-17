@@ -43,8 +43,26 @@ export function tokenIgual(dado: unknown, esperado: string): boolean {
 
 export const puertoValido = (p: unknown): p is number => typeof p === 'number' && Number.isInteger(p) && p >= 1024 && p <= 65535
 
-/** Tema de ntfy: lo que acepta su URL, sin barras ni espacios. */
-export const temaValido = (t: unknown): t is string => typeof t === 'string' && /^[A-Za-z0-9_-]{6,64}$/.test(t)
+export const TEMA_MIN = 20
+export const NTFY_POR_DEFECTO = 'https://ntfy.sh/'
+
+/** Tema de ntfy: lo que acepta su URL, sin barras ni espacios. El largo mínimo es lo único que lo protege: cualquiera que lo sepa lee los avisos. */
+export const temaValido = (t: unknown): t is string => typeof t === 'string' && /^[A-Za-z0-9_-]{20,64}$/.test(t)
+
+export function servidorNtfy(u: unknown): string | null {
+  if (u === undefined || u === '') return NTFY_POR_DEFECTO
+  if (typeof u !== 'string') return null
+  let url: URL
+  try {
+    url = new URL(u)
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) return null
+  return `${url.origin}${url.pathname.replace(/\/*$/, '/')}`
+}
+
+export const tokenNtfyValido = (t: unknown): t is string => typeof t === 'string' && /^[A-Za-z0-9_.-]{1,200}$/.test(t)
 
 /** `resets_at` llega como segundos o milisegundos desde 1970, o como fecha ISO. */
 export function aMs(v: unknown): number | null {

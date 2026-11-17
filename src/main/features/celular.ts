@@ -11,7 +11,7 @@ import type { HookEventPayload } from '../hooks'
 import { PUERTO_POR_DEFECTO, type CelularVista, type RemotoVista } from '../../shared/celular'
 import { enlaceCelu, secretoValido } from '../../shared/celu-remoto'
 import { LIMITES_ARCHIVO } from '../statusline-core'
-import { armarEstado, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, temaValido, textoAviso, type TipoAviso } from './celular-core'
+import { armarEstado, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyValido, type TipoAviso } from './celular-core'
 import { crearFuenteWifi, type FuenteDeEstado, type ProveedorDeEstado } from './celular-servidor'
 import { crearFuenteRemota, type CambioRemoto } from './celular-remoto'
 import { sesionChat } from './chat'
@@ -34,32 +34,38 @@ interface Config {
   puerto: number
   token: string
   aprobar: boolean
-  ntfy: { encendido: boolean; tema: string }
+  ntfy: { encendido: boolean; tema: string; servidor: string; token?: string; temaRenovado?: boolean }
   remoto: { encendido: boolean; aprobar: boolean; secreto: string }
 }
 
 const REVISAR_IP_MS = 15_000
-const NTFY_URL = 'https://ntfy.sh/'
 
 const file = (): string => join(app.getPath('userData'), 'features', 'celular.json')
 const nuevoToken = (): string => randomBytes(32).toString('base64url')
-const nuevoTema = (): string => `sloth-${randomBytes(9).toString('hex')}`
+const nuevoTema = (): string => `sloth-${randomBytes(12).toString('hex')}`
 
 function porDefecto(): Config {
-  return { encendido: false, puerto: PUERTO_POR_DEFECTO, token: nuevoToken(), aprobar: false, ntfy: { encendido: false, tema: nuevoTema() }, remoto: { encendido: false, aprobar: false, secreto: nuevoToken() } }
+  return { encendido: false, puerto: PUERTO_POR_DEFECTO, token: nuevoToken(), aprobar: false, ntfy: { encendido: false, tema: nuevoTema(), servidor: NTFY_POR_DEFECTO }, remoto: { encendido: false, aprobar: false, secreto: nuevoToken() } }
 }
 
 function cargar(): Config {
   const base = porDefecto()
   const raw = leerJson(file(), { validar: (v) => (esObjeto(v) ? (v as Partial<Config>) : undefined), porDefecto: (): Partial<Config> => ({}) }).valor
+  const temaGuardado = raw.ntfy?.tema
+  const temaOk = temaValido(temaGuardado)
+  const token = tokenNtfyValido(raw.ntfy?.token) ? raw.ntfy.token : undefined
+  const renovado = raw.ntfy?.temaRenovado === true || (!temaOk && temaGuardado !== undefined)
   return {
     encendido: raw.encendido === true,
     puerto: puertoValido(raw.puerto) ? raw.puerto : base.puerto,
     token: typeof raw.token === 'string' && raw.token.length >= 43 ? raw.token : base.token,
     aprobar: raw.aprobar === true,
     ntfy: {
-      encendido: raw.ntfy?.encendido === true,
-      tema: temaValido(raw.ntfy?.tema) ? raw.ntfy.tema : base.ntfy.tema
+      encendido: temaOk && raw.ntfy?.encendido === true,
+      tema: temaOk ? temaGuardado : base.ntfy.tema,
+      servidor: servidorNtfy(raw.ntfy?.servidor) ?? NTFY_POR_DEFECTO,
+      ...(token !== undefined && { token }),
+      ...(renovado && { temaRenovado: true })
     },
     remoto: {
       encendido: raw.remoto?.encendido === true,
@@ -81,7 +87,7 @@ const feature: Feature = {
   name: 'celular',
   register(ctx: FeatureContext) {
     let cfg = cargar()
-    if (!existsSync(file())) {
+    if (!existsSync(file()) || cfg.ntfy.temaRenovado) {
       try {
         guardarConfig(cfg)
       } catch (e) {
@@ -127,7 +133,13 @@ const feature: Feature = {
       puerto: cfg.puerto,
       enlace: fuente && ipServida ? `http://${ipServida}:${cfg.puerto}/?t=${cfg.token}` : null,
       aprobar: cfg.aprobar,
-      ntfy: { ...cfg.ntfy },
+      ntfy: {
+        encendido: cfg.ntfy.encendido,
+        tema: cfg.ntfy.tema,
+        servidor: cfg.ntfy.servidor,
+        conToken: cfg.ntfy.token !== undefined,
+        ...(cfg.ntfy.temaRenovado && { temaRenovado: true })
+      },
       error,
       ipCambio,
       remoto: vistaRemota()
@@ -301,9 +313,10 @@ const feature: Feature = {
       if (!espacio) return
       if (!prueba && !debeAvisar(enviados, `${wsId}:${tipo}`, Date.now())) return
       const { titulo, cuerpo } = prueba ? { titulo: 'Sloth', cuerpo: 'Así te van a llegar los avisos.' } : textoAviso(tipo, espacio, detalle)
-      const r = await fetch(NTFY_URL, {
+      const r = await fetch(cfg.ntfy.servidor, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        redirect: 'error',
+        headers: { 'content-type': 'application/json', ...(cfg.ntfy.token !== undefined && { authorization: `Bearer ${cfg.ntfy.token}` }) },
         body: JSON.stringify({ topic: cfg.ntfy.tema, title: titulo, message: cuerpo, priority: tipo === 'termino' ? 3 : 4, tags: [tipo === 'termino' ? 'white_check_mark' : 'warning'] }),
         signal: AbortSignal.timeout(8000)
       })
@@ -359,10 +372,22 @@ const feature: Feature = {
     })
 
     ctx.handle('ntfy', (p: unknown) => {
-      const { encendido, tema } = (p ?? {}) as { encendido?: unknown; tema?: unknown }
+      const { encendido, tema, servidor, token, generarTema } = (p ?? {}) as { encendido?: unknown; tema?: unknown; servidor?: unknown; token?: unknown; generarTema?: unknown }
       if (encendido !== undefined && typeof encendido !== 'boolean') throw new Error('Valor inválido.')
-      if (tema !== undefined && !temaValido(tema)) throw new Error('El tema va de 6 a 64 caracteres: letras, números, guion o guion bajo.')
-      cfg.ntfy = { encendido: encendido ?? cfg.ntfy.encendido, tema: tema ?? cfg.ntfy.tema }
+      if (tema !== undefined && !temaValido(tema)) throw new Error(`El tema va de ${TEMA_MIN} a 64 caracteres: letras, números, guion o guion bajo.`)
+      if (generarTema !== undefined && generarTema !== true) throw new Error('Valor inválido.')
+      const srv = servidor === undefined ? cfg.ntfy.servidor : servidorNtfy(servidor)
+      if (srv === null) throw new Error('El servidor tiene que ser una dirección https:// sin usuario, parámetros ni #.')
+      if (token !== undefined && token !== null && !tokenNtfyValido(token)) throw new Error('El token solo puede llevar letras, números, punto, guion y guion bajo (hasta 200).')
+      const cambiaTema = generarTema === true || (tema !== undefined && tema !== cfg.ntfy.tema)
+      const tokenFinal = token === undefined ? cfg.ntfy.token : (token ?? undefined)
+      cfg.ntfy = {
+        encendido: encendido ?? cfg.ntfy.encendido,
+        tema: generarTema === true ? nuevoTema() : (tema ?? cfg.ntfy.tema),
+        servidor: srv,
+        ...(tokenFinal !== undefined && { token: tokenFinal }),
+        ...(!cambiaTema && cfg.ntfy.temaRenovado && { temaRenovado: true })
+      }
       guardar()
       avisar()
       return vista()
