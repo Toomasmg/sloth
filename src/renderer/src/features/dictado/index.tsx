@@ -9,7 +9,7 @@ import './dictado.css'
 
 function BotonDictado({ paneId }: { paneId: string }): React.JSX.Element | null {
   const disponible = useDictadoDisponible(paneId)
-  const { estado, error, vacio } = useDictado(paneId)
+  const { estado, error, vacio, progreso } = useDictado(paneId)
   const novedad = useMostrarNovedad(paneId)
   if (!disponible) return null
   const label = estado === 'escuchando' ? 'Detener dictado' : estado === 'transcribiendo' ? 'Transcribiendo…' : 'Dictar'
@@ -21,9 +21,11 @@ function BotonDictado({ paneId }: { paneId: string }): React.JSX.Element | null 
         </button>
       )}
       {estado !== 'inactivo' && (
-        <span className="dictado-estado" data-estado={estado} role="status">
+        <span className="dictado-estado" data-estado={estado} role="status" title={progreso === undefined ? undefined : 'Se baja una sola vez; después el dictado anda sin conexión.'}>
           <span className="dictado-dot" aria-hidden="true" />
-          <span className="dictado-estado-texto">{estado === 'escuchando' ? 'Escuchando…' : 'Transcribiendo…'}</span>
+          <span className="dictado-estado-texto">
+            {estado === 'escuchando' ? 'Escuchando…' : progreso === undefined ? 'Transcribiendo…' : `Bajando el modelo… ${progreso} %`}
+          </span>
         </span>
       )}
       <IconButton

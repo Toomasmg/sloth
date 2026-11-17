@@ -18,5 +18,13 @@ export interface ProgresoModelo {
   total: number
 }
 
+/** Porcentaje (0-100) de un evento `feat:dictado:modelo`; `null` si no hay bajada en curso o el dato no es válido. */
+export function porcentajeModelo(p: unknown): number | null {
+  if (typeof p !== 'object' || p === null) return null
+  const { recibidos, total } = p as Partial<ProgresoModelo>
+  if (typeof recibidos !== 'number' || typeof total !== 'number' || !(total > 0) || !(recibidos >= 0)) return null
+  return Math.min(100, Math.floor((100 * recibidos) / total))
+}
+
 /** Respuesta de `feat:dictado:transcribir`. */
 export type ResultadoDictado = { ok: true; texto: string } | { ok: false; error: ErrorDictado }
