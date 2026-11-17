@@ -382,6 +382,7 @@ const feature: Feature = {
       if (typeof token !== 'string' || !pending.has(token)) throw new Error('La vista previa venció: volvé a elegir el archivo.')
       const entry = pending.get(token)!
       if (!entry.parsed) throw new Error('Falta la contraseña del archivo.')
+      ctx.store.exigirEscritura()
       const parsed = entry.parsed
       pending.delete(token)
       const choices = parseChoices(rawChoices)

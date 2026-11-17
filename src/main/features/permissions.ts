@@ -1,7 +1,8 @@
 import { app, Notification, type BrowserWindow } from 'electron'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
+import { podarSegunStore } from '../poda'
 import type { Feature, FeatureContext } from './context'
 import type { TerminalBackend, PendingPermission } from '../daemon-client'
 import type { HookEventPayload } from '../hooks'
@@ -53,28 +54,16 @@ const MAX_IMPORT = 500
 
 const file = (): string => join(app.getPath('userData'), 'features', 'permissions.json')
 
-function writeAtomic(path: string, data: unknown): void {
-  mkdirSync(dirname(path), { recursive: true })
-  const tmp = `${path}.${process.pid}.tmp`
-  writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8')
-  renameSync(tmp, path)
-}
-
-/** Lectura tolerante: lo que no se entiende se descarta (nunca tira). */
+/** Lectura tolerante: las entradas que no se entienden se descartan; un archivo ilegible se aparta. */
 function load(): State {
-  const empty: State = { rules: [], history: [] }
-  try {
-    const raw = JSON.parse(readFileSync(file(), 'utf8').replace(/^﻿/, '')) as Partial<State>
-    const rules = Array.isArray(raw.rules)
-      ? raw.rules.filter((r): r is PermissionRule => !!r && typeof r.id === 'string' && typeof r.workspaceId === 'string').slice(0, MAX_RULES)
-      : []
-    const history = Array.isArray(raw.history)
-      ? raw.history.filter((h): h is DecisionEntry => !!h && typeof h.id === 'string' && typeof h.at === 'number').slice(0, MAX_HISTORY)
-      : []
-    return { rules, history }
-  } catch {
-    return empty
-  }
+  const raw = leerJson(file(), { validar: (v) => (esObjeto(v) ? (v as Partial<State>) : undefined), porDefecto: (): Partial<State> => ({}) }).valor
+  const rules = Array.isArray(raw.rules)
+    ? raw.rules.filter((r): r is PermissionRule => !!r && typeof r.id === 'string' && typeof r.workspaceId === 'string').slice(0, MAX_RULES)
+    : []
+  const history = Array.isArray(raw.history)
+    ? raw.history.filter((h): h is DecisionEntry => !!h && typeof h.id === 'string' && typeof h.at === 'number').slice(0, MAX_HISTORY)
+    : []
+  return { rules, history }
 }
 
 const startOfToday = (): number => {
@@ -102,7 +91,7 @@ const feature: Feature = {
 
     const save = (): void => {
       try {
-        writeAtomic(file(), state)
+        escribirJsonAtomico(file(), state)
       } catch (e) {
         ctx.log('no se pudo guardar:', (e as Error).message)
       }
@@ -222,12 +211,14 @@ const feature: Feature = {
     }
 
     ctx.handle('list', () => {
-      // Reglas de espacios que ya no existen: se quitan (no quedan huérfanas en el archivo).
-      const before = state.rules.length
-      state.rules = state.rules.filter((r) => Boolean(ctx.store.workspace(r.workspaceId)))
-      if (state.rules.length !== before) save()
+      // Reglas de espacios que ya no existen: no quedan huérfanas en el archivo.
+      const p = podarSegunStore(state.rules, (r) => Boolean(ctx.store.workspace(r.workspaceId)), ctx.store.confiable)
+      if (p.guardar.length !== state.rules.length) {
+        state.rules = p.guardar
+        save()
+      }
       return {
-        rules: state.rules,
+        rules: p.vista,
         history: state.history.filter((h) => h.at >= startOfToday()),
         spaces: Object.fromEntries(ctx.store.workspaces.map((w) => [w.id, { name: w.name, cwd: w.cwd, accountId: w.accountId }]))
       }

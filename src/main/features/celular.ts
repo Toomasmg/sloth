@@ -1,9 +1,10 @@
 import { app } from 'electron'
 import { randomBytes } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
+import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
 import { networkInterfaces } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import type { PendingPermission } from '../daemon-client'
 import type { HookEventPayload } from '../hooks'
@@ -50,34 +51,26 @@ function porDefecto(): Config {
 
 function cargar(): Config {
   const base = porDefecto()
-  try {
-    const raw = JSON.parse(readFileSync(file(), 'utf8').replace(/^﻿/, '')) as Partial<Config>
-    return {
-      encendido: raw.encendido === true,
-      puerto: puertoValido(raw.puerto) ? raw.puerto : base.puerto,
-      token: typeof raw.token === 'string' && raw.token.length >= 43 ? raw.token : base.token,
-      aprobar: raw.aprobar === true,
-      ntfy: {
-        encendido: raw.ntfy?.encendido === true,
-        tema: temaValido(raw.ntfy?.tema) ? raw.ntfy.tema : base.ntfy.tema
-      },
-      remoto: {
-        encendido: raw.remoto?.encendido === true,
-        aprobar: raw.aprobar === true && raw.remoto?.aprobar === true,
-        secreto: secretoValido(raw.remoto?.secreto) ? raw.remoto.secreto : base.remoto.secreto
-      }
+  const raw = leerJson(file(), { validar: (v) => (esObjeto(v) ? (v as Partial<Config>) : undefined), porDefecto: (): Partial<Config> => ({}) }).valor
+  return {
+    encendido: raw.encendido === true,
+    puerto: puertoValido(raw.puerto) ? raw.puerto : base.puerto,
+    token: typeof raw.token === 'string' && raw.token.length >= 43 ? raw.token : base.token,
+    aprobar: raw.aprobar === true,
+    ntfy: {
+      encendido: raw.ntfy?.encendido === true,
+      tema: temaValido(raw.ntfy?.tema) ? raw.ntfy.tema : base.ntfy.tema
+    },
+    remoto: {
+      encendido: raw.remoto?.encendido === true,
+      aprobar: raw.aprobar === true && raw.remoto?.aprobar === true,
+      secreto: secretoValido(raw.remoto?.secreto) ? raw.remoto.secreto : base.remoto.secreto
     }
-  } catch {
-    return base
   }
 }
 
 function guardarConfig(c: Config): void {
-  const f = file()
-  mkdirSync(dirname(f), { recursive: true })
-  const tmp = `${f}.${process.pid}.tmp`
-  writeFileSync(tmp, JSON.stringify(c, null, 2), 'utf8')
-  renameSync(tmp, f)
+  escribirJsonAtomico(file(), c)
 }
 
 const ipActual = (): string | null => elegirIp(networkInterfaces())

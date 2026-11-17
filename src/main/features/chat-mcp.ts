@@ -14,7 +14,7 @@ import { argsAlta, argsBaja, leerRegistro, MCP_SCRIPT_NAME, planificar, type Reg
 import { CHAT_MCP_SCRIPT } from './chat-mcp-script'
 import { resolveClaudeExe } from './tickets/claude-run'
 import { hayNode, writeIfChanged } from '../hooks'
-import { writeJsonAtomic } from './tray-settings'
+import { escribirJsonAtomico } from '../json-file'
 
 export interface ChatMcpDeps {
   data: ChatData
@@ -107,7 +107,7 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
   const emitConfig = (): void => ctx.emit('mcpConfig', view())
 
   function save(): void {
-    writeJsonAtomic(cfgPath, { v: 2, enabled: cfg.enabled, cuentas: cfg.cuentas, grants: cfg.grants, tokens: cfg.tokens })
+    escribirJsonAtomico(cfgPath, { v: 2, enabled: cfg.enabled, cuentas: cfg.cuentas, grants: cfg.grants, tokens: cfg.tokens })
   }
 
   /** El token deja de valer en el acto; sacarlo de la config de la cuenta puede esperar. */

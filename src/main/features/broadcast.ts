@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { escribirJsonAtomico, leerJson } from '../json-file'
 import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 
@@ -28,19 +28,14 @@ let file = ''
 let entries: SentEntry[] = []
 
 function load(): SentEntry[] {
-  try {
-    const raw = JSON.parse(readFileSync(file, 'utf8').replace(/^﻿/, '')) as unknown
-    return Array.isArray(raw) ? raw.map(clean).filter((e): e is SentEntry => e !== null).slice(0, MAX_ENTRIES) : []
-  } catch {
-    return []
-  }
+  return leerJson(file, {
+    validar: (raw) => (Array.isArray(raw) ? raw.map(clean).filter((e): e is SentEntry => e !== null).slice(0, MAX_ENTRIES) : undefined),
+    porDefecto: (): SentEntry[] => []
+  }).valor
 }
 
 function save(): void {
-  mkdirSync(join(app.getPath('userData'), 'features'), { recursive: true })
-  const tmp = `${file}.tmp`
-  writeFileSync(tmp, JSON.stringify(entries, null, 2), 'utf8')
-  renameSync(tmp, file)
+  escribirJsonAtomico(file, entries)
 }
 
 const str = (v: unknown, max: number): string | undefined => (typeof v === 'string' && v.length <= max ? v : undefined)

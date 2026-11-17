@@ -1,0 +1,18 @@
+/* Queda fijo y sin cerrar: mientras dure, nada de lo que se cambie se guarda. */
+.f-avisos-solo-lectura {
+  position: fixed;
+  top: calc(40px + var(--s-2));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-menu);
+  width: min(720px, calc(100vw - var(--s-5)));
+  border: 1px solid var(--warn-fg);
+  border-radius: var(--r-md);
+}
+.f-avisos-solo-lectura strong {
+  font-weight: 600;
+}
+.f-avisos-ruta {
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
