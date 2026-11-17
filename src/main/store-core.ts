@@ -1,6 +1,8 @@
 import type { Account, Workspace } from '../shared/types'
+import { migrar, type Migraciones } from './versionado'
 
 export const VERSION_ESTADO = 1
+export const MIGRACIONES_ESTADO: Migraciones = {}
 
 export interface PersistedState {
   version: typeof VERSION_ESTADO
@@ -18,6 +20,8 @@ export interface EstadoValidado {
   espaciosRepetidos: number
   /** El archivo lo escribió una versión de Sloth más nueva (puede traer campos que esta no conoce). */
   versionFutura: boolean
+  /** Venía sin `version` o de una versión vieja: hay que reescribirlo con la actual (con respaldo). */
+  migrado: boolean
 }
 
 export const estadoVacio = (): EstadoValidado => ({
@@ -26,7 +30,8 @@ export const estadoVacio = (): EstadoValidado => ({
   espaciosDescartados: 0,
   cuentasRepetidas: 0,
   espaciosRepetidos: 0,
-  versionFutura: false
+  versionFutura: false,
+  migrado: false
 })
 
 type Obj = Record<string, unknown>
@@ -78,19 +83,22 @@ function filtrar<T extends { id: string }>(
   return { ok, descartados: lista.length - ok.length, repetidos }
 }
 
-/** Devuelve undefined si la raíz no es un objeto (el archivo entero no sirve). */
+/** Devuelve undefined si la raíz no es un objeto o su `version` no se entiende (el archivo entero no sirve). */
 export function validarEstado(raw: unknown): EstadoValidado | undefined {
-  if (!esObj(raw)) return undefined
-  const cuentas = filtrar(raw.accounts, validarCuenta)
-  const espacios = filtrar(raw.workspaces, validarEspacio)
-  const openPanes = Array.isArray(raw.openPanes) ? raw.openPanes.filter((p): p is string => typeof p === 'string') : []
+  const r = migrar(raw, MIGRACIONES_ESTADO, VERSION_ESTADO)
+  if (r.estado === 'invalida') return undefined
+  const datos = r.datos
+  const cuentas = filtrar(datos.accounts, validarCuenta)
+  const espacios = filtrar(datos.workspaces, validarEspacio)
+  const openPanes = Array.isArray(datos.openPanes) ? datos.openPanes.filter((p): p is string => typeof p === 'string') : []
   return {
-    estado: { version: VERSION_ESTADO, accounts: cuentas.ok, workspaces: espacios.ok, openPanes },
+    estado: { ...datos, version: VERSION_ESTADO, accounts: cuentas.ok, workspaces: espacios.ok, openPanes },
     cuentasDescartadas: cuentas.descartados,
     espaciosDescartados: espacios.descartados,
     cuentasRepetidas: cuentas.repetidos,
     espaciosRepetidos: espacios.repetidos,
-    versionFutura: typeof raw.version === 'number' && raw.version > VERSION_ESTADO
+    versionFutura: r.estado === 'futura',
+    migrado: r.estado === 'migrado'
   }
 }
 
@@ -173,18 +181,17 @@ export function decidirCarga(l: LecturaEstado, rutasCorregidas: boolean): Decisi
   }
   const v = l.v
   const descartes = v.cuentasDescartadas + v.espaciosDescartados
-  const detalle = descartes > 0 ? ` Además saqué ${describirDescartes(v)}.` : ''
   if (v.versionFutura) {
     return {
-      soloLectura: false,
+      soloLectura: true,
       respaldar: true,
       guardar: false,
-      confiable: descartes === 0,
+      confiable: false,
       aviso: (bak) =>
-        `sloth-state.json lo guardó una versión más nueva de Sloth: ${textoRespaldo(bak)}. Cualquier cambio (también abrir o cerrar un panel) lo reescribe con el formato de esta versión y puede perder lo que esta no conoce.${detalle}`
+        `sloth-state.json lo guardó una versión más nueva de Sloth (${textoRespaldo(bak)}). Lo abrí en solo lectura: no voy a guardar cambios para no pisarlo. Actualizá Sloth para seguir.`
     }
   }
-  if (descartes === 0 && !rutasCorregidas) return { soloLectura: false, respaldar: false, guardar: false, confiable: true }
+  if (descartes === 0 && !rutasCorregidas && !v.migrado) return { soloLectura: false, respaldar: false, guardar: false, confiable: true }
   return {
     soloLectura: false,
     respaldar: true,

@@ -81,7 +81,9 @@ export class Store {
       !r.soloLectura && corregirRutasViejas(v.estado.accounts, join(app.getPath('appData'), 'AntiRea'), app.getPath('userData'))
     const d = decidirCarga({ v, apartado: r.apartado, soloLectura: r.soloLectura, motivo: r.motivo }, rutasCorregidas)
     this.cargaConfiable = d.confiable
-    if (d.soloLectura) this.soloLecturaMotivo = `sloth-state.json ${r.motivo ?? 'no se pudo leer'}`
+    if (d.soloLectura) {
+      this.soloLecturaMotivo = r.motivo ? `sloth-state.json ${r.motivo}` : 'sloth-state.json es de una versión más nueva de Sloth'
+    }
     let bak: string | undefined
     if (d.respaldar) {
       try {
