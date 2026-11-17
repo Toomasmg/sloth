@@ -48,6 +48,8 @@ export interface ChatMcpView {
   viaColumn: boolean
 }
 
+export type ModoRiesgoso = 'bypassPermissions' | 'acceptEdits'
+
 export interface ChatMcpAsk {
   id: string
   op: ChatMcpOp
@@ -59,6 +61,8 @@ export interface ChatMcpAsk {
   workspace?: string
   /** Solo en 'enviar': el texto que escribió Claude y se mandaría (ya validado). */
   preview?: string
+  /** La cuenta corre sin pedir permisos: lo que lea Claude del chat podría llevarlo a actuar sin que lo veas, así que no hay «siempre». */
+  sinSiempre?: ModoRiesgoso
   expiresAt: number
 }
 

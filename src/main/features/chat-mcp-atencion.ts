@@ -3,7 +3,7 @@
  * por `AtencionDeps`). La cuenta sale del token; el espacio que manda la terminal solo se muestra.
  */
 import { convKey, type ChatConvRef } from '../../shared/chat'
-import { VIA_CLAUDE_PREFIX, type ChatMcpAsk, type ChatMcpChoice, type ChatMcpOp } from '../../shared/chat-mcp'
+import { VIA_CLAUDE_PREFIX, type ChatMcpAsk, type ChatMcpChoice, type ChatMcpOp, type ModoRiesgoso } from '../../shared/chat-mcp'
 import {
   cuentaDelToken,
   debeRegistrar,
@@ -46,6 +46,7 @@ export interface AtencionDeps {
   etiquetaCuenta(id: string): string | undefined
   /** «Siempre» en un pedido de leer: el main lo guarda en la config. */
   guardarGrant(accountId: string, conv: ChatConvRef, nombre: string): void
+  modoRiesgoso(cuenta: string, ws: string): ModoRiesgoso | null
   pedidosCambiaron(asks: ChatMcpAsk[]): void
   avisar(ask: ChatMcpAsk, donde: string): void
   now(): number
@@ -116,6 +117,8 @@ export function crearAtencion(d: AtencionDeps): {
     }
     if (w && w.accountId === cuenta) ask.workspace = limpiarNombre(w.name)
     if (preview !== undefined) ask.preview = preview
+    const riesgo = op === 'leer' ? d.modoRiesgoso(cuenta, ws) : null
+    if (riesgo) ask.sinSiempre = riesgo
     let resolveFn: (ok: boolean) => void = () => undefined
     const promise = new Promise<boolean>((r) => (resolveFn = r))
     const p: Pendiente = {
@@ -136,7 +139,8 @@ export function crearAtencion(d: AtencionDeps): {
   }
 
   async function exigirPermiso(cuenta: string, hash: string, ws: string, cand: ConvCandidata, op: ChatMcpOp, preview?: string): Promise<void> {
-    if (!permitido(d.config(), cuenta, cand.conv, op) && !(await preguntar(cuenta, ws, cand, op, preview))) throw new Error(NO_PERMITIDO)
+    const guardado = d.modoRiesgoso(cuenta, ws) === null && permitido(d.config(), cuenta, cand.conv, op)
+    if (!guardado && !(await preguntar(cuenta, ws, cand, op, preview))) throw new Error(NO_PERMITIDO)
     // Mientras esperaba, el usuario pudo apagar, desmarcar la cuenta o borrarla.
     if (!vigente(cuenta, hash)) throw new Error(d.config().enabled ? CUENTA_NO : APAGADO)
   }
@@ -205,6 +209,7 @@ export function crearAtencion(d: AtencionDeps): {
     if (!p) return
     if (choice === 'always') {
       if (p.ask.op !== 'leer') throw new Error('Para enviar no hay «siempre»: cada mensaje se confirma.')
+      if (p.ask.sinSiempre) throw new Error(`Con la cuenta en ${p.ask.sinSiempre} no hay «siempre»: cada lectura se confirma.`)
       try {
         d.guardarGrant(p.cuenta, p.ask.conv, p.ask.nombre)
       } finally {

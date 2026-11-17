@@ -7,6 +7,7 @@ import {
   envolverContenido,
   hashToken,
   limpiarNombre,
+  modoRiesgoso,
   parsearConfig,
   parsearPedido,
   permitido,
@@ -200,4 +201,16 @@ test('validarCuentas acepta ids existentes sin repetir y rechaza el resto', () =
   assert.throws(() => validarCuentas(['z'], ['a']), /no existe/)
   assert.throws(() => validarCuentas([1], ['a']), /no existe/)
   assert.throws(() => validarCuentas(Array.from({ length: 101 }, () => 'a'), ['a']), /inválida/)
+})
+
+test('modoRiesgoso: vacíos y no objetos dan null', () => {
+  assert.equal(modoRiesgoso(), null)
+  assert.equal(modoRiesgoso({}, null, 'x', 5, [], { permissions: 'x' }, { permissions: { defaultMode: 'plan' } }), null)
+})
+
+test('modoRiesgoso: cada modo y combinados, bypass gana', () => {
+  assert.equal(modoRiesgoso({ permissions: { defaultMode: 'acceptEdits' } }), 'acceptEdits')
+  assert.equal(modoRiesgoso({ permissions: { defaultMode: 'bypassPermissions' } }), 'bypassPermissions')
+  assert.equal(modoRiesgoso({ permissions: { defaultMode: 'acceptEdits' } }, {}, { permissions: { defaultMode: 'bypassPermissions' } }), 'bypassPermissions')
+  assert.equal(modoRiesgoso({ permissions: { defaultMode: 'bypassPermissions' } }, { permissions: { defaultMode: 'acceptEdits' } }), 'bypassPermissions')
 })
