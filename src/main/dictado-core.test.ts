@@ -46,4 +46,7 @@ test('errorDictado arma el mensaje y dice si hay ajustes para abrir', () => {
   assert.equal(errorDictado('microfono').ajustes, true)
   assert.equal(errorDictado('sin-motor').ajustes, false)
   assert.match(errorDictado('otro', 'tardó demasiado').mensaje, /tardó demasiado/)
+  assert.equal(errorDictado('sin-modelo').ajustes, false)
+  assert.match(errorDictado('sin-modelo').mensaje, /sin conexión/)
+  assert.match(errorDictado('sin-modelo', 'disco').mensaje, /espacio/)
 })
