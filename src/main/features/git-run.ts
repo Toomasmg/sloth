@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { isAbsolute } from 'node:path'
+import { safeGitArgs, safeGitEnv } from '../git-safe'
 
 /**
  * Corre git / gh sin shell (array de argumentos), oculto en Windows y con timeout.
@@ -23,7 +24,7 @@ export interface RunOpts {
   signal?: AbortSignal
 }
 
-const ENV = {
+const ENV = safeGitEnv({
   ...process.env,
   // Nada de prompts interactivos: si git o gh quieren preguntar algo, fallan con un mensaje.
   GIT_TERMINAL_PROMPT: '0',
@@ -32,7 +33,7 @@ const ENV = {
   GH_NO_UPDATE_NOTIFIER: '1',
   NO_COLOR: '1',
   LC_ALL: 'C'
-}
+})
 
 export function run(cmd: 'git' | 'gh', args: string[], opts: RunOpts = {}): Promise<RunResult> {
   return new Promise((resolve, reject) => {
@@ -136,14 +137,14 @@ export function readable(r: RunResult, what: string): string {
 
 /** git con -C <cwd>; tira GitError legible si falla. */
 export async function git(cwd: string, args: string[], opts: Omit<RunOpts, 'cwd'> = {}): Promise<string> {
-  const r = await run('git', ['-C', cwd, '-c', 'core.quotepath=false', ...args], opts)
+  const r = await run('git', safeGitArgs(cwd, args), opts)
   if (r.code !== 0) throw new GitError(readable(r, `git ${args[0]}`))
   return r.stdout
 }
 
 /** git que devuelve el resultado crudo (para comandos donde el código distinto de 0 significa "no"). */
 export function gitRaw(cwd: string, args: string[], opts: Omit<RunOpts, 'cwd'> = {}): Promise<RunResult> {
-  return run('git', ['-C', cwd, '-c', 'core.quotepath=false', ...args], opts)
+  return run('git', safeGitArgs(cwd, args), opts)
 }
 
 export function isDir(p: unknown): p is string {

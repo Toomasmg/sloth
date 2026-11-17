@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { parseGithubRemote, parsePrList, REPO_RE, type TeamPr } from './team-core'
+import { safeGitArgs, safeGitEnv } from '../git-safe'
 
 /**
  * GitHub para la vista «Equipo», solo lectura: `git remote get-url origin` de cada repo y
@@ -13,14 +14,14 @@ const GIT_TIMEOUT_MS = 8_000
 const MAX_REPOS = 20
 const PARALLEL = 4
 
-const ENV = {
+const ENV = safeGitEnv({
   ...process.env,
   GIT_TERMINAL_PROMPT: '0',
   GCM_INTERACTIVE: 'never',
   GH_PROMPT_DISABLED: '1',
   GH_NO_UPDATE_NOTIFIER: '1',
   NO_COLOR: '1'
-}
+})
 
 export class GhMissingError extends Error {
   constructor() {
@@ -68,7 +69,7 @@ export async function githubRepoOf(dir: string, run = exec): Promise<string | un
   } catch {
     return undefined
   }
-  const r = await run('git', ['remote', 'get-url', 'origin'], dir, GIT_TIMEOUT_MS)
+  const r = await run('git', safeGitArgs(dir, ['remote', 'get-url', 'origin']), dir, GIT_TIMEOUT_MS)
   if (r.missing || r.code !== 0) return undefined
   return parseGithubRemote(r.stdout.trim())
 }

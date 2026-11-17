@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { createReadStream, existsSync, openSync, readSync, closeSync, statSync, unlinkSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { git, gitRaw, GitError, PROTECTED, readable, run, validBranchName } from './git-run'
+import { safeGitArgs, safeGitEnv } from '../git-safe'
 
 /** Lógica de git/gh de la función «git», sin Electron (se prueba con Node). */
 
@@ -212,10 +213,10 @@ function clip(s: string): string {
 /** Lee como mucho `limit` líneas de un proceso, cortándolo cuando ya alcanza. */
 function streamLines(cwd: string, args: string[], limit: number, timeoutMs = 20000): Promise<{ lines: string[]; more: boolean; code: number; stderr: string }> {
   return new Promise((res, rej) => {
-    const child = spawn('git', ['-C', cwd, '-c', 'core.quotepath=false', ...args], {
+    const child = spawn('git', safeGitArgs(cwd, args), {
       windowsHide: true,
       shell: false,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0', NO_COLOR: '1', LC_ALL: 'C' }
+      env: safeGitEnv({ ...process.env, GIT_TERMINAL_PROMPT: '0', NO_COLOR: '1', LC_ALL: 'C' })
     })
     const lines: string[] = []
     let rest = ''

@@ -1,6 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { GitError, run } from './git-run'
+import { spawnSync } from 'node:child_process'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { git, GitError, gitRaw, run } from './git-run'
 
 test('con la señal ya abortada, run rechaza enseguida como cancelada', async () => {
   const ac = new AbortController()
@@ -20,4 +24,22 @@ test('sin abortar, run termina normal', async () => {
   const ac = new AbortController()
   const r = await run('git', ['--version'], { signal: ac.signal })
   assert.equal(r.code, 0)
+})
+
+test('git y gitRaw no ejecutan el core.fsmonitor de un repo ajeno', async () => {
+  const base = mkdtempSync(join(tmpdir(), 'sloth-fsmonitor-'))
+  try {
+    assert.equal((await run('git', ['init', '-q', base])).code, 0)
+    writeFileSync(join(base, 'a.txt'), 'hola')
+    assert.equal((await run('git', ['-C', base, 'config', 'core.fsmonitor', 'touch marca-fsmonitor'])).code, 0)
+    // Control: sin la config segura, git sí corre el comando del repo.
+    spawnSync('git', ['-C', base, 'status'], { stdio: 'ignore', windowsHide: true })
+    assert.ok(existsSync(join(base, 'marca-fsmonitor')), 'el control no ejecutó el fsmonitor')
+    rmSync(join(base, 'marca-fsmonitor'))
+    await gitRaw(base, ['status', '--porcelain'])
+    await git(base, ['status'])
+    assert.equal(existsSync(join(base, 'marca-fsmonitor')), false)
+  } finally {
+    rmSync(base, { recursive: true, force: true })
+  }
 })
