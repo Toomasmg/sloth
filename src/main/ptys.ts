@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import type { SpawnSpec } from '../shared/daemon-protocol'
 import type { ShellChoice } from './features/settings-model'
-import { shellArgs, type ShellFamily } from './shell-args'
+import { shellArgs, shellLaunch, type ShellFamily } from './shell-args'
 
 export { shellArgs, type ShellFamily }
 
@@ -11,6 +11,8 @@ export interface PtySpec {
   env: Record<string, string>
   /** argv de Claude que la shell corre al abrirse (p. ej. ['claude', '--continue']). Sin valor = solo la shell. */
   claude?: string[]
+  /** Ruta absoluta de claude.exe, si se encontró: así la shell no busca `claude` en la carpeta del repo. */
+  claudeExe?: string
 }
 
 const GIT_BASH_PATHS = ['C:\\Program Files\\Git\\bin\\bash.exe']
@@ -65,8 +67,6 @@ export function baseEnv(): Record<string, string> {
     env[k] = v
   }
   env.TERM_PROGRAM = 'Sloth'
-  // cmd.exe busca primero en la carpeta actual: sin esto, un claude.cmd que venga en el repo se ejecuta solo.
-  env.NoDefaultCurrentDirectoryInExePath = '1'
   return env
 }
 
@@ -75,7 +75,8 @@ export function baseEnv(): Record<string, string> {
  * backend en proceso (src/main/daemon-client.ts). Acá solo armamos lo que se le manda a spawn.
  * `shell` es la elección de Configuración (solo afecta terminales nuevas: las vivas no se tocan).
  */
-export function toSpawnSpec(spec: PtySpec, cols: number, rows: number, shell: ShellChoice): SpawnSpec {
+export function toSpawnSpec(spec: PtySpec, cols: number, rows: number, shell: ShellChoice): { spawn: SpawnSpec; paste?: string } {
   const bin = resolveShell(shell)
-  return { file: bin.file, args: shellArgs(bin.family, spec.claude), cwd: spec.cwd, env: spec.env, cols, rows }
+  const launch = shellLaunch(bin.family, spec.claude, spec.claudeExe)
+  return { spawn: { file: bin.file, args: launch.args, cwd: spec.cwd, env: { ...spec.env, ...launch.env }, cols, rows }, paste: launch.paste }
 }

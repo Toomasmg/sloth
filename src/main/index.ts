@@ -10,7 +10,10 @@ import { accountStatus, createAccount } from './accounts'
 import { installInto, stateForEvent, writeHookScript, type HookEventPayload } from './hooks'
 import { esFalsoFinal, pendientes, registrar as registrarFondo, venceEn, type Fondo } from './segundo-plano-core'
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
-import { claudeWithPrompt } from './shell-args'
+import { claudeWithPrompt, pastePayload } from './shell-args'
+import { avisar } from './avisos'
+import { resolveClaudeExe } from './features/tickets/claude-run'
+import { initialPromptProblem } from '../shared/initial-prompt'
 import { nextAgentState, type AgentInput } from './agent-machine'
 import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
 import { clipboardForPaste } from './clipboard-paste'
@@ -123,6 +126,8 @@ app.whenReady().then(async () => {
   const prepareListeners: ((acc: Account) => void)[] = []
   const removeListeners: ((acc: Account) => void)[] = []
   const commandOverrides: ((ws: Workspace, acc: Account) => string | undefined)[] = []
+  /** Primer mensaje que no se pudo pasar como argumento: se pega en el primer SessionStart del espacio. */
+  const pendingPaste = new Map<string, { text: string; until: number }>()
   const safe = (name: string, fn: () => void): void => {
     try {
       fn()
@@ -140,6 +145,7 @@ app.whenReady().then(async () => {
     // Con un shell de fondo corriendo, terminar el turno no es «terminó» ni «te espera»: no se avisa.
     if (esFalsoFinal(p, n)) p = { ...p, enFondo: n }
     for (const l of hookListeners) safe('hook', () => l(p))
+    if (p.event === 'SessionStart') pasteInitialPrompt(p.ws)
     const ws = store.workspace(p.ws)
     if (!ws) return
     const { state, detail } = p.enFondo
@@ -264,6 +270,20 @@ app.whenReady().then(async () => {
     }
   }
 
+  function pasteInitialPrompt(wsId: string): void {
+    const s = pendingPaste.get(wsId)
+    if (!s) return
+    pendingPaste.delete(wsId)
+    // Recién acá se gasta: si Sloth se cerró antes de pegarlo, la próxima terminal lo vuelve a intentar.
+    if (store.workspace(wsId)) store.updateWorkspace(wsId, { initialPromptUsed: true })
+    const name = store.workspace(wsId)?.name ?? 'un espacio'
+    if (Date.now() > s.until) return avisar(`Claude tardó en arrancar en «${name}» y no le pegué el primer mensaje: escribilo a mano.`)
+    // Sin Enter: si Claude se cerró en el medio, el texto queda en la línea de la shell sin ejecutarse.
+    setTimeout(() => {
+      void backend().then((b) => b.write(wsId, pastePayload(s.text)))
+    }, 1500)
+  }
+
   /** argv de Claude para la terminal del espacio (la shell lo quota según su sintaxis en ptys.ts). */
   function claudeCommand(ws: Workspace, acc: Account): string[] | undefined {
     // Los reemplazos (p. ej. retomar tras mover de cuenta) se aplican aunque el espacio no abra Claude solo.
@@ -273,10 +293,8 @@ app.whenReady().then(async () => {
       if (cmd) return cmd.trim().split(/\s+/)
     }
     if (!ws.autoStartClaude) return undefined
-    if (ws.initialPrompt && !ws.initialPromptUsed) {
-      store.updateWorkspace(ws.id, { initialPromptUsed: true })
-      return claudeWithPrompt(ws.initialPrompt)
-    }
+    // Un «!» inicial Claude Code lo correría como comando de la terminal: ese prompt no se manda.
+    if (ws.initialPrompt && !ws.initialPromptUsed && !initialPromptProblem(ws.initialPrompt)) return claudeWithPrompt(ws.initialPrompt)
     if (ws.resume !== false && hasPreviousConversation(acc, ws.cwd)) return ['claude', '--continue']
     return ['claude']
   }
@@ -286,7 +304,7 @@ app.whenReady().then(async () => {
       const acc = requireAccount(accountIdFromLoginPane(paneId))
       prepareAccount(acc)
       // Primer arranque de Claude con esta carpeta: pide tema y login.
-      return { cwd: homedir(), env: accountEnv(acc), claude: ['claude'] }
+      return { cwd: homedir(), env: accountEnv(acc), claude: ['claude'], claudeExe: resolveClaudeExe() }
     }
     const ws = store.workspace(paneId)
     if (!ws) throw new Error('Ese espacio ya no existe.')
@@ -299,7 +317,8 @@ app.whenReady().then(async () => {
       SLOTH_HOOK_URL: b.hookUrl,
       SLOTH_TOKEN: b.hookToken
     }
-    return { cwd: ws.cwd, env, claude: claudeCommand(ws, acc) }
+    const claude = claudeCommand(ws, acc)
+    return { cwd: ws.cwd, env, claude, claudeExe: claude ? resolveClaudeExe() : undefined }
   }
 
   ipcMain.handle('state:get', async () => {
@@ -383,6 +402,8 @@ app.whenReady().then(async () => {
     if (input.ticket?.trim() && !ticket) throw new Error('El ticket solo lleva letras, números, guiones, puntos o _ (p. ej. PROJ-123 o 123).')
     const initialPrompt = input.initialPrompt?.trim() || undefined
     if (initialPrompt && initialPrompt.length > 4000) throw new Error('El prompt inicial es demasiado largo.')
+    const promptProblem = initialPrompt ? initialPromptProblem(initialPrompt) : undefined
+    if (promptProblem) throw new Error(promptProblem)
     const branch = input.branch?.trim() || undefined
     if (branch && !validBranchName(branch)) throw new Error('La rama no es un nombre válido.')
     const baseBranch = input.baseBranch?.trim() || undefined
@@ -469,10 +490,15 @@ app.whenReady().then(async () => {
     const b = await backend()
     // Si ya corre (siguió viva en el daemon), solo se reconecta: no se rearma la cuenta ni el comando.
     const shellChoice = currentSettings().terminal.shell
-    const spawn = b.isRunning(id)
-      ? toSpawnSpec({ cwd: homedir(), env: {} }, cols, rows, shellChoice)
-      : toSpawnSpec(specFor(id, b), cols, rows, shellChoice)
+    const running = b.isRunning(id)
+    const spec: PtySpec = running ? { cwd: homedir(), env: {} } : specFor(id, b)
+    const { spawn, paste } = toSpawnSpec(spec, cols, rows, shellChoice)
     const result = await b.start(id, spawn)
+    const ws = running ? undefined : store.workspace(id)
+    if (ws?.initialPrompt && !ws.initialPromptUsed && spec.claude?.includes('--')) {
+      if (paste) pendingPaste.set(id, { text: paste, until: Date.now() + 2 * 60 * 1000 })
+      else store.updateWorkspace(id, { initialPromptUsed: true })
+    }
     if (store.workspace(id)) moveAgent(id, 'start')
     return result
   })
