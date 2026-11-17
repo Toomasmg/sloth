@@ -1,6 +1,7 @@
 import { useRef, useState, type DragEvent } from 'react'
 import type { UiCtx } from '../host'
 import { Ico, P } from './ico'
+import { ruleWarning } from '../../../../main/features/permissions-core'
 import {
   errText,
   type AddRulesResult,
@@ -538,6 +539,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
                     </div>
                     {p.reglas.map((r) => {
                       const off = reasonOf(p, r)
+                      const warning = r.valida && r.draft ? ruleWarning(r.draft) : undefined
                       return (
                         <label key={r.id} className={`f-ei-row sub${off ? ' f-ei-disabled' : ''}`}>
                           <input
@@ -552,6 +554,7 @@ export function ImportTab({ ui, onClose }: { ui: UiCtx; onClose: () => void }): 
                             {r.texto}
                           </span>
                           {off && <span className="f-ei-muted f-ei-fix">{off}</span>}
+                          {!off && warning && <span className="f-ei-warnText">{warning}</span>}
                         </label>
                       )
                     })}

@@ -25,6 +25,8 @@ export interface PermissionRule {
   tool: string
   /** cmd: comando exacto · net: dominio · edit/other: «*» */
   match: string
+  /** edit: carpeta del espacio al crear la regla. Las reglas viejas sin cwd usan la del espacio. */
+  cwd?: string
   label: string
   on: boolean
   createdAt: number
@@ -146,34 +148,47 @@ export function labelOf(kind: PermissionKind, tool: string, input: Record<string
 /** Texto del botón «Permitir siempre» según el tipo. */
 export function alwaysLabel(kind: PermissionKind): string {
   if (kind === 'cmd') return 'Permitir siempre aquí'
-  if (kind === 'edit') return 'Permitir siempre ediciones aquí'
+  if (kind === 'edit') return 'Permitir siempre ediciones en este repo'
   if (kind === 'net') return 'Permitir siempre este dominio aquí'
   return 'Permitir siempre aquí'
 }
 
 /** Regla que se guarda al elegir «Permitir siempre» para este pedido. */
-export function ruleFor(req: PermissionRequestLike): Omit<PermissionRule, 'id' | 'on' | 'createdAt'> {
+export function ruleFor(req: PermissionRequestLike, cwd?: string): Omit<PermissionRule, 'id' | 'on' | 'createdAt'> {
   const kind = kindOf(req.tool)
   const label = labelOf(kind, req.tool, req.input)
   if (kind === 'cmd') return { workspaceId: req.ws, kind, tool: req.tool, match: str(req.input.command) ?? '', label }
   if (kind === 'net') return { workspaceId: req.ws, kind, tool: req.tool, match: hostOf(req.input), label }
-  if (kind === 'edit') return { workspaceId: req.ws, kind, tool: req.tool, match: '*', label }
+  if (kind === 'edit') return { workspaceId: req.ws, kind, tool: req.tool, match: '*', label: 'Editar archivos en este repo', ...(cwd ? { cwd } : {}) }
   return { workspaceId: req.ws, kind, tool: req.tool, match: '*', label }
 }
 
-/** ¿La regla cubre este pedido? Mismo espacio, mismo tipo y, según el tipo, mismo comando o dominio. */
-export function ruleMatches(rule: PermissionRule, req: PermissionRequestLike): boolean {
+/**
+ * Dice si la edición de un pedido cae dentro de la carpeta de la regla (la decide main con rutas
+ * reales). Sin esto, ninguna regla de edición aprueba nada.
+ */
+export type EditScope = (rule: PermissionRule, req: PermissionRequestLike) => boolean
+
+/** ¿La regla cubre este pedido? Mismo espacio, mismo tipo y, según el tipo, mismo comando, dominio o carpeta. */
+export function ruleMatches(rule: PermissionRule, req: PermissionRequestLike, editScope?: EditScope): boolean {
   if (!rule.on || rule.workspaceId !== req.ws) return false
   const kind = kindOf(req.tool)
   if (rule.kind !== kind) return false
   if (kind === 'cmd') return rule.match !== '' && (str(req.input.command) ?? '') === rule.match
   if (kind === 'net') return rule.match !== '' && hostOf(req.input) === rule.match
-  if (kind === 'edit') return FILE_EDIT_TOOLS.has(req.tool) && rule.match === '*'
+  if (kind === 'edit') return FILE_EDIT_TOOLS.has(req.tool) && rule.match === '*' && (editScope?.(rule, req) ?? false)
   return rule.tool === req.tool
 }
 
-export function findRule(rules: readonly PermissionRule[], req: PermissionRequestLike): PermissionRule | undefined {
-  return rules.find((r) => ruleMatches(r, req))
+export function findRule(rules: readonly PermissionRule[], req: PermissionRequestLike, editScope?: EditScope): PermissionRule | undefined {
+  return rules.find((r) => ruleMatches(r, req, editScope))
+}
+
+/** Aviso al importar una regla amplia: las de edición y las de herramienta completa no miran qué hacen. */
+export function ruleWarning(rule: Pick<RuleDraft, 'kind' | 'tool'>): string | undefined {
+  if (rule.kind === 'edit') return 'Aprueba sola cualquier edición dentro del repo de este espacio, sin mostrarte el cambio.'
+  if (rule.kind === 'other') return `Aprueba solo cualquier uso de ${otherName(rule.tool)}, sin mirar qué hace.`
+  return undefined
 }
 
 /** Regla validada, lista para guardar (sin id, sin espacio, sin estado). */
@@ -219,7 +234,7 @@ export function checkRule(raw: unknown): { ok: true; rule: RuleDraft } | { ok: f
   }
   if (kind === 'edit') {
     if (!FILE_EDIT_TOOLS.has(tool) || match !== '*') return fail('regla de edición no válida')
-    return { ok: true, rule: { kind, tool, match: '*', label: 'Editar archivos' } }
+    return { ok: true, rule: { kind, tool, match: '*', label: 'Editar archivos en este repo' } }
   }
   if (match !== '*') return fail('Sloth solo guarda herramientas completas, sin patrón')
   return { ok: true, rule: { kind, tool, match: '*', label: otherName(tool) } }

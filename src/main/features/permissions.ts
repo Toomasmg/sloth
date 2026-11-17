@@ -1,4 +1,5 @@
 import { app, Notification, type BrowserWindow } from 'electron'
+import { realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
@@ -11,15 +12,18 @@ import {
   CHOICES,
   checkRule,
   decisionFor,
+  filesOf,
   findRule,
   kindOf,
   labelOf,
   ruleFor,
   shouldNotify,
+  type EditScope,
   type PermissionChoice,
   type PermissionKind,
   type PermissionRule
 } from './permissions-core'
+import { editInsideRepo } from './permissions-paths'
 
 /**
  * Función «permissions» (lado main): pedidos de permiso de Claude, reglas «Permitir siempre» por
@@ -103,6 +107,12 @@ const feature: Feature = {
 
     const spaceName = (wsId: string): string => ctx.store.workspace(wsId)?.name ?? 'Espacio borrado'
 
+    const editScope: EditScope = (rule, req) => {
+      const cwd = rule.cwd ?? ctx.store.workspace(req.ws)?.cwd
+      const files = filesOf(req.tool, req.input)
+      return !!cwd && files.length > 0 && files.every((f) => editInsideRepo(f, cwd, realpathSync.native))
+    }
+
     const remember = (e: Omit<DecisionEntry, 'id' | 'at'>): DecisionEntry => {
       const entry: DecisionEntry = { id: randomUUID(), at: Date.now(), ...e }
       state.history = [entry, ...state.history].slice(0, MAX_HISTORY)
@@ -117,7 +127,7 @@ const feature: Feature = {
       const label = labelOf(kind, req.tool, req.input)
       const base = { workspaceId: req.ws, spaceName: spaceName(req.ws), tool: req.tool, kind, label }
       if (choice === 'allowAlways') {
-        const r = ruleFor(req)
+        const r = ruleFor(req, ctx.store.workspace(req.ws)?.cwd)
         const existing = state.rules.find((x) => x.on && x.workspaceId === r.workspaceId && x.kind === r.kind && x.tool === r.tool && x.match === r.match)
         const rule = existing ?? { ...r, id: randomUUID(), on: true, createdAt: Date.now() }
         if (!existing) state.rules = [rule, ...state.rules].slice(0, MAX_RULES)
@@ -195,7 +205,7 @@ const feature: Feature = {
     /** Pedido nuevo: si una regla lo cubre se aprueba solo; si no, aviso (la tarjeta la muestra la UI). */
     function onRequest(b: TerminalBackend, req: PendingPermission): void {
       if (!ctx.store.workspace(req.ws)) return
-      const rule = findRule(state.rules, req)
+      const rule = findRule(state.rules, req, editScope)
       if (rule) {
         try {
           b.answerPermission(req.id, decisionFor('allow'))
@@ -271,7 +281,8 @@ const feature: Feature = {
           omitidas++
           continue
         }
-        state.rules = [{ id: randomUUID(), workspaceId: wsId, on: true, createdAt: Date.now(), ...r }, ...state.rules]
+        const cwd = r.kind === 'edit' ? ctx.store.workspace(wsId)?.cwd : undefined
+        state.rules = [{ id: randomUUID(), workspaceId: wsId, on: true, createdAt: Date.now(), ...r, ...(cwd ? { cwd } : {}) }, ...state.rules]
         agregadas++
       }
       if (agregadas) save()
