@@ -361,6 +361,14 @@ function TeamBlock({ t }: { t: TeamStatus }): React.JSX.Element {
     )
   return (
     <div className="f-team-config-block">
+      {t.avisos?.map((a) => (
+        <p key={a} className="f-team-config-invalid" title={t.repoPath}>
+          <Warning size={13} weight="fill" aria-hidden="true" />
+          <span>
+            <span className="mono">{repoName(t.repoPath)}/.sloth/team.json</span>: {a}
+          </span>
+        </p>
+      ))}
       {t.notify && (
         <div className="f-team-config-chip-row">
           <button type="button" className="f-team-config-chip" onClick={() => openTeamDialog({ kind: 'import', repoPath: t.repoPath })} title={`Ver qué cambia (${t.repoPath})`}>
