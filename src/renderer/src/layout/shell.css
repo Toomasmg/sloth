@@ -303,6 +303,10 @@
 body.is-resizing-side .sl-resize::before {
   background: var(--accent);
 }
+.sl-resize:focus-visible::before {
+  width: 3px;
+  box-shadow: 0 0 0 2px var(--focus);
+}
 body.is-resizing-side,
 body.is-resizing-side * {
   cursor: col-resize !important;

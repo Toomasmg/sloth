@@ -100,7 +100,7 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
           )}
         </nav>
 
-        <main className="f-set-main">
+        <div className="f-set-main">
           <div className="f-set-col">
             <header className="f-set-head">
               <div className="f-set-head-text">
@@ -132,7 +132,7 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
               </div>
             </SaveContext.Provider>
           </div>
-        </main>
+        </div>
 
         {toast && (
           <div role={toast.err ? 'alert' : 'status'} aria-live="polite" className={`f-set-toast ${toast.err ? 'err' : ''}`}>

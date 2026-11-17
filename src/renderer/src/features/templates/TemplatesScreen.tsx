@@ -468,7 +468,7 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
           <p className="tp-foot">Las plantillas del equipo no se editan ni se borran. Duplicalas para tener tu versión.</p>
         </aside>
 
-        <main className="tp-main">
+        <div className="tp-main">
           {!cur && (
             <div className="tp-none">
               <span className="tp-none-title">Elegí una plantilla de la lista</span>
@@ -794,7 +794,7 @@ export function TemplatesScreen({ initialId, onClose }: Props): React.JSX.Elemen
               )}
             </div>
           )}
-        </main>
+        </div>
       </div>
 
     </Modal>

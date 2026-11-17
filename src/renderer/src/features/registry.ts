@@ -23,6 +23,7 @@ import permissions from './permissions'
 import dictado from './dictado'
 import celular from './celular'
 import avisos from './avisos'
+import regiones from './regiones'
 
 /** Todas las funciones de la interfaz, en el orden en que aparecen en cada lugar. */
-export const FEATURE_UIS: FeatureUi[] = [history, git, worktrees, prs, palette, broadcast, templates, updater, exportImport, tickets, settings, onboarding, teamConfig, team, layout, chat, help, report, sound, moveAccount, permissions, dictado, celular, avisos]
+export const FEATURE_UIS: FeatureUi[] = [history, git, worktrees, prs, palette, broadcast, templates, updater, exportImport, tickets, settings, onboarding, teamConfig, team, layout, chat, help, report, sound, moveAccount, permissions, dictado, celular, avisos, regiones]
