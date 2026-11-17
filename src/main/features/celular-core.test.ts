@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { AccountUsage, AgentStatus } from '../../shared/types'
-import { aMs, armarEstado, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, temaValido, textoAviso, tokenIgual, tokenNtfyTras, tokenNtfyValido, type Entrada } from './celular-core'
+import { aMs, claveValida, armarEstado, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type Entrada } from './celular-core'
 
 const v4 = (address: string, internal = false) => ({ address, family: 'IPv4', internal })
 
@@ -21,12 +21,14 @@ test('elegirIp prefiere el Wi-Fi y descarta lo virtual, lo interno y lo público
   assert.equal(elegirIp({}), null)
 })
 
-test('tokenIgual solo acepta el mismo texto', () => {
-  assert.equal(tokenIgual('abc', 'abc'), true)
-  assert.equal(tokenIgual('abd', 'abc'), false)
-  assert.equal(tokenIgual('ab', 'abc'), false)
-  assert.equal(tokenIgual(undefined, 'abc'), false)
-  assert.equal(tokenIgual('', ''), false)
+test('claveValida acepta solo 32 bytes en base64url canónico', () => {
+  assert.equal(claveValida('A'.repeat(43)), true)
+  assert.equal(claveValida('A'.repeat(42)), false)
+  assert.equal(claveValida('A'.repeat(44)), false)
+  assert.equal(claveValida('A'.repeat(42) + '+'), false)
+  assert.equal(claveValida('A'.repeat(42) + 'B'), false)
+  assert.equal(claveValida(undefined), false)
+  assert.equal(claveValida(123), false)
 })
 
 test('puerto y tema se validan', () => {

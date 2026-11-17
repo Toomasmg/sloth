@@ -54,7 +54,7 @@ test('al regenerar, la PC deja de publicar con la clave vieja y rechaza las deci
   let secreto = VIEJO
   const decididas: string[] = []
   const fuente = crearFuenteRemota({
-    proveedor: { estado: async () => ESTADO, decidir: (id, d) => void decididas.push(`${id}:${d}`), puedeAprobar: () => true, token: () => 'x', icono: () => null },
+    proveedor: { estado: async () => ESTADO, decidir: (id, d) => void decididas.push(`${id}:${d}`), puedeAprobar: () => true, clave: () => 'x', icono: () => null },
     sesion: () => sesion,
     secreto: () => secreto,
     puedeAprobar: () => true,

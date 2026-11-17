@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto'
+import { derivarClaves } from './celular-sello'
 import type { AccountUsage, AgentStatus } from '../../shared/types'
 import type { CuentaCelular, EstadoCelular, EstadoSesion, PedidoCelular, SesionCelular, VentanaLimite } from '../../shared/celular'
 
@@ -33,13 +33,8 @@ export function elegirIp(redes: Record<string, InterfazRed[] | undefined>): stri
   return (candidatas.find((c) => WIFI.test(c.nombre)) ?? candidatas[0])?.ip ?? null
 }
 
-/** Comparación del token en tiempo constante. */
-export function tokenIgual(dado: unknown, esperado: string): boolean {
-  if (typeof dado !== 'string' || !esperado) return false
-  const a = Buffer.from(dado)
-  const b = Buffer.from(esperado)
-  return a.length === b.length && timingSafeEqual(a, b)
-}
+/** La clave del QR: 32 bytes en base64url canónico (43 caracteres). */
+export const claveValida = (v: unknown): v is string => typeof v === 'string' && derivarClaves(v) !== null
 
 export const puertoValido = (p: unknown): p is number => typeof p === 'number' && Number.isInteger(p) && p >= 1024 && p <= 65535
 
