@@ -1,16 +1,12 @@
 import { app } from 'electron'
-import { existsSync, readFileSync, renameSync, writeFileSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { copyFileSync, existsSync, renameSync, mkdirSync } from 'node:fs'
+import { basename, join } from 'node:path'
 import type { Account, Workspace } from '../shared/types'
+import { avisar } from './avisos'
+import { escribirJsonAtomico, leerJson, rutaLibre } from './json-file'
+import { corregirRutasViejas, validarEstado, VERSION_ESTADO, type EstadoValidado, type PersistedState } from './store-core'
 
-interface PersistedState {
-  version: 1
-  accounts: Account[]
-  workspaces: Workspace[]
-  openPanes: string[]
-}
-
-const EMPTY: PersistedState = { version: 1, accounts: [], workspaces: [], openPanes: [] }
+const EMPTY: PersistedState = { version: VERSION_ESTADO, accounts: [], workspaces: [], openPanes: [] }
 
 /**
  * La app antes se llamaba AntiRea: si existe %APPDATA%\AntiRea y todavía no hay %APPDATA%\Sloth,
@@ -38,8 +34,9 @@ function migrateFromAntiRea(): void {
 }
 
 export class Store {
-  private state: PersistedState
+  private state: PersistedState = structuredClone(EMPTY)
   private readonly file: string
+  private soloLectura = false
 
   constructor() {
     migrateFromAntiRea()
@@ -48,47 +45,60 @@ export class Store {
     const legacy = join(app.getPath('userData'), 'antirea-state.json')
     if (!existsSync(this.file) && existsSync(legacy)) renameSync(legacy, this.file)
     this.state = this.load()
-    this.fixLegacyPaths()
   }
 
-  /** Las cuentas guardan rutas absolutas: si venían de %APPDATA%\AntiRea, apuntarlas a la carpeta nueva. */
-  private fixLegacyPaths(): void {
-    const oldRoot = join(app.getPath('appData'), 'AntiRea')
-    const newRoot = app.getPath('userData')
-    let changed = false
-    for (const acc of this.state.accounts) {
-      if (acc.configDir.toLowerCase().startsWith(oldRoot.toLowerCase() + '\\')) {
-        acc.configDir = newRoot + acc.configDir.slice(oldRoot.length)
-        changed = true
-      }
+  /** Sin respaldo no se reescribe: si la copia falla, el store queda en solo lectura. */
+  private respaldar(): string | undefined {
+    const bak = rutaLibre(`${this.file}.bak-${Date.now()}`)
+    try {
+      copyFileSync(this.file, bak)
+      return bak
+    } catch (e) {
+      console.warn('[store] no se pudo respaldar sloth-state.json:', (e as Error).message)
+      this.soloLectura = true
+      return undefined
     }
-    if (changed) this.save()
+  }
+
+  private respaldoTexto(bak: string | undefined): string {
+    return bak ? `guardé el original como ${basename(bak)}` : 'no pude respaldarlo, así que no voy a guardar cambios hasta que reinicies'
   }
 
   private load(): PersistedState {
-    if (!existsSync(this.file)) return structuredClone(EMPTY)
+    let v: EstadoValidado
     try {
-      // Sin BOM: si el archivo se editó con el Bloc de notas o PowerShell 5.1, igual se lee.
-      const raw = readFileSync(this.file, 'utf8').replace(/^\uFEFF/, '')
-      const parsed = JSON.parse(raw) as Partial<PersistedState>
-      return {
-        version: 1,
-        accounts: Array.isArray(parsed.accounts) ? parsed.accounts : [],
-        workspaces: Array.isArray(parsed.workspaces) ? parsed.workspaces : [],
-        openPanes: Array.isArray(parsed.openPanes) ? parsed.openPanes : []
-      }
-    } catch {
-      // Archivo corrupto: lo guardamos aparte en vez de pisarlo en silencio.
-      renameSync(this.file, `${this.file}.corrupt-${Date.now()}`)
+      v = leerJson(this.file, {
+        validar: validarEstado,
+        porDefecto: () => ({ estado: structuredClone(EMPTY), cuentasDescartadas: 0, espaciosDescartados: 0, versionFutura: false })
+      }).valor
+    } catch (e) {
+      // Puede estar sano (permisos, antivirus): arrancar vacío y sin guardar, para no pisarlo.
+      this.soloLectura = true
+      avisar(`No pude leer sloth-state.json (${(e as Error).message}). Arranqué sin cuentas ni espacios y no voy a guardar cambios hasta que reinicies.`)
       return structuredClone(EMPTY)
     }
+    const estado = v.estado
+    const rutasCorregidas = corregirRutasViejas(estado.accounts, join(app.getPath('appData'), 'AntiRea'), app.getPath('userData'))
+    if (v.versionFutura) {
+      const bak = this.respaldar()
+      avisar(`sloth-state.json lo guardó una versión más nueva de Sloth: ${this.respaldoTexto(bak)}. Si guardás cambios, lo que esta versión no conoce puede perderse.`)
+      return estado
+    }
+    const descartados = v.cuentasDescartadas + v.espaciosDescartados
+    if (descartados === 0 && !rutasCorregidas) return estado
+    const bak = this.respaldar()
+    this.state = estado
+    this.save()
+    if (descartados > 0)
+      avisar(
+        `sloth-state.json tenía ${v.cuentasDescartadas} cuenta(s) y ${v.espaciosDescartados} espacio(s) dañados. Los saqué y ${this.respaldoTexto(bak)}.`
+      )
+    return estado
   }
 
-  /** Escritura atómica: tmp + rename, así un corte no deja el JSON a medias. */
   private save(): void {
-    const tmp = `${this.file}.tmp`
-    writeFileSync(tmp, JSON.stringify(this.state, null, 2), 'utf8')
-    renameSync(tmp, this.file)
+    if (this.soloLectura) return
+    escribirJsonAtomico(this.file, this.state)
   }
 
   get accounts(): Account[] {
