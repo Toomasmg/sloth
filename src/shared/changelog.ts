@@ -9,6 +9,92 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.28',
+    date: '2026-11-17',
+    title: 'Más seguro por dentro',
+    items: [
+      'Al actualizar, las terminales abiertas se cierran una sola vez: Sloth y su servicio de terminales ahora se verifican entre sí antes de hablar.',
+      'El aviso de Windows solo ofrece «Permitir» cuando el comando es corto y se ve entero; si no, lo revisás en Sloth.',
+      'Celular: el tema de ntfy tiene que ser largo (botón «Generar otro»), y podés usar tu propio servidor ntfy con token.',
+      '«Claude en el chat» no ofrece «leer siempre» en cuentas que corren sin pedir permisos.',
+      'Las imágenes pegadas se borran a las 24 horas, y el settings.json de cada cuenta se respalda antes de que Sloth lo toque.',
+      'Chat: «Vaciar para mí» en un mensaje directo borra solo tu lado. Los códigos de invitación vencen a los 7 días o a los 50 usos, y quien sale del equipo deja de ver el chat al instante. Hace falta aplicar la migración 0008.'
+    ]
+  },
+  {
+    version: '0.6.27',
+    date: '2026-11-17',
+    title: 'Más seguro con repos ajenos',
+    items: [
+      'El primer mensaje de un espacio llega entero en PowerShell, cmd y Git Bash, con comillas, acentos o «/ticket», y no hay forma de que ejecute comandos.',
+      'Los scripts de tu repo (por ejemplo .bat o gradlew) vuelven a correr normal en la terminal.',
+      '«Permitir siempre ediciones en este repo» ya no sigue accesos directos que apunten afuera del repo.',
+      'Sloth ya no ejecuta nada que venga en la configuración de git de un repo ajeno al mostrar cambios o el historial.',
+      'Chat: sacar a alguien del equipo cambia el código en el mismo paso (hace falta aplicar la migración 0007). Si usás un servidor propio, se avisa y se pide confirmar al aceptar invitaciones.',
+      'Celular: el panel avisa que por Wi-Fi la conexión no va cifrada.'
+    ]
+  },
+  {
+    version: '0.6.26',
+    date: '2026-11-17',
+    title: 'Más seguro con repos ajenos y sin perder tu configuración',
+    items: [
+      'Abrir un espacio sobre un repo que no es tuyo ya no puede ejecutar comandos en tu PC: ni por el prompt inicial, ni por la configuración de git del repo, ni por un claude.cmd en la carpeta.',
+      '«Permitir siempre ediciones» ahora vale solo dentro del repo del espacio. Fuera de él, o en .git y .claude, Sloth vuelve a preguntar.',
+      'Si un archivo de configuración se daña, Sloth lo guarda aparte y te avisa en vez de pisarlo. Si el archivo de estado trae una cuenta o un espacio roto, Sloth abre igual.',
+      'Chat: sacar a alguien del equipo cambia el código de invitación, y te avisa si una invitación apunta a un servidor que no es de Supabase.',
+      'El estado de cada espacio ya no queda en «listo» cuando la terminal se cerró.'
+    ]
+  },
+  {
+    version: '0.6.25',
+    date: '2026-11-16',
+    title: 'El QR del celu remoto',
+    items: [
+      'Celular: al prender «Verlo también fuera de tu Wi-Fi» el panel ya no se cae; el código QR ahora entra aunque el enlace sea largo.',
+      'Si un código no se puede dibujar, el panel avisa y te deja copiar el enlace.'
+    ]
+  },
+  {
+    version: '0.6.24',
+    date: '2026-11-16',
+    title: 'El celu desde cualquier red',
+    items: [
+      'Celular: además del Wi-Fi de casa, ahora lo podés ver desde cualquier red. Prendé «Verlo también fuera de tu Wi-Fi» en el panel del celular, escaneá el QR y entrá con GitHub.',
+      'Lo que viaja va cifrado con una clave que solo tienen tu PC y tu celu: nunca sale lo que pasa en la terminal ni tus prompts.',
+      'En Android (Samsung o Chrome) la página se instala como app, con el ícono de Sloth y a pantalla completa.',
+      '«Regenerar código» deja afuera de verdad a los celus de antes.'
+    ]
+  },
+  {
+    version: '0.6.23',
+    date: '2026-11-16',
+    title: 'Claude en el chat',
+    items: [
+      'Nuevo: Claude puede leer y mandar mensajes del chat desde tus terminales. Se prende en Configuración → Chat → «Claude en el chat» y elegís en qué cuentas de Claude.',
+      'Cada mensaje que quiera mandar Claude te muestra el texto exacto y espera tu confirmación. Sale con tu nombre y la marca «vía Claude».',
+      'Leer el chat también pide permiso por conversación, y lo podés revocar cuando quieras.'
+    ]
+  },
+  {
+    version: '0.6.22',
+    date: '2026-11-16',
+    title: '«Te necesita» solo cuando de verdad',
+    items: [
+      'Si Claude termina el turno con un shell corriendo en segundo plano (por ejemplo, una verificación), el espacio sigue en «trabajando · Shell en segundo plano» y no te avisa «terminó» ni «te necesita», ni en Windows ni en el celu. El aviso llega cuando termina el shell.',
+      'Los pedidos de permiso y las preguntas de Claude te siguen llegando aunque haya un shell corriendo.'
+    ]
+  },
+  {
+    version: '0.6.21',
+    date: '2026-11-16',
+    title: 'Acciones del chat a mano',
+    items: [
+      'Chat: las acciones de un mensaje (reaccionar, responder, más) aparecen solo al hacer clic en él, pegadas a la burbuja y de a una. Al tocar otro mensaje, pasan a ese. Esc las cierra sin cerrar el chat.',
+      'El aviso de actualización ya no flota sobre el chat ni el micrófono: se muestra en la píldora de versión de arriba.'
+    ]
+  },
+  {
     version: '0.6.20',
     date: '2026-11-16',
     title: 'El celu sin la barra del navegador',
