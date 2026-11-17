@@ -64,3 +64,22 @@ export function containsText(body: string, q: string): boolean {
 export function esHostSupabase(host: string): boolean {
   return /^[a-z0-9]{8,40}\.supabase\.co$/.test(host.toLowerCase())
 }
+
+/**
+ * Lo que la UI manda para confirmar una invitación. Con un servidor fuera de supabase.co va atado al
+ * host completo que se le mostró: confirmar «conectar» no alcanza para otro servidor.
+ */
+export function inviteConfirmation(decision: string, host: string): string {
+  return esHostSupabase(host) ? decision : `${decision}@${host}`
+}
+
+/** El host de la URL si no es de Supabase (para avisarlo); undefined si es <ref>.supabase.co o no es una URL. */
+export function hostNoSupabase(url: string): string | undefined {
+  let host: string
+  try {
+    host = new URL(url).host
+  } catch {
+    return undefined
+  }
+  return esHostSupabase(host) ? undefined : host
+}

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { applyMention, containsText, escapeLike, esHostSupabase, mentionQueryAt, mentionsLogin, splitMentions } from './chat-text'
+import { applyMention, containsText, escapeLike, esHostSupabase, hostNoSupabase, inviteConfirmation, mentionQueryAt, mentionsLogin, splitMentions } from './chat-text'
 
 test('menciones: separa texto y logins', () => {
   assert.deepEqual(splitMentions('hola @Tomy, ¿venís?'), [
@@ -52,4 +52,16 @@ test('esHostSupabase: solo <ref>.supabase.co, no un host parecido', () => {
   assert.equal(esHostSupabase('ABCDEFGHIJ.SUPABASE.CO'), true)
   for (const h of ['acme.supabase.co.evil.example', 'supabase.co', 'evil-supabase.co', 'a.b.supabase.co', 'abcdefghij.supabase.co:8443', 'chat.miempresa.com', ''])
     assert.equal(esHostSupabase(h), false, h)
+})
+
+test('con un servidor propio, confirmar una invitación exige el host completo que se mostró', () => {
+  assert.equal(inviteConfirmation('confirmNew', 'abcdefghijklmnopqrst.supabase.co'), 'confirmNew')
+  assert.equal(inviteConfirmation('confirmNew', 'chat.miempresa.com'), 'confirmNew@chat.miempresa.com')
+  assert.equal(inviteConfirmation('confirmReplace', 'acme.supabase.co.evil.example'), 'confirmReplace@acme.supabase.co.evil.example')
+})
+
+test('hostNoSupabase: el host completo de un servidor propio, nada si es de Supabase', () => {
+  assert.equal(hostNoSupabase('https://abcdefghijklmnopqrst.supabase.co'), undefined)
+  assert.equal(hostNoSupabase('https://chat.miempresa.com:8443'), 'chat.miempresa.com:8443')
+  assert.equal(hostNoSupabase('no es url'), undefined)
 })
