@@ -108,6 +108,9 @@ export interface ChatTeam {
   role: ChatRole
   /** Solo para owner/admin. */
   inviteCode?: string
+  /** Solo con la 0008. */
+  inviteExpiresAt?: number
+  inviteUsesLeft?: number
   memberCount: number
   unread: number
   lastMessageAt?: number
@@ -212,7 +215,7 @@ export interface ChatTeamInput {
 export type ChatAuth =
   | { status: 'unconfigured' }
   | { status: 'signedOut' }
-  | { status: 'signingIn'; startedAt: number }
+  | { status: 'signingIn'; startedAt: number; aviso?: string }
   | { status: 'signedIn'; me: ChatProfile }
   | { status: 'error'; message: string }
 
@@ -227,6 +230,8 @@ export interface ChatSnapshot {
   unreadTotal: number
   /** El servidor tiene la 0004: editar, borrar, responder, reaccionar, «escribiendo…», «visto», borrado automático y vaciar. */
   extras: boolean
+  /** El servidor tiene la 0008: vaciar un DM lo oculta solo para quien vacía. Sin ella se borra para los dos. */
+  dmClearForMe: boolean
   /** Ya llegaron las listas del servidor al menos una vez en esta sesión (hasta entonces vienen vacías). */
   listsLoaded: boolean
 }

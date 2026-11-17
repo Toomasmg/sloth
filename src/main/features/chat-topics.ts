@@ -15,6 +15,7 @@ export const UPDATE_EVENT = 'message_update'
 export const REACTION_EVENT = 'reaction'
 export const TYPING_EVENT = 'typing'
 export const READ_EVENT = 'read'
+export const MEMBER_REMOVED_EVENT = 'member_removed'
 /** Realtime corta en 100 canales por conexión; uno queda para «sloth-inbox» y el resto de margen. */
 export const MAX_TOPICS = 90
 export const SEEN_MAX = 2000
@@ -63,7 +64,7 @@ export function diffTopics(current: Iterable<string>, wanted: readonly string[])
  */
 export function rowFromBroadcast(payload: unknown, conv: ChatConvRef): MessageRow | undefined {
   if (!isObj(payload)) return undefined
-  const { id, client_id, team_id, thread_id, author_id, body, created_at, edited_at, deleted_at, reply_to, kind } = payload
+  const { id, client_id, team_id, thread_id, author_id, body, created_at, edited_at, deleted_at, reply_to, kind, via } = payload
   if (!isUuid(id) || !isUuid(client_id) || !isUuid(author_id)) return undefined
   if (typeof body !== 'string') return undefined
   if (!isDate(created_at)) return undefined
@@ -85,7 +86,15 @@ export function rowFromBroadcast(payload: unknown, conv: ChatConvRef): MessageRo
   if (deleted_at != null) row.deleted_at = deleted_at
   if (reply_to != null) row.reply_to = reply_to
   if (kind != null && kind !== 'text') row.kind = kind
+  if (via === 'claude') row.via = 'claude'
   return row
+}
+
+export function memberRemovedFromBroadcast(p: unknown, teamId: string): { userId: string } | undefined {
+  if (!isObj(p)) return undefined
+  const { team_id, user_id } = p
+  if (!isUuid(user_id) || team_id !== teamId) return undefined
+  return { userId: user_id }
 }
 
 /** Clave de versión para el dedupe: una edición o un borrado del mismo mensaje cuentan como nuevos. */
@@ -156,5 +165,41 @@ export class Throttle {
 
   clear(): void {
     this.last.clear()
+  }
+}
+
+/**
+ * Como Throttle, pero lo que no pasa no se pierde: queda uno pendiente por clave para el final de la
+ * ventana. `ask` da 'now' (mandalo ya), los ms que faltan (programalo y llamá a `fired` al mandarlo)
+ * o null (ya hay uno programado, que cubre este).
+ */
+export class TrailingThrottle {
+  private last = new Map<string, number>()
+  private pending = new Set<string>()
+  private minMs: number
+
+  constructor(minMs: number) {
+    this.minMs = minMs
+  }
+
+  ask(key: string, at: number): 'now' | number | null {
+    if (this.pending.has(key)) return null
+    const prev = this.last.get(key)
+    if (prev === undefined || at - prev >= this.minMs) {
+      this.last.set(key, at)
+      return 'now'
+    }
+    this.pending.add(key)
+    return this.minMs - (at - prev)
+  }
+
+  fired(key: string, at: number): void {
+    this.pending.delete(key)
+    this.last.set(key, at)
+  }
+
+  clear(): void {
+    this.last.clear()
+    this.pending.clear()
   }
 }

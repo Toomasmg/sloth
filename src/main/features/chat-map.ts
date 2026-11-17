@@ -307,6 +307,9 @@ export interface TeamInfo {
   lastMessageAt?: number
   /** Solo para owner/admin (la RLS ya lo filtra). */
   inviteCode?: string
+  /** Solo con la 0008. */
+  inviteExpiresAt?: number
+  inviteUsesLeft?: number
 }
 
 export function teamFromRow(row: TeamRow, info: TeamInfo): ChatTeam | undefined {
@@ -324,7 +327,13 @@ export function teamFromRow(row: TeamRow, info: TeamInfo): ChatTeam | undefined 
   if (info.lastMessageAt !== undefined) team.lastMessageAt = info.lastMessageAt
   const retention = retentionOf(row.retention_hours)
   if (retention !== undefined) team.retentionHours = retention
-  if (info.inviteCode && (info.role === 'owner' || info.role === 'admin')) team.inviteCode = info.inviteCode
+  if (info.inviteCode && (info.role === 'owner' || info.role === 'admin')) {
+    team.inviteCode = info.inviteCode
+    if (typeof info.inviteExpiresAt === 'number' && Number.isFinite(info.inviteExpiresAt)) team.inviteExpiresAt = info.inviteExpiresAt
+    if (typeof info.inviteUsesLeft === 'number' && Number.isInteger(info.inviteUsesLeft) && info.inviteUsesLeft >= 0) {
+      team.inviteUsesLeft = info.inviteUsesLeft
+    }
+  }
   return team
 }
 

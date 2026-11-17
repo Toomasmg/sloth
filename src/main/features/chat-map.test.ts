@@ -35,6 +35,20 @@ test('mensaje vía Claude: solo con via = claude', () => {
   assert.equal('via' in (messageFromRow(row, author) ?? {}), false)
 })
 
+test('el vencimiento del código solo va con código y rol de gestión', () => {
+  const base = { role: 'owner' as const, memberCount: 2, unread: 0, inviteCode: 'a'.repeat(16) }
+  const t = teamFromRow({ id: T, name: 'Equipo' }, { ...base, inviteExpiresAt: 1000, inviteUsesLeft: 3 })
+  assert.equal(t?.inviteExpiresAt, 1000)
+  assert.equal(t?.inviteUsesLeft, 3)
+  const bad = teamFromRow({ id: T, name: 'Equipo' }, { ...base, inviteExpiresAt: Number.NaN, inviteUsesLeft: -1 })
+  assert.equal('inviteExpiresAt' in (bad ?? {}), false)
+  assert.equal('inviteUsesLeft' in (bad ?? {}), false)
+  assert.equal('inviteUsesLeft' in (teamFromRow({ id: T, name: 'Equipo' }, { ...base, inviteUsesLeft: 1.5 }) ?? {}), false)
+  const member = teamFromRow({ id: T, name: 'Equipo' }, { ...base, role: 'member', inviteExpiresAt: 1000 })
+  assert.equal('inviteExpiresAt' in (member ?? {}), false)
+  assert.equal('inviteExpiresAt' in (teamFromRow({ id: T, name: 'Equipo' }, { ...base, inviteCode: undefined, inviteExpiresAt: 1000 }) ?? {}), false)
+})
+
 test('avisos de la conversación y borrado automático del equipo', () => {
   assert.deepEqual(messageFromRow({ ...row, body: 'clear', kind: 'clear' }, author)?.notice, { kind: 'clear' })
   assert.deepEqual(messageFromRow({ ...row, body: '720', kind: 'retention' }, author)?.notice, { kind: 'retention', hours: 720 })

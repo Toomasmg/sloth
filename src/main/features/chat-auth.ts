@@ -2,11 +2,13 @@
  * Login con GitHub por Supabase Auth (PKCE) y servidor loopback del callback.
  *  - El servidor escucha SOLO en 127.0.0.1, en el primer puerto libre de la lista.
  *  - Acepta solo GET <path>. Todo lo demás responde 404.
- *  - Termina con el primer callback válido (con «code»), o al cancelar, o a los 5 minutos. Después se cierra.
+ *  - Termina cuando un callback con «code» se canjea bien, al cancelar, a los 5 minutos o tras demasiados canjes
+ *    fallidos. Después se cierra. Los canjes van de a uno, en el orden en que llegan.
  *  - La respuesta es HTML mínimo, sin recursos externos, con CSP `default-src 'none'`.
  *  - El código lo valida Supabase en `exchangeCodeForSession`: sin el code_verifier de PKCE que
- *    guarda nuestra sesión, el código no sirve. Un proceso local que pegue al callback con un code
- *    inventado solo hace fallar ese canje.
+ *    guarda nuestra sesión, el código no sirve. auth-js borra ese verifier después de cada canje, salga
+ *    bien o mal, así que un canje fallido lo restaura (`preservarVerificador`): un code inventado que
+ *    llega antes que el bueno solo hace fallar ese canje.
  *
  * Sin Electron: el navegador (`openExternal`) y el cliente llegan por parámetro, así se prueba con Node.
  */
@@ -17,7 +19,14 @@ const HOST = '127.0.0.1'
 const CODE_RE = /^[A-Za-z0-9._~-]{1,512}$/
 export const LOGIN_TIMEOUT_MS = 5 * 60 * 1000
 
-export type CallbackOutcome = { kind: 'code'; code: string } | { kind: 'error'; message: string } | { kind: 'cancelled' } | { kind: 'timeout' }
+export const MAX_CANJES = 8
+const MAX_EN_COLA = 4
+
+export type CallbackOutcome =
+  | { kind: 'ok' }
+  | { kind: 'cancelled' }
+  | { kind: 'timeout'; ultimoError?: string }
+  | { kind: 'demasiados' }
 
 export interface CallbackServer {
   readonly port: number
@@ -32,6 +41,9 @@ export interface CallbackOptions {
   ports: readonly number[]
   path: string
   timeoutMs?: number
+  canjear(code: string): Promise<boolean>
+  /** Se llama cuando un canje falla y el login sigue esperando. */
+  onCanjeFallido?(): void
 }
 
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
@@ -117,9 +129,35 @@ export async function startCallbackServer(opts: CallbackOptions): Promise<Callba
     resolveOutcome(o)
   }
 
-  const timer = setTimeout(() => finish({ kind: 'timeout' }), opts.timeoutMs ?? LOGIN_TIMEOUT_MS)
+  let ultimoError: string | undefined
+  let canjes = 0
+  let enCola = 0
+  let cola: Promise<void> = Promise.resolve()
+  const timer = setTimeout(() => finish({ kind: 'timeout', ...(ultimoError !== undefined && { ultimoError }) }), opts.timeoutMs ?? LOGIN_TIMEOUT_MS)
 
-  srv.on('request', (req: IncomingMessage, res: ServerResponse) => {
+  const canjearEnOrden = async (code: string, res: ServerResponse): Promise<void> => {
+    if (finished) {
+      send(res, 404, page('No encontrado', 'Esta dirección ya no está activa.'))
+      return
+    }
+    canjes++
+    const ok = await opts.canjear(code).catch(() => false)
+    if (ok) {
+      send(res, 200, page('Listo, ya iniciaste sesión', 'Tu cuenta de GitHub quedó conectada al chat del equipo.', 'ok'))
+      finish({ kind: 'ok' })
+      return
+    }
+    ultimoError = 'No se pudo completar el login. Probá de nuevo.'
+    send(res, 400, page('No se pudo completar', 'El código no sirvió. Probá iniciar sesión de nuevo desde Sloth.'))
+    if (canjes >= MAX_CANJES) finish({ kind: 'demasiados' })
+    else opts.onCanjeFallido?.()
+  }
+
+  // Cualquier web puede pegarle a este puerto local, así que solo termina el login un canje que funciona: un
+  // callback falso no lo corta. Por eso no hace falta `state`: las Redirect URLs de Supabase son exactas y sumarle una
+  // query rompería el login de los equipos que ya están configurados. Los codes se encolan en vez de rechazarse
+  // para que el bueno no se pierda si llega mientras se canjea uno falso.
+  const atender = (req: IncomingMessage, res: ServerResponse): void => {
     if (finished) {
       send(res, 404, page('No encontrado', 'Esta dirección ya no está activa.'))
       return
@@ -138,18 +176,25 @@ export async function startCallbackServer(opts: CallbackOptions): Promise<Callba
     const code = url.searchParams.get('code')
     const err = url.searchParams.get('error_description') ?? url.searchParams.get('error')
     if (code && CODE_RE.test(code)) {
-      send(res, 200, page('Listo, ya iniciaste sesión', 'Tu cuenta de GitHub quedó conectada al chat del equipo.', 'ok'))
-      finish({ kind: 'code', code })
+      if (enCola >= MAX_EN_COLA) {
+        send(res, 429, page('Demasiados intentos', 'Esperá un momento y probá de nuevo desde Sloth.'))
+        return
+      }
+      enCola++
+      cola = cola.then(() => canjearEnOrden(code, res)).finally(() => {
+        enCola--
+      })
       return
     }
     if (err) {
+      ultimoError = 'GitHub o Supabase devolvieron un error al iniciar sesión.'
       send(res, 400, page('No se pudo iniciar sesión', err.slice(0, 200)))
-      finish({ kind: 'error', message: 'GitHub o Supabase devolvieron un error al iniciar sesión.' })
       return
     }
     // Un callback sin código no termina el login: se sigue esperando el bueno.
     send(res, 400, page('Falta el código', 'Probá iniciar sesión de nuevo desde Sloth.'))
-  })
+  }
+  srv.on('request', atender)
 
   return {
     port,
@@ -169,6 +214,10 @@ export interface GithubLoginDeps {
   openExternal(url: string): Promise<void>
   /** Si el proyecto tiene GitHub habilitado; null cuando no se pudo saber (no frena el login). */
   githubHabilitado?(): Promise<boolean | null>
+  /** Guarda el code_verifier de PKCE y devuelve con qué restaurarlo si el canje falla. */
+  preservarVerificador?(): () => void
+  /** Un canje falló pero el login sigue esperando (puede haber sido un callback falso). */
+  onCanjeFallido?(): void
 }
 
 export const GITHUB_DESHABILITADO =
@@ -197,7 +246,27 @@ export interface GithubLogin {
 export async function startGithubLogin(deps: GithubLoginDeps): Promise<GithubLogin> {
   // Sin esto, el navegador muestra el JSON crudo de Supabase («provider is not enabled»).
   if ((await deps.githubHabilitado?.()) === false) throw new Error(GITHUB_DESHABILITADO)
-  const server = await startCallbackServer({ ports: deps.ports, path: deps.path })
+  let cerrado = false
+  const server = await startCallbackServer({
+    ports: deps.ports,
+    path: deps.path,
+    canjear: async (c) => {
+      const restaurar = deps.preservarVerificador?.()
+      let ok = false
+      try {
+        ok = !(await deps.client.auth.exchangeCodeForSession(c)).error
+      } finally {
+        if (!ok) restaurar?.()
+      }
+      // Un canje que termina después de cancelar o de vencer el tiempo no deja una sesión que la UI no muestra.
+      if (ok && cerrado) {
+        await deps.client.auth.signOut({ scope: 'local' }).catch(() => undefined)
+        return false
+      }
+      return ok
+    },
+    ...(deps.onCanjeFallido && { onCanjeFallido: deps.onCanjeFallido })
+  })
   try {
     const { data, error } = await deps.client.auth.signInWithOAuth({
       provider: 'github',
@@ -211,12 +280,12 @@ export async function startGithubLogin(deps: GithubLoginDeps): Promise<GithubLog
     server.cancel()
     throw e
   }
-  const done = server.outcome.then(async (o): Promise<LoginResult> => {
+  const done = server.outcome.then((o): LoginResult => {
+    if (o.kind !== 'ok') cerrado = true
     if (o.kind === 'cancelled') return { kind: 'cancelled' }
-    if (o.kind === 'timeout') return { kind: 'failed', message: 'Se venció el tiempo del login (5 minutos). Probá de nuevo.' }
-    if (o.kind === 'error') return { kind: 'failed', message: o.message }
-    const { error } = await deps.client.auth.exchangeCodeForSession(o.code)
-    return error ? { kind: 'failed', message: 'No se pudo completar el login. Probá de nuevo.' } : { kind: 'ok' }
+    if (o.kind === 'demasiados') return { kind: 'failed', message: 'Llegaron demasiados códigos que no sirvieron. Probá iniciar sesión de nuevo.' }
+    if (o.kind === 'timeout') return { kind: 'failed', message: `Se venció el tiempo del login (5 minutos).${o.ultimoError ? ` ${o.ultimoError}` : ''} Probá de nuevo.` }
+    return { kind: 'ok' }
   })
   return { cancel: () => server.cancel(), done }
 }

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, net, protocol, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, net, protocol, session, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import { pathToFileURL } from 'node:url'
 import { normalize, sep } from 'node:path'
 import { existsSync, readdirSync, statSync } from 'node:fs'
@@ -23,10 +23,12 @@ import { normTicketId, TEMPLATE_COLOR_KEYS, validBranch } from '../shared/templa
 import { baseSettingsFor, syncSharedSetup, unshareSetup } from './setup'
 import { UsageScanner } from './usage'
 import { FEATURES } from './features'
+import { hookTokenDe } from '../daemon/auth'
 import { APP_ID } from '../shared/app-id'
 import { currentSettings, initialChrome } from './features/settings'
 import { validateWorkspacePatch } from './workspace-patch'
 import { loadWindowState, trackWindowState } from './window-state'
+import { dimValida, idValido, origenConfiable, permisoChromium } from './ipc-guard'
 import { zoomFor } from './zoom-keys'
 import type { FeatureContext } from './features/context'
 import type { UiCommand } from '../shared/features'
@@ -105,6 +107,11 @@ function serveRenderer(): void {
 
 app.whenReady().then(async () => {
   serveRenderer()
+  const devUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined
+  session.defaultSession.setPermissionRequestHandler((_wc, permiso, cb, d) => cb(permisoChromium(permiso, origenConfiable(d.requestingUrl, devUrl), 'mediaTypes' in d ? d.mediaTypes : undefined)))
+  session.defaultSession.setPermissionCheckHandler((_wc, permiso, origin, d) =>
+    permisoChromium(permiso, origenConfiable(d.requestingUrl ?? origin, devUrl), 'mediaType' in d && d.mediaType ? [d.mediaType] : undefined)
+  )
   const store = new Store()
   // La ventana se crea antes que nada más: el primer render no espera a daemon, escaneos ni registros.
   // Los handlers de las funciones se registran en este mismo turno (antes de que el renderer pida nada).
@@ -315,13 +322,27 @@ app.whenReady().then(async () => {
       ...accountEnv(acc),
       SLOTH_WS: ws.id,
       SLOTH_HOOK_URL: b.hookUrl,
-      SLOTH_TOKEN: b.hookToken
+      SLOTH_TOKEN: hookTokenDe(b.hookToken, ws.id)
     }
     const claude = claudeCommand(ws, acc)
     return { cwd: ws.cwd, env, claude, claudeExe: claude ? resolveClaudeExe() : undefined }
   }
 
-  ipcMain.handle('state:get', async () => {
+  // Un iframe o una página que se cuele en la ventana no puede mandar pedidos al núcleo: solo vale el origen de la app.
+  const desdeLaApp = (e: { senderFrame?: { url: string } | null }): boolean => origenConfiable(e.senderFrame?.url, devUrl)
+  function handle<A extends unknown[]>(canal: string, fn: (e: IpcMainInvokeEvent, ...args: A) => unknown): void {
+    ipcMain.handle(canal, (e, ...args) => {
+      if (!desdeLaApp(e)) throw new Error('Pedido de un origen no permitido.')
+      return fn(e, ...(args as A))
+    })
+  }
+  function on<A extends unknown[]>(canal: string, fn: (e: IpcMainEvent, ...args: A) => void): void {
+    ipcMain.on(canal, (e, ...args) => {
+      if (desdeLaApp(e)) fn(e, ...(args as A))
+    })
+  }
+
+  handle('state:get', async () => {
     // «Reabrir los espacios»: si está apagado, solo vuelven los paneles cuyas terminales siguen vivas en el daemon.
     let openPanes = store.openPanes
     if (!currentSettings().reopenSpaces) {
@@ -331,17 +352,17 @@ app.whenReady().then(async () => {
     return { accounts: store.accounts, workspaces: store.workspaces, openPanes, agents: Object.fromEntries(agents), soloLectura: store.soloLectura }
   })
 
-  ipcMain.handle('permission:pending', () =>
+  handle('permission:pending', () =>
     (term?.pendingPermissions() ?? []).filter((r) => store.workspace(r.ws)).map(toPrompt)
   )
 
-  ipcMain.handle('daemon:info', async (): Promise<DaemonInfo> => {
+  handle('daemon:info', async (): Promise<DaemonInfo> => {
     const b = await backend()
     const sessions = await b.list().catch(() => [])
     return { ...b.info(), sessions: sessions.filter((x) => x.running).length }
   })
 
-  ipcMain.handle('daemon:shutdown', async () => {
+  handle('daemon:shutdown', async () => {
     const b = await backend()
     const sessions = await b.list().catch(() => [])
     await b.shutdown()
@@ -355,18 +376,20 @@ app.whenReady().then(async () => {
     }
   })
 
-  ipcMain.handle('accounts:add', (_e, label: string) => {
+  handle('accounts:add', (_e, label: unknown) => {
+    if (typeof label !== 'string' || label.length > 80) throw new Error('El nombre de la cuenta tiene que ser un texto de hasta 80 caracteres.')
     store.exigirEscritura()
-    const acc = { ...createAccount(String(label ?? '')), shareSetup: true }
+    const acc = { ...createAccount(label), shareSetup: true }
     store.addAccount(acc)
     prepareAccount(acc)
     return acc
   })
 
-  ipcMain.handle('accounts:usage', () => usage.scan(store.accounts))
+  handle('accounts:usage', () => usage.scan(store.accounts))
 
-  ipcMain.handle('accounts:setShareSetup', (_e, id: string, share: boolean) => {
-    const acc = store.updateAccount(id, { shareSetup: Boolean(share) })
+  handle('accounts:setShareSetup', (_e, id: unknown, share: unknown) => {
+    if (!idValido(id) || typeof share !== 'boolean') throw new Error('Pedido inválido.')
+    const acc = store.updateAccount(id, { shareSetup: share })
     if (!acc) throw new Error('Esa cuenta ya no existe.')
     if (!acc.shareSetup) {
       unshareSetup(acc)
@@ -377,7 +400,8 @@ app.whenReady().then(async () => {
     return syncSharedSetup(acc, !accountBusy(acc.id))
   })
 
-  ipcMain.handle('accounts:remove', async (_e, id: string) => {
+  handle('accounts:remove', async (_e, id: unknown) => {
+    if (!idValido(id)) throw new Error('Pedido inválido.')
     const used = store.workspaces.filter((w) => w.accountId === id)
     if (used.length) throw new Error(`La usan ${used.length} espacio(s): ${used.map((w) => w.name).join(', ')}`)
     await (await backend()).kill(loginPaneId(id))
@@ -386,7 +410,7 @@ app.whenReady().then(async () => {
     store.removeAccount(id)
   })
 
-  ipcMain.handle('accounts:statuses', () =>
+  handle('accounts:statuses', () =>
     Object.fromEntries(store.accounts.map((a) => [a.id, accountStatus(a)]))
   )
 
@@ -428,9 +452,13 @@ app.whenReady().then(async () => {
     store.addWorkspace(ws)
     return ws
   }
-  ipcMain.handle('workspaces:add', (_e, input: NewWorkspaceInput) => addWorkspace(input))
+  handle('workspaces:add', (_e, input: unknown) => {
+    if (typeof input !== 'object' || input === null || !idValido((input as { accountId?: unknown }).accountId)) throw new Error('Pedido inválido.')
+    return addWorkspace(input as NewWorkspaceInput)
+  })
 
-  ipcMain.handle('workspaces:remove', async (_e, id: string) => {
+  handle('workspaces:remove', async (_e, id: unknown) => {
+    if (!idValido(id)) throw new Error('Pedido inválido.')
     // El worktree queda en disco a propósito: puede tener trabajo sin commitear.
     await (await backend()).kill(id)
     agents.delete(id)
@@ -438,7 +466,7 @@ app.whenReady().then(async () => {
   })
 
   // v0.5: renombrar / ícono. Responde con el espacio actualizado (la UI lo reemplaza en su lista).
-  ipcMain.handle('workspaces:update', (_e, id: unknown, patch: unknown) => {
+  handle('workspaces:update', (_e, id: unknown, patch: unknown) => {
     if (typeof id !== 'string' || !store.workspace(id)) throw new Error('Ese espacio ya no existe.')
     const p = validateWorkspacePatch(patch)
     const next: Partial<Workspace> = {}
@@ -450,7 +478,7 @@ app.whenReady().then(async () => {
   })
 
   // v0.5: abrir la carpeta del espacio. VS Code por su protocolo vscode:// (sin lanzar procesos ni shell).
-  ipcMain.handle('workspaces:reveal', async (_e, id: unknown, target: unknown) => {
+  handle('workspaces:reveal', async (_e, id: unknown, target: unknown) => {
     const ws = typeof id === 'string' ? store.workspace(id) : undefined
     if (!ws) throw new Error('Ese espacio ya no existe.')
     if (!existsSync(ws.cwd) || !statSync(ws.cwd).isDirectory()) throw new Error(`No existe la carpeta ${ws.cwd}`)
@@ -477,16 +505,17 @@ app.whenReady().then(async () => {
     } else throw new Error('Destino inválido.')
   })
 
-  ipcMain.handle('ui:openPanes', (_e, ids: string[]) => {
+  handle('ui:openPanes', (_e, ids: string[]) => {
     if (Array.isArray(ids)) store.setOpenPanes(ids.filter((x) => typeof x === 'string'))
   })
 
-  ipcMain.handle('dialog:pickFolder', async () => {
+  handle('dialog:pickFolder', async () => {
     const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory'] })
     return r.canceled ? null : (r.filePaths[0] ?? null)
   })
 
-  ipcMain.handle('pty:start', async (_e, id: string, cols: number, rows: number) => {
+  handle('pty:start', async (_e, id: unknown, cols: unknown, rows: unknown) => {
+    if (!idValido(id) || !dimValida(cols) || !dimValida(rows)) throw new Error('Pedido inválido.')
     const b = await backend()
     // Si ya corre (siguió viva en el daemon), solo se reconecta: no se rearma la cuenta ni el comando.
     const shellChoice = currentSettings().terminal.shell
@@ -502,19 +531,23 @@ app.whenReady().then(async () => {
     if (store.workspace(id)) moveAgent(id, 'start')
     return result
   })
-  ipcMain.on('pty:write', (_e, id: string, data: string) => {
-    term?.write(id, String(data))
-    for (const l of writeListeners) safe('pty-write', () => l(id, String(data)))
+  on('pty:write', (_e, id: unknown, data: unknown) => {
+    if (!idValido(id) || typeof data !== 'string') return
+    term?.write(id, data)
+    for (const l of writeListeners) safe('pty-write', () => l(id, data))
   })
-  ipcMain.on('pty:resize', (_e, id: string, cols: number, rows: number) => term?.resize(id, cols, rows))
-  ipcMain.handle('pty:kill', async (_e, id: string) => {
+  on('pty:resize', (_e, id: unknown, cols: unknown, rows: unknown) => {
+    if (idValido(id) && dimValida(cols) && dimValida(rows)) term?.resize(id, cols, rows)
+  })
+  handle('pty:kill', async (_e, id: unknown) => {
+    if (!idValido(id)) throw new Error('Pedido inválido.')
     await (await backend()).kill(id)
     if (store.workspace(id)) moveAgent(id, 'exit')
   })
 
   // Texto, rutas de archivos copiados o una imagen guardada como PNG (src/main/clipboard-paste.ts).
-  ipcMain.handle('clipboard:read', () => clipboardForPaste())
-  ipcMain.handle('clipboard:write', (_e, text: unknown) => clipboard.writeText(String(text)))
+  handle('clipboard:read', () => clipboardForPaste())
+  handle('clipboard:write', (_e, text: unknown) => clipboard.writeText(String(text)))
 
   // Funciones (features): cada una con sus canales feat:<nombre>:<op>.
   for (const f of FEATURES) {
@@ -530,7 +563,7 @@ app.whenReady().then(async () => {
         if (win) safe(f.name, () => cb(win!))
       },
       handle: (op, fn) => {
-        ipcMain.handle(`feat:${f.name}:${op}`, (_e, ...args: unknown[]) => fn(...args))
+        handle(`feat:${f.name}:${op}`, (_e, ...args: unknown[]) => fn(...args))
       },
       emit: (event, ...args) => send(`feat:${f.name}:${event}`, ...args),
       ui: uiCommand,

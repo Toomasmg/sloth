@@ -8,7 +8,7 @@ import type { FeatureContext } from './context'
 import type { ChatData } from './chat-data'
 import type { Account } from '../../shared/types'
 import type { ChatMcpAccountReg, ChatMcpAsk, ChatMcpView } from '../../shared/chat-mcp'
-import { conGrant, debeRegistrar, hashToken, KEY_RE, MCP_LIMITS, parsearConfig, sinGrant, validarCuentas, type McpConfig } from './chat-mcp-core'
+import { conGrant, debeRegistrar, hashToken, KEY_RE, MCP_LIMITS, modoRiesgoso, parsearConfig, sinGrant, validarCuentas, type McpConfig } from './chat-mcp-core'
 import { crearAtencion } from './chat-mcp-atencion'
 import { argsAlta, argsBaja, leerRegistro, MCP_SCRIPT_NAME, planificar, type Registro } from './chat-mcp-registro'
 import { CHAT_MCP_SCRIPT } from './chat-mcp-script'
@@ -26,6 +26,14 @@ const CONN_MS = 5000
 const MAX_CONEXIONES = 16
 const CLI_MS = 30_000
 const REINTENTO_MS = 1500
+
+function leerJsonSuave(file: string): unknown {
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'))
+  } catch {
+    return {}
+  }
+}
 
 const msgOf = (e: unknown): string => (e instanceof Error && e.message ? e.message.slice(0, 300) : 'Algo salió mal.')
 
@@ -219,6 +227,14 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
       cfg = { ...cfg, ...conGrant(cfg, accountId, { conv, nombre }, Date.now()) }
       save()
       emitConfig()
+    },
+    modoRiesgoso: (cuenta, ws) => {
+      const acc = ctx.store.account(cuenta)
+      if (!acc) return null
+      const archivos = [join(acc.configDir, 'settings.json')]
+      const w = ws ? ctx.store.workspace(ws) : undefined
+      if (w?.accountId === cuenta) archivos.push(join(w.cwd, '.claude', 'settings.json'), join(w.cwd, '.claude', 'settings.local.json'))
+      return modoRiesgoso(...archivos.map(leerJsonSuave))
     },
     pedidosCambiaron: (asks) => ctx.emit('mcpAsks', asks),
     avisar: (ask, donde) => {

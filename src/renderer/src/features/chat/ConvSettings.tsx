@@ -4,7 +4,7 @@ import { CHAT_RETENTION_HOURS, type ChatConvRef, type ChatTeam } from '../../../
 import { canManageConv, parseRetention, retentionLabel } from '../../../../shared/chat-retention'
 import { Modal } from '../../Modal'
 import { Button, InlineAlert, Select } from '../../ui'
-import { clearConversation, errText, setRetention } from './store'
+import { clearConversation, errText, setRetention, useDmClearForMe } from './store'
 
 const NEVER = 'off'
 const OPTIONS = [
@@ -71,16 +71,17 @@ export function RetentionDialog({ team, onClose }: { team: ChatTeam; onClose(): 
   )
 }
 
-/** Confirmación de «Vaciar conversación»: se borra para todos y no tiene vuelta atrás. */
+/** Confirmación de «Vaciar conversación»: en un equipo se borra para todos; en un DM, solo de tu lado si el servidor tiene la 0008. */
 export function ClearDialog({ conv, title, onClose }: { conv: ChatConvRef; title: string; onClose(): void }): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string>()
+  const forMe = useDmClearForMe() && conv.kind === 'dm'
 
   const clear = async (): Promise<void> => {
     setBusy(true)
     setErr(undefined)
     try {
-      await clearConversation(conv)
+      await clearConversation(conv, forMe)
       onClose()
     } catch (e) {
       setErr(errText(e))
@@ -101,15 +102,21 @@ export function ClearDialog({ conv, title, onClose }: { conv: ChatConvRef; title
             Cancelar
           </Button>
           <Button variant="danger" onClick={() => void clear()} loading={busy}>
-            Vaciar para todos
+            {forMe ? 'Vaciar para mí' : 'Vaciar para todos'}
           </Button>
         </>
       }
     >
       <div className="f-chat-settings">
-        <p>
-          Se borran todos los mensajes de <strong>{title}</strong> para todos los participantes. No se puede deshacer.
-        </p>
+        {forMe ? (
+          <p>
+            Se borran los mensajes de <strong>{title}</strong> de tu lado. La otra persona los sigue viendo. No se puede deshacer.
+          </p>
+        ) : (
+          <p>
+            Se borran todos los mensajes de <strong>{title}</strong> para todos los participantes. No se puede deshacer.
+          </p>
+        )}
         {err && <InlineAlert tone="danger">{err}</InlineAlert>}
       </div>
     </Modal>

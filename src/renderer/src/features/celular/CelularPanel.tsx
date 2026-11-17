@@ -35,6 +35,8 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
   const [ocupado, setOcupado] = useState(false)
   const [puerto, setPuerto] = useState('')
   const [tema, setTema] = useState('')
+  const [servidor, setServidor] = useState('')
+  const [token, setToken] = useState('')
   const [confirmar, setConfirmar] = useState(false)
 
   useEffect(() => {
@@ -45,6 +47,7 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
         setV(x)
         setPuerto(String(x.puerto))
         setTema(x.ntfy.tema)
+        setServidor(x.ntfy.servidor)
       },
       (e: unknown) => setErr(cleanError(e))
     )
@@ -54,6 +57,16 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
       off()
     }
   }, [ui])
+
+  const temaVista = v?.ntfy.tema
+  useEffect(() => {
+    if (temaVista !== undefined) setTema(temaVista)
+  }, [temaVista])
+
+  const servidorVista = v?.ntfy.servidor
+  useEffect(() => {
+    if (servidorVista !== undefined) setServidor(servidorVista)
+  }, [servidorVista])
 
   // Sin `disabled` mientras guarda: un botón con foco que se deshabilita le tira el foco al body.
   const hacer = async (op: string, ...args: unknown[]): Promise<boolean> => {
@@ -93,7 +106,7 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
 
   const puertoNum = Number(puerto)
   const puertoMal = !/^\d+$/.test(puerto) || puertoNum < 1024 || puertoNum > 65535
-  const temaMal = !/^[A-Za-z0-9_-]{6,64}$/.test(tema)
+  const temaMal = !/^[A-Za-z0-9_-]{20,64}$/.test(tema)
 
   return (
     <SidePanel labelId="f-cel-title" title="Celular" onClose={onClose} width={420} className="f-cel">
@@ -203,7 +216,7 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
               Avisarme por ntfy
             </Switch>
             <p className="f-cel-nota">
-              Cuando una sesión termina, te necesita o pide permiso, y Sloth no está en primer plano. Usa ntfy.sh: el aviso (nombre del espacio y qué pasó) pasa por sus servidores. Respeta «No molestar».
+              Cuando una sesión termina, te necesita o pide permiso, y Sloth no está en primer plano. El aviso (nombre del espacio y qué pasó) pasa por el servidor de ntfy que elijas. Respeta «No molestar».
             </p>
             <form
               className="f-cel-fila"
@@ -215,20 +228,64 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
               <label htmlFor="f-cel-tema" className="f-cel-label">
                 Tema
               </label>
-              <Input id="f-cel-tema" size="sm" mono value={tema} onChange={(e) => setTema(e.target.value.trim())} error={temaMal ? 'De 6 a 64: letras, números, - o _.' : undefined} />
+              <Input id="f-cel-tema" size="sm" mono value={tema} onChange={(e) => setTema(e.target.value.trim())} error={temaMal ? 'De 20 a 64: letras, números, - o _.' : undefined} />
               <Button size="sm" variant="secondary" type="submit">
                 Guardar
               </Button>
             </form>
+            {v.ntfy.temaRenovado && (
+              <InlineAlert tone="warning">
+                Tu tema era corto y cualquiera podía adivinarlo: generamos uno nuevo. Suscribite a este en la app ntfy y volvé a prender los avisos.
+              </InlineAlert>
+            )}
             <p className="f-cel-nota">En la app ntfy del celu, suscribite a este tema. Cualquiera que sepa el nombre puede leerlo: dejalo largo y al azar.</p>
             <div className="f-cel-acciones f-cel-izq">
               <Button size="sm" variant="ghost" onClick={() => void copiar(v.ntfy.tema, 'Tema')}>
                 Copiar tema
               </Button>
+              <Button size="sm" variant="ghost" onClick={() => void hacer('ntfy', { generarTema: true })}>
+                Generar otro
+              </Button>
               <Button size="sm" variant="secondary" onClick={() => void probar()}>
                 Probar aviso
               </Button>
             </div>
+            <div className="f-cel-fila">
+              <label htmlFor="f-cel-servidor" className="f-cel-label">
+                Servidor
+              </label>
+              <Input
+                id="f-cel-servidor"
+                size="sm"
+                mono
+                value={servidor}
+                onChange={(e) => setServidor(e.target.value.trim())}
+                onBlur={() => {
+                  if (servidor !== v.ntfy.servidor) void hacer('ntfy', { servidor })
+                }}
+              />
+            </div>
+            {v.ntfy.conToken && <p className="f-cel-nota">El token guardado es de este servidor: si lo cambiás, se borra y hay que cargarlo de nuevo.</p>}
+            <form
+              className="f-cel-fila"
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (token !== '') void hacer('ntfy', { token }).then((ok) => ok && setToken(''))
+              }}
+            >
+              <label htmlFor="f-cel-token" className="f-cel-label">
+                Token de acceso (opcional)
+              </label>
+              <Input id="f-cel-token" size="sm" mono type="password" autoComplete="off" value={token} placeholder={v.ntfy.conToken ? 'Guardado' : undefined} onChange={(e) => setToken(e.target.value.trim())} />
+              <Button size="sm" variant="secondary" type="submit">
+                Guardar
+              </Button>
+              {v.ntfy.conToken && (
+                <Button size="sm" variant="ghost" onClick={() => void hacer('ntfy', { token: null })}>
+                  Quitar
+                </Button>
+              )}
+            </form>
           </section>
 
           {err && <InlineAlert tone="danger">{err}</InlineAlert>}

@@ -4,7 +4,9 @@
  */
 import { createHash, timingSafeEqual } from 'node:crypto'
 import type { ChatConvRef } from '../../shared/chat'
-import type { ChatMcpGrant, ChatMcpOp } from '../../shared/chat-mcp'
+import type { ChatMcpGrant, ChatMcpOp, ModoRiesgoso } from '../../shared/chat-mcp'
+
+export type { ModoRiesgoso }
 
 export const MCP_LIMITS = {
   enviarPorMinuto: 6,
@@ -259,4 +261,17 @@ export function parsearConfig(raw: unknown): McpConfig {
     if (grants.length >= MAX_GRANTS) break
   }
   return { enabled: raw.enabled === true, cuentas: cuentasDe(raw.cuentas), grants, tokens: tokensDe(raw.tokens) }
+}
+
+export function modoRiesgoso(...settings: unknown[]): ModoRiesgoso | null {
+  let modo: ModoRiesgoso | null = null
+  for (const s of settings) {
+    if (typeof s !== 'object' || s === null) continue
+    const perms = (s as Record<string, unknown>).permissions
+    if (typeof perms !== 'object' || perms === null) continue
+    const m = (perms as Record<string, unknown>).defaultMode
+    if (m === 'bypassPermissions') return m
+    if (m === 'acceptEdits') modo = m
+  }
+  return modo
 }

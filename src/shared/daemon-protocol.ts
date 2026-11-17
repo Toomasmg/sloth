@@ -6,7 +6,7 @@
 import type { PtyChunk, PtyStartResult } from './types'
 
 /** Se sube si cambia el protocolo de forma incompatible (va en el nombre del pipe). */
-export const DAEMON_PROTOCOL_VERSION = 1
+export const DAEMON_PROTOCOL_VERSION = 2
 
 /** Eventos de Claude Code que llegan por /hook (fire-and-forget). */
 export const HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'Notification', 'Stop', 'SessionEnd'] as const
@@ -56,7 +56,17 @@ export interface SessionInfo {
 
 // ---------- Cliente -> daemon ----------
 
+export interface ChallengeMsg {
+  t: 'challenge'
+  nonce: string
+}
 export interface HelloMsg {
+  t: 'hello'
+  proof: string
+  clientVersion: string
+}
+/** Saludo del protocolo 1: solo se usa para apagar un daemon viejo. */
+export interface LegacyHelloMsg {
   t: 'hello'
   token: string
   clientVersion: string
@@ -99,6 +109,7 @@ export interface PermissionAnswerMsg {
 }
 
 export type ClientMessage =
+  | ChallengeMsg
   | HelloMsg
   | StartMsg
   | WriteMsg
@@ -110,6 +121,11 @@ export type ClientMessage =
 
 // ---------- Daemon -> cliente ----------
 
+export interface ChallengeOkMsg {
+  t: 'challenge-ok'
+  nonce: string
+  proof: string
+}
 export interface HelloOkMsg {
   t: 'hello-ok'
   version: string
@@ -154,6 +170,7 @@ export interface PermissionResolvedMsg {
 }
 
 export type DaemonMessage =
+  | ChallengeOkMsg
   | HelloOkMsg
   | ReplyMsg
   | DataMsg

@@ -233,6 +233,9 @@ function onRealtime(m: ChatMessage): void {
     mergeInto(m.conv, [mergeUpdate(prev, { ...m, reactions: undefined })], 'oldest')
     return
   }
+  // Una edición o un borrado de algo que no está en caché es de una página sin cargar o de un DM que
+  // vaciaste para vos (Broadcast no pasa por la RLS): no se agrega.
+  if (m.editedAt !== undefined || m.deletedAt !== undefined) return
   mergeInto(m.conv, [mergeUpdate(undefined, m)], 'oldest')
   clearTyping(key, m.author.id)
   if (m.notice) {
@@ -242,7 +245,6 @@ function onRealtime(m: ChatMessage): void {
     }
     return
   }
-  if (m.deletedAt !== undefined) return
   alertIncoming(m)
   if (m.author.id === meId()) return
   if (nav.open && nav.conv && convKey(nav.conv) === key) {
@@ -358,6 +360,10 @@ export function useTyping(conv: ChatConvRef): string[] {
 /** El servidor tiene la actualización 0004: editar, borrar, responder, reaccionar, «escribiendo…» y «Visto». */
 export function useExtras(): boolean {
   return useSyncExternalStore(subscribe, () => snap?.extras === true)
+}
+
+export function useDmClearForMe(): boolean {
+  return useSyncExternalStore(subscribe, () => snap?.dmClearForMe === true)
 }
 
 /** Hay snapshot y el servidor no tiene la 0004. */
@@ -535,11 +541,12 @@ function putUpdate(m: ChatMessage): void {
 }
 
 /**
- * Vacía la conversación para todos. Lo de la caché se va ya; el aviso llega por realtime y, por si
- * no llega, se vuelve a pedir la última página. Los errores los muestra quien llama.
+ * Vacía la conversación: el equipo para todos y el DM según `forMe`, que es lo que confirmó la persona
+ * (main lo rechaza si el servidor hace otra cosa). Lo de la caché se va ya y se vuelve a pedir la última
+ * página, porque en un DM vaciado para uno no llega aviso. Los errores los muestra quien llama.
  */
-export async function clearConversation(conv: ChatConvRef): Promise<void> {
-  await call('clear', conv)
+export async function clearConversation(conv: ChatConvRef, forMe: boolean): Promise<void> {
+  await call('clear', conv, forMe)
   const key = convKey(conv)
   msgs.set(key, (msgs.get(key) ?? []).filter((m) => m.status !== 'sent'))
   meta.set(key, { more: false })

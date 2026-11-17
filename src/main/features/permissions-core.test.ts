@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { dentroDelRepo, findRule, ruleFor, ruleMatches, type PermissionRequestLike, type PermissionRule } from './permissions-core'
+import { dentroDelRepo, findRule, permitirDesdeAviso, ruleFor, ruleMatches, type PermissionRequestLike, type PermissionRule } from './permissions-core'
 
 const CWD = 'C:\\dev\\repo'
 const pedido = (tool: string, input: Record<string, unknown>): PermissionRequestLike => ({ id: 'p1', ws: 'w1', tool, input, at: 0, expiresAt: 0 })
@@ -55,4 +55,21 @@ test('las reglas de comando y de dominio siguen siendo exactas', () => {
   assert.equal(findRule([net], pedido('WebFetch', { url: 'https://example.com/b' }))?.id, 'r1')
   assert.equal(findRule([net], pedido('WebFetch', { url: 'https://example.org/' })), undefined)
   assert.equal(findRule([cmd], { ...pedido('Bash', { command: 'npm test' }), ws: 'otro' }, CWD), undefined)
+})
+
+test('permitirDesdeAviso: solo comandos cortos que se ven enteros', () => {
+  assert.equal(permitirDesdeAviso('cmd', { command: 'npm test' }), true)
+  assert.equal(permitirDesdeAviso('cmd', { command: 'x'.repeat(80) }), true)
+  assert.equal(permitirDesdeAviso('cmd', { command: 'x'.repeat(81) }), false)
+  assert.equal(permitirDesdeAviso('cmd', { command: 'ls\nrm -rf /' }), false)
+  assert.equal(permitirDesdeAviso('cmd', { command: 'ls\rrm' }), false)
+  assert.equal(permitirDesdeAviso('cmd', {}), false)
+  assert.equal(permitirDesdeAviso('edit', { file_path: 'a.ts' }), false)
+  assert.equal(permitirDesdeAviso('cmd', { command: 'git commit -m "acción"' }), true)
+  assert.equal(permitirDesdeAviso('cmd', { command: 'ls\trm' }), false)
+  assert.equal(permitirDesdeAviso('cmd', { command: 'echo ‮gnp.exe' }), false)
+  assert.equal(permitirDesdeAviso('cmd', { command: 'rm​ -rf x' }), false)
+  assert.equal(permitirDesdeAviso('cmd', { command: 'ls\u001b[2K' }), false)
+  assert.equal(permitirDesdeAviso('net', { url: 'https://a.com' }), false)
+  assert.equal(permitirDesdeAviso('other', {}), false)
 })

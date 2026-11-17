@@ -346,6 +346,12 @@ const feature: Feature = {
           ports: CHAT_CALLBACK_PORTS,
           path: CHAT_CALLBACK_PATH,
           openExternal: (u) => shell.openExternal(u),
+          preservarVerificador: () => session.preservarVerificador(),
+          onCanjeFallido: () => {
+            if (login !== l || auth.status !== 'signingIn') return
+            auth = { ...auth, aviso: 'Llegó un código que no sirvió. Si ya volviste del navegador y no entró, cancelá y probá de nuevo.' }
+            emit()
+          },
           githubHabilitado: async () => {
             try {
               const res = await fetch(`${supabaseUrl}/auth/v1/settings`, {

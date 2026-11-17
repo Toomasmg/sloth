@@ -26,6 +26,13 @@ export function InviteDialog({ team, onClose }: { team: ChatTeam; onClose(): voi
 
   useEffect(() => () => window.clearTimeout(copyTimer.current), [])
 
+  const expiryNote = ((): string | null => {
+    if (team.inviteExpiresAt === undefined) return null
+    if (team.inviteExpiresAt <= Date.now() || team.inviteUsesLeft === 0) return 'Este código ya no sirve: generá uno nuevo.'
+    const date = new Date(team.inviteExpiresAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    return team.inviteUsesLeft === undefined ? `Vence el ${date}` : `Vence el ${date} · quedan ${team.inviteUsesLeft} ingresos`
+  })()
+
   const invite = async (): Promise<void> => {
     const l = login.trim()
     setErr(null)
@@ -163,6 +170,7 @@ ${token}`)
                 </button>
               </div>
             </div>
+            {expiryNote && <p className="field-help">{expiryNote}</p>}
             <div className="f-chat-team-full">
               <p className="field-help">Para alguien que todavía no tiene el chat: trae el servidor y el código, y entra en un solo paso.</p>
               <button type="button" className="btn sm primary" onClick={() => void copyFull()} disabled={!code || busy !== null || confirmCode}>
