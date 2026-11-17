@@ -24,6 +24,7 @@ import type {
   SpawnSpec
 } from '../shared/daemon-protocol'
 import { TerminalCore } from '../daemon/core'
+import { copiaPty, hashArchivo, hashesDe, mismosHashes } from './daemon-bin'
 import { daemonKeyFileFor, DAEMON_SCRIPT_NAME, legacyPipeNameFor, pipeNameFor, tokenFileFor } from '../daemon/paths'
 import { KEY_RE, mismaPrueba, NONCE_RE, nuevoNonce, pruebaCliente, pruebaDaemon } from '../daemon/auth'
 
@@ -213,22 +214,24 @@ function runtimeFiles(opts: CreateBackendOptions): { script: string; ptyDir: str
     const dest = join(binRoot, safeVersion)
     const script = join(dest, DAEMON_SCRIPT_NAME)
     const ptyDir = join(dest, 'node_modules', 'node-pty')
-    if (!existsSync(join(dest, '.ok'))) {
+    const keepPrebuild = `${process.platform}-${process.arch}`
+    // Cualquier proceso del usuario puede tocar la copia: se verifica en cada lanzamiento, que solo
+    // ocurre cuando no hay daemon corriendo y los archivos no están en uso.
+    const esperados = new Map([[DAEMON_SCRIPT_NAME, hashArchivo(packagedScript)]])
+    for (const [k, v] of hashesDe(srcPty, (rel, name) => copiaPty(rel, name, keepPrebuild))) esperados.set(`node_modules/node-pty/${k}`, v)
+    const motivo = !existsSync(join(dest, '.ok'))
+      ? 'no estaba copiado'
+      : mismosHashes(esperados, hashesDe(dest, (rel) => rel.join('/') !== '.ok'))
+        ? ''
+        : 'la copia no coincide con la instalada'
+    if (motivo) {
+      opts.log?.(`[daemon] se copia el daemon a daemon-bin: ${motivo}`)
       rmSync(dest, { recursive: true, force: true })
       mkdirSync(dest, { recursive: true })
       cpSync(packagedScript, script)
-      const skipDirs = new Set(['src', 'deps', 'third_party', 'scripts', 'typings', 'node-addon-api'])
-      const keepPrebuild = `${process.platform}-${process.arch}`
       cpSync(srcPty, ptyDir, {
         recursive: true,
-        filter: (src) => {
-          const rel = src.slice(srcPty.length).split(sep).filter(Boolean)
-          if (rel.length === 0) return true
-          if (rel.length === 1 && skipDirs.has(rel[0])) return false
-          if (rel[0] === 'prebuilds' && rel.length >= 2 && rel[1] !== keepPrebuild) return false
-          const name = basename(src)
-          return !/\.(pdb|map)$/i.test(name) && !/\.test\.js$/i.test(name)
-        }
+        filter: (src) => copiaPty(src.slice(srcPty.length).split(sep).filter(Boolean), basename(src), keepPrebuild)
       })
       writeFileSync(join(dest, '.ok'), opts.appVersion)
     }
