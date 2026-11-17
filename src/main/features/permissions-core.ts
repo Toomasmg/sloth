@@ -143,6 +143,14 @@ export function labelOf(kind: PermissionKind, tool: string, input: Record<string
   return otherName(tool)
 }
 
+/** El aviso de Windows corta el texto: «Permitir» ahí solo es honesto si lo que se aprueba se ve entero. */
+export function permitirDesdeAviso(kind: PermissionKind, input: Record<string, unknown>): boolean {
+  if (kind === 'edit') return false
+  if (kind !== 'cmd') return true
+  const c = str(input.command)
+  return c !== undefined && c.length <= 80 && !/[\r\n]/.test(c)
+}
+
 /** Texto del botón «Permitir siempre» según el tipo. */
 export function alwaysLabel(kind: PermissionKind): string {
   if (kind === 'cmd') return 'Permitir siempre aquí'
