@@ -177,3 +177,14 @@ test('el MAC de la web coincide con el de node:crypto', () => {
   const d = randomBytes(300)
   assert.equal(hex(web._t.hmac(new Uint8Array(k), new Uint8Array(d))), createHmac('sha256', k).update(d).digest('hex'))
 })
+
+test('abrirRespuesta acepta una respuesta de ~100 sesiones (más de 8192 caracteres)', () => {
+  const claves = derivarClaves(Buffer.alloc(32, 3).toString('base64url'))
+  const w = web.abrirClave(Buffer.alloc(32, 3).toString('base64url'))
+  assert.ok(claves && w)
+  const iv = randomBytes(16)
+  const json = JSON.stringify({ sesiones: Array.from({ length: 100 }, (_, i) => ({ id: 's' + i, detalle: 'é'.repeat(200) })) })
+  const sobre = sellarRespuesta(claves, iv, json)
+  assert.ok(sobre.length > 8192)
+  assert.equal(web.abrirRespuesta(w, new Uint8Array(iv), sobre), json)
+})

@@ -240,7 +240,7 @@ export const SELLO_JS = `(function () {
   }
 
   function abrirRespuesta(claves, ivPedido, sobre) {
-    if (typeof sobre !== 'string' || sobre.length > 8192) return null;
+    if (typeof sobre !== 'string' || sobre.length > 262144) return null;
     var bytes = deBase64url(sobre);
     if (!bytes || bytes.length < 48) return null;
     var iv = bytes.subarray(0, 16);

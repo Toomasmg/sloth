@@ -85,7 +85,7 @@ export function abrirRespuesta(c: Claves, ivPedido: Buffer, sobre: string): stri
   return abrir(c, prefijoRespuesta(ivPedido), sobre)?.json ?? null
 }
 
-export function crearRepetidos(ttlMs = 10 * 60_000, tope = 2000): Repetidos {
+export function crearRepetidos(ttlMs = 10 * 60_000, tope = 20_000): Repetidos {
   const vistos = new Map<string, number>()
   return {
     vistoAntes(iv, ahora) {
