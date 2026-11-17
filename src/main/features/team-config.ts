@@ -62,6 +62,8 @@ export interface TeamStatus {
   links: TeamLink[]
   ajustes?: TeamSettings
   settingsPending: boolean
+  /** Partes del archivo que se ignoraron sin invalidar el resto. */
+  avisos?: string[]
 }
 
 const featuresDir = (): string => join(app.getPath('userData'), 'features')
@@ -147,7 +149,8 @@ const feature: Feature = {
         notify: pending > 0 && e?.dismissedHash !== r.hash,
         links: r.config.links,
         ajustes: r.config.ajustes,
-        settingsPending: Boolean(r.settingsHash) && e?.settingsHash !== r.settingsHash
+        settingsPending: Boolean(r.settingsHash) && e?.settingsHash !== r.settingsHash,
+        avisos: r.config.avisos
       }
     }
 

@@ -57,9 +57,14 @@ export interface TeamConfig {
   links: TeamLink[]
   /** Chat del equipo: se usa solo si el usuario lo acepta (ver chat.ts). */
   chat?: ChatServerConfig
+  /** Partes del archivo que se ignoraron (una plantilla, el chat) sin invalidar el resto. */
+  avisos?: string[]
 }
 
 export class TeamConfigError extends Error {}
+
+// Un problema que descarta solo esa parte del archivo, no el team.json entero.
+class ParteDescartada extends TeamConfigError {}
 
 const fail = (msg: string): never => {
   throw new TeamConfigError(msg)
@@ -132,7 +137,7 @@ function parseTemplate(raw: unknown, i: number): TeamTemplate {
   checkVars(namePattern, `${label}: namePattern`)
   checkVars(initialPrompt, `${label}: initialPrompt`)
   const promptProblem = initialPrompt ? initialPromptProblem(initialPrompt) : undefined
-  if (promptProblem) fail(`${label}: ${promptProblem}`)
+  if (promptProblem) throw new ParteDescartada(`${label}: ${promptProblem} Se ignora esa plantilla.`)
   let useWorktree: TeamTemplate['useWorktree']
   if (raw.useWorktree !== undefined && raw.useWorktree !== null && raw.useWorktree !== false) {
     if (!isObj(raw.useWorktree)) fail(`${label}: useWorktree tiene que ser { "branchPattern": "…" }.`)
@@ -208,7 +213,16 @@ export function parseTeamConfig(textIn: string): TeamConfig {
   if (data.plantillas !== undefined && !Array.isArray(data.plantillas)) fail('plantillas: tiene que ser una lista.')
   const rawT = (data.plantillas as unknown[] | undefined) ?? []
   if (rawT.length > MAX_TEMPLATES) fail(`plantillas: como mucho ${MAX_TEMPLATES}.`)
-  const plantillas = rawT.map(parseTemplate)
+  const avisos: string[] = []
+  const plantillas: TeamTemplate[] = []
+  rawT.forEach((raw, i) => {
+    try {
+      plantillas.push(parseTemplate(raw, i))
+    } catch (e) {
+      if (!(e instanceof ParteDescartada)) throw e
+      avisos.push(e.message)
+    }
+  })
   const seen = new Set<string>()
   for (const t of plantillas) {
     const k = t.name.toLowerCase()
@@ -222,9 +236,10 @@ export function parseTeamConfig(textIn: string): TeamConfig {
     try {
       cfg.chat = parseChatServerConfig(data.chat, { allowSelfHosted: false })
     } catch (e) {
-      fail(`chat: ${e instanceof Error ? e.message : 'configuración inválida.'}`)
+      avisos.push(`chat: ${e instanceof Error ? e.message : 'configuración inválida.'} Se ignora el chat del equipo.`)
     }
   }
+  if (avisos.length) cfg.avisos = avisos
   return cfg
 }
 
@@ -467,6 +482,11 @@ export function buildTeamExport(repo: string, templates: readonly ExistingTempla
     const bad = personalData(t.initialPrompt) ?? personalData(t.namePattern) ?? personalData(t.useWorktree?.branchPattern)
     if (bad) {
       skipped.push({ name: t.name, reason: `tiene ${bad} en el prompt o en el nombre` })
+      continue
+    }
+    const promptProblem = t.initialPrompt ? initialPromptProblem(t.initialPrompt) : undefined
+    if (promptProblem) {
+      skipped.push({ name: t.name, reason: promptProblem })
       continue
     }
     const out: TeamTemplate = { name: t.name, repoPath: safe, cuenta: SUGGESTED, autoStartClaude: t.autoStartClaude !== false, resume: t.resume !== false }

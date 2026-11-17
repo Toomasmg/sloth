@@ -198,6 +198,8 @@ export interface ParsedSpace extends ExportedSpace {
   resume: boolean
   initialPrompt?: string
   ticket?: string
+  /** Algo del archivo que se dejó afuera sin saltear el espacio (p. ej. un primer mensaje inválido). */
+  aviso?: string
 }
 
 /** Una regla del archivo, ya revisada. `texto` es lo que se muestra (comando, dominio…). */
@@ -219,6 +221,8 @@ export interface ParsedImport {
   cuentas: ExportedAccount[]
   espacios: ParsedSpace[]
   plantillas: ExportedTemplate[]
+  /** Plantillas que no se importan por un primer mensaje inválido (el resto del archivo sigue). */
+  plantillasDescartadas: { name: string; reason: string }[]
   apariencia?: ExportedAppearance
   /** Atajos cambiados: id → combinación canónica. Solo los ids y combinaciones válidos. */
   atajos?: Record<string, string>
@@ -347,8 +351,8 @@ export function parseImport(text: string): ParsedImport {
       const initialPrompt = str(w, 'initialPrompt', where, 4000, false)
       const ticket = str(w, 'ticket', where, 40, false)
       const promptProblem = initialPrompt ? initialPromptProblem(initialPrompt) : undefined
-      if (promptProblem) throw new Error(`${where}: ${promptProblem}`)
-      if (initialPrompt) e.initialPrompt = initialPrompt
+      if (promptProblem) e.aviso = `${promptProblem} Se importa sin ese primer mensaje.`
+      else if (initialPrompt) e.initialPrompt = initialPrompt
       if (ticket) e.ticket = ticket
     }
     const color = typeof w.color === 'string' && ACCOUNT_PALETTE.some((c) => c.hex === w.color) ? (w.color as string) : undefined
@@ -361,7 +365,9 @@ export function parseImport(text: string): ParsedImport {
   const rawTpl = data.plantillas ?? []
   if (!Array.isArray(rawTpl)) throw new Error('«plantillas» tiene que ser una lista.')
   if (rawTpl.length > 200) throw new Error('Demasiadas plantillas en el archivo.')
-  const plantillas: ExportedTemplate[] = rawTpl.map((t, i) => {
+  const plantillasDescartadas: { name: string; reason: string }[] = []
+  const plantillas: ExportedTemplate[] = []
+  rawTpl.forEach((t, i) => {
     const where = `Plantilla ${i + 1}`
     if (!isObj(t)) throw new Error(`${where}: formato inválido.`)
     const e: ExportedTemplate = {
@@ -375,14 +381,14 @@ export function parseImport(text: string): ParsedImport {
     const initialPrompt = str(t, 'initialPrompt', where, 4000, false)
     if (cuenta) e.cuenta = cuenta
     if (namePattern) e.namePattern = namePattern
-    const promptProblem = initialPrompt ? initialPromptProblem(initialPrompt) : undefined
-    if (promptProblem) throw new Error(`${where}: ${promptProblem}`)
     if (initialPrompt) e.initialPrompt = initialPrompt
     if (t.useWorktree !== undefined && t.useWorktree !== null) {
       if (!isObj(t.useWorktree)) throw new Error(`${where}: «useWorktree» inválido.`)
       e.useWorktree = { branchPattern: str(t.useWorktree, 'branchPattern', where, 200, true)! }
     }
-    return e
+    const promptProblem = initialPrompt ? initialPromptProblem(initialPrompt) : undefined
+    if (promptProblem) plantillasDescartadas.push({ name: e.name, reason: promptProblem })
+    else plantillas.push(e)
   })
 
   // Apariencia: solo los valores que la Configuración acepta; el resto se ignora.
@@ -434,7 +440,7 @@ export function parseImport(text: string): ParsedImport {
     })
   }
 
-  return { version, formatoVersion, cuentas, espacios, plantillas, apariencia, atajos, equipo, permisos }
+  return { version, formatoVersion, cuentas, espacios, plantillas, plantillasDescartadas, apariencia, atajos, equipo, permisos }
 }
 
 // ---------- Plan (vista previa) ----------
@@ -451,6 +457,7 @@ export interface PlanSpace {
   motivo?: string
   /** Nombre del espacio local que choca (solo en conflicto). */
   existente?: string
+  aviso?: string
 }
 export interface PlanAccount {
   label: string
@@ -509,7 +516,7 @@ export function buildPlan(
   const known = new Set([...localLabels, ...parsed.cuentas.map((c) => c.label.toLowerCase())])
 
   const espacios: PlanSpace[] = parsed.espacios.map((e, index) => {
-    const base = { index, nombre: e.nombre, ruta: e.ruta, cuenta: e.cuenta, color: e.color }
+    const base = { index, nombre: e.nombre, ruta: e.ruta, cuenta: e.cuenta, color: e.color, ...(e.aviso ? { aviso: e.aviso } : {}) }
     if (!known.has(e.cuenta.toLowerCase())) return { ...base, status: 'saltear', motivo: `la cuenta «${e.cuenta}» no está en el archivo` }
     if (e.sinCarpeta) return { ...base, status: 'saltear', motivo: 'es un worktree y el archivo no trae su carpeta' }
     if (!isDir(e.ruta)) return { ...base, status: 'faltante', motivo: 'la carpeta no existe en esta PC' }
@@ -526,7 +533,7 @@ export function buildPlan(
   )
   const nuevas: string[] = []
   const existentes: string[] = []
-  const salteadas: { name: string; reason: string }[] = []
+  const salteadas: { name: string; reason: string }[] = [...(parsed.plantillasDescartadas ?? [])]
   for (const t of parsed.plantillas) {
     if (localNames.has(t.name.toLowerCase())) existentes.push(t.name)
     else if (!isDir(t.repoPath)) salteadas.push({ name: t.name, reason: 'la carpeta del repo no existe en esta PC' })
