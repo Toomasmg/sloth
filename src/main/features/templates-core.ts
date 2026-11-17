@@ -195,7 +195,7 @@ export function pickSuggested(accounts: { id: string }[], loggedIn: (id: string)
   return [...pool].sort((a, b) => used5h(a.id) - used5h(b.id))[0]?.id
 }
 
-export const VERSION_PLANTILLAS = 1
+const VERSION_PLANTILLAS = 1
 
 interface FileShape {
   version: number
@@ -228,6 +228,7 @@ export class TemplateFile {
   private readonly file: string
   private resto: Record<string, unknown> = {}
   private soloLectura = false
+  private futura = false
   private porRespaldar = false
   constructor(file: string) {
     this.file = file
@@ -239,13 +240,14 @@ export class TemplateFile {
       validar: (v) => {
         const r = migrar(v, {}, VERSION_PLANTILLAS)
         if (r.estado === 'invalida') return undefined
-        this.soloLectura = r.estado === 'futura'
+        this.futura = r.estado === 'futura'
+        this.soloLectura = this.futura
         this.porRespaldar = r.estado === 'migrado'
         return r.datos as Partial<FileShape>
       },
       porDefecto: (): Partial<FileShape> => ({})
     }).valor
-    if (this.soloLectura) avisoVersionFutura(this.file)
+    if (this.futura) avisoVersionFutura(this.file)
     const { version: _v, templates: _t, defaultId: _d, ...resto } = data
     this.resto = resto
     this.def = typeof data.defaultId === 'string' ? data.defaultId : null
@@ -255,7 +257,10 @@ export class TemplateFile {
   }
 
   private persist(): void {
-    if (this.soloLectura) return
+    if (this.soloLectura) {
+      if (this.futura) avisoVersionFutura(this.file)
+      return
+    }
     if (this.porRespaldar) {
       try {
         respaldar(this.file)

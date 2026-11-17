@@ -2,7 +2,8 @@ import { app, dialog, nativeTheme, type BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { escribirJsonAtomico, leerJson, respaldar } from '../json-file'
 import { avisar, avisoVersionFutura } from '../avisos'
-import { migrar } from '../versionado'
+import { migrar, type EstadoVersion } from '../versionado'
+import { armarArchivo, leerSettings, type ArchivoSettings } from './settings-archivo'
 import type { Feature, FeatureContext } from './context'
 import {
   applyPatch,
@@ -22,27 +23,41 @@ import { SURFACE } from '../../shared/surfaces'
  */
 const file = (): string => join(app.getPath('userData'), 'features', 'settings.json')
 
-export const VERSION_SETTINGS = 1
+const VERSION_SETTINGS = 1
 
 let soloLectura = false
+let futura = false
 let porRespaldar = false
+let resto: Record<string, unknown> = {}
 
-const validar = (v: unknown): SlothSettings | undefined => {
-  const r = migrar(v, {}, VERSION_SETTINGS)
-  if (r.estado === 'invalida') return undefined
-  soloLectura = r.estado === 'futura'
-  porRespaldar = r.estado === 'migrado'
-  return normalize(r.datos)
+interface Lectura extends ArchivoSettings {
+  estado: EstadoVersion
 }
 
+// Solo devuelve: los flags del módulo los asigna read(), así una consulta (initialChrome) no los toca.
+const validar = (v: unknown): Lectura | undefined => {
+  const r = migrar(v, {}, VERSION_SETTINGS)
+  if (r.estado === 'invalida') return undefined
+  return { ...leerSettings(r.datos), estado: r.estado }
+}
+
+const sinArchivo = (): Lectura => ({ settings: normalize(undefined), resto: {}, estado: 'actual' })
+
 function read(): SlothSettings {
-  const valor = leerJson(file(), { validar, porDefecto: () => normalize(undefined) }).valor
-  if (soloLectura) avisoVersionFutura(file())
-  return valor
+  const l = leerJson(file(), { validar, porDefecto: sinArchivo }).valor
+  futura = l.estado === 'futura'
+  soloLectura = futura
+  porRespaldar = l.estado === 'migrado'
+  resto = l.resto
+  if (futura) avisoVersionFutura(file())
+  return l.settings
 }
 
 function guardar(): void {
-  if (soloLectura) return
+  if (soloLectura) {
+    if (futura) avisoVersionFutura(file())
+    return
+  }
   if (porRespaldar) {
     try {
       respaldar(file())
@@ -53,7 +68,7 @@ function guardar(): void {
       return
     }
   }
-  escribirJsonAtomico(file(), { version: VERSION_SETTINGS, ...settings })
+  escribirJsonAtomico(file(), armarArchivo(settings, resto, VERSION_SETTINGS))
 }
 
 /** Colores de la barra de título que dibuja Windows (los botones de ventana): el fondo es el --surface del tema (src/shared/surfaces.ts). */
@@ -71,7 +86,7 @@ const chromeFor = (theme: ThemeChoice, dark: boolean): { bg: string; symbol: str
  */
 export function initialChrome(): { bg: string; symbol: string; dark: boolean } {
   try {
-    const s = settings ?? leerJson(file(), { validar, porDefecto: () => normalize(undefined), soloConsulta: true }).valor
+    const s = settings ?? leerJson(file(), { validar, porDefecto: sinArchivo, soloConsulta: true }).valor.settings
     nativeTheme.themeSource = themeSource(s.theme)
     const dark = resolveDark(s.theme, nativeTheme.shouldUseDarkColors)
     return { ...chromeFor(s.theme, dark), dark }
