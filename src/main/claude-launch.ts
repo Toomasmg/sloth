@@ -1,3 +1,5 @@
+import { mightBeSubcommand } from '../shared/initial-prompt'
+
 /** Familia de sintaxis de la shell: cambia cómo se pasa el comando inicial. */
 export type ShellFamily = 'ps' | 'cmd' | 'posix'
 
@@ -53,11 +55,23 @@ function shellOnly(family: ShellFamily): string[] {
   return family === 'ps' ? ['-NoLogo'] : family === 'posix' ? ['--login', '-i'] : []
 }
 
+/** Un script de PowerShell como -EncodedCommand: nunca se vuelve a parsear como línea de comandos. */
+export function psEncoded(script: string): string {
+  return Buffer.from(script, 'utf16le').toString('base64')
+}
+
+/** Valor de SLOTH_PROMPT para PowerShell: ya entre comillas, así el modo Legacy lo pasa sin tocarlo. */
+export function psPromptValue(prompt: string): string {
+  return `"${windowsArgBody(prompt)}"`
+}
+
+const CMD_NO_CWD = 'NoDefaultCurrentDirectoryInExePath'
+
 /**
  * Argumentos de la shell que corre Claude y se queda abierta. El primer mensaje va por la variable
  * SLOTH_PROMPT, que la shell expande como un solo argumento después de `--`. Eso solo es seguro si
- * se lanza claude.exe directo: un claude.cmd pasaría otra vez por cmd. En cmd, o sin claude.exe,
- * el mensaje se pega en Claude cuando arranca.
+ * se lanza claude.exe directo: un claude.cmd pasaría otra vez por cmd. En cmd, sin claude.exe o si
+ * el mensaje podría tomarse como subcomando, se pega en Claude cuando arranca.
  */
 export function shellLaunch(family: ShellFamily, launch?: ClaudeLaunch): ShellLaunch {
   if (!launch?.argv.length) return { args: shellOnly(family), env: {} }
@@ -65,20 +79,26 @@ export function shellLaunch(family: ShellFamily, launch?: ClaudeLaunch): ShellLa
   if (family === 'cmd' && exe && !CMD_PLAIN.test(exe)) exe = undefined
   const argv = exe && launch.argv[0] === 'claude' ? [exe, ...launch.argv.slice(1)] : launch.argv
   const prompt = launch.prompt ? promptLine(launch.prompt) : undefined
-  const viaEnv = prompt !== undefined && exe !== undefined && family !== 'cmd'
+  const viaEnv = prompt !== undefined && exe !== undefined && family !== 'cmd' && !mightBeSubcommand(prompt)
   const paste = prompt !== undefined && !viaEnv ? prompt : undefined
   switch (family) {
     case 'ps': {
       const head = `& ${argv.map(psArg).join(' ')}`
-      if (!viaEnv) return { args: ['-NoLogo', '-NoExit', '-Command', head], env: {}, paste }
-      // Con --% PowerShell pasa el resto de la línea tal cual (solo expande %VAR%): las comillas las arma windowsArgBody.
-      const cmd = `${head} --% -- "%${PROMPT_VAR}%"\nRemove-Item Env:${PROMPT_VAR} -ErrorAction Ignore`
-      return { args: ['-NoLogo', '-NoExit', '-Command', cmd], env: { [PROMPT_VAR]: windowsArgBody(prompt) } }
+      if (!viaEnv) return { args: ['-NoLogo', '-NoExit', '-EncodedCommand', psEncoded(head)], env: {}, paste }
+      // PowerShell 7.3+ en modo Windows vuelve a entrecomillar a su manera; Legacy (el de 5.1) pasa tal
+      // cual un valor que ya viene entre comillas. El bloque { } deja la variable solo para esta línea.
+      const script = `& { $PSNativeCommandArgumentPassing = 'Legacy'; $p = $env:${PROMPT_VAR}; Remove-Item Env:${PROMPT_VAR} -ErrorAction Ignore; ${head} -- $p }`
+      return { args: ['-NoLogo', '-NoExit', '-EncodedCommand', psEncoded(script)], env: { [PROMPT_VAR]: psPromptValue(prompt) } }
     }
-    case 'cmd':
-      return { args: ['/k', argv.map((a, i) => (i === 0 && a === exe ? a : cmdArg(a))).join(' ')], env: {}, paste }
+    case 'cmd': {
+      const line = argv.map((a, i) => (i === 0 && a === exe ? a : cmdArg(a))).join(' ')
+      if (exe) return { args: ['/k', line], env: {}, paste }
+      // Sin ruta, cmd buscaría `claude` primero en la carpeta del repo: solo esta línea deja de mirar ahí.
+      return { args: ['/k', `set ${CMD_NO_CWD}=1& ${line}& set ${CMD_NO_CWD}=`], env: {}, paste }
+    }
     case 'posix': {
-      const head = argv.map(posixArg).join(' ')
+      // MSYS convierte en ruta de Windows todo argumento que parezca una ruta POSIX («/ticket X»).
+      const head = `MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' ${argv.map(posixArg).join(' ')}`
       if (!viaEnv) return { args: ['--login', '-i', '-c', `${head}; exec bash --login -i`], env: {}, paste }
       const cmd = `p=$${PROMPT_VAR}; unset ${PROMPT_VAR}; ${head} -- "$p"; unset p; exec bash --login -i`
       return { args: ['--login', '-i', '-c', cmd], env: { [PROMPT_VAR]: prompt } }
@@ -101,7 +121,6 @@ export function baseEnv(source: Record<string, string | undefined> = process.env
       key === 'CLAUDE_CONFIG_DIR' ||
       key === 'ANTHROPIC_API_KEY' ||
       key === 'ANTHROPIC_AUTH_TOKEN' ||
-      key === 'NODEFAULTCURRENTDIRECTORYINEXEPATH' ||
       key.startsWith('ELECTRON_') ||
       key.startsWith('ANTIREA_') ||
       key.startsWith('SLOTH_')
@@ -110,7 +129,5 @@ export function baseEnv(source: Record<string, string | undefined> = process.env
     env[k] = v
   }
   env.TERM_PROGRAM = 'Sloth'
-  // Sin esto, cmd busca `claude` primero en la carpeta del repo: un claude.cmd del repo se ejecutaría solo.
-  env.NoDefaultCurrentDirectoryInExePath = '1'
   return env
 }
