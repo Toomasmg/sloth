@@ -9,6 +9,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.26',
+    date: '2026-11-17',
+    title: 'Más seguro con repos ajenos y sin perder tu configuración',
+    items: [
+      'Abrir un espacio sobre un repo que no es tuyo ya no puede ejecutar comandos en tu PC: ni por el prompt inicial, ni por la configuración de git del repo, ni por un claude.cmd en la carpeta.',
+      '«Permitir siempre ediciones» ahora vale solo dentro del repo del espacio. Fuera de él, o en .git y .claude, Sloth vuelve a preguntar.',
+      'Si un archivo de configuración se daña, Sloth lo guarda aparte y te avisa en vez de pisarlo. Si el archivo de estado trae una cuenta o un espacio roto, Sloth abre igual.',
+      'Chat: sacar a alguien del equipo cambia el código de invitación, y te avisa si una invitación apunta a un servidor que no es de Supabase.',
+      'El estado de cada espacio ya no queda en «listo» cuando la terminal se cerró.'
+    ]
+  },
+  {
     version: '0.6.25',
     date: '2026-11-16',
     title: 'El QR del celu remoto',
