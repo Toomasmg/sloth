@@ -4,7 +4,7 @@
  * módulo de node-pty se inyecta (el daemon lo carga por ruta absoluta).
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
-import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import type * as NodePty from 'node-pty'
 import type { PtyChunk, PtyStartResult } from '../shared/types'
 import {
@@ -15,6 +15,7 @@ import {
   type SpawnSpec
 } from '../shared/daemon-protocol'
 import { closeSerially, type CloseLimits } from './shutdown'
+import { hookTokenDe, mismaPrueba, NONCE_RE } from './auth'
 
 export type PtyModule = typeof NodePty
 
@@ -64,11 +65,6 @@ interface Waiting {
 }
 
 type Log = (msg: string) => void
-
-function tokenOk(given: unknown, expected: string): boolean {
-  if (typeof given !== 'string' || given.length !== expected.length) return false
-  return timingSafeEqual(Buffer.from(given), Buffer.from(expected))
-}
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -280,7 +276,8 @@ export class TerminalCore {
       res.writeHead(404).end()
       return
     }
-    if (!tokenOk(req.headers['x-sloth-token'], this.hookToken)) {
+    const token = req.headers['x-sloth-token']
+    if (typeof token !== 'string' || !NONCE_RE.test(token)) {
       res.writeHead(403).end()
       return
     }
@@ -306,6 +303,11 @@ export class TerminalCore {
         body = JSON.parse(Buffer.concat(parts).toString('utf8'))
       } catch {
         res.writeHead(400).end()
+        return
+      }
+      const ws = isPlainObject(body) && typeof body.ws === 'string' ? body.ws : ''
+      if (!ws || !mismaPrueba(token, hookTokenDe(this.hookToken, ws))) {
+        res.writeHead(403).end()
         return
       }
       if (route === '/hook') this.onHook(body, res)

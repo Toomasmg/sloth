@@ -65,7 +65,7 @@ export interface CelularVista {
   /** http://<ip>:<puerto>/?t=<token>, o null si no hay IP o está apagado. */
   enlace: string | null
   aprobar: boolean
-  ntfy: { encendido: boolean; tema: string }
+  ntfy: { encendido: boolean; tema: string; servidor: string; conToken: boolean; temaRenovado?: boolean }
   error: string | null
   /** La IP cambió desde que se abrió el servidor: el QR viejo ya no sirve. */
   ipCambio: boolean

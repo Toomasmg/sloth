@@ -278,3 +278,13 @@ test('un conector en solo lectura no ofrece acciones y sus escrituras siguen neg
   assert.deepEqual(info(asana, 'asana').acciones, accionesSoportadas(asana))
   assert.ok(negadas(asana as ConectorMcp).includes(nombreCompleto(asana as ConectorMcp, 'add_comment')))
 })
+
+test('los MCP ajenos van a --disallowedTools en la lista, el detalle y las acciones', () => {
+  const ajenos = ['mcp__claude_ai_Slack', 'mcp__mi_server']
+  const negadasDe = (args: string[]): string[] => args[args.indexOf('--disallowedTools') + 1].split(',')
+  const accion = accionesSoportadas(GRUV)[0]
+  for (const args of [buildListaArgs(GRUV, 'haiku', ajenos), buildDetalleArgs(GRUV, 'haiku', ajenos), buildAccionArgs(GRUV, 'haiku', accion, ajenos)]) {
+    for (const a of ajenos) assert.ok(negadasDe(args).includes(a), a)
+  }
+  assert.ok(!negadasDe(buildListaArgs(GRUV, 'haiku')).includes('mcp__claude_ai_Slack'))
+})

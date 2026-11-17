@@ -237,6 +237,11 @@ function ListBody({ snap, onModal, ui }: { snap: ChatSnapshot; onModal(k: Modal)
         <p role="status">
           <CircleNotch size={14} className="f-chat-spin" aria-hidden="true" /> Esperando el navegador…
         </p>
+        {a.aviso && (
+          <p className="f-chat-err" role="alert">
+            {a.aviso}
+          </p>
+        )}
         <button type="button" className="btn sm ghost" onClick={() => run(ui, 'feat:chat:cancelSignIn')}>
           Cancelar
         </button>

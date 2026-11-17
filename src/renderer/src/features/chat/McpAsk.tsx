@@ -105,6 +105,12 @@ export function McpAsk(): React.JSX.Element | null {
             </pre>
           </>
         )}
+        {ask.sinSiempre !== undefined && (
+          <p className="f-chat-mcpask-note">
+            Esta cuenta corre con {ask.sinSiempre === 'bypassPermissions' ? 'permisos salteados' : 'ediciones aceptadas solas'}: lo que lea Claude del chat podría llevarlo a
+            ejecutar cosas sin preguntarte. Por eso cada lectura se confirma.
+          </p>
+        )}
         <p className="f-chat-mcpask-note" role="timer" aria-live="off">
           Se deniega solo en {secs} s{lista.length > 1 ? ` · +${lista.length - 1} más esperando` : ''}
         </p>
@@ -118,9 +124,11 @@ export function McpAsk(): React.JSX.Element | null {
               <Button variant="ghost" onClick={() => answer('once')}>
                 Permitir una vez
               </Button>
-              <Button variant="secondary" onClick={() => answer('always')}>
-                Siempre desde esta cuenta
-              </Button>
+              {ask.sinSiempre === undefined && (
+                <Button variant="secondary" onClick={() => answer('always')}>
+                  Siempre desde esta cuenta
+                </Button>
+              )}
             </>
           )}
           <Button variant="primary" ref={denyRef} onClick={() => answer('deny')}>

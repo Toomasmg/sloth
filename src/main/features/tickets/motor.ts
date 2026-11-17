@@ -247,7 +247,7 @@ export function info(def: ConectorDef | undefined, idPedido: string, soloLectura
   }
 }
 
-export function buildArgs(model: string, o: { allow: string[]; deny: string[]; schema: unknown }): string[] {
+export function buildArgs(model: string, o: { allow: string[]; deny: string[]; schema: unknown; extraDeny?: readonly string[] }): string[] {
   return [
     '-p',
     '--output-format',
@@ -260,13 +260,13 @@ export function buildArgs(model: string, o: { allow: string[]; deny: string[]; s
     '--allowedTools',
     o.allow.join(','),
     '--disallowedTools',
-    o.deny.join(','),
+    [...o.deny, ...(o.extraDeny ?? [])].join(','),
     '--no-session-persistence',
     '--disable-slash-commands',
     // Si la cuenta tiene bypassPermissions o acceptEdits, un texto de un ticket podría usar herramientas sin preguntar.
-    // Las reglas permissions.allow del settings.json de la cuenta siguen sumándose a --allowedTools. No se cortan con
+    // Las reglas permissions.allow del settings.json de la cuenta siguen sumándose a --allowedTools, y no se cortan con
     // --setting-sources project,local porque ese flag también esconde los MCP de alcance usuario (.claude.json), que
-    // es donde están los conectores que no son de claude.ai (Azure DevOps, propios sobre un MCP local).
+    // es donde están los conectores que no son de claude.ai. Por eso los MCP ajenos al conector van en --disallowedTools.
     '--permission-mode',
     'default',
     // Sin hooks: los de Sloth esperan un espacio y el de permisos bloquearía la consulta.
@@ -333,8 +333,8 @@ export function permisosPorConsulta(def: ConectorMcp): PermisosConsulta {
 
 const completos = (def: ConectorMcp, xs: readonly string[]): string[] => xs.map((t) => nombreCompleto(def, t))
 
-export const buildListaArgs = (def: ConectorMcp, model: string): string[] =>
-  buildArgs(model, { allow: completos(def, permisosPorConsulta(def).lista), deny: negadas(def), schema: OUTPUT_SCHEMA })
+export const buildListaArgs = (def: ConectorMcp, model: string, ajenos: readonly string[] = []): string[] =>
+  buildArgs(model, { allow: completos(def, permisosPorConsulta(def).lista), deny: negadas(def), schema: OUTPUT_SCHEMA, extraDeny: ajenos })
 
 export function buildDetallePrompt(def: ConectorMcp, id: string): string {
   const n = def.nombre
@@ -358,8 +358,8 @@ export function buildDetallePrompt(def: ConectorMcp, id: string): string {
   ].join('\n')
 }
 
-export const buildDetalleArgs = (def: ConectorMcp, model: string): string[] =>
-  buildArgs(model, { allow: completos(def, permisosPorConsulta(def).detalle), deny: negadas(def), schema: DETAIL_SCHEMA })
+export const buildDetalleArgs = (def: ConectorMcp, model: string, ajenos: readonly string[] = []): string[] =>
+  buildArgs(model, { allow: completos(def, permisosPorConsulta(def).detalle), deny: negadas(def), schema: DETAIL_SCHEMA, extraDeny: ajenos })
 
 const NOTA_HORAS = 'En dato.minutos_total poné el total del reloj del ticket que devuelve la herramienta, en minutos enteros; si no lo trae, null.'
 
@@ -396,12 +396,13 @@ export function buildAccionPrompt(def: ConectorMcp, a: Accion, i: AccionInput): 
   ].join('\n')
 }
 
-export function buildAccionArgs(def: ConectorMcp, model: string, a: Accion): string[] {
+export function buildAccionArgs(def: ConectorMcp, model: string, a: Accion, ajenos: readonly string[] = []): string[] {
   const tool = nombreCompleto(def, herramientaDe(def, a))
   return buildArgs(model, {
     allow: completos(def, permisosPorConsulta(def).acciones[a] ?? []),
     deny: negadas(def).filter((t) => t !== tool),
-    schema: ACCION_SCHEMA
+    schema: ACCION_SCHEMA,
+    extraDeny: ajenos
   })
 }
 

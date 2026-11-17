@@ -91,6 +91,7 @@ import {
   usaComandoTicket,
   type ResultadoLista
 } from './motor'
+import { mcpAjenos } from './mcp-ajenos'
 
 /**
  * Tickets del conector elegido. Los de vía mcp son conectores de claude.ai, así que todo se pide a
@@ -539,6 +540,19 @@ interface Ejecucion {
   sinClaudeAi?: boolean
 }
 
+function leerJsonSuave(file: string): unknown {
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'))
+  } catch {
+    return {}
+  }
+}
+
+function ajenosDe(run: Ejecucion, def: ConectorMcp): string[] {
+  const dir = run.env.CLAUDE_CONFIG_DIR
+  return mcpAjenos(leerJsonSuave(join(dir, 'settings.json')), leerJsonSuave(join(dir, '.claude.json')), def.herramientas.prefijo)
+}
+
 /** Con `mcp`, si la cuenta lo usa con un servidor que no es de claude.ai, la sesión no conecta los de claude.ai. */
 function ejecucion(nombre: string, accountId: string, mcp?: ConectorMcp): Ejecucion {
   const acc = ctx.store.account(accountId)
@@ -660,7 +674,7 @@ async function refresh(rawAccount: unknown): Promise<{ count: number; tokens?: n
     const r = await runClaude({
       exe: run.exe,
       // --verbose trae el system/init: de ahí sale qué servidores tenía la sesión de verdad.
-      args: [...buildListaArgs(d, state.config.model), '--verbose'],
+      args: [...buildListaArgs(d, state.config.model, ajenosDe(run, d)), '--verbose'],
       prompt: buildPrompt(d, state.config.assigneeId),
       cwd: run.cwd,
       env: run.env,
@@ -823,7 +837,7 @@ async function detalle(rawId: unknown, rawFresco?: unknown): Promise<Detalle> {
   try {
     const d = await runClaude({
       exe: c.exe,
-      args: buildDetalleArgs(dc, state.config.model),
+      args: buildDetalleArgs(dc, state.config.model, ajenosDe(c, dc)),
       prompt: buildDetallePrompt(dc, id),
       cwd: c.cwd,
       env: c.env,
@@ -870,7 +884,7 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
     else if (c && dc) {
       const r = await runClaude({
         exe: c.exe,
-        args: buildAccionArgs(dc, state.config.model, a),
+        args: buildAccionArgs(dc, state.config.model, a, ajenosDe(c, dc)),
         prompt: buildAccionPrompt(dc, a, input),
         cwd: c.cwd,
         env: c.env,

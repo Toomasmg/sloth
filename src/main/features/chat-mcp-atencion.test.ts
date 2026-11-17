@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ChatConvRef } from '../../shared/chat'
-import type { ChatMcpAsk } from '../../shared/chat-mcp'
+import type { ChatMcpAsk, ModoRiesgoso } from '../../shared/chat-mcp'
 import { APAGADO, crearAtencion, CUENTA_NO, NO_AUTORIZADO, NO_PERMITIDO, type AtencionDeps, type MsgLeido } from './chat-mcp-atencion'
 import { hashToken, MCP_LIMITS, type McpConfig } from './chat-mcp-core'
 
@@ -14,6 +14,7 @@ function armar(over: Partial<McpConfig> = {}): {
   asks: ChatMcpAsk[][]
   enviados: string[]
   grants: string[]
+  modo: ModoRiesgoso | null
   deps: AtencionDeps
   at: ReturnType<typeof crearAtencion>
 } {
@@ -21,7 +22,8 @@ function armar(over: Partial<McpConfig> = {}): {
     cfg: { enabled: true, cuentas: ['A', 'B'], grants: [], tokens: { A: hashToken(TOK_A), B: hashToken(TOK_B) }, ...over } as McpConfig,
     asks: [] as ChatMcpAsk[][],
     enviados: [] as string[],
-    grants: [] as string[]
+    grants: [] as string[],
+    modo: null as ModoRiesgoso | null
   }
   let n = 0
   const deps: AtencionDeps = {
@@ -39,6 +41,7 @@ function armar(over: Partial<McpConfig> = {}): {
       s.grants.push(`${cuenta}|${conv.kind}:${conv.id}`)
       s.cfg = { ...s.cfg, grants: [...s.cfg.grants, { accountId: cuenta, conv, nombre: 'x', at: 0 }] }
     },
+    modoRiesgoso: () => s.modo,
     pedidosCambiaron: (l) => s.asks.push(l),
     avisar: () => undefined,
     now: () => 1000,
@@ -172,4 +175,37 @@ test('listar cuenta para el tope de lecturas', async () => {
   for (let i = 0; i < MCP_LIMITS.leerPorMinuto; i++) assert.equal((await s.at.atenderLinea(linea(TOK_A, { op: 'listar' }))).ok, true)
   assert.equal((await s.at.atenderLinea(linea(TOK_A, { op: 'listar' }))).ok, false)
   assert.equal((await s.at.atenderLinea(linea(TOK_B, { op: 'listar' }))).ok, true)
+})
+
+test('con la cuenta en bypass, un «siempre» guardado igual pregunta y marca sinSiempre', async () => {
+  const s = armar({ grants: [{ accountId: 'A', conv: { kind: 'team', id: T1 }, nombre: 'x', at: 0 }] })
+  s.modo = 'bypassPermissions'
+  const p = s.at.atenderLinea(linea(TOK_A, leer))
+  const [ask] = ultimo(s)
+  assert.equal(ask.sinSiempre, 'bypassPermissions')
+  s.at.responder(ask.id, 'once')
+  assert.equal((await p).ok, true)
+})
+
+test('con la cuenta en bypass, responder «siempre» tira error y el pedido sigue', async () => {
+  const s = armar()
+  s.modo = 'acceptEdits'
+  const p = s.at.atenderLinea(linea(TOK_A, leer))
+  const [ask] = ultimo(s)
+  assert.throws(() => s.at.responder(ask.id, 'always'), /no hay «siempre»/)
+  assert.equal(s.at.pendientes().length, 1)
+  assert.deepEqual(s.grants, [])
+  s.at.responder(ask.id, 'deny')
+  assert.equal((await p).ok, false)
+})
+
+test('sin modo riesgoso un grant guardado no pregunta y el pedido no trae sinSiempre', async () => {
+  const s = armar({ grants: [{ accountId: 'A', conv: { kind: 'team', id: T1 }, nombre: 'x', at: 0 }] })
+  assert.equal((await s.at.atenderLinea(linea(TOK_A, leer))).ok, true)
+  assert.equal(s.asks.length, 0)
+  const s2 = armar()
+  const p = s2.at.atenderLinea(linea(TOK_A, leer))
+  assert.equal(ultimo(s2)[0].sinSiempre, undefined)
+  s2.at.responder(ultimo(s2)[0].id, 'once')
+  await p
 })

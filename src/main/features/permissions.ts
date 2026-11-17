@@ -15,6 +15,7 @@ import {
   findRule,
   kindOf,
   labelOf,
+  permitirDesdeAviso,
   ruleFor,
   shouldNotify,
   type PermissionChoice,
@@ -156,20 +157,19 @@ const feature: Feature = {
       const win = ctx.window()
       if (!currentSettings().notify.perm) return
       if (!shouldNotify({ dnd: isDnd(), windowFocused: !!win && !win.isDestroyed() && win.isFocused(), focusedSpace, wsId: ws.id })) return
+      const kind = kindOf(req.tool)
+      const conPermitir = permitirDesdeAviso(kind, req.input)
       const n = new Notification({
         title: `${ws.name} pide permiso`,
-        body: labelOf(kindOf(req.tool), req.tool, req.input),
-        actions: [
-          { type: 'button', text: 'Permitir' },
-          { type: 'button', text: 'Ver' }
-        ]
+        body: labelOf(kind, req.tool, req.input),
+        actions: conPermitir ? [{ type: 'button', text: 'Permitir' }, { type: 'button', text: 'Ver' }] : [{ type: 'button', text: 'Ver' }]
       })
       n.on('click', () => showWindow(ws.id))
       n.on('failed', (_e, error) => ctx.log('notificaciones: falló el aviso de permiso:', error))
       // Electron manda el índice en el evento (actionIndex); el segundo argumento es el formato viejo.
       n.on('action', (event: { actionIndex?: number }, legacyIndex?: number) => {
         const index = event.actionIndex ?? legacyIndex
-        if (index === 0) {
+        if (conPermitir && index === 0) {
           const b = ctx.terminal()
           try {
             if (b) answer(b, req.id, 'allow')

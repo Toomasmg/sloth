@@ -212,7 +212,7 @@ export interface ChatTeamInput {
 export type ChatAuth =
   | { status: 'unconfigured' }
   | { status: 'signedOut' }
-  | { status: 'signingIn'; startedAt: number }
+  | { status: 'signingIn'; startedAt: number; aviso?: string }
   | { status: 'signedIn'; me: ChatProfile }
   | { status: 'error'; message: string }
 

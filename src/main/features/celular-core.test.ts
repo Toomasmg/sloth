@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { AccountUsage, AgentStatus } from '../../shared/types'
-import { aMs, armarEstado, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, temaValido, textoAviso, tokenIgual, type Entrada } from './celular-core'
+import { aMs, armarEstado, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, temaValido, textoAviso, tokenIgual, tokenNtfyTras, tokenNtfyValido, type Entrada } from './celular-core'
 
 const v4 = (address: string, internal = false) => ({ address, family: 'IPv4', internal })
 
@@ -34,10 +34,39 @@ test('puerto y tema se validan', () => {
   assert.equal(puertoValido(80), false)
   assert.equal(puertoValido(70000), false)
   assert.equal(puertoValido(4732.5), false)
-  assert.equal(temaValido('sloth-1a2b3c'), true)
+  assert.equal(temaValido('sloth-' + 'a'.repeat(14)), true)
   assert.equal(temaValido('con espacio'), false)
   assert.equal(temaValido('a/b/c/d/e'), false)
   assert.equal(temaValido('ab'), false)
+})
+
+test('temaValido: 19 caracteres no, 20 sí, 65 no', () => {
+  assert.equal(temaValido('a'.repeat(19)), false)
+  assert.equal(temaValido('a'.repeat(20)), true)
+  assert.equal(temaValido('a'.repeat(65)), false)
+})
+
+test('servidorNtfy: https sin credenciales, query ni hash; vacío es ntfy.sh', () => {
+  assert.equal(servidorNtfy(undefined), 'https://ntfy.sh/')
+  assert.equal(servidorNtfy(''), 'https://ntfy.sh/')
+  assert.equal(servidorNtfy('https://ntfy.ejemplo.com'), 'https://ntfy.ejemplo.com/')
+  assert.equal(servidorNtfy('https://ntfy.ejemplo.com/sub'), 'https://ntfy.ejemplo.com/sub/')
+  assert.equal(servidorNtfy('http://ntfy.ejemplo.com/'), null)
+  assert.equal(servidorNtfy('https://user@ntfy.ejemplo.com/'), null)
+  assert.equal(servidorNtfy('https://user:pass@ntfy.ejemplo.com/'), null)
+  assert.equal(servidorNtfy('https://ntfy.ejemplo.com/?x=1'), null)
+  assert.equal(servidorNtfy('https://ntfy.ejemplo.com/#x'), null)
+  assert.equal(servidorNtfy('no es una url'), null)
+  assert.equal(servidorNtfy(5), null)
+})
+
+test('tokenNtfyValido', () => {
+  assert.equal(tokenNtfyValido('tk_abc.DEF-123'), true)
+  assert.equal(tokenNtfyValido(''), false)
+  assert.equal(tokenNtfyValido('con espacio'), false)
+  assert.equal(tokenNtfyValido('a\nb'), false)
+  assert.equal(tokenNtfyValido('a'.repeat(201)), false)
+  assert.equal(tokenNtfyValido(null), false)
 })
 
 test('aMs entiende segundos, milisegundos e ISO', () => {
@@ -143,4 +172,12 @@ test('resumenPermiso no lleva el comando ni la ruta', () => {
   assert.equal(resumenPermiso('cmd'), 'Claude quiere correr un comando.')
   assert.equal(resumenPermiso('edit'), 'Claude quiere editar archivos.')
   assert.equal(resumenPermiso('otra'), 'Claude quiere usar una herramienta.')
+})
+
+test('tokenNtfyTras: cambiar de servidor sin token nuevo borra el guardado', () => {
+  const actual = { servidor: 'https://ntfy.miempresa.com/', token: 'tk_a' }
+  assert.equal(tokenNtfyTras(actual, 'https://ntfy.miempresa.com/', undefined), 'tk_a')
+  assert.equal(tokenNtfyTras(actual, 'https://ntfy.sh/', undefined), undefined)
+  assert.equal(tokenNtfyTras(actual, 'https://ntfy.sh/', 'tk_b'), 'tk_b')
+  assert.equal(tokenNtfyTras(actual, 'https://ntfy.miempresa.com/', null), undefined)
 })

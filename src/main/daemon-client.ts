@@ -9,7 +9,7 @@ import { EventEmitter } from 'node:events'
 import { connect, type Socket } from 'node:net'
 import { spawn, execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, join, sep } from 'node:path'
 import * as nodePty from 'node-pty'
 import type { PtyChunk, PtyStartResult } from '../shared/types'
@@ -18,12 +18,15 @@ import type {
   DaemonMessage,
   HelloOkMsg,
   HookEventPayload,
+  LegacyHelloMsg,
   PendingPermission,
   SessionInfo,
   SpawnSpec
 } from '../shared/daemon-protocol'
 import { TerminalCore } from '../daemon/core'
-import { DAEMON_SCRIPT_NAME, pipeNameFor, tokenFileFor } from '../daemon/paths'
+import { copiaPty, hashArchivo, hashesDe, mismosHashes } from './daemon-bin'
+import { daemonKeyFileFor, DAEMON_SCRIPT_NAME, legacyPipeNameFor, pipeNameFor, tokenFileFor } from '../daemon/paths'
+import { KEY_RE, mismaPrueba, NONCE_RE, nuevoNonce, pruebaCliente, pruebaDaemon } from '../daemon/auth'
 
 export type { HookEventPayload, PendingPermission, SessionInfo, SpawnSpec }
 
@@ -74,6 +77,7 @@ export interface CreateBackendOptions {
 
 const CONNECT_TIMEOUT_MS = 5_000
 const HELLO_TIMEOUT_MS = 3_000
+const LEGACY_HELLO_TIMEOUT_MS = 5_000
 const REQUEST_TIMEOUT_MS = 15_000
 
 // ======================= Backend en proceso =======================
@@ -153,23 +157,27 @@ class InProcessBackend extends EventEmitter implements TerminalBackend {
 
 interface Launcher {
   pipe: string
-  token: string
+  key: string
   /** Lanza el daemon (detached). Tira si no hay node o faltan archivos. */
   launch(): void
 }
 
-function ensureToken(userDataDir: string): string {
-  const file = tokenFileFor(userDataDir)
+function ensureKey(userDataDir: string): string {
+  const file = daemonKeyFileFor(userDataDir)
+  // Solo se crea una clave si no hay o si la que hay no sirve. Con otro error (antivirus, OneDrive, un bloqueo)
+  // pisarla dejaría inalcanzable al daemon vivo: este arranque queda con terminales en proceso.
   try {
-    const t = readFileSync(file, 'utf8').trim()
-    if (/^[0-9a-f]{64}$/i.test(t)) return t
-  } catch {
-    /* no existe: se crea */
+    const k = readFileSync(file, 'utf8').trim()
+    if (KEY_RE.test(k)) return k
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw new Error(`no se pudo leer la clave del daemon: ${(e as Error).message}`)
   }
   mkdirSync(userDataDir, { recursive: true })
-  const t = randomBytes(32).toString('hex')
-  writeFileSync(file, t, { encoding: 'utf8', mode: 0o600 })
-  return t
+  const k = randomBytes(32).toString('hex')
+  const tmp = `${file}.${process.pid}.tmp`
+  writeFileSync(tmp, k, { encoding: 'utf8', mode: 0o600 })
+  renameSync(tmp, file)
+  return k
 }
 
 function findNode(override?: string): string {
@@ -208,22 +216,24 @@ function runtimeFiles(opts: CreateBackendOptions): { script: string; ptyDir: str
     const dest = join(binRoot, safeVersion)
     const script = join(dest, DAEMON_SCRIPT_NAME)
     const ptyDir = join(dest, 'node_modules', 'node-pty')
-    if (!existsSync(join(dest, '.ok'))) {
+    const keepPrebuild = `${process.platform}-${process.arch}`
+    // Cualquier proceso del usuario puede tocar la copia: se verifica en cada lanzamiento, que solo
+    // ocurre cuando no hay daemon corriendo y los archivos no están en uso.
+    const esperados = new Map([[DAEMON_SCRIPT_NAME, hashArchivo(packagedScript)]])
+    for (const [k, v] of hashesDe(srcPty, (rel, name) => copiaPty(rel, name, keepPrebuild))) esperados.set(`node_modules/node-pty/${k}`, v)
+    const motivo = !existsSync(join(dest, '.ok'))
+      ? 'no estaba copiado'
+      : mismosHashes(esperados, hashesDe(dest, (rel) => rel.join('/') !== '.ok'))
+        ? ''
+        : 'la copia no coincide con la instalada'
+    if (motivo) {
+      opts.log?.(`[daemon] se copia el daemon a daemon-bin: ${motivo}`)
       rmSync(dest, { recursive: true, force: true })
       mkdirSync(dest, { recursive: true })
       cpSync(packagedScript, script)
-      const skipDirs = new Set(['src', 'deps', 'third_party', 'scripts', 'typings', 'node-addon-api'])
-      const keepPrebuild = `${process.platform}-${process.arch}`
       cpSync(srcPty, ptyDir, {
         recursive: true,
-        filter: (src) => {
-          const rel = src.slice(srcPty.length).split(sep).filter(Boolean)
-          if (rel.length === 0) return true
-          if (rel.length === 1 && skipDirs.has(rel[0])) return false
-          if (rel[0] === 'prebuilds' && rel.length >= 2 && rel[1] !== keepPrebuild) return false
-          const name = basename(src)
-          return !/\.(pdb|map)$/i.test(name) && !/\.test\.js$/i.test(name)
-        }
+        filter: (src) => copiaPty(src.slice(srcPty.length).split(sep).filter(Boolean), basename(src), keepPrebuild)
       })
       writeFileSync(join(dest, '.ok'), opts.appVersion)
     }
@@ -247,10 +257,10 @@ function runtimeFiles(opts: CreateBackendOptions): { script: string; ptyDir: str
 }
 
 function makeLauncher(opts: CreateBackendOptions): Launcher {
-  const token = ensureToken(opts.userDataDir)
+  const key = ensureKey(opts.userDataDir)
   return {
     pipe: pipeNameFor(opts.userDataDir),
-    token,
+    key,
     launch() {
       const nodePath = findNode(opts.nodePath)
       const { script, ptyDir } = runtimeFiles(opts)
@@ -325,22 +335,45 @@ interface Conn {
   setHandler(fn: (m: DaemonMessage) => void): void
 }
 
-function handshake(sock: Socket, token: string, clientVersion: string): Promise<Conn> {
+function sendLine(sock: Socket, msg: ClientMessage | LegacyHelloMsg): void {
+  sock.write(JSON.stringify(msg) + '\n')
+}
+
+/**
+ * Saludo mutuo: el daemon prueba primero que conoce la clave. Hasta verificarlo no se manda nada
+ * que dependa de ella, así otro proceso que ocupe el pipe no se lleva ni la prueba ni lo que se tipea.
+ */
+function handshake(sock: Socket, key: string, clientVersion: string): Promise<Conn> {
   return new Promise((resolve, reject) => {
     let handler: ((m: DaemonMessage) => void) | null = null
     const queue: DaemonMessage[] = []
     let hello: HelloOkMsg | null = null
+    const nc = nuevoNonce()
+    let nd: string | null = null
     const timer = setTimeout(() => {
       sock.destroy()
       reject(new Error('El daemon no respondió el saludo.'))
     }, HELLO_TIMEOUT_MS)
     const onClose = (): void => {
       clearTimeout(timer)
-      reject(new Error('El daemon rechazó la conexión (¿token distinto?).'))
+      reject(new Error('El daemon rechazó la conexión (¿clave distinta?).'))
     }
     sock.once('close', onClose)
     sock.on('error', () => {})
     lineReader(sock, (m) => {
+      if (!nd) {
+        if (m.t !== 'challenge-ok') return
+        if (typeof m.nonce !== 'string' || !NONCE_RE.test(m.nonce) || !mismaPrueba(m.proof, pruebaDaemon(key, nc, m.nonce))) {
+          clearTimeout(timer)
+          sock.off('close', onClose)
+          sock.destroy()
+          reject(Object.assign(new Error('El pipe del daemon lo tiene otro proceso que no es Sloth.'), { code: 'EIMPOSTOR' }))
+          return
+        }
+        nd = m.nonce
+        sendLine(sock, { t: 'hello', proof: pruebaCliente(key, nc, nd), clientVersion })
+        return
+      }
       if (!hello) {
         if (m.t !== 'hello-ok') return
         hello = m
@@ -359,8 +392,7 @@ function handshake(sock: Socket, token: string, clientVersion: string): Promise<
       if (handler) handler(m)
       else queue.push(m)
     })
-    const msg: ClientMessage = { t: 'hello', token, clientVersion }
-    sock.write(JSON.stringify(msg) + '\n')
+    sendLine(sock, { t: 'challenge', nonce: nc })
   })
 }
 
@@ -369,7 +401,7 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 /** Conecta y saluda; si no hay daemon (y se permite) lo lanza y reintenta hasta ~5 s. */
 async function connectOrLaunch(l: Launcher, appVersion: string, allowLaunch: boolean): Promise<Conn> {
   try {
-    return await handshake(await connectPipe(l.pipe), l.token, appVersion)
+    return await handshake(await connectPipe(l.pipe), l.key, appVersion)
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code
     if (code !== 'ENOENT' && code !== 'ECONNREFUSED') throw e
@@ -381,7 +413,7 @@ async function connectOrLaunch(l: Launcher, appVersion: string, allowLaunch: boo
   while (Date.now() < deadline) {
     await sleep(150)
     try {
-      return await handshake(await connectPipe(l.pipe), l.token, appVersion)
+      return await handshake(await connectPipe(l.pipe), l.key, appVersion)
     } catch (e) {
       last = e
       const code = (e as NodeJS.ErrnoException).code
@@ -391,16 +423,76 @@ async function connectOrLaunch(l: Launcher, appVersion: string, allowLaunch: boo
   throw new Error(`El daemon no levantó en ${CONNECT_TIMEOUT_MS / 1000} s (${(last as Error)?.message ?? '?'}).`)
 }
 
-async function waitPipeGone(pipe: string, ms: number): Promise<void> {
+async function waitPipeGone(pipe: string, ms: number): Promise<boolean> {
   const deadline = Date.now() + ms
   while (Date.now() < deadline) {
     try {
       const s = await connectPipe(pipe)
       s.destroy()
     } catch {
-      return
+      return true
     }
     await sleep(100)
+  }
+  return false
+}
+
+function apagarDaemonV1(sock: Socket, token: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      sock.destroy()
+      reject(new Error('no respondió el saludo'))
+    }, LEGACY_HELLO_TIMEOUT_MS)
+    sock.once('close', () => {
+      clearTimeout(timer)
+      reject(new Error('cortó la conexión'))
+    })
+    sock.on('error', () => {})
+    lineReader(sock, (m) => {
+      if (m.t !== 'hello-ok') return
+      clearTimeout(timer)
+      sendLine(sock, { t: 'shutdown', rid: 1 })
+      sock.end()
+      resolve()
+    })
+    sendLine(sock, { t: 'hello', token, clientVersion: 'retiro' })
+  })
+}
+
+/**
+ * Un daemon del protocolo 1 no se sigue usando aunque tenga terminales vivas: ese saludo no
+ * autentica al daemon. Se lo apaga y el token viejo se borra para que no le sirva a nadie. Si no se
+ * le pudo pedir que se apague, el token queda para reintentar en el próximo arranque: sin él nadie
+ * podría apagarlo, y con terminales vivas no se apaga solo.
+ */
+async function retirarDaemonV1(userDataDir: string, log: (m: string) => void): Promise<void> {
+  const tokenFile = tokenFileFor(userDataDir)
+  if (!existsSync(tokenFile)) return
+  try {
+    const token = readFileSync(tokenFile, 'utf8').trim()
+    if (KEY_RE.test(token)) {
+      const pipe = legacyPipeNameFor(userDataDir)
+      let sock: Socket | undefined
+      try {
+        sock = await connectPipe(pipe)
+      } catch (e) {
+        const code = (e as NodeJS.ErrnoException).code
+        if (code !== 'ENOENT' && code !== 'ECONNREFUSED') throw e
+      }
+      if (sock) {
+        await apagarDaemonV1(sock, token)
+        const apagado = await waitPipeGone(pipe, 3000)
+        log(apagado ? '[daemon] se apagó el daemon del protocolo 1' : '[daemon] se le pidió al daemon del protocolo 1 que se apague; todavía no cerró')
+      }
+    }
+  } catch (e) {
+    log(`[daemon] no se pudo apagar el daemon del protocolo 1 (se reintenta en el próximo arranque): ${(e as Error)?.message ?? String(e)}`)
+    return
+  }
+  try {
+    rmSync(tokenFile, { force: true })
+  } catch (e) {
+    log(`[daemon] no se pudo borrar daemon-token: ${(e as Error)?.message ?? String(e)}`)
   }
 }
 
@@ -615,6 +707,7 @@ export async function createTerminalBackend(opts: CreateBackendOptions): Promise
   if (opts.forceInProcess || process.env.SLOTH_INPROCESS === '1') return inProcess('forzado por configuración')
 
   try {
+    await retirarDaemonV1(opts.userDataDir, log)
     const launcher = makeLauncher(opts)
     let c = await connectOrLaunch(launcher, opts.appVersion, true)
     if (c.hello.version !== opts.appVersion) {
