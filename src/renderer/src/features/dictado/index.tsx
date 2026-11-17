@@ -24,7 +24,9 @@ function BotonDictado({ paneId }: { paneId: string }): React.JSX.Element | null 
         <span className="dictado-estado" data-estado={estado} role="status" title={progreso === undefined ? undefined : 'Se baja una sola vez; después el dictado anda sin conexión.'}>
           <span className="dictado-dot" aria-hidden="true" />
           <span className="dictado-estado-texto">
-            {estado === 'escuchando' ? 'Escuchando…' : progreso === undefined ? 'Transcribiendo…' : `Bajando el modelo… ${progreso} %`}
+            {estado === 'escuchando' ? 'Escuchando…' : progreso === undefined ? 'Transcribiendo…' : 'Bajando el modelo…'}
+            {/* El porcentaje cambia unas 4 veces por segundo: fuera de lo que lee el lector de pantalla. */}
+            {estado === 'transcribiendo' && progreso !== undefined && <span aria-hidden="true"> {progreso} %</span>}
           </span>
         </span>
       )}
