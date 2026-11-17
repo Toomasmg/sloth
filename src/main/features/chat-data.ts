@@ -714,13 +714,9 @@ export function registerChatData(ctx: FeatureContext, core: ChatCoreHandle, onCh
   function onMemberRemoved(g: number, conv: ChatConvRef, payload: unknown): void {
     const ev = memberRemovedFromBroadcast(payload, conv.id)
     if (g !== gen || !ev) return
-    if (ev.userId === core.me()?.id) {
-      failedTopics.add(`team:${conv.id}`)
-      closeTopic(`team:${conv.id}`)
-      void refreshLists(true)
-    } else {
-      void refreshLists(false)
-    }
+    // Sin failedTopics: si te vuelven a sumar en esta sesión, el canal tiene que volver a abrirse.
+    if (ev.userId === core.me()?.id) closeTopic(`team:${conv.id}`)
+    void refreshLists(true)
   }
 
   function closeTopic(topic: string): void {
