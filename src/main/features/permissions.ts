@@ -1,4 +1,5 @@
 import { app, Notification, type BrowserWindow } from 'electron'
+import { lstatSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
@@ -20,6 +21,7 @@ import {
   type PermissionKind,
   type PermissionRule
 } from './permissions-core'
+import { dentroDelRepoReal, type PathFs } from './permissions-paths'
 
 /**
  * Función «permissions» (lado main): pedidos de permiso de Claude, reglas «Permitir siempre» por
@@ -46,6 +48,7 @@ interface State {
   history: DecisionEntry[]
 }
 
+const DISCO: PathFs = { real: (p) => realpathSync.native(p), lstat: (p) => lstatSync(p) }
 const MAX_HISTORY = 300
 const MAX_RULES = 200
 const MAX_MESSAGE = 1000
@@ -196,7 +199,7 @@ const feature: Feature = {
     function onRequest(b: TerminalBackend, req: PendingPermission): void {
       const ws = ctx.store.workspace(req.ws)
       if (!ws) return
-      const rule = findRule(state.rules, req, ws.cwd)
+      const rule = findRule(state.rules, req, ws.cwd, (f, cwd) => dentroDelRepoReal(f, cwd, DISCO))
       if (rule) {
         try {
           b.answerPermission(req.id, decisionFor('allow'))
