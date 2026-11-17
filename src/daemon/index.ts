@@ -10,9 +10,9 @@
 import { createServer, type Socket } from 'node:net'
 import { appendFileSync, existsSync, readFileSync, renameSync, statSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { timingSafeEqual } from 'node:crypto'
 import { TerminalCore, type PtyModule } from './core'
-import { logFileFor, pipeNameFor, tokenFileFor } from './paths'
+import { daemonKeyFileFor, logFileFor, pipeNameFor } from './paths'
+import { KEY_RE, mismaPrueba, NONCE_RE, nuevoNonce, pruebaCliente, pruebaDaemon } from './auth'
 import { DAEMON_PROTOCOL_VERSION, type ClientMessage, type DaemonMessage } from '../shared/daemon-protocol'
 
 declare const __SLOTH_DAEMON_VERSION__: string | undefined
@@ -59,13 +59,13 @@ process.on('unhandledRejection', (e) => log(`unhandledRejection ${String(e)}`))
 
 if (!userData || !ptyPath) fail('faltan --user-data o --node-pty')
 
-let token: string
+let key: string
 try {
-  token = readFileSync(tokenFileFor(userData), 'utf8').trim()
+  key = readFileSync(daemonKeyFileFor(userData), 'utf8').trim()
 } catch {
-  fail('no se pudo leer daemon-token')
+  fail('no se pudo leer daemon-key')
 }
-if (!/^[0-9a-f]{64}$/i.test(token)) fail('daemon-token inválido')
+if (!KEY_RE.test(key)) fail('daemon-key inválida')
 
 let pty: PtyModule
 try {
@@ -78,6 +78,8 @@ interface Client {
   sock: Socket
   authed: boolean
   version?: string
+  nonce?: string
+  nonceDaemon?: string
 }
 const clients = new Set<Client>()
 const authedCount = (): number => {
@@ -163,12 +165,14 @@ function reply(c: Client, rid: number, fn: () => unknown): void {
 
 function handle(c: Client, msg: ClientMessage): void {
   if (!c.authed) {
-    if (msg.t !== 'hello' || typeof msg.token !== 'string' || msg.token.length !== token.length) {
-      c.sock.destroy()
+    if (msg.t === 'challenge' && !c.nonce && typeof msg.nonce === 'string' && NONCE_RE.test(msg.nonce)) {
+      c.nonce = msg.nonce
+      c.nonceDaemon = nuevoNonce()
+      send(c, { t: 'challenge-ok', nonce: c.nonceDaemon, proof: pruebaDaemon(key, c.nonce, c.nonceDaemon) })
       return
     }
-    if (!timingSafeEqual(Buffer.from(msg.token), Buffer.from(token))) {
-      log('hello con token incorrecto')
+    if (msg.t !== 'hello' || !c.nonce || !c.nonceDaemon || !mismaPrueba(msg.proof, pruebaCliente(key, c.nonce, c.nonceDaemon))) {
+      log('saludo rechazado')
       c.sock.destroy()
       return
     }
