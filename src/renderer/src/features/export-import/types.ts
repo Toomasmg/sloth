@@ -44,6 +44,7 @@ export interface PlanSpace {
   status: SpaceStatus
   motivo?: string
   existente?: string
+  aviso?: string
 }
 
 /** Regla lista para guardar (la valida main otra vez en feat:permissions:addRules). */

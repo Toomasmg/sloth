@@ -23,6 +23,7 @@ export interface TeamStatus {
   links: TeamLink[]
   ajustes?: TeamSettings
   settingsPending: boolean
+  avisos?: string[]
 }
 export type PlanAction = 'new' | 'update' | 'same' | 'renamed'
 export interface PlanItem {

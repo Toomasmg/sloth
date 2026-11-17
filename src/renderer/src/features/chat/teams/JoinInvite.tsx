@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { CircleNotch, ClipboardText, Ticket } from '@phosphor-icons/react'
 import type { ChatInviteJoin, ChatInvitePreview } from '../../../../../shared/chat'
-import { esHostSupabase } from '../../../../../shared/chat-text'
+import { esHostSupabase, inviteConfirmation } from '../../../../../shared/chat-text'
 import { Modal } from '../../../Modal'
 import { Button, InlineAlert, Textarea } from '../../../ui'
 import { useUi } from '../../host'
@@ -47,7 +47,7 @@ export function JoinInvite(): React.JSX.Element {
     clearInviteError()
   }, [pendingErr])
 
-  const join = async (confirmed?: 'confirmNew' | 'confirmReplace', teamName?: string): Promise<void> => {
+  const join = async (confirmed?: string, teamName?: string): Promise<void> => {
     setBusy(true)
     setErr(null)
     try {
@@ -181,7 +181,7 @@ export function JoinInvite(): React.JSX.Element {
         <Button variant="ghost" onClick={() => setPhase({ kind: 'paste' })} disabled={busy}>
           Volver
         </Button>
-        <Button variant={replace ? 'danger' : 'primary'} loading={busy} data-autofocus onClick={() => void join(p.decision === 'confirmReplace' ? 'confirmReplace' : 'confirmNew', p.teamName)}>
+        <Button variant={replace ? 'danger' : 'primary'} loading={busy} data-autofocus onClick={() => void join(inviteConfirmation(p.decision === 'confirmReplace' ? 'confirmReplace' : 'confirmNew', p.host), p.teamName)}>
           {replace ? 'Reemplazar y entrar' : 'Conectar y entrar'}
         </Button>
       </>

@@ -161,8 +161,11 @@ export function ruleFor(req: PermissionRequestLike): Omit<PermissionRule, 'id' |
   return { workspaceId: req.ws, kind, tool: req.tool, match: '*', label }
 }
 
-// Carpetas del repo donde un archivo escrito termina ejecutándose solo (hooks de git, de Claude, tareas del editor).
-const CARPETAS_SENSIBLES: ReadonlySet<string> = new Set(['.git', '.claude', '.vscode', '.husky'])
+// Carpetas del repo donde un archivo escrito termina ejecutándose solo (hooks de git, de Claude, tareas del
+// editor, contenedores, CI, la config de equipo de Sloth).
+const CARPETAS_SENSIBLES: ReadonlySet<string> = new Set(['.git', '.claude', '.vscode', '.husky', '.githooks', '.idea', '.devcontainer', '.github', '.sloth'])
+// Forma de un nombre corto 8.3 («git~1», «vscode~1», «claude~1.jso»); «informe~2.docx» no.
+const NOMBRE_CORTO = /^[^.]{1,6}~\d+(\.[^.]{0,3})?$/
 
 /** Segmentos de una ruta absoluta, con «.» y «..» resueltos; null si no es absoluta o sale de la raíz. */
 function segmentos(ruta: string): string[] | null {
@@ -191,15 +194,18 @@ export function dentroDelRepo(archivo: string, cwd: string): boolean {
   const ruta = segmentos(esAbsoluta ? archivo : `${cwd}/${archivo}`)
   if (!base || !ruta || ruta.length <= base.length) return false
   if (base.some((s, i) => ruta[i] !== s)) return false
-  // «:» abre un flujo alterno de NTFS y «git~1» es el nombre corto de .git: ninguno pasa por regla.
-  return ruta.slice(base.length).every((s) => s !== '' && !CARPETAS_SENSIBLES.has(s) && !s.includes(':') && !/^git~\d/.test(s))
+  // «:» abre un flujo alterno de NTFS y un nombre corto («git~1», «vscode~1») puede ser una carpeta sensible.
+  return ruta.slice(base.length).every((s) => s !== '' && !CARPETAS_SENSIBLES.has(s) && !s.includes(':') && !NOMBRE_CORTO.test(s))
 }
+
+/** Decide si un archivo cae dentro del repo. Main pasa una que además mira el disco (permissions-paths.ts). */
+export type DentroDelRepo = (archivo: string, cwd: string) => boolean
 
 /**
  * ¿La regla cubre este pedido? Mismo espacio, mismo tipo y, según el tipo, mismo comando o dominio.
  * Las ediciones además necesitan `cwd`, la carpeta del espacio: fuera de ella vuelve a preguntar.
  */
-export function ruleMatches(rule: PermissionRule, req: PermissionRequestLike, cwd?: string): boolean {
+export function ruleMatches(rule: PermissionRule, req: PermissionRequestLike, cwd?: string, dentro: DentroDelRepo = dentroDelRepo): boolean {
   if (!rule.on || rule.workspaceId !== req.ws) return false
   const kind = kindOf(req.tool)
   if (rule.kind !== kind) return false
@@ -208,13 +214,13 @@ export function ruleMatches(rule: PermissionRule, req: PermissionRequestLike, cw
   if (kind === 'edit') {
     if (!FILE_EDIT_TOOLS.has(req.tool) || rule.match !== '*' || !cwd) return false
     const archivos = filesOf(req.tool, req.input)
-    return archivos.length > 0 && archivos.every((f) => dentroDelRepo(f, cwd))
+    return archivos.length > 0 && archivos.every((f) => dentro(f, cwd))
   }
   return rule.tool === req.tool
 }
 
-export function findRule(rules: readonly PermissionRule[], req: PermissionRequestLike, cwd?: string): PermissionRule | undefined {
-  return rules.find((r) => ruleMatches(r, req, cwd))
+export function findRule(rules: readonly PermissionRule[], req: PermissionRequestLike, cwd?: string, dentro?: DentroDelRepo): PermissionRule | undefined {
+  return rules.find((r) => ruleMatches(r, req, cwd, dentro))
 }
 
 /** Regla validada, lista para guardar (sin id, sin espacio, sin estado). */

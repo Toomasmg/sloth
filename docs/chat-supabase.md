@@ -41,7 +41,7 @@ Esto lo hace **una sola persona del equipo, una vez**. Son unos 15 minutos. Desp
 ## 4. Correr la migración, con las tablas y la seguridad
 
 1. En Supabase, andá a **SQL Editor → New query**.
-2. Copiá todo el contenido de [`supabase/migrations/0001_chat.sql`](../supabase/migrations/0001_chat.sql) de este repo, pegalo y tocá **Run**. Tiene que terminar sin errores. Después hacé lo mismo con [`supabase/migrations/0002_hardening.sql`](../supabase/migrations/0002_hardening.sql), que cierra el acceso por API a las funciones internas (responde a los avisos del Security Advisor). Por último, [`supabase/migrations/0003_realtime_broadcast.sql`](../supabase/migrations/0003_realtime_broadcast.sql): hace que los mensajes lleguen en el momento (Realtime Broadcast en canales privados). Sin ella el chat anda igual, pero cada mensaje tarda uno o dos segundos en aparecerle al otro.
+2. Copiá todo el contenido de [`supabase/migrations/0001_chat.sql`](../supabase/migrations/0001_chat.sql) de este repo, pegalo y tocá **Run**. Tiene que terminar sin errores. Después hacé lo mismo con [`supabase/migrations/0002_hardening.sql`](../supabase/migrations/0002_hardening.sql), que cierra el acceso por API a las funciones internas (responde a los avisos del Security Advisor). Por último, [`supabase/migrations/0003_realtime_broadcast.sql`](../supabase/migrations/0003_realtime_broadcast.sql): hace que los mensajes lleguen en el momento (Realtime Broadcast en canales privados). Sin ella el chat anda igual, pero cada mensaje tarda uno o dos segundos en aparecerle al otro. Si ya tenías el chat andando, corré también [`supabase/migrations/0007_expulsar.sql`](../supabase/migrations/0007_expulsar.sql) (es idempotente): hace que expulsar a alguien cambie el código de invitación en el mismo paso y cierra un agujero por el que alguien de afuera podía regenerar el código de un equipo y leerlo.
 3. Comprobá que quedó bien:
    - En **Table Editor** tienen que aparecer `profiles`, `teams`, `team_members`, `team_invite_codes`, `team_invites`, `dm_threads` y `messages`. Todas tienen que tener el candado de RLS activado.
    - En **Storage** tiene que aparecer el bucket `team-photos`, **privado**.
@@ -100,9 +100,10 @@ En **Celular → Desde cualquier red**, Sloth publica la misma vista que en el W
 - Entrar a un equipo, abrir un DM y marcar como leído pasan solo por funciones que revisan permisos; no se puede insertar directo. El código de invitación lo ven solo los owners y los admins.
 - El usuario de GitHub sale de la identidad que guarda Supabase al iniciar sesión, y el usuario no la puede editar. Por eso nadie puede hacerse pasar por `ana` para quedarse con su invitación.
 - Las fotos van en un bucket **privado**. Las ven solo los miembros del equipo y las cambian solo los owners y los admins.
+- Expulsar (migración 0007) saca a la persona, borra sus invitaciones pendientes y cambia el código en una sola transacción: la invitación vieja deja de servir y hay que reenviarla a quienes todavía no entraron.
 - El canal del celu (`celu:<uid>`, migración 0006) lo leen y escriben **solo** su dueño. Es la única política de escritura en Realtime y no abre los canales del chat: además del tópico del canal, ata la columna `topic` de la fila.
 
-La migración tiene una prueba con PGlite (Postgres en WASM), con 65 casos de acceso permitido y prohibido (los del canal del celu incluidos): `npm i --no-save @electric-sql/pglite` y después `node supabase/tests/rls.test.mjs supabase/migrations/0001_chat.sql supabase/migrations/0002_hardening.sql supabase/migrations/0003_realtime_broadcast.sql supabase/migrations/0006_celu_remoto.sql`.
+La migración tiene una prueba con PGlite (Postgres en WASM), con 81 casos de acceso permitido y prohibido (los del canal del celu y los de expulsar incluidos): `npm i --no-save @electric-sql/pglite` y después `node supabase/tests/rls.test.mjs supabase/migrations/0001_chat.sql supabase/migrations/0002_hardening.sql supabase/migrations/0003_realtime_broadcast.sql supabase/migrations/0006_celu_remoto.sql supabase/migrations/0007_expulsar.sql`.
 
 ## Costos y consumo
 
