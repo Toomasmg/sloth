@@ -28,7 +28,7 @@ export interface ChatMcpGrant {
   at: number
 }
 
-export type ChatMcpRegState = 'revisando' | 'ok' | 'pendiente' | 'conflicto' | 'sin-node' | 'sin-cli' | 'error'
+export type ChatMcpRegState = 'revisando' | 'ok' | 'pendiente' | 'conflicto' | 'sin-node' | 'sin-cli' | 'error' | 'no-soportado'
 
 export interface ChatMcpAccountReg {
   accountId: string

@@ -5,8 +5,8 @@ import { claudeWithPrompt } from './shell-args'
 
 test('proveedorDe: sin campo es claude y un valor desconocido no es ninguno', () => {
   assert.equal(proveedorDe({}), PROVEEDORES.claude)
-  assert.equal(proveedorDe({ proveedor: 'codex' }), undefined)
-  assert.throws(() => proveedorExigido({ proveedor: 'codex' }), /actualizá Sloth/)
+  assert.equal(proveedorDe({ proveedor: 'otro-agente' }), undefined)
+  assert.throws(() => proveedorExigido({ proveedor: 'otro-agente' }), /actualizá Sloth/)
 })
 
 test('claude: quitarDelEntorno', () => {

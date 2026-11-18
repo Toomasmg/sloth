@@ -121,10 +121,21 @@ const GROUPS: { key: string; label: string }[] = [
   { key: 'Terminal', label: 'Terminal' },
   { key: 'Chat', label: 'Chat' }
 ]
+/** Cuentas de Codex: texto fijo, sin datos de afuera. */
+const CODEX_PASOS: string[] = [
+  'Instalá Codex en la PC: abrí una terminal y corré «npm install -g @openai/codex». Sloth lo detecta solo; hasta entonces no aparece la opción.',
+  'Configuración › Cuentas › Agregar cuenta: elegí «Codex» en Agente, poné un nombre y tocá Agregar.',
+  'Se abre una terminal con «codex login». Iniciá sesión en el navegador, de a una cuenta por vez: el login usa el puerto 1455 y dos a la vez se pisan.',
+  'Para cerrar la sesión de una cuenta, corré «codex logout» en la terminal de esa cuenta.',
+  'Cada espacio de Codex abre una conversación nueva: Sloth todavía no retoma la anterior. El primer mensaje de una plantilla o de un espacio nuevo no siempre se manda solo con Codex: si no puede, te avisa y lo escribís a mano.',
+  'Con Codex todavía no hay: uso y límites, avisos de permisos desde el celu, tickets, chat MCP, historial, mover espacios a otra cuenta, dormir espacios ni usar tu setup de Claude. Varios de esos lugares lo dicen; en otros la función simplemente no corre con una cuenta de Codex.'
+]
+
 const SECTIONS = [
   { id: 'ay-primeros', label: 'Primeros pasos' },
   { id: 'ay-atajos', label: 'Atajos de teclado' },
   { id: 'ay-faq', label: 'Preguntas frecuentes' },
+  { id: 'ay-codex', label: 'Cuentas de Codex' },
   { id: 'ay-mas', label: 'Más ayuda' }
 ] as const
 
@@ -156,7 +167,8 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
     rows: SHORTCUTS.filter((s) => (s.group ?? 'General') === g.key).filter((s) => matchesAll(`${g.label} ${s.what} ${comboText(s)}`, words))
   })).filter((g) => g.rows.length > 0)
   const nShortcuts = groups.reduce((n, g) => n + g.rows.length, 0)
-  const total = cards.length + nShortcuts + faqs.length
+  const codexVisible = matchesAll(`Cuentas de Codex ${CODEX_PASOS.join(' ')}`, words)
+  const total = cards.length + nShortcuts + faqs.length + (codexVisible ? 1 : 0)
   const noResults = hasQ && total === 0
 
   const countLabel = !hasQ
@@ -418,6 +430,19 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
                       </div>
                     )
                   })}
+                </div>
+              </section>
+            )}
+
+            {codexVisible && (
+              <section id="ay-codex" className="ay-sec" aria-labelledby="ay-h-codex">
+                <h2 id="ay-h-codex">Cuentas de Codex</h2>
+                <div className="ay-card-box">
+                  <ol className="ay-steps">
+                    {CODEX_PASOS.map((t) => (
+                      <li key={t}>{hl(t)}</li>
+                    ))}
+                  </ol>
                 </div>
               </section>
             )}

@@ -51,7 +51,7 @@ test('el env de la terminal con CLAUDE_CONFIG_DIR es el de staging, con el mismo
 })
 
 test('una cuenta con un proveedor que no se conoce nunca arma un spawn', () => {
-  for (const proveedor of ['codex', '', 'CLAUDE', ' claude', 'claude ', '__proto__', 'toString', 42, null, {}, ['claude']]) {
+  for (const proveedor of ['otro-agente', '', 'CLAUDE', ' claude', 'claude ', '__proto__', 'toString', 42, null, {}, ['claude']]) {
     assert.throws(() => proveedorExigido({ proveedor }), /no conoce; actualizá Sloth/, String(proveedor))
   }
 })

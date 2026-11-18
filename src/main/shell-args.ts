@@ -53,6 +53,8 @@ export const PASTE_END = '\x1b[201~'
 // En cmd la ruta de claude.exe va sin comillas: node-pty escapa las comillas con \" y cmd no lo entiende.
 const CMD_PLAIN = /^[A-Za-z0-9_\-.:\\@]+$/
 const CMD_NO_CWD = 'NoDefaultCurrentDirectoryInExePath'
+// Un .cmd corre por cmd.exe: la ruta no puede traer nada que cmd lea como sintaxis.
+const CMD_SHIM_SEGURO = /^[^%&^!"<>|\r\n]+\.cmd$/i
 
 /** Contenido de un argumento entre comillas según las reglas de CommandLineToArgvW (las comillas de afuera las pone quien lo usa). */
 export function windowsArgBody(s: string): string {
@@ -91,9 +93,12 @@ export function shellLaunch(family: ShellFamily, claude?: string[], claudeExe?: 
   const split = splitPrompt(claude)
   let exe = claudeExe && /\.exe$/i.test(claudeExe) ? claudeExe : undefined
   if (family === 'cmd' && exe && !CMD_PLAIN.test(exe)) exe = undefined
-  const argv = exe && split.argv[0] === 'claude' ? [exe, ...split.argv.slice(1)] : split.argv
+  const agente = split.argv[0]
+  // En PowerShell, `codex` a secas puede resolver a codex.ps1, que la política de ejecución suele bloquear: con codex.cmd se llama por ruta.
+  const shim = family === 'ps' && agente === 'codex' && claudeExe && CMD_SHIM_SEGURO.test(claudeExe) ? claudeExe : undefined
+  const argv = exe && (agente === 'claude' || agente === 'codex') ? [exe, ...split.argv.slice(1)] : shim ? [shim, ...split.argv.slice(1)] : split.argv
   const prompt = split.prompt
-  const viaEnv = prompt !== undefined && exe !== undefined && family !== 'cmd' && !mightBeSubcommand(prompt)
+  const viaEnv = prompt !== undefined && exe !== undefined && family !== 'cmd' && !mightBeSubcommand(prompt, agente)
   const paste = prompt !== undefined && !viaEnv ? prompt : undefined
   switch (family) {
     case 'ps': {

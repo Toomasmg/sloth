@@ -7,6 +7,7 @@ import { encryptText, WRONG_PASSWORD } from './export-crypto'
 import {
   buildPlan,
   cuentaExportada,
+  shareSetupAlImportar,
   exportRules,
   exportSpaces,
   exportTemplates,
@@ -493,4 +494,19 @@ test('lo exportado lleva solo el nombre del perfil: ni ids, ni usuario de GitHub
   const fuente = readFileSync(join(import.meta.dirname, 'export-import.ts'), 'utf8')
   assert.equal(/ghLogin/.test(fuente), false)
   assert.equal(fuente.match(/perfilActivo\(\)\.\w+/g)?.join(), 'perfilActivo().nombre')
+})
+
+test('cuentaExportada conserva codex y no lleva carpeta ni nada de login', () => {
+  const e = cuentaExportada({ ...acc('a1', 'Trabajo'), proveedor: 'codex' })
+  assert.deepEqual(e, { label: 'Trabajo', shareSetup: true, proveedor: 'codex' })
+  assert.equal(JSON.stringify(e).includes('secreto'), false)
+  assert.deepEqual(parse({ cuentas: [{ label: 'a', proveedor: 'codex' }] }).cuentas, [{ label: 'a', shareSetup: true, proveedor: 'codex' }])
+})
+
+test('shareSetupAlImportar: una cuenta de Codex no activa el setup compartido aunque el archivo lo traiga', () => {
+  assert.equal(shareSetupAlImportar(true, { proveedor: 'codex' }), false)
+  assert.equal(shareSetupAlImportar(true, {}), true)
+  assert.equal(shareSetupAlImportar(true, { proveedor: 'claude' }), true)
+  assert.equal(shareSetupAlImportar(false, {}), false)
+  assert.equal(shareSetupAlImportar(true, { proveedor: 'agente-futuro' }), true)
 })

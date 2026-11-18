@@ -188,13 +188,6 @@ export function buildInput(t: Template, vars: TemplateVars, accountId: string, n
   }
 }
 
-/** La cuenta sugerida: con sesión iniciada y la que menos usó en las últimas 5 h. */
-export function pickSuggested(accounts: { id: string }[], loggedIn: (id: string) => boolean, used5h: (id: string) => number): string | undefined {
-  const logged = accounts.filter((a) => loggedIn(a.id))
-  const pool = logged.length ? logged : accounts
-  return [...pool].sort((a, b) => used5h(a.id) - used5h(b.id))[0]?.id
-}
-
 const VERSION_PLANTILLAS = 1
 
 interface FileShape {
