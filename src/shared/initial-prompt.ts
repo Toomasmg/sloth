@@ -28,9 +28,34 @@ export const CLAUDE_SUBCOMMANDS: ReadonlySet<string> = new Set([
 // Una versión más nueva de Claude Code puede sumar subcomandos: una palabra suelta en minúsculas tampoco va como argumento.
 const BARE_WORD = /^[a-z][a-z-]*$/
 
-/** ¿Claude Code podría tomar este argumento (tal cual se le pasa) como un subcomando? */
-export function mightBeSubcommand(arg: string): boolean {
-  return CLAUDE_SUBCOMMANDS.has(arg) || BARE_WORD.test(arg)
+// Subcomandos de `codex --help` (0.164) con sus alias: Codex también los despacha por el primer operando.
+export const CODEX_SUBCOMMANDS: ReadonlySet<string> = new Set([
+  'a',
+  'app',
+  'app-server',
+  'apply',
+  'cloud',
+  'completion',
+  'debug',
+  'doctor',
+  'e',
+  'exec',
+  'features',
+  'fork',
+  'help',
+  'login',
+  'logout',
+  'mcp',
+  'mcp-server',
+  'resume',
+  'review',
+  'sandbox'
+])
+
+/** ¿El agente podría tomar este argumento (tal cual se le pasa) como un subcomando? */
+export function mightBeSubcommand(arg: string, agente: string = 'claude'): boolean {
+  const conocidos = agente === 'codex' ? CODEX_SUBCOMMANDS : CLAUDE_SUBCOMMANDS
+  return conocidos.has(arg) || BARE_WORD.test(arg)
 }
 
 /** Por qué un primer mensaje no se puede mandar a Claude, o undefined si está bien. */

@@ -91,9 +91,10 @@ export function shellLaunch(family: ShellFamily, claude?: string[], claudeExe?: 
   const split = splitPrompt(claude)
   let exe = claudeExe && /\.exe$/i.test(claudeExe) ? claudeExe : undefined
   if (family === 'cmd' && exe && !CMD_PLAIN.test(exe)) exe = undefined
-  const argv = exe && split.argv[0] === 'claude' ? [exe, ...split.argv.slice(1)] : split.argv
+  const agente = split.argv[0]
+  const argv = exe && (agente === 'claude' || agente === 'codex') ? [exe, ...split.argv.slice(1)] : split.argv
   const prompt = split.prompt
-  const viaEnv = prompt !== undefined && exe !== undefined && family !== 'cmd' && !mightBeSubcommand(prompt)
+  const viaEnv = prompt !== undefined && exe !== undefined && family !== 'cmd' && !mightBeSubcommand(prompt, agente)
   const paste = prompt !== undefined && !viaEnv ? prompt : undefined
   switch (family) {
     case 'ps': {

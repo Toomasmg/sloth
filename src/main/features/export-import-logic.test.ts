@@ -494,3 +494,10 @@ test('lo exportado lleva solo el nombre del perfil: ni ids, ni usuario de GitHub
   assert.equal(/ghLogin/.test(fuente), false)
   assert.equal(fuente.match(/perfilActivo\(\)\.\w+/g)?.join(), 'perfilActivo().nombre')
 })
+
+test('cuentaExportada conserva codex y no lleva carpeta ni nada de login', () => {
+  const e = cuentaExportada({ ...acc('a1', 'Trabajo'), proveedor: 'codex' })
+  assert.deepEqual(e, { label: 'Trabajo', shareSetup: true, proveedor: 'codex' })
+  assert.equal(JSON.stringify(e).includes('secreto'), false)
+  assert.deepEqual(parse({ cuentas: [{ label: 'a', proveedor: 'codex' }] }).cuentas, [{ label: 'a', shareSetup: true, proveedor: 'codex' }])
+})
