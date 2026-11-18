@@ -564,16 +564,20 @@ const feature: Feature = {
     ctx.handle('test', (): Promise<ChatTestResult> => testConnection())
 
     // Con la clave pública y solo lectura: no toca la config guardada ni emite snapshot. Una corrida a la vez.
-    let validando: Promise<ChatCheck[]> | undefined
+    let validando: { id: string; p: Promise<ChatCheck[]> } | undefined
     ctx.handle('validate', (): Promise<ChatCheck[]> => {
       refresh()
       if (!active) {
         return Promise.resolve([{ id: 'config', estado: 'fallo', titulo: 'Sin configuración', detalle: 'Primero guardá la URL y la clave publicable del proyecto.' }])
       }
-      validando ??= validarChat({ supabaseUrl: active.cfg.supabaseUrl, anonKey: active.cfg.anonKey, fetch }).finally(() => {
-        validando = undefined
-      })
-      return validando
+      const id = `${active.id}|${active.cfg.supabaseUrl}|${active.cfg.anonKey}`
+      if (validando?.id !== id) {
+        const p: Promise<ChatCheck[]> = validarChat({ supabaseUrl: active.cfg.supabaseUrl, anonKey: active.cfg.anonKey, fetch }).finally(() => {
+          if (validando?.p === p) validando = undefined
+        })
+        validando = { id, p }
+      }
+      return validando.p
     })
     ctx.handle('previewInvite', (text: unknown): ChatInvitePreview => inviteState(parseInvitation(text)))
     ctx.handle('joinInvite', (text: unknown, confirmed: unknown): Promise<ChatInviteJoin> => joinInvite(text, confirmed))

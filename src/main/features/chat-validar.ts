@@ -277,7 +277,7 @@ export async function validarChat(deps: ValidarDeps): Promise<ChatCheck[]> {
       }
     ]
   }
-  const host = chequeoHost(new URL(base).hostname)
+  const host = chequeoHost(new URL(base).host)
   const pedir = crearPedidor(deps, base)
   const alcance = chequeoAlcance(await pedir('/auth/v1/health'))
   if (alcance.estado !== 'ok') return [host, alcance, ...sinDatos()]
