@@ -27,6 +27,7 @@ import { normTicketId, TEMPLATE_COLOR_KEYS, validBranch } from '../shared/templa
 import { baseSettingsFor, syncSharedSetup, unshareSetup } from './setup'
 import { UsageScanner } from './usage'
 import { FEATURES } from './features'
+import { registrarActividad } from './features/perfiles'
 import { hookTokenDe } from '../daemon/auth'
 import { APP_ID } from '../shared/app-id'
 import { currentSettings, initialChrome } from './features/settings'
@@ -49,7 +50,7 @@ import {
   type RevealTarget,
   type Workspace
 } from '../shared/types'
-import { cambiandoDePerfil, raizDatos } from './perfil'
+import { cambiandoDePerfil, marcarCambioDePerfil, raizDatos } from './perfil'
 import { terminalesAjenas } from './perfiles-core'
 
 let win: BrowserWindow | null = null
@@ -600,6 +601,7 @@ app.whenReady().then(async () => {
     const { spawn, paste } = toSpawnSpec(spec, cols, rows, shellChoice)
     const result = await b.start(id, spawn)
     const ws = running ? undefined : store.workspace(id)
+    if (ws) registrarActividad({ t: Date.now(), tipo: 'espacio', espacio: ws.name })
     if (ws?.initialPrompt && !ws.initialPromptUsed && spec.claude?.includes('--')) {
       if (paste) pendingPaste.set(id, { text: paste, until: Date.now() + 2 * 60 * 1000 })
       else store.updateWorkspace(id, { initialPromptUsed: true })
@@ -626,6 +628,33 @@ app.whenReady().then(async () => {
   // Texto, rutas de archivos copiados o una imagen guardada como PNG (src/main/clipboard-paste.ts).
   handle('clipboard:read', () => clipboardForPaste())
   handle('clipboard:write', (_e, text: unknown) => clipboard.writeText(String(text)))
+
+  async function cerrarTerminalesAjenas(): Promise<number> {
+    const b = await backend()
+    let cerradas = 0
+    for (const id of [...ajenas]) {
+      try {
+        await b.kill(id)
+        ajenas.delete(id)
+        cerradas++
+      } catch (e) {
+        logger.error('perfiles', e)
+      }
+    }
+    return cerradas
+  }
+
+  // Como el cierre que conserva las terminales, pero sin pasar por el cierre de ventana (bandeja, confirmaciones).
+  async function reiniciarPorPerfil(): Promise<void> {
+    marcarCambioDePerfil()
+    marcarCierreLimpio()
+    quitPrepared = true
+    const b = term
+    if (b?.info().mode === 'inprocess') await Promise.race([b.shutdown(), new Promise((r) => setTimeout(r, 5000))]).catch(() => undefined)
+    finishQuit(b)
+    app.relaunch()
+    app.exit(0)
+  }
 
   // Funciones (features): cada una con sus canales feat:<nombre>:<op>.
   for (const f of FEATURES) {
@@ -660,6 +689,9 @@ app.whenReady().then(async () => {
       },
       prepareAccount,
       accountBusy,
+      terminalesAjenas: () => [...ajenas],
+      cerrarTerminalesAjenas,
+      reiniciarPorPerfil,
       onPrepareAccount: (cb) => prepareListeners.push(cb),
       onRemoveAccount: (cb) => removeListeners.push(cb),
       restartTerminal: async (id) => {
