@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import type { ChatMessage, ChatReactionEvent } from '../../../../shared/chat'
-import { applyReaction, clearBefore, composerKey, lastEditable, matchParts, mergeUpdate, seenUpTo, snippet, startsGroup, typingText } from './message-ops'
+import { applyReaction, clearBefore, composerKey, lastEditable, matchParts, mergeUpdate, proximoVencimiento, seenUpTo, snippet, startsGroup, typingText } from './message-ops'
 
 const conv = { kind: 'dm', id: 'c1' } as const
 const msg = (over: Partial<ChatMessage> = {}): ChatMessage => ({
@@ -168,4 +168,23 @@ test('avisos: no se editan, no llevan «Visto» y no agrupan al siguiente', () =
   assert.equal(lastEditable([msg(), notice], 'me')?.id, 'm1')
   assert.equal(seenUpTo([msg(), notice], 'me', 500), 'm1')
   assert.equal(startsGroup(notice, msg({ id: 'm2', createdAt: 160 })), true)
+})
+
+const HORA = 3_600_000
+
+test('próximo vencimiento: sin retención o sin mensajes no hay nada que agendar', () => {
+  assert.equal(proximoVencimiento([msg()], undefined, 1000), undefined)
+  assert.equal(proximoVencimiento([], 24, 1000), undefined)
+})
+
+test('próximo vencimiento: el del mensaje no vencido más viejo', () => {
+  const list = [msg({ id: 'a', createdAt: 5 * HORA }), msg({ id: 'b', createdAt: 2 * HORA }), msg({ id: 'c', createdAt: 9 * HORA })]
+  assert.equal(proximoVencimiento(list, 24, 10 * HORA), 2 * HORA + 24 * HORA)
+})
+
+test('próximo vencimiento: saltea los que ya vencieron y es exacto en el borde', () => {
+  const list = [msg({ id: 'a', createdAt: 0 }), msg({ id: 'b', createdAt: 4 * HORA })]
+  assert.equal(proximoVencimiento(list, 24, 24 * HORA), 28 * HORA)
+  assert.equal(proximoVencimiento(list, 24, 24 * HORA - 1), 24 * HORA)
+  assert.equal(proximoVencimiento([msg({ createdAt: 0 })], 24, 24 * HORA), undefined)
 })

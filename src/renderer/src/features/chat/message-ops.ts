@@ -1,5 +1,7 @@
 import type { ChatMessage, ChatReactionEvent, ChatReplyRef } from '../../../../shared/chat'
 import { CHAT_REACTIONS } from '../../../../shared/chat'
+import type { ChatRetentionHours } from '../../../../shared/chat'
+import { isExpired } from '../../../../shared/chat-retention'
 
 const emojiOrder = (e: string): number => CHAT_REACTIONS.indexOf(e as (typeof CHAT_REACTIONS)[number])
 
@@ -128,4 +130,17 @@ export function snippet(text: string, query: string, max = 140): string {
 /** Aviso de «vació la conversación»: se van los mensajes anteriores; quedan los envíos que no salieron. */
 export function clearBefore(list: ChatMessage[], clear: ChatMessage): ChatMessage[] {
   return list.filter((m) => m.id === clear.id || m.createdAt > clear.createdAt || m.status !== 'sent')
+}
+
+const HORA_MS = 3_600_000
+
+/** Instante (ms epoch) en que vence el primer mensaje que todavía no venció; undefined si no hay retención o nada por vencer. */
+export function proximoVencimiento(msgs: readonly ChatMessage[], retentionHours: ChatRetentionHours | undefined, now: number): number | undefined {
+  if (retentionHours === undefined) return undefined
+  let mas: number | undefined
+  for (const m of msgs) {
+    if (isExpired(m.createdAt, retentionHours, now)) continue
+    if (mas === undefined || m.createdAt < mas) mas = m.createdAt
+  }
+  return mas === undefined ? undefined : mas + retentionHours * HORA_MS
 }
