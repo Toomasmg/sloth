@@ -9,6 +9,7 @@ import {
   nombrePerfilValido,
   nuevoIdPerfil,
   reconstruirIndice,
+  terminalesAjenas,
   validarIndice,
   validarMeta,
   type Perfil
@@ -69,6 +70,17 @@ test('reconstruirIndice: ordena por fecha y conserva el activo previo si sigue e
   assert.equal(reconstruirIndice(metas, 'p-perdido')?.activo, 'principal')
   assert.equal(reconstruirIndice(metas)?.activo, 'principal')
   assert.equal(reconstruirIndice([]), null)
+})
+
+test('terminalesAjenas: las vivas sin espacio en este perfil; las cerradas y las propias no', () => {
+  const propios = new Set(['ws-1'])
+  const sesiones = [
+    { id: 'ws-1', running: true },
+    { id: 'ws-otro', running: true },
+    { id: 'ws-muerta', running: false }
+  ]
+  assert.deepEqual(terminalesAjenas(sesiones, (id) => propios.has(id)), ['ws-otro'])
+  assert.deepEqual(terminalesAjenas([], () => false), [])
 })
 
 test('aCopiar: solo el estado y las funciones, nunca logins, claves ni respaldos', () => {

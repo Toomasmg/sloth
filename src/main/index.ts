@@ -49,7 +49,8 @@ import {
   type RevealTarget,
   type Workspace
 } from '../shared/types'
-import { raizDatos } from './perfil'
+import { cambiandoDePerfil, raizDatos } from './perfil'
+import { terminalesAjenas } from './perfiles-core'
 
 let win: BrowserWindow | null = null
 const windowListeners: ((w: BrowserWindow) => void)[] = []
@@ -247,6 +248,9 @@ app.whenReady().then(async () => {
   }
 
   // Las terminales viven en el daemon (sobreviven al cierre) o, si no hay node, dentro de la app.
+  // El daemon es uno para todos los perfiles: las que ya corrían y no son de un espacio de este perfil no se tocan ni se escuchan.
+  const ajenas = new Set<string>()
+  const esAjena = (id: string): boolean => ajenas.has(id)
   let term: TerminalBackend | undefined
   let termPromise: Promise<TerminalBackend> | undefined
   function backend(): Promise<TerminalBackend> {
@@ -263,16 +267,20 @@ app.whenReady().then(async () => {
       }).then(async (b) => {
         term = b
         b.on('data', (id: string, chunks: PtyChunk[]) => {
+          if (esAjena(id)) return
           send('pty:data', id, chunks)
           for (const l of dataListeners) safe('pty-data', () => l(id, chunks))
         })
         b.on('exit', (id: string, code: number) => {
+          if (esAjena(id)) return
           send('pty:exit', id, code)
           for (const l of exitListeners) safe('pty-exit', () => l(id, code))
           // Un espacio dormido sigue «Dormido» (su terminal se cerró a propósito).
           if (store.workspace(id)) moveAgent(id, 'exit')
         })
-        b.on('hook', onHook)
+        b.on('hook', (p: HookEventPayload) => {
+          if (!esAjena(p.ws)) onHook(p)
+        })
         b.on('permission', onPermission)
         b.on('permission-resolved', (id: string) => send('permission:resolved', id))
         b.on('disconnect', () => {
@@ -287,6 +295,7 @@ app.whenReady().then(async () => {
         // Rehidratar: estado de los agentes que siguieron trabajando con la app cerrada.
         const sessions = await b.list().catch(() => [])
         const running = new Set(sessions.filter((x) => x.running).map((x) => x.id))
+        for (const id of terminalesAjenas(sessions, (id) => store.workspace(id) !== undefined)) ajenas.add(id)
         for (const [wsId, ev] of Object.entries(b.lastHookEvents())) {
           if (!store.workspace(wsId) || !running.has(wsId)) continue
           const { state, detail } = stateForEvent(ev)
@@ -583,6 +592,7 @@ app.whenReady().then(async () => {
   handle('pty:start', async (_e, id: unknown, cols: unknown, rows: unknown) => {
     if (!idValido(id) || !dimValida(cols) || !dimValida(rows)) throw new Error('Pedido inválido.')
     const b = await backend()
+    if (esAjena(id)) throw new Error('Esa terminal es de otro perfil.')
     // Si ya corre (siguió viva en el daemon), solo se reconecta: no se rearma la cuenta ni el comando.
     const shellChoice = currentSettings().terminal.shell
     const running = b.isRunning(id)
@@ -598,16 +608,18 @@ app.whenReady().then(async () => {
     return result
   })
   on('pty:write', (_e, id: unknown, data: unknown) => {
-    if (!idValido(id) || typeof data !== 'string') return
+    if (!idValido(id) || typeof data !== 'string' || esAjena(id)) return
     term?.write(id, data)
     for (const l of writeListeners) safe('pty-write', () => l(id, data))
   })
   on('pty:resize', (_e, id: unknown, cols: unknown, rows: unknown) => {
-    if (idValido(id) && dimValida(cols) && dimValida(rows)) term?.resize(id, cols, rows)
+    if (idValido(id) && dimValida(cols) && dimValida(rows) && !esAjena(id)) term?.resize(id, cols, rows)
   })
   handle('pty:kill', async (_e, id: unknown) => {
     if (!idValido(id)) throw new Error('Pedido inválido.')
-    await (await backend()).kill(id)
+    const b = await backend()
+    if (esAjena(id)) throw new Error('Esa terminal es de otro perfil.')
+    await b.kill(id)
     if (store.workspace(id)) moveAgent(id, 'exit')
   })
 
@@ -686,7 +698,9 @@ app.whenReady().then(async () => {
     marcarCierreLimpio()
     const b = term
     // En proceso no hay daemon que las conserve: se espera el cierre ordenado igual (ver daemon/shutdown.ts).
-    if (b && (!currentSettings().keepTerminalsAlive || b.info().mode === 'inprocess')) {
+    // Al cambiar de perfil el daemon las conserva para cuando se vuelva.
+    const conservar = currentSettings().keepTerminalsAlive || cambiandoDePerfil()
+    if (b && (!conservar || b.info().mode === 'inprocess')) {
       e.preventDefault()
       quitPrepared = true
       void Promise.race([b.shutdown(), new Promise((r) => setTimeout(r, 5000))])

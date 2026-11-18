@@ -85,6 +85,14 @@ export function reconstruirIndice(metas: readonly Perfil[], activoPrevio?: strin
   return { version: 1, activo, perfiles: unicos }
 }
 
+/**
+ * Terminales vivas en el daemon que no son de ningún espacio de este perfil. Los ids son UUID de espacio,
+ * únicos entre perfiles, así que una que corre sin espacio acá es de otro perfil.
+ */
+export function terminalesAjenas(sesiones: readonly { id: string; running: boolean }[], esPropia: (id: string) => boolean): string[] {
+  return sesiones.filter((s) => s.running && !esPropia(s.id)).map((s) => s.id)
+}
+
 export function aCopiar(entradasRaiz: readonly string[]): string[] {
   return entradasRaiz.filter((e) => ENTRADAS_DE_PERFIL.includes(e))
 }
