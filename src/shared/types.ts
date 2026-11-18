@@ -31,6 +31,8 @@ export interface AgenteDisponible {
   /** Falso si la versión instalada es más vieja que la mínima con la que Sloth probó el agente. */
   versionOk?: boolean
   comoInstalar?: string
+  /** Por qué está instalado pero no se puede usar (p. ej. falta PowerShell 7). */
+  aviso?: string
 }
 
 export interface UsageTotals {

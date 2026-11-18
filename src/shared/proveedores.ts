@@ -1,4 +1,4 @@
-export const PROVEEDORES_IDS = ['claude', 'codex'] as const
+export const PROVEEDORES_IDS = ['claude', 'codex', 'copilot'] as const
 export type ProveedorId = (typeof PROVEEDORES_IDS)[number]
 export const PROVEEDOR_DEFECTO: ProveedorId = 'claude'
 
@@ -63,9 +63,9 @@ const NINGUNA: Capacidades = {
   limitesExperimental: false
 }
 
-export const CAPACIDADES: Record<ProveedorId, Capacidades> = { claude: TODAS, codex: { ...NINGUNA, avisoTurno: true, limitesExperimental: true } }
+export const CAPACIDADES: Record<ProveedorId, Capacidades> = { claude: TODAS, codex: { ...NINGUNA, avisoTurno: true, limitesExperimental: true }, copilot: { ...NINGUNA } }
 
-export const NOMBRE_PROVEEDOR: Record<ProveedorId, string> = { claude: 'Claude Code', codex: 'Codex' }
+export const NOMBRE_PROVEEDOR: Record<ProveedorId, string> = { claude: 'Claude Code', codex: 'Codex', copilot: 'GitHub Copilot' }
 
 export function nombreProveedor(cuenta: { proveedor?: unknown }): string {
   const id = proveedorIdDe(cuenta)
@@ -128,4 +128,15 @@ export function cuentaSugerida(
   const logueadas = cuentas.filter((c) => conSesion(c.id))
   const pool = [logueadas.filter(conUso), cuentas.filter(conUso), logueadas, cuentas].find((l) => l.length) ?? []
   return [...pool].sort((a, b) => usado5h(a.id) - usado5h(b.id))[0]?.id
+}
+
+MOTIVOS_ESPECIFICOS.copilot = {
+  hooks: 'Con Copilot no hay avisos de permisos desde el celu todavía.',
+  tickets: 'Los tickets todavía solo corren con Claude Code: ni las consultas ni el trabajo por ticket usan cuentas de Copilot.',
+  historial: 'El historial todavía solo lee las conversaciones de Claude Code.',
+  moverCuenta: 'Mover espacios todavía solo anda entre cuentas de Claude Code.',
+  uso: 'Copilot no informa cuánto te queda: Sloth no puede mostrar el uso.',
+  statusline: 'Copilot no ejecuta un comando externo para la barra de estado.',
+  setupCompartido: 'El setup compartido es el de tu carpeta de Claude Code: no aplica a Copilot.',
+  overrideClaude: 'Estos reemplazos de comando son de Claude Code.'
 }
