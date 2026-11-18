@@ -6,7 +6,7 @@
 import type { ServidorMcp } from '../../../shared/tickets'
 import { analizar } from '../../toml-escaner'
 
-const MAX_TOML = 1024 * 1024
+export const MAX_TOML = 1024 * 1024
 const MAX_SERVIDORES = 100
 const NOMBRE_RE = /^[A-Za-z0-9_-]{1,64}$/
 
@@ -22,12 +22,14 @@ export function servidoresDeConfigToml(toml: string): string[] | undefined {
   for (const s of a.sentencias) {
     if (s.tipo === 'tablaArray') continue
     const ruta = s.tipo === 'clave' ? [...s.tabla, ...s.ruta] : s.ruta
+    // `mcp_servers = { a = { ... } }` en la raíz: el escáner no abre las tablas en línea, así que no se sabe qué servidores hay.
+    if (s.tipo === 'clave' && ruta.length === 1 && ruta[0] === 'mcp_servers') return undefined
     if (ruta[0] === 'mcp_servers' && ruta.length > 1 && nombres.size < MAX_SERVIDORES) nombres.add(ruta[1])
   }
   return [...nombres]
 }
 
-/** Los que no se pueden desactivar con `-c` por su nombre: se le avisa a la persona. */
+/** Los que no se pueden desactivar con `-c` por su nombre: con uno así no se consulta. */
 export const servidoresIgnorados = (servidores: readonly string[]): string[] => servidores.filter((n) => !nombreServidorValido(n))
 
 /** El nombre del servidor de `mcp__<nombre>__`. Los de claude.ai no están en el config.toml de ninguna cuenta de Codex. */
@@ -41,6 +43,3 @@ export function servidorDePrefijo(prefijo: string): string | undefined {
 export function servidoresRevisados(nombres: readonly string[]): ServidorMcp[] {
   return nombres.filter(nombreServidorValido).map((nombre) => ({ nombre, prefijo: `mcp__${nombre}__`, estado: 'otro' }))
 }
-
-/** `runClaude` lanza sin shell: en Windows un `.cmd` de npm no se puede abrir así. */
-export const lanzableSinShell = (exe: string, plataforma: NodeJS.Platform): boolean => !(plataforma === 'win32' && /\.(cmd|bat)$/i.test(exe))

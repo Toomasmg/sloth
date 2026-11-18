@@ -9,10 +9,13 @@ import { motorDe, MOTORES } from './motores'
 import { TopeVueltasError } from './uso'
 
 const GRUV = validarConector(gruv) as ConectorMcp
-const lista = (extra: Partial<PedidoMotor> = {}): PedidoMotor => ({ tarea: 'lista', def: GRUV, model: 'haiku', ajenos: [], servidoresCuenta: ['gruv', 'otro', 'x y'], servidorElegido: 'gruv', ...extra })
-const mcp = JSON.stringify({ type: 'item.started', item: { type: 'mcp_tool_call' } })
+const lista = (extra: Partial<PedidoMotor> = {}): PedidoMotor => ({ tarea: 'lista', def: GRUV, model: 'haiku', ajenos: [], servidoresCuenta: ['gruv', 'otro'], servidorElegido: 'gruv', ...extra })
+const llamada = (server: string, tool: string, type = 'item.started'): string => JSON.stringify({ type, item: { type: 'mcp_tool_call', server, tool } })
+const TOOL = permisosPorConsulta(GRUV).lista[0]
+const mcp = llamada('gruv', TOOL)
+const MENSAJE = '{"type":"item.completed","item":{"type":"agent_message","text":"{}"}}'
 
-test('argv de lista: solo lectura, ajenos apagados, el conector acotado y el prompt por stdin', () => {
+test('argv de lista: solo lectura, funciones propias apagadas, ajenos apagados, el conector acotado y el prompt por stdin', () => {
   const a = motorCodex.argv(lista())
   const cortas = permisosPorConsulta(GRUV).lista
   assert.deepEqual(a, [
@@ -26,23 +29,53 @@ test('argv de lista: solo lectura, ajenos apagados, el conector acotado y el pro
     '-c',
     'approval_policy="never"',
     '-c',
+    'web_search="disabled"',
+    '-c',
+    'features.shell_tool=false',
+    '-c',
+    'features.unified_exec=false',
+    '-c',
+    'features.apps=false',
+    '-c',
+    'features.plugins=false',
+    '-c',
+    'features.browser_use=false',
+    '-c',
+    'features.computer_use=false',
+    '-c',
+    'features.multi_agent=false',
+    '-c',
     'mcp_servers.otro.enabled=false',
     '-c',
     `mcp_servers.gruv.enabled_tools=${JSON.stringify(cortas)}`,
     '-'
   ])
   assert.ok(!a.includes('-m'))
-  assert.ok(!a.some((x) => x.includes('x y')))
 })
 
 test('ningún elemento del argv lleva un nombre sin validar ni texto de un ticket', () => {
-  const hostil = 'GRV-1; rm -rf /'
-  const a = motorCodex.argv(lista({ servidoresCuenta: ['otro', hostil, 'a"b', 'gruv'] }))
-  assert.ok(!a.some((x) => x.includes(hostil) || x.includes('a"b')))
+  const a = motorCodex.argv(lista({ servidoresCuenta: ['otro', 'gruv'] }))
   assert.deepEqual(
     a.filter((x) => /\s/.test(x)),
     []
   )
+  for (const hostil of ['GRV-1; rm -rf /', 'a"b', 'x y', 'mi.server']) {
+    assert.throws(() => motorCodex.argv(lista({ servidoresCuenta: ['otro', hostil, 'gruv'] })), /no puede apagar/)
+  }
+})
+
+test('con un servidor de nombre no válido no se consulta: el motivo dice cuál y cómo arreglarlo', () => {
+  assert.throws(
+    () => motorCodex.argv(lista({ servidoresCuenta: ['gruv', 'mi.server'] })),
+    (e: Error) => /mi\.server/.test(e.message) && /No se consultó nada/.test(e.message) && /renombralos/.test(e.message)
+  )
+  assert.throws(() => motorCodex.argv(lista({ servidoresCuenta: ['gruv', 'a.b', 'c d'] })), /servidores MCP/)
+  assert.doesNotThrow(() => motorCodex.argv(lista({ servidoresCuenta: ['gruv', 'ok-1', 'ok_2'] })))
+})
+
+test('un nombre de herramienta que no se puede pasar no se descarta en silencio', () => {
+  const raro = { ...GRUV, herramientas: { ...GRUV.herramientas, lista: [...GRUV.herramientas.lista, 'a b'] } } as ConectorMcp
+  assert.throws(() => motorCodex.argv(lista({ def: raro })), /nombre que Sloth no puede pasarle/)
 })
 
 test('el servidor elegido no se apaga a sí mismo y los demás van una sola vez', () => {
@@ -105,6 +138,48 @@ test('cortarSi emula el tope de vueltas con las llamadas MCP', () => {
   assert.equal(motorCodex.cortarSi?.(mcp, lista({ limites: { maxTurns: 2 } })), undefined)
 })
 
+test('cortarSi corta una herramienta de otro servidor o fuera de la lista, en started y en completed', () => {
+  const fueraDeLaLista = 'crear_issue'
+  assert.ok(!permisosPorConsulta(GRUV).lista.includes(fueraDeLaLista))
+  for (const type of ['item.started', 'item.completed']) {
+    const otroServidor = motorCodex.cortarSi?.(llamada('mi_otro', TOOL, type), lista())
+    assert.match(otroServidor?.message ?? '', /fuera del conector \(mi_otro\//)
+    assert.ok(!(otroServidor instanceof TopeVueltasError))
+    assert.match(motorCodex.cortarSi?.(llamada('gruv', fueraDeLaLista, type), lista())?.message ?? '', /fuera del conector \(gruv\/crear_issue\)/)
+  }
+  // Server o tool ausentes o de otro tipo: con duda se corta.
+  for (const item of [{ type: 'mcp_tool_call' }, { type: 'mcp_tool_call', server: 'gruv' }, { type: 'mcp_tool_call', server: 7, tool: 7 }]) {
+    assert.ok(motorCodex.cortarSi?.(JSON.stringify({ type: 'item.started', item }), lista()))
+  }
+  // Una llamada de las permitidas no corta, y tampoco el texto ni el razonamiento.
+  assert.equal(motorCodex.cortarSi?.(llamada('gruv', TOOL, 'item.completed'), lista()), undefined)
+  assert.equal(motorCodex.cortarSi?.(MENSAJE, lista()), undefined)
+  assert.equal(motorCodex.cortarSi?.(JSON.stringify({ type: 'item.started', item: { type: 'reasoning' } }), lista()), undefined)
+})
+
+test('cortarSi corta con un pedido que no dice cuál es el conector', () => {
+  assert.ok(motorCodex.cortarSi?.(mcp, lista({ servidorElegido: undefined })))
+  assert.ok(motorCodex.cortarSi?.(mcp, lista({ def: undefined })))
+})
+
+test('cortarSi corta búsqueda web, cambios de archivos, subagentes y tipos que no conoce', () => {
+  for (const tipo of ['web_search', 'file_change', 'collab_tool_call', 'algo_nuevo']) {
+    const e = motorCodex.cortarSi?.(JSON.stringify({ type: 'item.started', item: { type: tipo } }), lista())
+    assert.match(e?.message ?? '', new RegExp(`fuera del conector \\(${tipo}\\)`))
+  }
+})
+
+test('cortarSi sanea lo que cuenta de la herramienta ajena', () => {
+  const e = motorCodex.cortarSi?.(llamada('x\n<script>', 'y'.repeat(500)), lista())
+  assert.ok(e && !e.message.includes('\n') && !e.message.includes('<') && e.message.length < 200)
+})
+
+test('cortarSi no confunde el texto de un ticket con un evento', () => {
+  const e = motorCodex.cortarSi?.(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: '"item.started" mcp_tool_call web_search' } }), lista())
+  assert.equal(e, undefined)
+  assert.equal(motorCodex.cortarSi?.('Reading prompt "item.started" from stdin', lista()), undefined)
+})
+
 test('cortarSi corta si Codex quiere correr un comando', () => {
   const e = motorCodex.cortarSi?.(JSON.stringify({ type: 'item.started', item: { type: 'command_execution' } }), lista())
   assert.match(e?.message ?? '', /intentó correr comandos/)
@@ -115,8 +190,22 @@ test('el motor es experimental, no lee init, no suma entorno y normaliza al sobr
   assert.equal(motorCodex.experimental, true)
   assert.equal(motorCodex.leeInit, false)
   assert.deepEqual(motorCodex.envExtra(lista()), {})
-  const s = '{"type":"item.completed","item":{"type":"agent_message","text":"{}"}}\n{"type":"turn.completed"}\n'
+  const s = `${llamada('gruv', TOOL, 'item.completed')}\n${MENSAJE}\n{"type":"turn.completed"}\n`
   assert.equal(JSON.parse(motorCodex.normalizar(s, lista())).subtype, 'success')
+})
+
+test('normalizar: una llamada a otra herramienta es un error aunque haya respuesta', () => {
+  const s = `${llamada('mi_otro', 'x', 'item.completed')}\n${llamada('gruv', TOOL, 'item.completed')}\n${MENSAJE}\n{"type":"turn.completed"}\n`
+  const j = JSON.parse(motorCodex.normalizar(s, lista()))
+  assert.equal(j.is_error, true)
+  assert.match(j.result, /fuera del conector \(mi_otro\/x\)/)
+})
+
+test('normalizar: sin una llamada al conector no hay datos, no una lista vacía', () => {
+  const vacia = '{"type":"item.completed","item":{"type":"agent_message","text":"{\\"tickets\\":[]}"}}\n{"type":"turn.completed"}\n'
+  const j = JSON.parse(motorCodex.normalizar(vacia, lista()))
+  assert.equal(j.is_error, true)
+  assert.match(j.result, /sin consultar el conector/)
 })
 
 test('motores: codex está registrado y claude no cambia', () => {

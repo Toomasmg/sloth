@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { lanzableSinShell, nombreServidorValido, servidorDePrefijo, servidoresRevisados, servidoresDeConfigToml, servidoresIgnorados } from './codex-config'
+import { nombreServidorValido, servidorDePrefijo, servidoresRevisados, servidoresDeConfigToml, servidoresIgnorados } from './codex-config'
 
 test('dos servidores: la subtabla .env no suma otro nombre', () => {
   const toml = `model = "gpt-5"
@@ -69,8 +69,12 @@ test('servidoresRevisados: sin saber si andan y sin los nombres que no se pueden
   assert.deepEqual(servidoresRevisados([]), [])
 })
 
-test('lanzableSinShell: un .cmd de Windows no', () => {
-  assert.equal(lanzableSinShell('C:\a\codex.cmd', 'win32'), false)
-  assert.equal(lanzableSinShell('C:\a\codex.exe', 'win32'), true)
-  assert.equal(lanzableSinShell('/usr/bin/codex.cmd', 'linux'), true)
+test('mcp_servers como tabla en línea en la raíz: no se sabe qué servidores hay', () => {
+  assert.equal(servidoresDeConfigToml('mcp_servers = { jira = { command = "x" } }\n'), undefined)
+  assert.equal(servidoresDeConfigToml('model = "x"\nmcp_servers = {}\n'), undefined)
+})
+
+test('mcp_servers con subtablas o claves con punto sí se leen', () => {
+  assert.deepEqual(servidoresDeConfigToml('[mcp_servers]\njira = { command = "x" }\n'), ['jira'])
+  assert.deepEqual(servidoresDeConfigToml('mcp_servers.jira = { command = "x" }\n'), ['jira'])
 })

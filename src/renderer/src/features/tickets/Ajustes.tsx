@@ -205,7 +205,7 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => voi
             </label>
             {snap.motorExperimental && (
               <p className="f-tickets-experimental" role="note">
-                <strong>Experimental.</strong> Las consultas con Codex todavía no se probaron con todas las versiones: si algo falla, el mensaje lo dice. Las acciones (escribir en el ticket) son de solo lectura, y el conector lo registrás vos en esa cuenta con «codex mcp add».
+                <strong>Experimental.</strong> Las consultas con Codex todavía no se probaron con todas las versiones: si algo falla, el mensaje lo dice. Las acciones (escribir en el ticket) todavía no andan con Codex: es solo lectura. Durante la consulta Sloth le apaga a Codex el shell, la búsqueda web, las apps y los plugins, lo deja en solo lectura y corta si usa algo que no sea el conector; un servidor MCP de la cuenta con un nombre raro (con puntos o espacios) frena la consulta, y lo que configure un administrador de Codex no se puede apagar desde acá. El conector lo registrás vos en esa cuenta con «codex mcp add».
               </p>
             )}
           </>
