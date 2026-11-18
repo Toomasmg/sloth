@@ -353,3 +353,30 @@ test('sinLista y conConector conservan lo gastado', () => {
   assert.deepEqual(sinLista(s).uso, s.uso)
   assert.deepEqual(conConector(s, 'github').uso, s.uso)
 })
+
+test('filtro por personas: se guarda validado, se lee un tickets.json sin esos campos y se suelta al cambiar de conector', () => {
+  const sin = sanearEstado(TICKETS_V2, conectorPorId)
+  assert.equal(sin?.config.personasElegidas, undefined)
+  assert.equal(sin?.personas, undefined)
+  const raw = {
+    ...TICKETS_V2,
+    tickets: [{ id: 'TCK-9', titulo: 'Nueve', estado: 'cerrado', fecha: '2026-11-17T10:00:00.000Z' }],
+    personas: [{ id: 'u-1', nombre: 'Mateo', email: 'm@x.com' }, { id: 'mal id', nombre: 'X' }],
+    personasAt: 5,
+    leido: { personas: ['u-1'], sinAsignar: true, hechos: true, ventanaDias: 4 },
+    config: { ...TICKETS_V2.config, personasElegidas: ['u-1', 'u-1'], incluirSinAsignar: true, estadosElegidos: ['en_qa', 'inventado'], ventanaDias: 30 }
+  }
+  const s = sanearEstado(raw, conectorPorId)
+  assert.deepEqual(s?.personas, [{ id: 'u-1', nombre: 'Mateo' }])
+  assert.deepEqual(s?.leido, { personas: ['u-1'], sinAsignar: true, hechos: true, ventanaDias: 4 })
+  assert.deepEqual(s?.config.personasElegidas, ['u-1'])
+  assert.equal(s?.config.incluirSinAsignar, true)
+  assert.deepEqual(s?.config.estadosElegidos, ['en_qa'])
+  assert.equal(s?.config.ventanaDias, undefined)
+  assert.equal(s?.tickets[0].fecha, '2026-11-17T10:00:00.000Z')
+  assert.deepEqual(sanearEstado(JSON.parse(JSON.stringify(s)), conectorPorId), s)
+  const otro = s && conConector(s, 'github')
+  assert.equal(otro?.config.personasElegidas, undefined)
+  assert.equal(otro?.config.estadosElegidos, undefined)
+  assert.equal(otro?.personas, undefined)
+})

@@ -1,5 +1,5 @@
 import { buildDescubrirArgs } from './descubrir'
-import { buildAccionArgs, buildDetalleArgs, buildListaArgs } from './motor'
+import { buildAccionArgs, buildDetalleArgs, buildListaArgs, buildPersonasArgs } from './motor'
 import type { MotorTickets, PedidoMotor } from './motor-tickets'
 
 const incompleto = (): never => {
@@ -15,6 +15,8 @@ function argv(p: PedidoMotor): string[] {
       return p.def ? buildDetalleArgs(p.def, p.model, p.ajenos, p.limites) : incompleto()
     case 'accion':
       return p.def && p.accion ? buildAccionArgs(p.def, p.model, p.accion, p.ajenos, p.limites) : incompleto()
+    case 'personas':
+      return p.def ? buildPersonasArgs(p.def, p.model, p.ajenos, p.limites) : incompleto()
     case 'descubrir':
       return buildDescubrirArgs()
     case 'revisar':

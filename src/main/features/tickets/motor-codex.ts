@@ -33,7 +33,7 @@ const incompleto = (): never => {
 /** Nombres cortos de herramienta que se le dejan al conector en cada tarea: los mismos que `--allowedTools` en Claude. */
 export function herramientasPermitidas(def: ConectorMcp, tarea: TareaMotor, accion?: Accion): string[] {
   const p = permisosPorConsulta(def)
-  if (tarea === 'lista') return p.lista
+  if (tarea === 'lista' || tarea === 'personas') return p.lista
   if (tarea === 'detalle') return p.detalle
   if (tarea === 'accion') return (accion && p.acciones[accion]) || []
   return []

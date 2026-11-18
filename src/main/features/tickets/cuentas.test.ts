@@ -266,6 +266,9 @@ test('mensajeCuenta dice qué hacer', () => {
   )
   assert.match(mensajeCuenta(GRUV, { ...tiene, nombre: 'gruv-tomy', prefijo: 'mcp__gruv-tomy__', estado: 'failed' }, 'Cosmos', []) ?? '', /no arrancó/)
   assert.match(mensajeCuenta(GRUV, { ...tiene, nombre: 'gruv-tomy', prefijo: 'mcp__gruv-tomy__', estado: 'pending', verificado: false }, 'Cosmos', []) ?? '', /no respondió a tiempo.*\/mcp/)
+  const conectado = mensajeCuenta(GRUV, { ...tiene, nombre: 'gruv-tomy', prefijo: 'mcp__gruv-tomy__', estado: 'connected', verificado: false }, 'Cosmos', []) ?? ''
+  assert.match(conectado, /figura conectado.*todavía no se revisaron sus herramientas.*Volver a revisar/)
+  assert.doesNotMatch(conectado, /no respondió|autenticar|\/mcp/)
   assert.match(mensajeCuenta(JIRA, { tipo: 'elegir', opciones: [] }, 'Personal', []) ?? '', /más de un servidor que puede ser Jira/)
   assert.equal(mensajeCuenta(GRUV, { ...tiene, nombre: 'claude.ai Gruv', prefijo: 'mcp__claude_ai_Gruv__', estado: 'connected' }, 'Cosmos', []), undefined)
 })
@@ -278,7 +281,7 @@ test('problemaEnSesion: sin el servidor o sin sus herramientas, la lista vacía 
   assert.equal(problemaEnSesion(GRUV, 'mcp__claude_ai_Gruv__', [srv('claude.ai Gruv', 'connected', GRUV_TOOLS)]), undefined)
   assert.deepEqual(problemaEnSesion(GRUV, 'mcp__claude_ai_Gruv__', [srv('claude.ai Gruv', 'connected', ['ver_reloj'])]), {
     tipo: 'falta',
-    parecido: { nombre: 'claude.ai Gruv', faltan: ['buscar_persona', 'listar_tickets', 'ver_flujo_tickets', 'ver_mi_inicio'] }
+    parecido: { nombre: 'claude.ai Gruv', faltan: ['buscar_persona', 'listar_tickets', 'ver_flujo_tickets', 'ver_mi_inicio', 'ver_mi_perfil'] }
   })
   assert.equal(problemaEnSesion(GRUV, 'mcp__claude_ai_Gruv__', undefined), undefined)
 })

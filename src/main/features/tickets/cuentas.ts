@@ -234,6 +234,9 @@ export function servidorDeLaLista(leidoCon: string | undefined, actual: Conector
   throw new Error(`El servidor de ${actual.nombre} de la cuenta cambió desde que se leyó la lista. Actualizá ${actual.nombre} antes de seguir.`)
 }
 
+/** La sesión arrancó con el servidor todavía conectando (sin sus herramientas): pasa por una carrera al arrancar y un segundo intento suele andar. */
+export class ServidorPendienteError extends Error {}
+
 export const usable = (d: Disponibilidad): boolean => d.tipo === 'tiene' && d.estado !== 'needs-auth' && d.estado !== 'failed'
 
 /**
@@ -273,6 +276,9 @@ export function mensajeCuenta(def: ConectorMcp, d: Disponibilidad, cuenta: strin
       : `Abrí una terminal con la cuenta «${cuenta}», corré /mcp y autenticá «${d.nombre}».`
   if (d.estado === 'failed') return `El servidor «${d.nombre}» de la cuenta «${cuenta}» no arrancó. Revisalo con /mcp en una terminal de esa cuenta.`
   if (usable(d) && d.verificado && d.estado !== 'pending') return undefined
+  // Conectado pero sin haberle visto las herramientas: no es que no responda, es que falta revisarlo.
+  if (d.estado === 'connected')
+    return `«${d.nombre}» figura conectado en la cuenta «${cuenta}», pero todavía no se revisaron sus herramientas. Tocá «Volver a revisar» y probá de nuevo.`
   // Un MCP propio que queda pending suele estar esperando que lo autentiquen o tarda en arrancar.
   const propio = deClaudeAi ? '' : ' Si pide autenticarse, abrí una terminal con esa cuenta y corré /mcp. Si tarda en arrancar, volvé a probar.'
   return `«${d.nombre}» no respondió a tiempo en la cuenta «${cuenta}».${propio} Podés probar igual o tocar «Volver a revisar».`
