@@ -10,7 +10,7 @@ import type { HookEventPayload } from '../hooks'
 import { PUERTO_POR_DEFECTO, type CelularVista, type RemotoVista } from '../../shared/celular'
 import { enlaceCelu, secretoValido } from '../../shared/celu-remoto'
 import { LIMITES_ARCHIVO } from '../statusline-core'
-import { capacidadesDe } from '../../shared/proveedores'
+import { agenteDe, capacidadesDe } from '../../shared/proveedores'
 import { limitesDeCuenta } from '../codex-limites'
 import { armarEstado, claveValida, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type TipoAviso } from './celular-core'
 import { crearFuenteWifi, type FuenteDeEstado, type ProveedorDeEstado } from './celular-servidor'
@@ -336,10 +336,11 @@ const feature: Feature = {
       // Con Sloth en primer plano el aviso ya se ve en la PC: el celu es para cuando estás en otra cosa.
       const win = ctx.window()
       if (!prueba && win && !win.isDestroyed() && win.isFocused()) return
-      const espacio = prueba ? 'Sloth' : ctx.store.workspace(wsId)?.name
+      const ws = prueba ? undefined : ctx.store.workspace(wsId)
+      const espacio = prueba ? 'Sloth' : ws?.name
       if (!espacio) return
       if (!prueba && !debeAvisar(enviados, `${wsId}:${tipo}`, Date.now())) return
-      const { titulo, cuerpo } = prueba ? { titulo: 'Sloth', cuerpo: 'Así te van a llegar los avisos.' } : textoAviso(tipo, espacio, detalle)
+      const { titulo, cuerpo } = prueba ? { titulo: 'Sloth', cuerpo: 'Así te van a llegar los avisos.' } : textoAviso(tipo, espacio, detalle, agenteDe(ws ? (ctx.store.account(ws.accountId) ?? {}) : {}))
       const r = await fetch(cfg.ntfy.servidor, {
         method: 'POST',
         redirect: 'error',
