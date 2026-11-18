@@ -81,6 +81,8 @@ export interface RunOptions<T> {
   cortarSi?: (linea: string) => Error | undefined
   /** Cómo se llama el programa en «No pude abrir …». */
   agente?: string
+  /** `args` es la línea de comandos ya armada (un .cmd por cmd.exe): Node no la entrecomilla de nuevo. */
+  verbatim?: boolean
 }
 
 /** Rechaza con un mensaje legible. */
@@ -93,7 +95,7 @@ export function runClaude<T>(o: RunOptions<T>): Promise<T> {
     let done = false
     // Con cortarSi el hijo es líder de su grupo fuera de Windows: sin eso cortarArbol no alcanza a sus nietos.
     const arbol = o.cortarSi !== undefined
-    const child = spawn(o.exe, o.args, { cwd: o.cwd, env: o.env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], ...(arbol ? spawnOptsArbol(process.platform) : {}) })
+    const child = spawn(o.exe, o.args, { cwd: o.cwd, env: o.env, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], ...(o.verbatim ? { windowsVerbatimArguments: true } : {}), ...(arbol ? spawnOptsArbol(process.platform) : {}) })
     const cortar = (): void => {
       if (arbol) void cortarArbol(child, depsReales(), 3000)
       else killTree(child.pid)
