@@ -73,6 +73,7 @@ import { NAV_LABEL } from './layout/nav-model'
 import { sortPaneActions, type PaneAction } from './layout/pane-actions'
 import { WorkspaceContextMenu, WorkspaceMenuButton } from './layout/WorkspaceMenu'
 import { TabBar, type TabInfo } from './layout/TabBar'
+import { SOLTAR_MS, direccionDe, pasoSwipe, swipeInicial } from './layout/swipe'
 import { IconButton, Tag, ToastHost, Tooltip, toast } from './ui'
 import './layout/layout.css'
 import './layout/shell.css'
@@ -568,6 +569,60 @@ export function App(): React.JSX.Element {
       })
     }
   }
+
+  // Vista de uno: el panel que entra se desliza desde el lado al que se fue (pestaña, Ctrl+Tab o touchpad).
+  const [slide, setSlide] = useState<{ id: string; dir: 1 | -1 } | null>(null)
+  const prevActive = useRef<string | null>(activeId)
+  const pedida = useRef<1 | -1 | undefined>(undefined)
+  useEffect(() => {
+    const prev = prevActive.current
+    prevActive.current = activeId
+    const dir = pedida.current
+    pedida.current = undefined
+    if (cap !== 1 || !prev || !activeId || prev === activeId) return
+    setSlide({ id: activeId, dir: direccionDe(openPanes, prev, activeId, dir) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId])
+
+  // Dos dedos de costado en el touchpad: el panel acompaña un poco y, pasado el umbral, cambia al vecino.
+  const swipe = useRef(swipeInicial())
+  useEffect(() => {
+    const area = areaRef.current
+    if (!area || cap !== 1 || openPanes.length < 2) return
+    let soltar: ReturnType<typeof setTimeout> | undefined
+    let movido: HTMLElement | null = null
+    const quieto = (): void => {
+      movido?.removeAttribute('data-swiping')
+      movido?.style.removeProperty('translate')
+      movido = null
+    }
+    const onWheel = (e: WheelEvent): void => {
+      // Ctrl = pellizco (zoom) y Shift = rueda del mouse puesta de costado: no son el gesto.
+      if (e.ctrlKey || e.shiftKey) return
+      const r = pasoSwipe(swipe.current, e.deltaX, e.deltaY, e.timeStamp)
+      swipe.current = r.estado
+      if (r.cambio) {
+        quieto()
+        pedida.current = r.cambio
+        kbRef.current.cycleBy(r.cambio)
+      } else if (r.arrastre) {
+        movido = area.querySelector<HTMLElement>(':scope > .pane:not(.hidden)')
+        movido?.setAttribute('data-swiping', 'true')
+        movido?.style.setProperty('translate', `${r.arrastre}px 0`)
+      }
+      clearTimeout(soltar)
+      // Al soltar sin llegar al umbral, vuelve a su lugar (con la transición de layout.css).
+      soltar = setTimeout(quieto, SOLTAR_MS)
+    }
+    // En captura: xterm corta la propagación de la rueda cuando la usa para el historial.
+    area.addEventListener('wheel', onWheel, { passive: true, capture: true })
+    return () => {
+      area.removeEventListener('wheel', onWheel, { capture: true })
+      clearTimeout(soltar)
+      quieto()
+    }
+  }, [cap, openPanes.length])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.metaKey) return
@@ -1148,7 +1203,10 @@ export function App(): React.JSX.Element {
                     key={paneId}
                     data-pane-id={paneId}
                     data-account-id={accId}
-                    className={`pane ${focused === paneId ? 'focused' : ''} ${ag ? `pane-${ag.state}` : ''} ${perm ? 'pane-perm' : ''} ${hidden ? 'hidden' : ''} ${paneDrag.drag?.id === paneId ? 'dragging' : ''}`}
+                    className={`pane ${focused === paneId ? 'focused' : ''} ${ag ? `pane-${ag.state}` : ''} ${perm ? 'pane-perm' : ''} ${hidden ? 'hidden' : ''} ${paneDrag.drag?.id === paneId ? 'dragging' : ''} ${slide?.id === paneId && !hidden ? (slide.dir > 0 ? 'slide-in-next' : 'slide-in-prev') : ''}`}
+                    onAnimationEnd={(e) => {
+                      if (e.target === e.currentTarget && e.animationName.startsWith('pane-in-')) setSlide(null)
+                    }}
                     style={{ '--acc': colorOf(accId), ...rectVars(rect) } as CSSProperties}
                     onMouseDown={() => setFocused(paneId)}
                     onFocus={() => setFocused(paneId)}

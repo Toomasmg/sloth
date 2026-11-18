@@ -317,3 +317,40 @@ body.is-resizing-row * {
 .pane-actions .icon-btn[hidden] {
   display: none;
 }
+
+/* Vista de uno: cambiar de panel lo desliza desde el costado (App.tsx: slide y el gesto del touchpad). */
+.view-uno .panes-area {
+  overflow: clip;
+}
+.view-uno .panes-area > .pane {
+  transition: translate 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.view-uno .panes-area > .pane[data-swiping='true'] {
+  transition: none;
+}
+.panes-area > .pane.slide-in-next {
+  animation: pane-in-next 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.panes-area > .pane.slide-in-prev {
+  animation: pane-in-prev 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes pane-in-next {
+  from {
+    translate: 64px 0;
+    opacity: 0.3;
+  }
+}
+@keyframes pane-in-prev {
+  from {
+    translate: -64px 0;
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .view-uno .panes-area > .pane,
+  .panes-area > .pane.slide-in-next,
+  .panes-area > .pane.slide-in-prev {
+    transition: none;
+    animation: none;
+  }
+}
