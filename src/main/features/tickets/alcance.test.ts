@@ -40,7 +40,7 @@ test('fechaValida normaliza a ISO y descarta lo que no es una fecha', () => {
   assert.equal(diaDesde(AHORA, 4), '2026-11-14')
 })
 
-test('lo propio abierto se ve siempre; lo propio terminado y lo ajeno, solo dentro de la ventana', () => {
+test('lo abierto se ve siempre, de quien sea; lo terminado, solo dentro de la ventana', () => {
   const f = F({ personasElegidas: ['u-Mateo'], estadosElegidos: ['en_curso', 'cerrado'] })
   const ts = [
     mio('M-VIEJO', { fecha: iso(30) }),
@@ -48,10 +48,12 @@ test('lo propio abierto se ve siempre; lo propio terminado y lo ajeno, solo dent
     mio('M-CERRADO', { estado: 'cerrado', fecha: iso(1) }),
     de('T-VIEJO', 'Mateo', { fecha: iso(6) }),
     de('T-NUEVO', 'Mateo', { fecha: iso(2) }),
+    de('T-CERRADO-VIEJO', 'Mateo', { estado: 'cerrado', fecha: iso(6) }),
+    de('T-CERRADO', 'Mateo', { estado: 'cerrado', fecha: iso(3) }),
     de('T-SIN-FECHA', 'Mateo'),
     de('OTRO', 'Lola', { fecha: iso(1) })
   ]
-  assert.deepEqual(visibles(ts, f, YO, GRUV, AHORA).map((x) => x.id), ['M-VIEJO', 'M-CERRADO', 'T-NUEVO', 'T-SIN-FECHA'])
+  assert.deepEqual(visibles(ts, f, YO, GRUV, AHORA).map((x) => x.id), ['M-VIEJO', 'M-CERRADO', 'T-VIEJO', 'T-NUEVO', 'T-CERRADO', 'T-SIN-FECHA'])
 })
 
 test('sin asignar solo si se pide, y el estado filtra', () => {
@@ -85,6 +87,7 @@ test('pendientes: todo la primera vez, y después solo lo que se sumó', () => {
   assert.equal(pendientesDe(F({ personasElegidas: ['u-Mateo'] }), { ...leido, personas: ['u-Mateo'] }, GRUV, YO).personas.length, 0)
   assert.equal(pendientesDe(F({ ventanaDias: 7 }), leido, GRUV, YO).todo, true)
   assert.equal(pendientesDe(F({ ventanaDias: 2 }), leido, GRUV, YO).todo, false)
+  assert.equal(pendientesDe(F({ ventanaDias: 7, estadosElegidos: ['en_curso'] }), { ...leido, hechos: false }, GRUV, YO).todo, false)
   assert.equal(pendientesDe(F(), { ...leido, hechos: false }, GRUV, YO).todo, true)
   assert.equal(pendientesDe(F({ estadosElegidos: ['en_curso'] }), { ...leido, hechos: false }, GRUV, YO).todo, false)
   assert.equal(pendientesDe(F(), leido, GRUV, undefined).todo, true)

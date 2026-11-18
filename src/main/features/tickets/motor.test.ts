@@ -362,7 +362,8 @@ const ALCANCE = { personas: ['11111111-1111-1111-1111-111111111111'], sinAsignar
 test('lista por alcance: los ids y la fecha van en el pedido, sin descripción ni criterios', () => {
   const p = buildPrompt(GRUV, '', ALCANCE)
   assert.match(p, /\["tu id","11111111-1111-1111-1111-111111111111","sin_asignar"\]/)
-  assert.match(p, /anterior a 2026-11-14/)
+  assert.match(p, /cerrados con "fecha" anterior a 2026-11-14/)
+  assert.doesNotMatch(p, /dejá de paginar/)
   assert.match(p, /estado: "cerrado"/)
   assert.match(p, /ver_mi_perfil/)
   assert.doesNotMatch(p, /"criterios"/)

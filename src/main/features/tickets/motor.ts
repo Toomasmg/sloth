@@ -326,7 +326,7 @@ export function buildPrompt(def: ConectorMcp, assigneeId: string, alcance?: Alca
   }
   const paso2 = porAlcance ? pasoPorAlcance(listaPor, listaHechos, alcance) : lista
   const campos = porAlcance
-    ? `"responsable" es el nombre de quien tiene asignado el ticket y "responsable_id" su id; si nadie lo tiene, no pongas ninguno de los dos. "fecha" es la fecha en formato ISO que dice el paso 2. No devuelvas los tickets con "fecha" anterior a ${alcance.desde}, salvo los tuyos que no estén cerrados. No agregues descripción ni criterios.`
+    ? `"responsable" es el nombre de quien tiene asignado el ticket y "responsable_id" su id; si nadie lo tiene, no pongas ninguno de los dos. "fecha" es la fecha en formato ISO que dice el paso 2. Lo abierto se devuelve siempre, sea cual sea su "fecha"; solo los cerrados con "fecha" anterior a ${alcance.desde} no se devuelven. No agregues descripción ni criterios.`
     : `"responsable" es el nombre de quien tiene asignado el ticket y "responsable_id" su id; si nadie lo tiene, no pongas ninguno de los dos. "descripcion" es el texto de la descripción en una línea, recortado a ${DESCRIPCION_MAX} caracteres, si la trae.`
   return [
     `Tarea de solo lectura. No modifiques nada en ${n}: no comentes, no muevas, no asignes, no tildes nada.`,

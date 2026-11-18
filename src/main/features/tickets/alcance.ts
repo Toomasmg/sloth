@@ -89,7 +89,7 @@ export const diaDesde = (ahora: number, dias: number): string => new Date(ahora 
 
 /** Lo que falta leer: todo si no se leyó nada, se sumaron los terminados o se alargó la ventana; si no, las personas que no se leyeron. */
 export function pendientesDe(f: FiltroVista, leido: AlcanceLeido | undefined, def: ConectorDef, me: Yo | undefined): PendientesLista {
-  if (!leido || !me || (hayHechos(f, def) && !leido.hechos) || f.ventanaDias > leido.ventanaDias)
+  if (!leido || !me || (hayHechos(f, def) && (!leido.hechos || f.ventanaDias > leido.ventanaDias)))
     return { personas: f.personasElegidas.filter((p) => p !== me?.id), sinAsignar: f.incluirSinAsignar, todo: true }
   return {
     personas: f.personasElegidas.filter((p) => p !== me.id && !leido.personas.includes(p)),
@@ -140,16 +140,16 @@ function dentroDelAlcance(t: Ticket, f: FiltroVista, me: Yo | undefined): boolea
   return t.responsableId !== undefined && f.personasElegidas.includes(t.responsableId)
 }
 
-/** La ventana corta lo terminado y lo de otras personas; lo propio que sigue abierto se ve siempre. Sin fecha válida no se descarta. */
-function dentroDeLaVentana(t: Ticket, f: FiltroVista, me: Yo | undefined, def: ConectorDef, ahora: number): boolean {
-  if (esMio(me, t) && !esHecho(t, def)) return true
+/** La ventana corta solo lo terminado: lo abierto, de quien sea, se ve siempre. Sin fecha válida no se descarta. */
+function dentroDeLaVentana(t: Ticket, f: FiltroVista, def: ConectorDef, ahora: number): boolean {
+  if (!esHecho(t, def)) return true
   const ms = t.fecha === undefined ? NaN : Date.parse(t.fecha)
   return Number.isNaN(ms) || ms >= ahora - f.ventanaDias * DIA_MS
 }
 
 export function visibles(tickets: readonly Ticket[], f: FiltroVista, me: Yo | undefined, def: ConectorDef, ahora: number): Ticket[] {
   return tickets.filter(
-    (t) => dentroDelAlcance(t, f, me) && dentroDeLaVentana(t, f, me, def, ahora) && (t.estado === undefined || f.estadosElegidos.includes(t.estado))
+    (t) => dentroDelAlcance(t, f, me) && dentroDeLaVentana(t, f, def, ahora) && (t.estado === undefined || f.estadosElegidos.includes(t.estado))
   )
 }
 
@@ -160,7 +160,7 @@ export function conteos(tickets: readonly Ticket[], f: FiltroVista, me: Yo | und
   let sinFecha = 0
   for (const t of tickets) {
     const enAlcance = dentroDelAlcance(t, f, me)
-    const enVentana = dentroDeLaVentana(t, f, me, def, ahora)
+    const enVentana = dentroDeLaVentana(t, f, def, ahora)
     const enEstado = t.estado === undefined || f.estadosElegidos.includes(t.estado)
     if (enAlcance && enVentana && t.estado !== undefined) porEstado[t.estado] = (porEstado[t.estado] ?? 0) + 1
     if (enAlcance && enVentana && enEstado) {

@@ -78,7 +78,7 @@ export default {
     lista:
       'Llamá a la herramienta de Gruv listar_tickets SIN filtrar por estado ni por asignado (quiero los tickets de todo el equipo), con limite: 50. Si vuelven 50, seguí con desplazamiento: 50, 100… hasta traer todos (como máximo 250).',
     listaPor:
-      'Llamá a listar_tickets una vez por cada responsable de esta lista: {asignados}. Usá asignado: <ese id> (o "sin_asignar") y limite: 50, todas en paralelo. Si una vuelve con 50, pedí la página siguiente con desplazamiento: 50 (y 100 como máximo). Vienen del más nuevo al más viejo por created_at: de un responsable que no sos vos, dejá de paginar apenas una página entera sea anterior a {desde}. "fecha" es created_at.',
+      'Llamá a listar_tickets una vez por cada responsable de esta lista: {asignados}. Usá asignado: <ese id> (o "sin_asignar") y limite: 50, todas en paralelo. Si una vuelve con 50, pedí la página siguiente con desplazamiento: 50 (y 100 como máximo). Son los abiertos de cada uno y se leen enteros, sin cortar por fecha. "fecha" es created_at.',
     listaHechos:
       'Además, por cada responsable llamá a listar_tickets con estado: "cerrado", el mismo asignado y limite: 50, y leé también la página de desplazamiento: 50 (los cerrados no vienen ordenados por cierre). En esos, "fecha" es closed_at.',
     personas:
