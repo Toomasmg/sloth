@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { CAPACIDADES, agenteComun, agenteDe, PROVEEDORES_IDS, capacidadesDe, cuentaSugerida, esProveedorId, motivoNoAgregar, motivoSinCapacidad, nombreProveedor, proveedorIdDe } from './proveedores'
+import { CAPACIDADES, agenteComun, agenteDe, PROVEEDORES_IDS, TICKETS_EXPERIMENTAL, capacidadesDe, cuentaSugerida, esProveedorId, motivoNoAgregar, motivoSinCapacidad, nombreProveedor, proveedorIdDe } from './proveedores'
 import type { Capacidades } from './proveedores'
 
 test('proveedorIdDe: ausente es claude y desconocido no es ninguno', () => {
@@ -23,7 +23,7 @@ test('esProveedorId solo acepta ids del registro', () => {
 test('capacidades: claude las tiene todas y codex ninguna', () => {
   assert.deepEqual([...PROVEEDORES_IDS], ['claude', 'codex', 'copilot'])
   for (const k of Object.keys(CAPACIDADES.claude) as (keyof Capacidades)[]) {
-    if (k === 'limitesExperimental' || k === 'avisoTurno') continue
+    if (k === 'limitesExperimental' || k === 'avisoTurno' || k === 'ticketsHeadless') continue
     assert.equal(CAPACIDADES.claude[k], true, `claude ${k}`)
     assert.equal(CAPACIDADES.codex[k], false, `codex ${k}`)
   }
@@ -37,7 +37,7 @@ test('nombreProveedor y motivoSinCapacidad', () => {
   assert.equal(nombreProveedor({ proveedor: 'codex' }), 'Codex')
   assert.equal(nombreProveedor({ proveedor: 'otro-agente' }), 'Agente desconocido')
   assert.equal(motivoSinCapacidad({}, 'tickets'), undefined)
-  assert.match(motivoSinCapacidad({ proveedor: 'codex' }, 'tickets') ?? '', /tickets todavía solo corren con Claude Code/)
+  assert.match(motivoSinCapacidad({ proveedor: 'codex' }, 'tickets') ?? '', /trabajo por ticket todavía solo corre con Claude Code/)
   assert.match(motivoSinCapacidad({ proveedor: 'codex' }, 'historial') ?? '', /historial/)
   assert.match(motivoSinCapacidad({ proveedor: 'codex' }, 'moverCuenta') ?? '', /Mover espacios/)
   assert.equal(motivoSinCapacidad({ proveedor: 'codex' }, 'dormir'), 'Codex todavía no soporta esto en Sloth.')
@@ -121,4 +121,14 @@ test('agenteDe y agenteComun con Copilot', () => {
   assert.equal(agenteDe({ proveedor: 'copilot' }), 'Copilot')
   assert.equal(agenteComun([{ proveedor: 'copilot' }, { proveedor: 'copilot' }]), 'Copilot')
   assert.equal(agenteComun([{ proveedor: 'copilot' }, { proveedor: 'codex' }]), undefined)
+})
+
+test('tickets: Codex consulta (experimental) pero no trabaja por ticket; Copilot sigue sin nada', () => {
+  assert.equal(CAPACIDADES.codex.ticketsHeadless, true)
+  assert.equal(CAPACIDADES.codex.tickets, false)
+  assert.equal(CAPACIDADES.copilot.ticketsHeadless, false)
+  assert.ok(TICKETS_EXPERIMENTAL.includes('codex'))
+  assert.ok(!TICKETS_EXPERIMENTAL.includes('claude'))
+  assert.match(motivoSinCapacidad({ proveedor: 'copilot' }, 'ticketsHeadless') ?? '', /Copilot/)
+  assert.match(motivoSinCapacidad({ proveedor: 'futuro' }, 'ticketsHeadless') ?? '', /actualizá Sloth/)
 })

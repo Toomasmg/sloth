@@ -23,6 +23,7 @@ export interface Capacidades {
   statusline: boolean
   setupCompartido: boolean
   tickets: boolean
+  ticketsHeadless: boolean
   chatMcp: boolean
   historial: boolean
   moverCuenta: boolean
@@ -38,6 +39,7 @@ const TODAS: Capacidades = {
   statusline: true,
   setupCompartido: true,
   tickets: true,
+  ticketsHeadless: true,
   chatMcp: true,
   historial: true,
   moverCuenta: true,
@@ -53,6 +55,7 @@ const NINGUNA: Capacidades = {
   statusline: false,
   setupCompartido: false,
   tickets: false,
+  ticketsHeadless: false,
   chatMcp: false,
   historial: false,
   moverCuenta: false,
@@ -63,7 +66,7 @@ const NINGUNA: Capacidades = {
   limitesExperimental: false
 }
 
-export const CAPACIDADES: Record<ProveedorId, Capacidades> = { claude: TODAS, codex: { ...NINGUNA, avisoTurno: true, limitesExperimental: true }, copilot: { ...NINGUNA } }
+export const CAPACIDADES: Record<ProveedorId, Capacidades> = { claude: TODAS, codex: { ...NINGUNA, ticketsHeadless: true, avisoTurno: true, limitesExperimental: true }, copilot: { ...NINGUNA } }
 
 export const NOMBRE_PROVEEDOR: Record<ProveedorId, string> = { claude: 'Claude Code', codex: 'Codex', copilot: 'GitHub Copilot' }
 
@@ -97,7 +100,7 @@ export function capacidadesDe(cuenta: { proveedor?: unknown }): Capacidades | un
 const MOTIVOS_ESPECIFICOS: Partial<Record<ProveedorId, Partial<Record<keyof Capacidades, string>>>> = {
   codex: {
     hooks: 'Con Codex no hay avisos de permisos desde el celu: Codex todavía no se los manda a Sloth.',
-    tickets: 'Los tickets todavía solo corren con Claude Code: ni las consultas ni el trabajo por ticket usan cuentas de Codex.',
+    tickets: 'Con Codex las consultas de tickets andan (experimental), pero el trabajo por ticket todavía solo corre con Claude Code.',
     historial: 'El historial todavía solo lee las conversaciones de Claude Code.',
     moverCuenta: 'Mover espacios todavía solo anda entre cuentas de Claude Code.',
     statusline: 'Codex no ejecuta un comando externo para la barra de estado: Sloth no puede leer sus límites por ahí.',
@@ -106,6 +109,9 @@ const MOTIVOS_ESPECIFICOS: Partial<Record<ProveedorId, Partial<Record<keyof Capa
     overrideClaude: 'Estos reemplazos de comando son de Claude Code.'
   }
 }
+
+/** El motor de consultas de estos agentes tiene datos sin confirmar con una cuenta real: la UI lo avisa. */
+export const TICKETS_EXPERIMENTAL: readonly ProveedorId[] = ['codex']
 
 /** Por qué la cuenta no puede usar esa función, o undefined si puede. */
 export function motivoSinCapacidad(cuenta: { proveedor?: unknown }, k: keyof Capacidades): string | undefined {
@@ -133,6 +139,7 @@ export function cuentaSugerida(
 MOTIVOS_ESPECIFICOS.copilot = {
   hooks: 'Con Copilot no hay avisos de permisos desde el celu todavía.',
   tickets: 'Los tickets todavía solo corren con Claude Code: ni las consultas ni el trabajo por ticket usan cuentas de Copilot.',
+  ticketsHeadless: 'Las consultas de tickets todavía solo corren con Claude Code o Codex: no usan cuentas de Copilot.',
   historial: 'El historial todavía solo lee las conversaciones de Claude Code.',
   moverCuenta: 'Mover espacios todavía solo anda entre cuentas de Claude Code.',
   uso: 'Copilot no informa cuánto te queda: Sloth no puede mostrar el uso.',

@@ -1185,3 +1185,12 @@
   margin-left: auto;
   text-align: right;
 }
+
+.f-tickets-experimental {
+  margin: 0;
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+p.f-tickets-experimental strong {
+  color: var(--text-2);
+}

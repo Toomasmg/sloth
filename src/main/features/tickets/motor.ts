@@ -490,7 +490,9 @@ export function parseEnvelope(def: ConectorDef, stdout: string): Envelope {
   const result = typeof env.result === 'string' ? env.result : ''
   if (env.is_error === true || (typeof env.subtype === 'string' && env.subtype !== 'success')) {
     const why = result || (typeof env.subtype === 'string' ? env.subtype : 'error')
-    throw new Error(`Claude no pudo completar la consulta: ${why.slice(0, 300)}`)
+    // Un motor que no es Claude (Codex) marca su sobre con `agente`; el de Claude no lo trae.
+    const quien = typeof env.agente === 'string' && /^[A-Za-z]{1,20}$/.test(env.agente) ? env.agente : 'Claude'
+    throw new Error(`${quien} no pudo completar la consulta: ${why.slice(0, 300)}`)
   }
   const structured = env.structured_output
   let data: unknown
