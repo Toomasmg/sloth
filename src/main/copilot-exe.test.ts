@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { hayPowerShell7, resolverCopilotExe, versionCopilotOk } from './copilot-exe'
+import { hayPowerShell7, resolverCopilotExe, versionCopilotOk, type DepsPowerShell } from './copilot-exe'
 
 const conArchivos = (...ps: string[]) => (p: string): boolean => ps.includes(p)
 
@@ -34,11 +34,56 @@ test('versionCopilotOk: 1.0.100 en adelante sirve, una más vieja no y un texto 
   assert.deepEqual(versionCopilotOk(''), { ok: false })
 })
 
-test('hayPowerShell7: pwsh en el PATH o en Program Files cuenta, powershell.exe 5.1 no', () => {
-  assert.equal(hayPowerShell7({ PATH: 'C:\\a;C:\\b' }, conArchivos('C:\\b\\pwsh.exe'), 'win32'), true)
-  assert.equal(hayPowerShell7({ PATH: 'C:\\a' }, conArchivos('C:\\a\\powershell.exe', 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'), 'win32'), false)
-  assert.equal(hayPowerShell7({ PATH: 'C:\\a' }, conArchivos('C:\\Program Files\\PowerShell\\7\\pwsh.exe'), 'win32'), true)
-  assert.equal(hayPowerShell7({ PATH: '.' }, conArchivos('.\\pwsh.exe'), 'win32'), false)
-  assert.equal(hayPowerShell7({}, () => false, 'win32'), false)
-  assert.equal(hayPowerShell7({}, () => false, 'linux'), true)
+function depsPwsh(existentes: string[], versiones: Record<string, string>): { deps: DepsPowerShell; corridos: string[] } {
+  const corridos: string[] = []
+  return {
+    corridos,
+    deps: {
+      existe: conArchivos(...existentes),
+      mayor: async (exe) => {
+        corridos.push(exe)
+        return versiones[exe]
+      }
+    }
+  }
+}
+
+test('hayPowerShell7: pwsh en el PATH o en Program Files cuenta si responde una versión 6 o más', async () => {
+  const a = depsPwsh(['C:\\b\\pwsh.exe'], { 'C:\\b\\pwsh.exe': '7\r\n' })
+  assert.equal(await hayPowerShell7({ PATH: 'C:\\a;C:\\b' }, 'win32', a.deps), true)
+  const b = depsPwsh(['C:\\Program Files\\PowerShell\\7\\pwsh.exe'], { 'C:\\Program Files\\PowerShell\\7\\pwsh.exe': '7' })
+  assert.equal(await hayPowerShell7({ PATH: 'C:\\a' }, 'win32', b.deps), true)
+  const c = depsPwsh(['D:\\Programas\\PowerShell\\7-preview\\pwsh.exe'], { 'D:\\Programas\\PowerShell\\7-preview\\pwsh.exe': '7' })
+  assert.equal(await hayPowerShell7({ PATH: '', ProgramFiles: 'D:\\Programas' }, 'win32', c.deps), true)
+})
+
+test('hayPowerShell7: el pwsh de Microsoft Store (alias que existsSync no ve) se reconoce corriéndolo', async () => {
+  const alias = 'C:\\Users\\t\\AppData\\Local\\Microsoft\\WindowsApps\\pwsh.exe'
+  const enPath = depsPwsh([], { [alias]: '7' })
+  assert.equal(await hayPowerShell7({ PATH: 'C:\\Users\\t\\AppData\\Local\\Microsoft\\WindowsApps' }, 'win32', enPath.deps), true)
+  assert.deepEqual(enPath.corridos, [alias])
+  const sinPath = depsPwsh([], { [alias]: '7' })
+  assert.equal(await hayPowerShell7({ PATH: 'C:\\a', LOCALAPPDATA: 'C:\\Users\\t\\AppData\\Local' }, 'win32', sinPath.deps), true)
+  const sinAlias = depsPwsh([], {})
+  assert.equal(await hayPowerShell7({ PATH: 'C:\\Users\\t\\AppData\\Local\\Microsoft\\WindowsApps', LOCALAPPDATA: 'C:\\Users\\t\\AppData\\Local' }, 'win32', sinAlias.deps), false)
+})
+
+test('hayPowerShell7: powershell.exe 5.1, una versión 5 o una salida rara no cuentan, y nunca se corre otro ejecutable', async () => {
+  const solo51 = depsPwsh(['C:\\a\\powershell.exe', 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'], { 'C:\\a\\powershell.exe': '5' })
+  assert.equal(await hayPowerShell7({ PATH: 'C:\\a;C:\\Windows\\System32\\WindowsPowerShell\\v1.0' }, 'win32', solo51.deps), false)
+  assert.deepEqual(solo51.corridos, [])
+  for (const salida of ['5', '5\r\n', '', 'error', '7 8', undefined]) {
+    const d = depsPwsh(['C:\\a\\pwsh.exe'], salida === undefined ? {} : { 'C:\\a\\pwsh.exe': salida })
+    assert.equal(await hayPowerShell7({ PATH: 'C:\\a' }, 'win32', d.deps), false, String(salida))
+  }
+})
+
+test('hayPowerShell7: una entrada relativa del PATH no se corre, se prueba el resto y fuera de Windows no hace falta', async () => {
+  const d = depsPwsh(['.\\pwsh.exe', 'C:\\b\\pwsh.exe'], { '.\\pwsh.exe': '7', 'C:\\b\\pwsh.exe': '5' })
+  assert.equal(await hayPowerShell7({ PATH: '.;C:\\b' }, 'win32', d.deps), false)
+  assert.deepEqual(d.corridos, ['C:\\b\\pwsh.exe'])
+  assert.equal(await hayPowerShell7({}, 'win32', depsPwsh([], {}).deps), false)
+  const linux = depsPwsh([], {})
+  assert.equal(await hayPowerShell7({}, 'linux', linux.deps), true)
+  assert.deepEqual(linux.corridos, [])
 })

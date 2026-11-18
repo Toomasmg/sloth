@@ -4,8 +4,10 @@ import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { Feature, FeatureContext } from './context'
 import type { Workspace } from '../../shared/types'
-import { createAccount } from '../accounts'
-import { esProveedorId, motivoNoAgregar } from '../../shared/proveedores'
+import { createAccount, motivoNoAgregarCuenta } from '../accounts'
+import { powerShell7Disponible } from '../agentes'
+import { AVISO_POWERSHELL_7 } from '../copilot-exe'
+import { esProveedorId } from '../../shared/proveedores'
 import { featuresDir } from './tray-settings'
 import { perfilActivo } from '../perfil'
 import { encryptText, MIN_PASSWORD } from './export-crypto'
@@ -391,12 +393,14 @@ const feature: Feature = {
 
       // 1) Cuentas que no existen acá: se crean sin sesión (las cuentas nunca traen sesión).
       const idByLabel = new Map<string, string>()
+      const noCreadas = new Map<string, string>()
       if (g.espacios) {
         for (const c of parsed.cuentas) {
           if (ctx.store.accounts.some((a) => a.label.trim().toLowerCase() === c.label.trim().toLowerCase())) continue
           try {
-            const motivo = c.proveedor !== undefined && esProveedorId(c.proveedor) ? motivoNoAgregar(ctx.store.accounts, c.proveedor) : undefined
+            const motivo = c.proveedor !== undefined && esProveedorId(c.proveedor) ? motivoNoAgregarCuenta(ctx.store.accounts, c.proveedor) : undefined
             if (motivo) throw new Error(motivo)
+            if (c.proveedor === 'copilot' && !(await powerShell7Disponible())) throw new Error(AVISO_POWERSHELL_7)
             const nueva = createAccount(c.label, c.proveedor)
             const acc = { ...nueva, shareSetup: shareSetupAlImportar(c.shareSetup, nueva) }
             ctx.store.addAccount(acc)
@@ -407,6 +411,7 @@ const feature: Feature = {
             }
             res.cuentas++
           } catch (e) {
+            noCreadas.set(c.label.trim().toLowerCase(), (e as Error).message)
             res.errores.push(`Cuenta «${c.label}»: ${(e as Error).message}`)
           }
         }
@@ -431,7 +436,8 @@ const feature: Feature = {
           const o = choices.espacios[String(i)] ?? {}
           const accountId = idByLabel.get(e.cuenta.toLowerCase())
           if (!accountId) {
-            res.saltados.push({ nombre: e.nombre, motivo: `no se encontró la cuenta «${e.cuenta}»` })
+            const noCreada = noCreadas.get(e.cuenta.trim().toLowerCase())
+            res.saltados.push({ nombre: e.nombre, motivo: noCreada ? `la cuenta «${e.cuenta}» no se pudo crear: ${noCreada}` : `no se encontró la cuenta «${e.cuenta}»` })
             return
           }
           const folder = o.carpeta ?? e.ruta

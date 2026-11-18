@@ -2,8 +2,6 @@ import { posix, win32 } from 'node:path'
 
 export const VERSION_MINIMA_COPILOT: readonly [number, number, number] = [1, 0, 100]
 
-const PWSH7_INSTALADO = 'C:\\Program Files\\PowerShell\\7\\pwsh.exe'
-
 function carpetasDelPath(env: NodeJS.ProcessEnv, plataforma: NodeJS.Platform): string[] {
   const win = plataforma === 'win32'
   const ruta = win ? win32 : posix
@@ -35,9 +33,42 @@ export function versionCopilotOk(salida: string): { version?: string; ok: boolea
   return { version: `${v[0]}.${v[1]}.${v[2]}`, ok: true }
 }
 
-/** Copilot en Windows exige PowerShell 6+: el `powershell.exe` 5.1 que trae el sistema no cuenta. Fuera de Windows no usa PowerShell. */
-export function hayPowerShell7(env: NodeJS.ProcessEnv, existe: (p: string) => boolean, plataforma: NodeJS.Platform): boolean {
+export const AVISO_POWERSHELL_7 = 'Copilot necesita PowerShell 7 en Windows: instalalo con «winget install Microsoft.PowerShell».'
+
+export interface DepsPowerShell {
+  existe: (p: string) => boolean
+  /** Corre `pwsh` con esa ruta y devuelve lo que imprime la versión mayor; undefined si no arrancó. */
+  mayor: (exe: string) => Promise<string | undefined>
+}
+
+// El pwsh de Microsoft Store es un alias de ejecución: existsSync da false aunque ande, así que esa carpeta se prueba corriendo.
+const CARPETA_ALIAS = /[\\/]Microsoft[\\/]WindowsApps[\\/]?$/i
+
+function candidatosPwsh(env: NodeJS.ProcessEnv, existe: (p: string) => boolean): string[] {
+  const candidatos: string[] = []
+  const programas = [env.ProgramW6432, env.ProgramFiles, 'C:\\Program Files'].filter((d): d is string => !!d && win32.isAbsolute(d))
+  for (const d of programas) {
+    for (const v of ['7', '7-preview']) {
+      const c = win32.join(d, 'PowerShell', v, 'pwsh.exe')
+      if (existe(c)) candidatos.push(c)
+    }
+  }
+  for (const d of carpetasDelPath(env, 'win32')) {
+    const c = win32.join(d, 'pwsh.exe')
+    if (existe(c) || CARPETA_ALIAS.test(d)) candidatos.push(c)
+  }
+  if (env.LOCALAPPDATA && win32.isAbsolute(env.LOCALAPPDATA)) candidatos.push(win32.join(env.LOCALAPPDATA, 'Microsoft', 'WindowsApps', 'pwsh.exe'))
+  const vistos = new Set<string>()
+  return candidatos.filter((c) => !vistos.has(c.toLowerCase()) && vistos.add(c.toLowerCase()))
+}
+
+/** Copilot en Windows exige PowerShell 6+: el `powershell.exe` 5.1 que trae el sistema no cuenta (solo se prueban ejecutables llamados pwsh.exe y se mira la versión). Fuera de Windows no usa PowerShell. */
+export async function hayPowerShell7(env: NodeJS.ProcessEnv, plataforma: NodeJS.Platform, deps: DepsPowerShell): Promise<boolean> {
   if (plataforma !== 'win32') return true
-  if (existe(PWSH7_INSTALADO)) return true
-  return carpetasDelPath(env, plataforma).some((d) => existe(win32.join(d, 'pwsh.exe')))
+  for (const c of candidatosPwsh(env, deps.existe)) {
+    const salida = await deps.mayor(c)
+    const m = salida === undefined ? null : /^\s*(\d+)\s*$/.exec(salida)
+    if (m && Number(m[1]) >= 6) return true
+  }
+  return false
 }

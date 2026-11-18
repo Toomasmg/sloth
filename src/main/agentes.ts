@@ -3,30 +3,41 @@ import { existsSync } from 'node:fs'
 import type { AgenteDisponible } from '../shared/types'
 import { NOMBRE_PROVEEDOR, PROVEEDORES_IDS } from '../shared/proveedores'
 import { versionCodexOk } from './codex-exe'
-import { hayPowerShell7, versionCopilotOk } from './copilot-exe'
+import { AVISO_POWERSHELL_7, hayPowerShell7, versionCopilotOk } from './copilot-exe'
+import { motivoNoAgregarCuenta } from './accounts'
+import { entornoLimpio } from './env-limpio'
 import { PROVEEDORES } from './proveedores'
 
 const TIMEOUT_MS = 5000
-
-const AVISO_POWERSHELL_7 = 'Copilot necesita PowerShell 7 en Windows: instalalo con «winget install Microsoft.PowerShell».'
+const TIMEOUT_PWSH_MS = 4000
 
 // cmd lee estos caracteres como sintaxis aun entre comillas: una ruta así no se ejecuta.
 const RUTA_CMD_RARA = /[%"&^!<>|\r\n]/
 
-function ejecutar(file: string, args: string[], verbatim: boolean): Promise<string | undefined> {
+function ejecutar(file: string, args: string[], verbatim: boolean, env?: NodeJS.ProcessEnv, timeout = TIMEOUT_MS): Promise<string | undefined> {
   return new Promise((resolver) => {
-    execFile(file, args, { timeout: TIMEOUT_MS, windowsHide: true, windowsVerbatimArguments: verbatim }, (err, stdout) => {
+    execFile(file, args, { timeout, windowsHide: true, windowsVerbatimArguments: verbatim, env }, (err, stdout) => {
       resolver(err ? undefined : String(stdout))
     })
   })
 }
 
-function salidaDeVersion(exe: string): Promise<string | undefined> {
-  if (process.platform !== 'win32' || !/\.(cmd|bat)$/i.test(exe)) return ejecutar(exe, ['--version'], false)
+function salidaDeVersion(exe: string, env?: NodeJS.ProcessEnv): Promise<string | undefined> {
+  if (process.platform !== 'win32' || !/\.(cmd|bat)$/i.test(exe)) return ejecutar(exe, ['--version'], false, env)
   if (RUTA_CMD_RARA.test(exe)) return Promise.resolve(undefined)
   // Un .cmd de npm solo corre por cmd.exe. Argumentos fijos y la ruta entre comillas; las de afuera las quita /s.
-  return ejecutar('cmd.exe', ['/d', '/s', '/c', `""${exe}" --version"`], true)
+  return ejecutar('cmd.exe', ['/d', '/s', '/c', `""${exe}" --version"`], true, env)
 }
+
+// Sin shell y con -NoProfile: no corre nada del usuario. El pwsh de la Store es un alias, por eso se prueba ejecutándolo.
+const pwshMayor = (exe: string): Promise<string | undefined> =>
+  ejecutar(exe, ['-NoProfile', '-NonInteractive', '-NoLogo', '-Command', '$PSVersionTable.PSVersion.Major'], false, undefined, TIMEOUT_PWSH_MS)
+
+/** Exportada para validar el alta fuera del formulario (IPC directo, importación). */
+export const powerShell7Disponible = (): Promise<boolean> => hayPowerShell7(process.env, process.platform, { existe: existsSync, mayor: pwshMayor })
+
+// La versión corre con el entorno de una terminal de Copilot (sin tokens de GitHub) y sin autoactualización: detectar no cambia el binario.
+const envDeVersionCopilot = (): NodeJS.ProcessEnv => ({ ...entornoLimpio(process.env, PROVEEDORES.copilot.quitarDelEntorno), COPILOT_AUTO_UPDATE: 'false' })
 
 /** Qué agentes hay para elegir. Todos aparecen; instalado es si se encontró su ejecutable. */
 export async function detectarAgentes(): Promise<AgenteDisponible[]> {
@@ -43,8 +54,9 @@ export async function detectarAgentes(): Promise<AgenteDisponible[]> {
         return { ...base, version, versionOk: ok }
       }
       if (id === 'copilot') {
-        const conAviso = hayPowerShell7(process.env, existsSync, process.platform) ? base : { ...base, aviso: AVISO_POWERSHELL_7 }
-        const salida = await salidaDeVersion(exe)
+        const [hayPwsh, salida] = await Promise.all([powerShell7Disponible(), salidaDeVersion(exe, envDeVersionCopilot())])
+        const aviso = hayPwsh ? motivoNoAgregarCuenta([], 'copilot') : AVISO_POWERSHELL_7
+        const conAviso = aviso ? { ...base, aviso } : base
         if (salida === undefined) return conAviso
         const { version, ok } = versionCopilotOk(salida)
         return { ...conAviso, version, versionOk: ok }
