@@ -29,6 +29,8 @@ import {
   info,
   mismaHerramienta,
   negadas,
+  normDescripcion,
+  nombreSinContacto,
   normalizePersonas,
   normalizeTickets,
   normEstado,
@@ -118,11 +120,36 @@ function listaNueva(prompt: string): string {
 }
 
 function esquemaNuevo(schema: unknown): unknown {
-  const s = JSON.parse(JSON.stringify(schema)) as { properties: { tickets: { items: { properties: Record<string, unknown> } } } }
+  const s = JSON.parse(JSON.stringify(schema)) as { properties: Record<string, unknown> & { tickets: { items: { properties: Record<string, unknown> } } } }
   const p = s.properties.tickets.items.properties
   delete p.criterios
   p.fecha = { type: 'string' }
+  const { error, ...resto } = s.properties
+  s.properties = { error, no_leidos: { type: 'number' }, ...resto } as typeof s.properties
   return s
+}
+
+/**
+ * Diferencias deliberadas del detalle con 0.6.4: Gruv no tiene un campo «descripcion» en el listado, así que el
+ * detalle lee ver_ticket (de lectura) y arma la descripción de sus campos de texto.
+ */
+function detalleNuevo(prompt: string): string {
+  const id = /^Del ticket (.+) \(el valor/m.exec(prompt)?.[1] ?? ''
+  const json = JSON.stringify(id)
+  return prompt
+    .replace(/(3\. Llamá a ver_reloj con .+\n)/, (_, paso: string) => `${paso}4. Llamá a ver_ticket con {"id":${json}}.\n`)
+    .replace('{"criterios":[{"id"', '{"descripcion":"…","criterios":[{"id"')
+    .replace('\n"minutos_total" son', () => `\n"descripcion": ${GRUV.pistas.descripcion} Texto plano, de hasta 1500 caracteres, sin copiar datos de contacto ni personales (correos, teléfonos); si el ticket no trae nada, no pongas "descripcion".\n"minutos_total" son`)
+}
+
+function detalleArgsNuevos(args: string[]): string[] {
+  const out = [...args]
+  const i = out.indexOf('--allowedTools')
+  out[i + 1] = `${out[i + 1]},mcp__claude_ai_Gruv__ver_ticket`
+  const j = out.indexOf('--json-schema')
+  const { error, ...resto } = (JSON.parse(out[j + 1]) as { properties: Record<string, unknown> }).properties
+  out[j + 1] = JSON.stringify({ ...JSON.parse(out[j + 1]), properties: { error, descripcion: { type: 'string' }, ...resto } })
+  return out
 }
 
 function listaArgsNuevos(args: string[]): string[] {
@@ -154,7 +181,17 @@ test('con Gruv, cada caso del golden 0.6.4 sale igual', async (t) => {
         return
       }
       const esperado =
-        c.fn === 'buildArgs' ? listaArgsNuevos(conModoPermisos(c.out as string[])) : c.fn.endsWith('Args') ? conModoPermisos(c.out as string[]) : c.fn === 'buildPrompt' ? listaNueva(c.out as string) : c.out
+        c.fn === 'buildArgs'
+          ? listaArgsNuevos(conModoPermisos(c.out as string[]))
+          : c.fn === 'buildDetalleArgs'
+            ? detalleArgsNuevos(conModoPermisos(c.out as string[]))
+            : c.fn.endsWith('Args')
+              ? conModoPermisos(c.out as string[])
+              : c.fn === 'buildPrompt'
+                ? listaNueva(c.out as string)
+                : c.fn === 'buildDetallePrompt'
+                  ? detalleNuevo(c.out as string)
+                  : c.out
       assert.deepEqual(JSON.parse(JSON.stringify(fn(c.args) ?? null)), esperado)
     })
   }
@@ -164,7 +201,7 @@ test('constantes iguales a las de Gruv 0.6.4', () => {
   const k = golden.constantes
   assert.deepEqual(negadas(GRUV), k.WRITE_TOOLS)
   assert.deepEqual(GRUV.herramientas.lista.map((t) => nombreCompleto(GRUV, t)), [...k.READ_TOOLS.slice(0, 3), nombreCompleto(GRUV, 'ver_mi_perfil'), ...k.READ_TOOLS.slice(3)])
-  assert.deepEqual(GRUV.herramientas.detalle.map((t) => nombreCompleto(GRUV, t)), k.DETAIL_TOOLS)
+  assert.deepEqual(GRUV.herramientas.detalle.map((t) => nombreCompleto(GRUV, t)), [...k.DETAIL_TOOLS, nombreCompleto(GRUV, 'ver_ticket')])
   for (const ac of accionesSoportadas(GRUV)) assert.equal(nombreCompleto(GRUV, GRUV.herramientas.escritura[ac] ?? ''), k.ACCION_TOOL[ac])
   assert.equal(GRUV.faltaConector.clave, k.NO_GRUV)
   assert.equal(TOOL_MISSING, k.TOOL_MISSING)
@@ -428,4 +465,78 @@ test('la consulta de personas solo deja usar la herramienta de personas', () => 
   assert.match(buildPersonasPrompt(GRUV), /No pongas mails, teléfonos/)
   assert.equal(filtraPersonas(GRUV), true)
   assert.equal(filtraPersonas(github as never), false)
+})
+
+const sobreDetalle = (o: unknown): string => JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: '', structured_output: o })
+
+test('el detalle de Gruv lee ver_ticket (de lectura) y pide la descripción acotada y sin datos de contacto', () => {
+  assert.ok(GRUV.herramientas.detalle.includes('ver_ticket'))
+  assert.ok(!GRUV.herramientas.negar.includes('ver_ticket'))
+  assert.ok(!Object.values(GRUV.herramientas.escritura).includes('ver_ticket'))
+  const p = buildDetallePrompt(GRUV, 'TCK-1')
+  assert.match(p, /Llamá a ver_ticket con \{"id":"TCK-1"\}/)
+  assert.match(p, /"ocurrido"/)
+  assert.match(p, /hasta 1500 caracteres/)
+  assert.match(p, /sin copiar datos de contacto/)
+  const args = buildDetalleArgs(GRUV, 'haiku')
+  assert.match(args[args.indexOf('--allowedTools') + 1], /mcp__claude_ai_Gruv__ver_ticket/)
+  assert.ok(!args[args.indexOf('--disallowedTools') + 1].split(',').includes('mcp__claude_ai_Gruv__ver_ticket'))
+})
+
+test('un conector sin pistas.descripcion no pide ni lee la descripción en el detalle', () => {
+  const { descripcion, ...pistas } = GRUV.pistas
+  void descripcion
+  const sin = { ...GRUV, pistas } as ConectorMcp
+  assert.doesNotMatch(buildDetallePrompt(sin, 'TCK-1'), /descripcion/)
+  assert.equal(parseDetalle(sin, sobreDetalle({ descripcion: 'algo', criterios: [], comentarios: [] })).descripcion, undefined)
+})
+
+test('parseDetalle trae la descripción normalizada y no la inventa', () => {
+  const d = parseDetalle(GRUV, sobreDetalle({ descripcion: 'Qué pasó:\nNo anda.', criterios: [], comentarios: [], minutos_total: 3 }))
+  assert.equal(d.descripcion, 'Qué pasó:\nNo anda.')
+  assert.equal(d.minutos, 3)
+  assert.equal('descripcion' in parseDetalle(GRUV, sobreDetalle({ criterios: [], comentarios: [] })), false)
+  assert.equal('descripcion' in parseDetalle(GRUV, sobreDetalle({ descripcion: 42, criterios: [], comentarios: [] })), false)
+})
+
+test('normDescripcion: texto plano, sin control ni dirección, con tope de largo y de renglones', () => {
+  assert.equal(normDescripcion('  Hola\r\n\r\n\r\n\r\nmundo\t  feliz  '), 'Hola\n\nmundo feliz')
+  assert.equal(normDescripcion('a\u0000b\u202ec\u200bd'), 'abcd')
+  assert.equal(normDescripcion('<img src=x onerror=alert(1)>'), '<img src=x onerror=alert(1)>')
+  assert.equal(normDescripcion('   \n \n '), undefined)
+  for (const mal of [null, undefined, 3, {}, ['x']]) assert.equal(normDescripcion(mal), undefined)
+  const larga = normDescripcion('x'.repeat(5000)) ?? ''
+  assert.equal(larga.length, 1500)
+  assert.ok(larga.endsWith('…'))
+  const muchas = normDescripcion(Array.from({ length: 80 }, (_, i) => `r${i}`).join('\n')) ?? ''
+  assert.equal(muchas.split('\n').length, 25)
+})
+
+test('personas: solo id y nombre, y un nombre con correo o teléfono los pierde', () => {
+  const id = (n: number): string => `${String(n).repeat(8)}-${String(n).repeat(4)}-${String(n).repeat(4)}-${String(n).repeat(4)}-${String(n).repeat(12)}`
+  const raw = [
+    { id: id(1), nombre: 'Ana (ana@empresa.com)', email: 'ana@empresa.com', telefono: '+54 11 5555-1234', rol: 'admin' },
+    { id: id(2), nombre: 'zoe@empresa.com' },
+    { id: id(3), nombre: 'Luis +54 9 11 5555 1234' },
+    { id: id(4), full_name: 'Marta', correo: 'm@x.com' }
+  ]
+  const out = normalizePersonas(GRUV, raw)
+  assert.deepEqual(out.map((p) => p.nombre).sort(), ['Ana', 'Luis', 'Marta', 'Persona sin nombre'])
+  for (const p of out) assert.deepEqual(Object.keys(p).sort(), ['id', 'nombre'])
+  assert.doesNotMatch(JSON.stringify(out), /@|5555/)
+  assert.equal(nombreSinContacto('José Álvarez'), 'José Álvarez')
+  assert.equal(nombreSinContacto('Ana 2'), 'Ana 2')
+})
+
+test('lista por alcance: lo que no entró (tope de tickets o lo que dice el modelo) se cuenta', () => {
+  const tickets = (n: number): unknown[] => Array.from({ length: n }, (_, i) => ({ id: `TCK-${i + 1}`, titulo: 't', estado: 'en_curso' }))
+  const sobre = (o: unknown): string => JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: '', structured_output: o })
+  const r = parseClaudeOutput(GRUV, sobre({ tickets: tickets(650) }), true)
+  assert.equal(r.tickets.length, 600)
+  assert.equal(r.noLeidos, 50)
+  assert.equal(parseClaudeOutput(GRUV, sobre({ tickets: tickets(3), no_leidos: 40 }), true).noLeidos, 40)
+  assert.equal(parseClaudeOutput(GRUV, sobre({ tickets: tickets(3) }), true).noLeidos, undefined)
+  assert.equal(parseClaudeOutput(GRUV, sobre({ tickets: tickets(3), no_leidos: -5 }), true).noLeidos, undefined)
+  assert.equal(parseClaudeOutput(GRUV, sobre({ tickets: tickets(3), no_leidos: 40 })).noLeidos, undefined)
+  assert.match(buildPrompt(GRUV, '', ALCANCE), /"no_leidos"/)
 })

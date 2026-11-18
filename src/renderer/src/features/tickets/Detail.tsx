@@ -6,6 +6,7 @@ import { SpaceIcon } from '../../icons/SlothIcons'
 import type { Workspace } from '../../../../shared/types'
 import { fmtHoras, tintFor, type Accion, type ConectorInfo, type Detalle, type DetView, type Estado, type EstadoBase, type Ticket, type WriteOpt } from './model'
 import { Av, ExternalGlyph, PrioGlyph, prioTone } from './parts'
+import { textoDescripcion } from './descripcion'
 import { Button, Select } from '../../ui'
 
 /** Lo que no se puede hacer desde la app: se dice en voz clara al lado del control. */
@@ -249,7 +250,7 @@ export function Detail(props: DetailProps): React.JSX.Element {
 
       <section className="f-tickets-sec" aria-labelledby="f-tickets-d-t">
         <h3 id="f-tickets-d-t">Descripción</h3>
-        <p className="f-tickets-desc">{t.descripcion ?? `${n} no trajo la descripción de este ticket.`}</p>
+        <p className="f-tickets-desc">{textoDescripcion(t, det, Boolean(view?.loading), conector.leeDetalle, n)}</p>
       </section>
 
       {conector.leeDetalle && (

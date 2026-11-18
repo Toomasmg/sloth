@@ -49,6 +49,8 @@ export interface Detalle {
   comentarios: Comentario[]
   /** null = sin registro (no es cero). */
   minutos: number | null
+  /** Solo con un conector que la trae en el detalle: texto plano, con saltos de línea y acotado. */
+  descripcion?: string
 }
 
 export interface Ticket {
@@ -78,7 +80,10 @@ export interface AlcanceLeido {
   sinAsignar: boolean
   /** Si se pidieron también los de categoría 'hecho'. */
   hechos: boolean
+  /** La ventana más corta con la que se leyeron los terminados. */
   ventanaDias: number
+  /** Cuántos tickets había y no se trajeron (tope de la lista o páginas sin leer); ausente = ninguno. */
+  noLeidos?: number
 }
 
 /** Qué se ve: lo que eligió la persona, con los valores por defecto ya resueltos. */
@@ -98,6 +103,8 @@ export interface ConteosTickets {
   ocultos: number
   /** Los que se ven pero no traen una fecha válida (la ventana no los puede descartar). */
   sinFecha: number
+  /** Lo que la última lectura no trajo por un tope: lo que se ve no es todo lo que hay. */
+  noLeidos?: number
 }
 
 /** Qué falta leer para que la lista cubra el filtro. */

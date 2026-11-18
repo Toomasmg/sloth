@@ -67,6 +67,8 @@ export interface ConectorMcp extends ConectorBase {
     /** Cómo armar la lista de personas con `herramientas.personas`. */
     personas?: string
     detalle: PasoLlamada[]
+    /** De qué campos de lo que traen los pasos de detalle sale la descripción del ticket. Sin esto, el detalle no la pide. */
+    descripcion?: string
     /** Cuándo usar las herramientas de apoyo; admite solo `{ticket}`. */
     apoyo?: string
     acciones: Partial<Record<Accion, PistaAccion>>
@@ -334,7 +336,7 @@ function validarMcp(raw: Obj): void {
   if ('criterio' in escritura && !deDetalle.length) fallar(`${H}.escritura.criterio`, 'tildar criterios necesita herramientas de detalle (de ahí salen sus ids)')
 
   const P = `${R}.pistas`
-  const p = objeto(o.pistas, P, ['yo', 'lista', 'detalle', 'acciones'], ['estados', 'apoyo', 'listaPor', 'listaHechos', 'personas'])
+  const p = objeto(o.pistas, P, ['yo', 'lista', 'detalle', 'acciones'], ['estados', 'apoyo', 'listaPor', 'listaHechos', 'personas', 'descripcion'])
   const yo = objeto(p.yo, `${P}.yo`, ['conId', 'sinId'])
   const conId = campo(yo.conId, `${P}.yo.conId`, PISTA_MAX)
   if (conId.split('{id}').length !== 2 || LLAVES.test(conId.replace('{id}', ''))) fallar(`${P}.yo.conId`, 'tiene que llevar {id} una sola vez y ninguna otra llave')
@@ -356,6 +358,10 @@ function validarMcp(raw: Obj): void {
 
   const pasos = lista(p.detalle, `${P}.detalle`, 0, 20)
   if (!pasos.length !== !deDetalle.length) fallar(`${P}.detalle`, 'hay pasos de detalle sin herramientas de detalle o al revés')
+  if ('descripcion' in p) {
+    campo(p.descripcion, `${P}.descripcion`, PISTA_MAX)
+    if (!pasos.length) fallar(`${P}.descripcion`, 'necesita pasos de detalle de donde sacarla')
+  }
   pasos.forEach((x, i) => {
     const r = `${P}.detalle[${i}]`
     const paso = objeto(x, r, ['herramienta', 'args'])

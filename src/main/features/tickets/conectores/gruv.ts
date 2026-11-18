@@ -14,7 +14,7 @@ export default {
     prefijo: 'mcp__claude_ai_Gruv__',
     lista: ['listar_tickets', 'ver_flujo_tickets', 'ver_mi_inicio', 'ver_mi_perfil', 'buscar_persona'],
     personas: 'buscar_persona',
-    detalle: ['listar_comentarios_ticket', 'listar_criterios_ticket', 'ver_reloj'],
+    detalle: ['listar_comentarios_ticket', 'listar_criterios_ticket', 'ver_reloj', 'ver_ticket'],
     escritura: {
       estado: 'mover_ticket',
       tomar: 'asignar_ticket',
@@ -87,8 +87,11 @@ export default {
     detalle: [
       { herramienta: 'listar_comentarios_ticket', args: { id: '{ticket}' } },
       { herramienta: 'listar_criterios_ticket', args: { id: '{ticket}' } },
-      { herramienta: 'ver_reloj', args: { entidad: 'ticket', id: '{ticket}' } }
+      { herramienta: 'ver_reloj', args: { entidad: 'ticket', id: '{ticket}' } },
+      { herramienta: 'ver_ticket', args: { id: '{ticket}' } }
     ],
+    descripcion:
+      'Gruv no tiene un campo "descripcion": el texto del ticket sale de lo que devuelve ver_ticket en "ocurrido" (qué pasó), "esperado" (qué se esperaba) y "pasos". Armalo con los que tengan texto, en ese orden, cada uno en su renglón y encabezado por "Qué pasó:", "Qué se esperaba:" y "Pasos:". Ignorá el resto de los campos de ver_ticket.',
     acciones: {
       estado: { args: { id: '{ticket}', estado: '{estado}' }, nota: 'No pongas resolucion ni resolucion_nota.' },
       tomar: { args: { id: '{ticket}', persona: '{persona}' }, nota: 'Es tomar el ticket para esa persona.' },

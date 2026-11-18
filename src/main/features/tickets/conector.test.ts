@@ -230,3 +230,16 @@ test('idNormalizado e idParaComando: la forma la fija el conector, y lo que va a
   assert.equal(idParaComando({ idRegex: '^.+$', idMayusculas: false }, 'a b'), null)
   assert.equal(idParaComando({ idRegex: '^.+$', idMayusculas: false }, 'a..b'), null)
 })
+
+test('pistas.descripcion: es un texto acotado y necesita pasos de detalle de donde sacarla', () => {
+  assert.doesNotThrow(() => validarConector(gruv))
+  assert.ok(typeof gruv.pistas.descripcion === 'string')
+  rechaza(con('pistas.descripcion', ''), /descripcion: tiene que ser un texto no vacío/)
+  rechaza(con('pistas.descripcion', 'x'.repeat(1001)), /más de 1000 caracteres/)
+  const sinCriterio = JSON.parse(JSON.stringify(gruv)) as ConectorMcp
+  delete sinCriterio.herramientas.escritura.criterio
+  delete sinCriterio.pistas.acciones.criterio
+  sinCriterio.herramientas.detalle = []
+  sinCriterio.pistas.detalle = []
+  rechaza(sinCriterio, /necesita pasos de detalle/)
+})

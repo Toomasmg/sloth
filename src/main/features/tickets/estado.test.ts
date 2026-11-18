@@ -380,3 +380,11 @@ test('filtro por personas: se guarda validado, se lee un tickets.json sin esos c
   assert.equal(otro?.config.estadosElegidos, undefined)
   assert.equal(otro?.personas, undefined)
 })
+
+test('lo que no se trajo por un tope se conserva si es un entero positivo, y las personas guardadas pierden mails y teléfonos', () => {
+  const base = { ...TICKETS_V2, leido: { personas: [], sinAsignar: false, hechos: true, ventanaDias: 4 } }
+  assert.equal(sanearEstado({ ...base, leido: { ...base.leido, noLeidos: 25 } }, conectorPorId)?.leido?.noLeidos, 25)
+  for (const mal of [0, -3, 2.5, '9', null, NaN]) assert.equal(sanearEstado({ ...base, leido: { ...base.leido, noLeidos: mal } }, conectorPorId)?.leido?.noLeidos, undefined)
+  const s = sanearEstado({ ...base, personas: [{ id: 'u-1', nombre: 'Ana (ana@x.com)', telefono: '+54 11 5555 1234' }, { id: 'u-2', nombre: 'zoe@x.com' }] }, conectorPorId)
+  assert.deepEqual(s?.personas, [{ id: 'u-1', nombre: 'Ana' }, { id: 'u-2', nombre: 'Persona sin nombre' }])
+})

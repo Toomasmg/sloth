@@ -153,7 +153,8 @@ function sanearLeido(raw: unknown, def: ConectorDef | undefined): AlcanceLeido |
   const ventanaDias = ventanaValida(raw.ventanaDias)
   const personas = def ? personasValidas(def, raw.personas) : null
   if (ventanaDias === undefined || !personas) return undefined
-  return { personas, sinAsignar: raw.sinAsignar === true, hechos: raw.hechos === true, ventanaDias }
+  const noLeidos = typeof raw.noLeidos === 'number' && Number.isInteger(raw.noLeidos) && raw.noLeidos > 0 ? Math.min(raw.noLeidos, 100_000) : undefined
+  return { personas, sinAsignar: raw.sinAsignar === true, hechos: raw.hechos === true, ventanaDias, ...(noLeidos ? { noLeidos } : {}) }
 }
 
 function sanearPersonas(raw: unknown, def: ConectorDef | undefined): PersonaEquipo[] | undefined {
