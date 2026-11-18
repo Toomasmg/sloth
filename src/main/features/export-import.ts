@@ -6,6 +6,7 @@ import type { Feature, FeatureContext } from './context'
 import type { Workspace } from '../../shared/types'
 import { createAccount } from '../accounts'
 import { featuresDir } from './tray-settings'
+import { perfilActivo } from '../perfil'
 import { encryptText, MIN_PASSWORD } from './export-crypto'
 import { normalizeSupabaseUrl } from './chat-config'
 import { normalize, type SlothSettings } from './settings-model'
@@ -213,6 +214,7 @@ const feature: Feature = {
     /** Lo que se exportaría con esa selección (sin escribir nada). */
     function buildDoc(sel: Selection): ExportDoc {
       const doc: ExportDoc = { formato: FORMAT, formatoVersion: FORMAT_VERSION, versión: app.getVersion(), exportado: new Date().toISOString() }
+      doc.perfil = perfilActivo().nombre
       const settings = readSettings()
       const ws = ctx.store.workspaces.filter((w) => sel.espacios.includes(w.id) && ctx.store.accounts.some((a) => a.id === w.accountId))
       if (ws.length) {

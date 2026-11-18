@@ -71,6 +71,7 @@ import { costoValido, diaLocal, lastRunTrasError, leerUso, limitesEfectivos, sum
 import { ASSIGNEE_MAX, assigneeValido, conConector, sinLista, type TicketsState } from './estado'
 import { ghAccion, ghDetalle, ghLista, ghYo, repoValido, type GhRun } from './gh'
 import { GitError, run as correr } from '../git-run'
+import { registrarActividad } from '../perfiles'
 import { espacioDelTicket } from '../../../shared/templates-shared'
 import { githubRepoOf } from '../team-github'
 import {
@@ -529,6 +530,7 @@ async function start(rawId: unknown, rawAccount?: unknown): Promise<{ id: string
     initialPrompt: usaComandoTicket(def) ? `/ticket ${id}` : undefined,
     resume: true
   })
+  registrarActividad({ t: Date.now(), tipo: 'ticket', ticket: id, espacio: ws.name })
   // El /ticket de la terminal suele asignarlo o moverlo: el detalle guardado deja de valer.
   detalles.delete(id)
   ctx.ui({ type: 'open-pane', id: ws.id })

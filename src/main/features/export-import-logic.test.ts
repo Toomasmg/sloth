@@ -1,5 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { Account, Workspace } from '../../shared/types'
 import { encryptText, WRONG_PASSWORD } from './export-crypto'
 import {
@@ -458,4 +460,22 @@ test('sectionSizes mide cada grupo y fmtKb lo muestra', () => {
   assert.equal(fmtKb(0), '0 KB')
   assert.equal(fmtKb(0.3), '< 1 KB')
   assert.equal(fmtKb(10.4), '≈ 10 KB')
+})
+
+test('el nombre del perfil en el archivo no cambia lo que se importa', () => {
+  const extra = { cuentas: [cuentaA], espacios: [espacioA], atajos: { palette: 'Ctrl K' } }
+  const con = parse({ ...extra, perfil: 'Trabajo' })
+  const sin = parse(extra)
+  assert.deepEqual(con, sin)
+  assert.deepEqual(parse({ ...extra, perfil: { x: 1 } }), sin)
+})
+
+test('lo exportado lleva solo el nombre del perfil: ni ids, ni usuario de GitHub ni rutas del perfil', () => {
+  const d: ExportDoc = { formato: FORMAT, formatoVersion: FORMAT_VERSION, 'versión': '1', exportado: 'x', perfil: 'Trabajo', espacios: exportSpaces([ws('w1', 'api', 'C:\repos\api', 'a1')], [acc('a1', 'Trabajo')], () => undefined) }
+  const json = JSON.stringify(d)
+  assert.match(json, /"perfil":"Trabajo"/)
+  for (const prohibido of ['ghLogin', 'p-', 'perfiles', 'principal', 'secreto']) assert.equal(json.includes(prohibido), false, prohibido)
+  const fuente = readFileSync(join(import.meta.dirname, 'export-import.ts'), 'utf8')
+  assert.equal(/ghLogin/.test(fuente), false)
+  assert.equal(fuente.match(/perfilActivo\(\)\.\w+/g)?.join(), 'perfilActivo().nombre')
 })
