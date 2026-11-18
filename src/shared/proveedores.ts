@@ -23,6 +23,7 @@ export interface Capacidades {
   statusline: boolean
   setupCompartido: boolean
   tickets: boolean
+  ticketsHeadless: boolean
   chatMcp: boolean
   historial: boolean
   moverCuenta: boolean
@@ -38,6 +39,7 @@ const TODAS: Capacidades = {
   statusline: true,
   setupCompartido: true,
   tickets: true,
+  ticketsHeadless: true,
   chatMcp: true,
   historial: true,
   moverCuenta: true,
@@ -53,6 +55,7 @@ const NINGUNA: Capacidades = {
   statusline: false,
   setupCompartido: false,
   tickets: false,
+  ticketsHeadless: false,
   chatMcp: false,
   historial: false,
   moverCuenta: false,
