@@ -29,6 +29,8 @@ export interface Capacidades {
   dormir: boolean
   uso: boolean
   overrideClaude: boolean
+  avisoTurno: boolean
+  limitesExperimental: boolean
 }
 
 const TODAS: Capacidades = {
@@ -41,7 +43,9 @@ const TODAS: Capacidades = {
   moverCuenta: true,
   dormir: true,
   uso: true,
-  overrideClaude: true
+  overrideClaude: true,
+  avisoTurno: true,
+  limitesExperimental: false
 }
 
 const NINGUNA: Capacidades = {
@@ -54,10 +58,12 @@ const NINGUNA: Capacidades = {
   moverCuenta: false,
   dormir: false,
   uso: false,
-  overrideClaude: false
+  overrideClaude: false,
+  avisoTurno: false,
+  limitesExperimental: false
 }
 
-export const CAPACIDADES: Record<ProveedorId, Capacidades> = { claude: TODAS, codex: NINGUNA }
+export const CAPACIDADES: Record<ProveedorId, Capacidades> = { claude: TODAS, codex: { ...NINGUNA, avisoTurno: true, limitesExperimental: true } }
 
 export const NOMBRE_PROVEEDOR: Record<ProveedorId, string> = { claude: 'Claude Code', codex: 'Codex' }
 
@@ -66,18 +72,38 @@ export function nombreProveedor(cuenta: { proveedor?: unknown }): string {
   return id === undefined ? 'Agente desconocido' : NOMBRE_PROVEEDOR[id]
 }
 
+export const ETIQUETA_AGENTE: Record<ProveedorId, string> = { claude: 'Claude', codex: 'Codex' }
+
+/** Nombre corto del agente de la cuenta para un texto; 'el agente' si no se conoce. */
+export function agenteDe(cuenta: { proveedor?: unknown }): string {
+  const id = proveedorIdDe(cuenta)
+  return id === undefined ? 'el agente' : ETIQUETA_AGENTE[id]
+}
+
+/** 'Claude' si todas son de Claude o no hay cuentas (el texto de siempre); el nombre si todas son del mismo agente; undefined si hay mezcla. */
+export function agenteComun(cuentas: readonly { proveedor?: unknown }[]): string | undefined {
+  const nombres = new Set(cuentas.map(agenteDe))
+  if (nombres.size === 0) return ETIQUETA_AGENTE.claude
+  return nombres.size === 1 ? [...nombres][0] : undefined
+}
+
 /** undefined si el agente de la cuenta no se conoce: quien lo use decide qué hacer (en general, no lanzar nada). */
 export function capacidadesDe(cuenta: { proveedor?: unknown }): Capacidades | undefined {
   const id = proveedorIdDe(cuenta)
   return id === undefined ? undefined : CAPACIDADES[id]
 }
 
+/** hooks, statusline, setupCompartido, overrideClaude y uso son permanentes; tickets, historial y moverCuenta (y chatMcp, dormir) se retoman en las ramas 4 y 5. */
 const MOTIVOS_ESPECIFICOS: Partial<Record<ProveedorId, Partial<Record<keyof Capacidades, string>>>> = {
   codex: {
     hooks: 'Con Codex no hay avisos de permisos desde el celu: Codex todavía no se los manda a Sloth.',
     tickets: 'Los tickets todavía solo corren con Claude Code: ni las consultas ni el trabajo por ticket usan cuentas de Codex.',
     historial: 'El historial todavía solo lee las conversaciones de Claude Code.',
-    moverCuenta: 'Mover espacios todavía solo anda entre cuentas de Claude Code.'
+    moverCuenta: 'Mover espacios todavía solo anda entre cuentas de Claude Code.',
+    statusline: 'Codex no ejecuta un comando externo para la barra de estado: Sloth no puede leer sus límites por ahí.',
+    setupCompartido: 'El setup compartido es el de tu carpeta de Claude Code: no aplica a Codex.',
+    uso: 'El conteo de tokens todavía solo lee las conversaciones de Claude Code.',
+    overrideClaude: 'Estos reemplazos de comando son de Claude Code.'
   }
 }
 

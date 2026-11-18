@@ -160,6 +160,8 @@ test('textoAviso no deja saltos de línea y corta lo largo', () => {
   assert.equal(p.titulo, 'api mala pide permiso')
   assert.ok(p.cuerpo.length <= 160)
   assert.equal(textoAviso('teNecesita', 'web', '').cuerpo, 'Claude necesita tu atención.')
+  assert.deepEqual(textoAviso('termino', 'web', undefined, 'Codex'), { titulo: 'web terminó', cuerpo: 'Codex terminó. Revisá los cambios antes de seguir.' })
+  assert.equal(textoAviso('teNecesita', 'web', '', 'Codex').cuerpo, 'Codex necesita tu atención.')
 })
 
 test('debeAvisar no repite el mismo aviso dentro de la ventana', () => {

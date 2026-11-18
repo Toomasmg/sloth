@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
 import { podarSegunStore } from '../poda'
+import { agenteDe } from '../../shared/proveedores'
 import type { Feature, FeatureContext } from './context'
 import type { TerminalBackend, PendingPermission } from '../daemon-client'
 import type { HookEventPayload } from '../hooks'
@@ -182,6 +183,11 @@ const feature: Feature = {
       n.show()
     }
 
+    function agenteDeEspacio(wsId: string): string {
+      const ws = ctx.store.workspace(wsId)
+      return agenteDe((ws && ctx.store.account(ws.accountId)) ?? {})
+    }
+
     /** Aviso de un espacio (terminó o te espera): lo gobierna «notify.done». */
     function notifyText(wsId: string, title: string, body: string): void {
       const ws = ctx.store.workspace(wsId)
@@ -310,7 +316,7 @@ const feature: Feature = {
 
     ctx.onHook((p: HookEventPayload) => {
       if (p.enFondo) return
-      if (p.event === 'Stop') notifyText(p.ws, 'terminó', 'Claude terminó. Revisá los cambios antes de seguir.')
+      if (p.event === 'Stop') notifyText(p.ws, 'terminó', `${agenteDeEspacio(p.ws)} terminó. Revisá los cambios antes de seguir.`)
       else if (p.event === 'Notification' && p.notificationType !== 'permission_prompt')
         notifyText(p.ws, 'te espera', p.message || 'Claude necesita tu atención.')
     })

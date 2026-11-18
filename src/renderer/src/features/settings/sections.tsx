@@ -6,7 +6,8 @@ import { fmtTok, totalTok, usageTitle } from '../../format'
 import { LogoMark } from '../../Logo'
 import { loginPaneId, type Account, type AgenteDisponible } from '../../../../shared/types'
 import { capacidadesDe, motivoSinCapacidad, nombreProveedor, proveedorIdDe } from '../../../../shared/proveedores'
-import { formularioCuenta } from './agente-form'
+import { TITULO_LIMITES, filasLimites, formularioCuenta, textoSinLimites } from './agente-form'
+import type { LecturaLimitesCodex } from '../../../../shared/celular'
 import type { ChatConfigView, ChatSnapshot } from '../../../../shared/chat'
 import { esHostSupabase } from '../../../../shared/chat-text'
 import { SHORTCUT_ACTIONS, bindingOf, comboFromEvent, findConflict, keyTokenOf, setShortcutCapture, type ShortcutAction } from '../../shortcuts'
@@ -156,6 +157,41 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
     })
   }
 
+  /** «Leer límites de uso (experimental)» de una cuenta de Codex: guarda y recarga la lista. */
+  const toggleLimites = (acc: Account): void => {
+    save(async () => {
+      await api.setLimitesExperimentales(acc.id, acc.limitesExperimentales !== true)
+      await ui.reload()
+    })
+  }
+
+  /** «Avisar cuando termina» de una cuenta de Codex: si no se puede activar (ya hay un notify propio, falta node) la pantalla muestra el motivo. */
+  const toggleAviso = (acc: Account): void => {
+    save(async () => {
+      await api.setAvisoDeTurno(acc.id, acc.avisoDeTurno !== true)
+      await ui.reload()
+    })
+  }
+
+  const conLectura = ui.accounts.filter((a) => capacidadesDe(a)?.limitesExperimental === true && a.limitesExperimentales === true).map((a) => a.id)
+  const claveLectura = conLectura.join(',')
+  /** Sin la clave: todavía leyendo. Cada cuenta entra apenas llega su lectura, sin esperar a las demás. */
+  const [limites, setLimites] = useState<Record<string, LecturaLimitesCodex>>({})
+  useEffect(() => {
+    const ids = claveLectura ? claveLectura.split(',') : []
+    setLimites((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => ids.includes(id))))
+    let vivo = true
+    for (const id of ids) {
+      api.limitesCodex(id).then(
+        (r) => vivo && setLimites((prev) => ({ ...prev, [id]: r })),
+        () => vivo && setLimites((prev) => ({ ...prev, [id]: { tipo: 'sin-dato' } }))
+      )
+    }
+    return () => {
+      vivo = false
+    }
+  }, [claveLectura])
+
   useEffect(() => {
     if (!adding) return
     api.agentes().then(setAgentes, () => setAgentes([]))
@@ -266,6 +302,12 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
           // Sin la capacidad el escáner devuelve ceros: mostrarlos sería un dato falso.
           const u = conUso ? ui.usage[a.id] : undefined
           const motivoSetup = capacidadesDe(a)?.setupCompartido === true ? undefined : motivoSinCapacidad(a, 'setupCompartido')
+          const conLimites = capacidadesDe(a)?.limitesExperimental === true
+          // Claude avisa por sus hooks siempre; solo el agente que avisa por notify tiene este switch.
+          const conAviso = capacidadesDe(a)?.avisoTurno === true && capacidadesDe(a)?.hooks !== true
+          const leyendoLimites = conLimites && a.limitesExperimentales === true
+          const lecturaL = limites[a.id]
+          const filasL = leyendoLimites ? filasLimites(lecturaL?.tipo === 'datos' ? lecturaL.limites : null) : []
           return (
             <div key={a.id} className="f-set-acc" style={{ '--acc': color } as React.CSSProperties}>
               <div className="f-set-row">
@@ -302,6 +344,17 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
                       </div>
                     </dl>
                   )}
+                  {leyendoLimites && filasL.length > 0 && (
+                    <dl className="sl-usage" title={TITULO_LIMITES}>
+                      {filasL.map((f) => (
+                        <div key={f.nombre}>
+                          <dt>{f.nombre}</dt>
+                          <dd>{f.valor}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                  {leyendoLimites && filasL.length === 0 && <span className="f-set-hint">{textoSinLimites(lecturaL)}</span>}
                 </div>
                 {conUso && (
                   <PlanField key={`${a.id}-${p.settings.accountPlans[a.id] ?? ''}`} label={a.label} value={p.settings.accountPlans[a.id] ?? ''} onCommit={(plan) => save({ accountPlans: { [a.id]: plan || null } })} />
@@ -362,6 +415,30 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
                     <span className="switch-track" aria-hidden="true" />
                   </label>
                   {motivoSetup && <span className="f-set-hint">{motivoSetup}</span>}
+                  {conLimites && (
+                    <>
+                      <label className="switch" role="menuitem" title="Sloth abre Codex un momento para preguntarle cuánto usaste. Solo lo hace si esa cuenta no tiene una terminal abierta.">
+                        <span className="switch-text">
+                          Leer límites de uso <Tag>Experimental</Tag>
+                        </span>
+                        <input type="checkbox" role="switch" checked={a.limitesExperimentales === true} onChange={() => toggleLimites(a)} />
+                        <span className="switch-track" aria-hidden="true" />
+                      </label>
+                      <span className="f-set-hint">Sloth abre Codex un momento para preguntarle cuánto usaste de cada ventana. Riesgo: al leer, Codex puede renovar el inicio de sesión de la cuenta, y si tenés su terminal abierta esa terminal se quedaría sin sesión; por eso Sloth no lee mientras haya una terminal abierta de esa cuenta y muestra «Sin dato». Con el celu abierto lo repite cada 5 minutos. Puede fallar si Codex cambia; con una API key no aplica.</span>
+                    </>
+                  )}
+                  {conAviso && (
+                    <>
+                      <label className="switch" role="menuitem" title="Agrega una línea «notify» al config.toml de esta cuenta de Codex.">
+                        <span className="switch-text">
+                          Avisar cuando termina <Tag>Experimental</Tag>
+                        </span>
+                        <input type="checkbox" role="switch" checked={a.avisoDeTurno === true} onChange={() => toggleAviso(a)} />
+                        <span className="switch-track" aria-hidden="true" />
+                      </label>
+                      <span className="f-set-hint">Agrega una línea «notify» al config.toml de la cuenta, nunca pisa una tuya y se saca al apagarlo. Si Codex no la ejecuta, no pasa nada: solo no llega el aviso. El cambio vale para las terminales que abras desde ahora; las que ya están abiertas siguen como estaban hasta que las reabras.</span>
+                    </>
+                  )}
                   <Button variant="danger" size="sm" role="menuitem" onClick={() => {
                       setMenu(null)
                       setConfirm(a.id)

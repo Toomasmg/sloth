@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { Store } from './store'
 import { accountStatus, createAccount } from './accounts'
-import { installInto, stateForEvent, writeHookScript, type HookEventPayload } from './hooks'
+import { hayNode, installInto, notifyScriptPath, stateForEvent, writeHookScript, type HookEventPayload } from './hooks'
 import { esFalsoFinal, pendientes, registrar as registrarFondo, venceEn, type Fondo } from './segundo-plano-core'
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
 import { pastePayload } from './shell-args'
@@ -18,10 +18,14 @@ import { marcarCrashPrevio } from './diag/estado'
 import { cerrarSesion, iniciarSesion } from './sesion-marcador'
 import { textoSeguro } from './diag/texto-seguro'
 import { argvPanelCuenta, armarEnvCuenta, proveedorDe, proveedorExigido, type Proveedor } from './proveedores'
-import { NOMBRE_PROVEEDOR, esProveedorId, motivoSinCapacidad } from '../shared/proveedores'
+import { NOMBRE_PROVEEDOR, capacidadesDe, esProveedorId, motivoSinCapacidad } from '../shared/proveedores'
+import { lectorLimites, limitesDeCuenta } from './codex-limites'
+import type { LecturaLimitesCodex } from '../shared/celular'
+import { avisarNotify, desinstalarNotify, prepararNotify } from './codex-notify'
+import { entornoDeTerminal } from './hook-env-core'
 import { detectarAgentes } from './agentes'
 import { initialPromptProblem } from '../shared/initial-prompt'
-import { nextAgentState, type AgentInput } from './agent-machine'
+import { nextAgentState, salidaDeDoneSinHooks, type AgentInput } from './agent-machine'
 import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
 import { clipboardForPaste } from './clipboard-paste'
 import { createWorktree } from './git'
@@ -349,12 +353,21 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     return store.workspaces.some((w) => w.accountId === accountId && b.isRunning(w.id))
   }
 
+  // Leer los límites de Codex lanza su app-server, que puede renovar el token de la cuenta: con una terminal abierta de la
+  // misma cuenta (o sin saber todavía cuáles hay, porque el backend no arrancó) no se lanza.
+  lectorLimites.conectarPermiso((id) => {
+    const a = store.account(id)
+    if (!a || a.limitesExperimentales !== true) return 'apagada'
+    return term && !accountBusy(id) ? 'ok' : 'en-uso'
+  })
+
   /** Deja la cuenta lista antes de abrir Claude: settings + hooks y tu setup compartido. */
   function prepareAccount(acc: Account): void {
     // Una cuenta de un agente que esta versión no conoce no se toca: ni hooks ni setup de Claude en su carpeta.
     const p = proveedorDe(acc)
     if (!p) return
     p.prepararCarpeta(acc.configDir)
+    if (p.id === 'codex' && p.capacidades.avisoTurno) safe('notify', () => ajustarNotify(acc))
     // Los hooks y el setup compartido son de Claude Code: con otro agente ni se escriben.
     if (!p.capacidades.hooks) return
     installInto(acc.configDir, baseSettingsFor(acc))
@@ -365,6 +378,24 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
       logger.aviso('setup', `cuenta ${store.accounts.indexOf(acc) + 1}: ${report.skipped.join('; ')}`)
     }
     for (const l of prepareListeners) safe('preparar cuenta', () => l(acc))
+  }
+
+  /** Con el aviso activado deja el `notify` de Sloth en la cuenta; apagado, saca el que puso Sloth. Devuelve el motivo si no quedó como se pidió. */
+  function ajustarNotify(acc: Account): string | undefined {
+    let motivo: string | undefined
+    if (acc.avisoDeTurno === true) {
+      try {
+        // Sin config.toml queda el de siempre (con el almacén de credenciales en archivo), no uno que solo tenga el notify.
+        proveedorExigido(acc).prepararCarpeta(acc.configDir)
+        motivo = prepararNotify(acc.configDir, hayNode() ? 'node' : undefined, notifyScriptPath())
+      } catch (e) {
+        motivo = `No pude preparar la carpeta de la cuenta de Codex (${(e as NodeJS.ErrnoException).code ?? 'error'}).`
+      }
+    } else {
+      motivo = desinstalarNotify(acc.configDir)
+    }
+    if (motivo) avisarNotify(motivo)
+    return motivo
   }
 
   function hasPreviousConversation(acc: Account, cwd: string): boolean {
@@ -424,9 +455,7 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     const p = proveedorExigido(acc)
     if (!existsSync(ws.cwd)) throw new Error(`No existe la carpeta ${ws.cwd}`)
     prepareAccount(acc)
-    const env = p.capacidades.hooks
-      ? { ...accountEnv(acc), SLOTH_WS: ws.id, SLOTH_HOOK_URL: b.hookUrl, SLOTH_TOKEN: hookTokenDe(b.hookToken, ws.id) }
-      : { ...accountEnv(acc), SLOTH_WS: ws.id }
+    const env = entornoDeTerminal(accountEnv(acc), p.capacidades, acc.avisoDeTurno === true, ws.id, () => ({ url: b.hookUrl, token: hookTokenDe(b.hookToken, ws.id) }))
     const claude = claudeCommand(ws, acc)
     return { cwd: ws.cwd, env, claude, claudeExe: claude ? exeDe(p) : undefined }
   }
@@ -508,6 +537,44 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     }
     installInto(acc.configDir, baseSettingsFor(acc))
     return syncSharedSetup(acc, !accountBusy(acc.id))
+  })
+
+  handle('accounts:setLimitesExperimentales', (_e, id: unknown, activo: unknown) => {
+    if (!idValido(id) || typeof activo !== 'boolean') throw new Error('Pedido inválido.')
+    const cuenta = store.account(id)
+    if (!cuenta) throw new Error('Esa cuenta ya no existe.')
+    if (capacidadesDe(cuenta)?.limitesExperimental !== true) throw new Error(motivoSinCapacidad(cuenta, 'limitesExperimental'))
+    store.exigirEscritura()
+    store.updateAccount(id, { limitesExperimentales: activo })
+    // Al apagar y prender se prueba de nuevo: ni la caché ni la espera tras un fallo sobreviven al switch.
+    lectorLimites.olvidar(id)
+  })
+
+  handle('accounts:setAvisoDeTurno', (_e, id: unknown, activo: unknown) => {
+    if (!idValido(id) || typeof activo !== 'boolean') throw new Error('Pedido inválido.')
+    const cuenta = store.account(id)
+    if (!cuenta) throw new Error('Esa cuenta ya no existe.')
+    const p = proveedorExigido(cuenta)
+    if (p.id !== 'codex' || !p.capacidades.avisoTurno) throw new Error(motivoSinCapacidad(cuenta, 'avisoTurno') ?? 'Esta cuenta no usa el aviso de «terminó» de Codex.')
+    store.exigirEscritura()
+    const acc = store.updateAccount(id, { avisoDeTurno: activo })
+    if (!acc) throw new Error('Esa cuenta ya no existe.')
+    const motivo = ajustarNotify(acc)
+    // Si no se pudo activar vuelve a apagado: no queda un switch prendido que no hace nada.
+    if (motivo && activo) {
+      store.updateAccount(id, { avisoDeTurno: false })
+      throw new Error(motivo)
+    }
+  })
+
+  // De a una cuenta: Ajustes muestra cada una apenas llega, sin esperar a las demás.
+  handle('accounts:limitesCodex', async (_e, id: unknown): Promise<LecturaLimitesCodex> => {
+    if (!idValido(id)) throw new Error('Pedido inválido.')
+    // Hasta que el backend no arranca no se sabe qué terminales hay abiertas.
+    await backend().catch(() => undefined)
+    const cuenta = store.account(id)
+    if (!cuenta || cuenta.limitesExperimentales !== true) return { tipo: 'sin-dato' }
+    return limitesDeCuenta(cuenta, true)
   })
 
   handle('accounts:remove', async (_e, id: unknown) => {
@@ -655,6 +722,11 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     if (!idValido(id) || typeof data !== 'string' || esAjena(id)) return
     term?.write(id, data)
     for (const l of writeListeners) safe('pty-write', () => l(id, data))
+    // Un agente sin hooks (Codex) no manda nada que lo saque de «terminó» al empezar otro turno. Lo que escribís en su
+    // terminal sí: vuelve a «idle» (no a «working», que no se puede saber) y el próximo aviso de terminó suena de nuevo.
+    const ws = store.workspace(id)
+    const acc = ws && store.account(ws.accountId)
+    if (acc && salidaDeDoneSinHooks(agents.get(id)?.state, capacidadesDe(acc)?.hooks !== false, data)) moveAgent(id, { hook: 'idle' })
   })
   on('pty:resize', (_e, id: unknown, cols: unknown, rows: unknown) => {
     if (idValido(id) && dimValida(cols) && dimValida(rows) && !esAjena(id)) term?.resize(id, cols, rows)
