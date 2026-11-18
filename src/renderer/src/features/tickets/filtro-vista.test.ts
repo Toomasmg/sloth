@@ -83,6 +83,8 @@ test('grupos: míos arriba, las elegidas en su orden y sin asignar solo si se pi
   const f = F({ personasElegidas: ['u-mateo', 'u-lola'] })
   const g = gruposDe(f, PERSONAS, YO, ts, { personas: ['u-mateo'], sinAsignar: false, todo: false })
   assert.deepEqual(g.map((x) => [x.clave, x.nombre, x.n, x.sinTraer]), [['mios', 'Míos', 1, false], ['u-mateo', 'Mateo Rossi', 1, true], ['u-lola', 'Lola Gómez', 2, false]])
+  const todo = gruposDe(f, PERSONAS, YO, ts, { personas: ['u-mateo', 'u-lola'], sinAsignar: false, todo: true })
+  assert.equal(todo.some((x) => x.sinTraer), false)
   const con = gruposDe({ ...f, incluirSinAsignar: true }, PERSONAS, YO, ts, undefined)
   assert.deepEqual(con.at(-1), { clave: 'sin_asignar', nombre: 'Sin asignar', tipo: 'sin', n: 1, sinTraer: false })
 })

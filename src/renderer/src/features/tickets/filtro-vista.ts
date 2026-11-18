@@ -84,7 +84,7 @@ export interface Grupo {
   nombre: string
   tipo: 'mios' | 'persona' | 'sin'
   n: number
-  /** Todavía no se trajeron sus tickets. */
+  /** Todavía no se trajeron sus tickets (si lo que falta es volver a leer todo, no se sabe de nadie en particular). */
   sinTraer: boolean
 }
 
@@ -114,9 +114,9 @@ export function gruposDe(
   for (const id of f.personasElegidas) {
     if (id === me?.id) continue
     const nombre = personas?.find((p) => p.id === id)?.nombre ?? nombres.get(id) ?? 'Persona sin nombre'
-    grupos.push({ clave: id, nombre: nombreSeguro(nombre), tipo: 'persona', n: cuenta.get(id) ?? 0, sinTraer: pendientes?.personas.includes(id) === true })
+    grupos.push({ clave: id, nombre: nombreSeguro(nombre), tipo: 'persona', n: cuenta.get(id) ?? 0, sinTraer: pendientes?.todo === false && pendientes.personas.includes(id) })
   }
-  if (f.incluirSinAsignar) grupos.push({ clave: SIN_ASIGNAR, nombre: 'Sin asignar', tipo: 'sin', n: cuenta.get(SIN_ASIGNAR) ?? 0, sinTraer: pendientes?.sinAsignar === true })
+  if (f.incluirSinAsignar) grupos.push({ clave: SIN_ASIGNAR, nombre: 'Sin asignar', tipo: 'sin', n: cuenta.get(SIN_ASIGNAR) ?? 0, sinTraer: pendientes?.todo === false && pendientes.sinAsignar })
   return grupos
 }
 
