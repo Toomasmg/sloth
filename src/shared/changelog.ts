@@ -9,6 +9,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.1',
+    date: '2026-11-18',
+    title: 'Links que abren, Rendimiento y deslizar entre paneles',
+    items: [
+      'Los links de la terminal se abren en el navegador con un clic: los que arma Claude Code y también las direcciones escritas como texto.',
+      'Nuevo en Configuración → Rendimiento: elegí cuánta RAM y cuántos núcleos pueden usar las terminales y lo que corre en ellas (Claude, npm, tests). En una notebook podés poner otros límites para cuando está a batería, y Sloth cambia solo al enchufarla o desenchufarla. Si las terminales llegan al tope de RAM, el programa que pide más se puede cerrar: dejá margen.',
+      'Con un panel a la vista, deslizá dos dedos de costado en el touchpad para pasar al panel de al lado. Cambiar por pestaña o con Ctrl+Tab también se ve con una animación corta.',
+      'Más liviano por dentro: el chat y el tablero de tickets gastan menos con listas largas.'
+    ]
+  },
+  {
     version: '0.7.0',
     date: '2026-11-18',
     title: 'Perfiles, más agentes y el celu cifrado',
