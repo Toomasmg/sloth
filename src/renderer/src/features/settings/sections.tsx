@@ -1362,10 +1362,14 @@ export function AboutSection({ onClose }: { onClose(): void }): React.JSX.Elemen
           <a className="btn sm" href="https://github.com/Toomasmg/sloth" target="_blank" rel="noreferrer">
             Repositorio
           </a>
+          <a className="btn sm" href="https://github.com/Toomasmg/sloth/blob/main/PRIVACY.md" target="_blank" rel="noreferrer">
+            Privacidad
+          </a>
           <Button size="sm" onClick={go(() => openReport())}>
             Reportar un problema
           </Button>
         </div>
+        <div className="f-set-hint">Sin telemetría: solo sale de tu PC lo que activás vos (chat, celu, ntfy, GitHub).</div>
       </div>
       <Group id="g-mas" title="Más">
         <ToggleLikeButton title="Novedades" hint="Qué cambió en la última versión de Sloth." onClick={go(() => openHelp('whatsnew'))} />
