@@ -769,13 +769,14 @@ const errorDeSesion = (def: ConectorMcp, p: Disponibilidad, run: Ejecucion, porD
   return p.tipo === 'tiene' && p.estado === 'pending' ? new ServidorPendienteError(msg) : new Error(msg)
 }
 
-/** Si la sesión arrancó antes de que el servidor termine de conectar, se vuelve a intentar una vez: sin esto, una de cada tres consultas daba un error engañoso. */
+/** Si la sesión arrancó antes de que el servidor termine de conectar, se vuelve a intentar (hasta tres veces, cada intento fallido dura unos 7 s y casi no cuesta): sin esto, entre una de cada tres y una de cada dos consultas daba un error engañoso. */
 async function conReintento<T>(corre: () => Promise<T>): Promise<T> {
-  try {
-    return await corre()
-  } catch (e) {
-    if (!(e instanceof ServidorPendienteError)) throw e
-    return corre()
+  for (let intento = 1; ; intento++) {
+    try {
+      return await corre()
+    } catch (e) {
+      if (!(e instanceof ServidorPendienteError) || intento >= 3) throw e
+    }
   }
 }
 
