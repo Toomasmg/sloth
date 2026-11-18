@@ -28,7 +28,8 @@ import { readTeamConfig, repoKey, TEAM_DIR } from '../team-config-core'
 import { escribirJsonAtomico } from '../../json-file'
 import { podarSegunStore } from '../../poda'
 import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, ticketId } from './acciones'
-import { resolveClaudeExe, runClaude } from './claude-run'
+import { runClaude } from './claude-run'
+import { proveedorDe } from '../../proveedores'
 import type { ConectorDef, ConectorGh, ConectorMcp } from './conector'
 import { crearAlmacen, type Almacen, type ConfigCruda, type FsTickets } from './almacen'
 import { CONECTORES } from './conectores'
@@ -543,6 +544,7 @@ interface Ejecucion {
   exe: string
   cwd: string
   env: Record<string, string>
+  envConfigDir: string
   /** La sesión corrió sin los conectores de claude.ai: su system/init no los trae. */
   sinClaudeAi?: boolean
 }
@@ -556,7 +558,7 @@ function leerJsonSuave(file: string): unknown {
 }
 
 function ajenosDe(run: Ejecucion, def: ConectorMcp): string[] {
-  const dir = run.env.CLAUDE_CONFIG_DIR
+  const dir = run.env[run.envConfigDir]
   return mcpAjenos(leerJsonSuave(join(dir, 'settings.json')), leerJsonSuave(join(dir, '.claude.json')), def.herramientas.prefijo)
 }
 
@@ -565,13 +567,14 @@ function ejecucion(nombre: string, accountId: string, mcp?: ConectorMcp): Ejecuc
   const acc = ctx.store.account(accountId)
   if (!acc) throw new Error(`La cuenta para consultar ${nombre} ya no existe. Elegí otra en Configuración.`)
   if (!accountStatus(acc).loggedIn) throw new Error(`La cuenta «${acc.label}» no tiene sesión iniciada.`)
-  const exe = resolveClaudeExe()
+  const p = proveedorDe(acc)
+  const exe = p.resolverExe()
   if (!exe) throw new Error('No encontré el ejecutable de Claude Code (claude.exe) en el PATH.')
   const cwd = join(carpeta(), 'tickets-run')
   mkdirSync(cwd, { recursive: true })
   // Un MCP propio lento puede tardar más que el tope por defecto de Claude Code en arrancar.
-  const env = { MCP_TIMEOUT: '30000', ...baseEnv(), CLAUDE_CONFIG_DIR: acc.configDir }
-  const run: Ejecucion = { accountId: acc.id, label: acc.label, exe, cwd, env }
+  const env = { MCP_TIMEOUT: '30000', ...baseEnv(p.quitarDelEntorno), ...p.envCuenta(acc.configDir) }
+  const run: Ejecucion = { accountId: acc.id, label: acc.label, exe, cwd, env, envConfigDir: p.envConfigDir }
   if (!mcp || defPara(mcp, acc.id).herramientas.prefijo.startsWith('mcp__claude_ai_')) return run
   // Conectar todos los de claude.ai solo para no usarlos demora cada consulta. Si la variable no existe en esta
   // versión de Claude Code, no cambia nada: el init los trae igual.

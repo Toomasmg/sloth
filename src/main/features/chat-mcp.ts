@@ -11,7 +11,7 @@ import { conGrant, debeRegistrar, hashToken, KEY_RE, MCP_LIMITS, modoRiesgoso, p
 import { crearAtencion } from './chat-mcp-atencion'
 import { argsAlta, argsBaja, leerRegistro, MCP_SCRIPT_NAME, planificar, type Registro } from './chat-mcp-registro'
 import { CHAT_MCP_SCRIPT } from './chat-mcp-script'
-import { resolveClaudeExe } from './tickets/claude-run'
+import { proveedorDe } from '../proveedores'
 import { hayNode, writeIfChanged } from '../hooks'
 import { escribirJsonAtomico } from '../json-file'
 import { carpetaFeatures, raizDatos } from '../perfil'
@@ -43,12 +43,12 @@ function pipePath(userData: string): string {
   return process.platform === 'win32' ? `\\\\.\\pipe\\sloth-chat-${r}` : join(userData, `chat-mcp-${r}.sock`)
 }
 
-function correrClaude(exe: string, args: string[], configDir: string): Promise<void> {
+function correrClaude(exe: string, args: string[], envCuenta: Record<string, string>): Promise<void> {
   return new Promise((resolve, reject) => {
     execFile(
       exe,
       args,
-      { env: { ...process.env, CLAUDE_CONFIG_DIR: configDir }, windowsHide: true, timeout: CLI_MS, maxBuffer: 256 * 1024, encoding: 'utf8' },
+      { env: { ...process.env, ...envCuenta }, windowsHide: true, timeout: CLI_MS, maxBuffer: 256 * 1024, encoding: 'utf8' },
       (err, _stdout, stderr) => {
         if (!err) return resolve()
         const detalle = String(stderr || err.message).trim().split('\n')[0].slice(0, 200)
@@ -156,7 +156,8 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
     if (accion === 'nada') return set('ok')
     if (accion === 'conflicto') return set('conflicto', 'Ya hay un MCP «sloth» que no puso Sloth; no se tocó.')
     if (quiere && !hayNode()) return set('sin-node', 'Falta node en el PATH: Claude no puede arrancar el MCP.')
-    const exe = resolveClaudeExe()
+    const p = proveedorDe(acc)
+    const exe = p.resolverExe()
     if (!exe) return set('sin-cli', 'No encontré Claude Code (claude.exe) en el PATH; no se tocó nada.')
     // Al arrancar, las terminales que sobrevivieron en el daemon todavía no se conocen: se espera a que las reporte.
     try {
@@ -166,10 +167,10 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
     }
     if (!ctx.terminal() || ctx.accountBusy(acc.id)) return set('pendiente', 'Se aplica cuando cierres las terminales de esta cuenta.')
     if (accion !== 'baja' && invalidarToken(acc.id)) save()
-    if (accion === 'baja' || accion === 'reemplazo') await correrClaude(exe, argsBaja(), acc.configDir)
+    if (accion === 'baja' || accion === 'reemplazo') await correrClaude(exe, argsBaja(), p.envCuenta(acc.configDir))
     if (accion === 'baja') return set('ok')
     const token = randomBytes(32).toString('hex')
-    await correrClaude(exe, argsAlta(scriptPath, token), acc.configDir)
+    await correrClaude(exe, argsAlta(scriptPath, token), p.envCuenta(acc.configDir))
     // El hash se guarda recién con el registro hecho: hasta ahí, ningún token de esta cuenta vale.
     cfg = { ...cfg, tokens: { ...cfg.tokens, [acc.id]: hashToken(token) } }
     save()
