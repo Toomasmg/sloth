@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { ajusteAncla, alturaTotal, calcularVentana, indiceEnOffset, offsetDeIndice, tramos, type Entrada } from './ventana-virtual'
+import { ajusteAncla, alturaTotal, calcularVentana, destinoTeclado, estaDibujada, estimadaDe, indiceEnOffset, offsetDeIndice, scrollParaVer, tramos, type Entrada } from './ventana-virtual'
 
 const base = (over: Partial<Entrada> = {}): Entrada => ({ n: 100, scrollTop: 0, alto: 300, alturas: [], estimada: 50, margen: 0, fijos: [], ...over })
 
@@ -127,4 +127,40 @@ test('10000 filas con alturas mezcladas se calculan en menos de 50 ms', () => {
     tramos(v, 10_000, alturas, 60)
   }
   assert.ok(performance.now() - t0 < 50, `tardó ${performance.now() - t0} ms`)
+})
+
+test('estimadaDe: promedio redondeado de lo medido y el defecto si no hay nada', () => {
+  assert.equal(estimadaDe([], 90), 90)
+  assert.equal(estimadaDe([80, 100, 91], 90), 90)
+  assert.equal(estimadaDe([0], 90), 1)
+})
+
+test('scrollParaVer: no mueve lo que ya se ve y mueve lo mínimo si no', () => {
+  assert.equal(scrollParaVer(200, 50, 100, 300), 100)
+  assert.equal(scrollParaVer(50, 50, 100, 300), 50)
+  assert.equal(scrollParaVer(380, 50, 100, 300), 130)
+  assert.equal(scrollParaVer(100, 50, 100, 300), 100)
+  assert.equal(scrollParaVer(5000, 50, 100, 300), 4750)
+})
+
+test('scrollParaVer: una fila más alta que la vista muestra su comienzo', () => {
+  assert.equal(scrollParaVer(500, 400, 100, 300), 500)
+})
+
+test('estaDibujada: dentro de la ventana o entre los fijos', () => {
+  const v = { desde: 10, hasta: 20, antes: 0, despues: 0, fijos: [3, 50] }
+  assert.deepEqual([3, 9, 10, 19, 20, 50].map((i) => estaDibujada(v, i)), [true, false, true, true, false, true])
+})
+
+test('destinoTeclado: flechas, páginas, inicio y fin, acotados a la lista', () => {
+  assert.equal(destinoTeclado('ArrowDown', 4, 100, 10), 5)
+  assert.equal(destinoTeclado('ArrowDown', 99, 100, 10), 99)
+  assert.equal(destinoTeclado('ArrowUp', 0, 100, 10), 0)
+  assert.equal(destinoTeclado('PageDown', 95, 100, 10), 99)
+  assert.equal(destinoTeclado('PageUp', 3, 100, 10), 0)
+  assert.equal(destinoTeclado('PageDown', 3, 100, 0), 4)
+  assert.equal(destinoTeclado('Home', 50, 100, 10), 0)
+  assert.equal(destinoTeclado('End', 50, 100, 10), 99)
+  assert.equal(destinoTeclado('a', 50, 100, 10), null)
+  assert.equal(destinoTeclado('End', 0, 0, 10), null)
 })

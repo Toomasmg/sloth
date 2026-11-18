@@ -119,3 +119,47 @@ export function tramos(v: Ventana, n: number, alturas: Alturas, estimada: number
   hueco(n)
   return out
 }
+
+/** Alto que se supone para lo no medido: el promedio redondeado de lo medido, o `defecto` si todavía no hay nada. */
+export function estimadaDe(medidas: Iterable<number>, defecto: number): number {
+  let suma = 0
+  let k = 0
+  for (const h of medidas) {
+    suma += h
+    k++
+  }
+  return k === 0 ? defecto : Math.max(1, Math.round(suma / k))
+}
+
+/** Nuevo `top` (offset de la vista sobre la lista) para que la fila [offset, offset + alto) quede entera a la vista, moviendo lo mínimo. */
+export function scrollParaVer(offset: number, alto: number, top: number, vista: number): number {
+  if (offset < top) return offset
+  if (offset + alto > top + vista) return alto >= vista ? offset : offset + alto - vista
+  return top
+}
+
+export function estaDibujada(v: Ventana, i: number): boolean {
+  return (i >= v.desde && i < v.hasta) || v.fijos.includes(i)
+}
+
+/** A qué fila pasa el foco con una tecla de navegación de lista; null si la tecla no navega. */
+export function destinoTeclado(key: string, i: number, n: number, pagina: number): number | null {
+  if (n <= 0) return null
+  const tope = (j: number): number => Math.min(n - 1, Math.max(0, j))
+  switch (key) {
+    case 'ArrowDown':
+      return tope(i + 1)
+    case 'ArrowUp':
+      return tope(i - 1)
+    case 'PageDown':
+      return tope(i + Math.max(1, pagina))
+    case 'PageUp':
+      return tope(i - Math.max(1, pagina))
+    case 'Home':
+      return 0
+    case 'End':
+      return n - 1
+    default:
+      return null
+  }
+}
