@@ -116,3 +116,9 @@ test('motivoNoAgregar: claude sin tope, copilot una sola cuenta y los desconocid
   assert.equal(motivoNoAgregar([{ proveedor: 'otro-agente' }], 'copilot'), undefined)
   assert.match(motivoNoAgregar([{ proveedor: 'copilot' }], 'copilot') ?? '', /^Ya tenés una cuenta de GitHub Copilot: su login es del sistema/)
 })
+
+test('agenteDe y agenteComun con Copilot', () => {
+  assert.equal(agenteDe({ proveedor: 'copilot' }), 'Copilot')
+  assert.equal(agenteComun([{ proveedor: 'copilot' }, { proveedor: 'copilot' }]), 'Copilot')
+  assert.equal(agenteComun([{ proveedor: 'copilot' }, { proveedor: 'codex' }]), undefined)
+})

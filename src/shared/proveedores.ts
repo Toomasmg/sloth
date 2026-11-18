@@ -72,7 +72,7 @@ export function nombreProveedor(cuenta: { proveedor?: unknown }): string {
   return id === undefined ? 'Agente desconocido' : NOMBRE_PROVEEDOR[id]
 }
 
-export const ETIQUETA_AGENTE: Record<ProveedorId, string> = { claude: 'Claude', codex: 'Codex' }
+export const ETIQUETA_AGENTE: Record<ProveedorId, string> = { claude: 'Claude', codex: 'Codex', copilot: 'Copilot' }
 
 /** Nombre corto del agente de la cuenta para un texto; 'el agente' si no se conoce. */
 export function agenteDe(cuenta: { proveedor?: unknown }): string {
