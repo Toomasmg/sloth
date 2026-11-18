@@ -151,3 +151,21 @@ test('un conector con una herramienta en dos roles no se edita con el asistente'
   def.herramientas.apoyoEn = { estado: ['get_transitions'] }
   assert.equal(seEditaSinPerder(validarPropio(def) as ConectorMcp), false)
 })
+
+test('comandoTicket del asistente: se guarda recortado, se conserva al editar y uno inválido no pasa', () => {
+  const b = base()
+  assert.equal('comandoTicket' in aDef(b), false)
+  b.comandoTicket = '  /mi:cmd '
+  assert.equal(aDef(b).comandoTicket, '/mi:cmd')
+  const r = validarBorrador(b)
+  assert.equal(r.ok, true)
+  if (!r.ok || r.def.via !== 'mcp') return
+  assert.equal(deDef(r.def).comandoTicket, '/mi:cmd')
+  assert.equal(aDef(deDef(r.def)).comandoTicket, '/mi:cmd')
+  b.comandoTicket = '/ticket; rm -rf'
+  const mal = validarBorrador(b)
+  assert.equal(mal.ok, false)
+  if (!mal.ok) assert.equal(mal.ruta, 'conector.comandoTicket')
+  b.comandoTicket = '   '
+  assert.equal('comandoTicket' in aDef(b), false)
+})

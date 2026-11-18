@@ -28,6 +28,8 @@ export interface Borrador {
   formato: FormatoId
   regexPropia: string
   ejemploId: string
+  /** Comando con el que arranca el espacio de un ticket; vacío o ausente = sin comando. */
+  comandoTicket?: string
   estados: Estado[]
   pistas: { yoConId: string; yoSinId: string; lista: string; pedirEstados: boolean; apoyo: string }
   /** El conector que se está editando: lo que el asistente no maneja se toma de acá. */
@@ -179,6 +181,7 @@ export function aDef(b: Borrador): ConectorMcp {
     idRegex: regex,
     idMayusculas: mayusculas,
     ...(o?.personaId !== undefined ? { personaId: o.personaId } : {}),
+    ...(b.comandoTicket?.trim() ? { comandoTicket: b.comandoTicket.trim() } : {}),
     ejemplo: { id: b.ejemploId, estado: estadoEj, prioridad: o?.ejemplo.prioridad ?? 'prioridad', proyecto: o?.ejemplo.proyecto ?? 'proyecto' },
     estados: b.estados.map((e) => ({ ...e })),
     faltaConector: o && o.nombre === b.nombre ? { ...o.faltaConector } : faltaConector(b.id, b.nombre),
@@ -236,6 +239,7 @@ export function deDef(def: ConectorMcp): Borrador {
     formato,
     regexPropia: formato === 'propio' ? def.idRegex : '',
     ejemploId: def.ejemplo.id,
+    ...(def.comandoTicket !== undefined ? { comandoTicket: def.comandoTicket } : {}),
     estados: def.estados.map((e) => ({ ...e })),
     pistas: {
       yoConId: def.pistas.yo.conId,

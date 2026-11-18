@@ -241,7 +241,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
             autoStartClaude: true,
             ticket: ticketId,
             // La skill /ticket abre su propio worktree desde origin/staging.
-            initialPrompt: tk?.conector.comandoTicket ? `/ticket ${ticketId}` : undefined,
+            initialPrompt: tk?.conector.comandoTicket ? `${tk.conector.comandoTicket} ${ticketId}` : undefined,
             resume: true,
             color: colorKey
           }

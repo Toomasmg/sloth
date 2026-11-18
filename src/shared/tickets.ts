@@ -178,8 +178,8 @@ export interface ConectorInfo {
   ejemploId: string
   /** Los del conector, incluidos los de categoría 'hecho'. */
   estados: Estado[]
-  /** Si los espacios de sus tickets arrancan con `/ticket <id>` (la skill `/ticket` es propia de un solo conector: gruv). */
-  comandoTicket: boolean
+  /** El comando con el que arrancan los espacios de sus tickets (`<comando> <id>`); null si el conector no declara uno. */
+  comandoTicket: string | null
 }
 
 export interface Corrida {

@@ -38,7 +38,7 @@ test('Gruv valida y la copia es nueva, igual e idempotente', () => {
 })
 
 test('el registro trae Gruv y GitHub validados', () => {
-  assert.deepEqual(CONECTORES.slice(0, 2).map((c) => c.id), ['gruv', 'github'])
+  assert.deepEqual(CONECTORES.map((c) => c.id).filter((id) => id === 'gruv' || id === 'github'), ['github', 'gruv'])
   assert.deepEqual(conectorPorId('github'), github)
   assert.deepEqual(conectorPorId('gruv'), gruv)
   assert.equal(conectorPorId('trello'), undefined)
@@ -187,4 +187,23 @@ test('regexDePersona: la del conector, cacheada, o la de siempre', () => {
   assert.equal(regexDePersona(d), regexDePersona(d))
   assert.equal(regexDePersona(d).test('abc'), true)
   assert.equal(regexDePersona(d).test('abc1'), false)
+})
+
+test('comandoTicket: opcional, con forma de comando y sin nada que llegue raro a la terminal', () => {
+  for (const ok of ['/ticket', '/mi:cmd', '/a', '/x_y-z9', `/${'a'.repeat(39)}`]) {
+    const d = con('comandoTicket', ok) as ConectorMcp
+    assert.equal(validarConector(d).comandoTicket, ok)
+  }
+  for (const mal of ['ticket', '/Ticket', '/a b', '/x;rm', '/ticket\n', '/ticket\r', '/', '/1a', '/$(x)', '/a|b', `/${'a'.repeat(40)}`, 5, '', null, ['/ticket']])
+    rechaza(con('comandoTicket', mal), /comandoTicket/)
+  const sin = validarConector(con('comandoTicket', BORRAR))
+  assert.equal('comandoTicket' in sin, false)
+  assert.equal(validarConector(github).comandoTicket, undefined)
+})
+
+test('comandoTicket: solo Gruv lo trae en los incluidos', () => {
+  assert.deepEqual(
+    CONECTORES.filter((c) => c.comandoTicket !== undefined).map((c) => [c.id, c.comandoTicket]),
+    [['gruv', '/ticket']]
+  )
 })

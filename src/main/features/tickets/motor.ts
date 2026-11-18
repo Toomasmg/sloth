@@ -226,15 +226,15 @@ export function idValido(def: ConectorDef, v: unknown): string | null {
   return s.length <= ID_MAX && ID_SEGURO_RE.test(s) && regexDeId(def).test(s) ? s : null
 }
 
-/** La skill `/ticket` es propia de un solo conector (gruv): solo ese arranca el espacio con ella. */
-export const usaComandoTicket = (def: ConectorDef): boolean => def.id === 'gruv'
+/** El comando con el que arranca el espacio de un ticket; solo lo tienen los conectores que lo declaran (gruv, con `/ticket`). */
+export const comandoDeTicket = (def: ConectorDef): string | null => def.comandoTicket ?? null
 
 export const leeDetalle = (def: ConectorDef): boolean => def.via === 'gh' || def.herramientas.detalle.length > 0
 
 /** `soloLectura`: un incluido sin probar se puede leer pero no ofrece acciones. */
 export function info(def: ConectorDef | undefined, idPedido: string, soloLectura = false): ConectorInfo {
   if (!def)
-    return { id: idPedido, nombre: idPedido === SIN_CONECTOR ? 'Sin conector' : idPedido, verificado: false, via: 'mcp', disponible: false, acciones: [], leeDetalle: false, ejemploId: '', estados: [], comandoTicket: false }
+    return { id: idPedido, nombre: idPedido === SIN_CONECTOR ? 'Sin conector' : idPedido, verificado: false, via: 'mcp', disponible: false, acciones: [], leeDetalle: false, ejemploId: '', estados: [], comandoTicket: null }
   return {
     id: def.id,
     nombre: def.nombre,
@@ -245,7 +245,7 @@ export function info(def: ConectorDef | undefined, idPedido: string, soloLectura
     leeDetalle: leeDetalle(def),
     ejemploId: def.ejemplo.id,
     estados: def.estados.map((e) => ({ ...e })),
-    comandoTicket: usaComandoTicket(def)
+    comandoTicket: comandoDeTicket(def)
   }
 }
 

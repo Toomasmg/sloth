@@ -53,6 +53,17 @@ test('una herramienta de lectura que parece de escritura se rechaza con su ruta'
   rechazaEn(conApoyo, 'conector.herramientas.apoyo[0]')
 })
 
+test('comandoTicket de un propio: el válido se acepta y el inválido se rechaza con su ruta', () => {
+  assert.equal(validarPropio({ ...propio('mi-linear'), comandoTicket: '/mi:cmd' }).comandoTicket, '/mi:cmd')
+  assert.equal('comandoTicket' in validarPropio(propio('mi-linear')), false)
+  for (const mal of ['/ticket; rm -rf', '/ticket\n/otro', 'ticket', 7]) rechazaEn({ ...propio('mi-linear'), comandoTicket: mal }, 'conector.comandoTicket')
+  const r = parsearArchivoPropios(JSON.stringify({ version: 1, conectores: [{ ...propio('mio'), comandoTicket: '/x y' }], aceptados: {} }))
+  assert.equal(r.archivo.conectores.length, 0)
+  assert.equal(r.archivo.apartados.length, 1)
+  assert.match(r.avisos[0], /comandoTicket/)
+  assert.throws(() => parsearImport(JSON.stringify({ ...propio('mio'), comandoTicket: '/x;y' })), /comandoTicket/)
+})
+
 test('los conectores propios de vía gh se rechazan', () => {
   rechazaEn({ ...github, id: 'mi-github' }, 'conector.via')
 })
