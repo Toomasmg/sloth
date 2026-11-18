@@ -89,7 +89,7 @@ test('«No volver a preguntar» + Cerrar apaga el aviso en Configuración', asyn
     const exited = new Promise<void>((r) => app.process().once('exit', () => r()))
     await clickX(app)
     await exited
-    const saved = JSON.parse(readFileSync(join(userData, 'features', 'settings.json'), 'utf8')) as { confirmQuit?: boolean }
+    const saved = JSON.parse(readFileSync(join(userData, 'perfiles', 'principal', 'features', 'settings.json'), 'utf8')) as { confirmQuit?: boolean }
     expect(saved.confirmQuit).toBe(false)
   } finally {
     await closeSloth(app, userData)

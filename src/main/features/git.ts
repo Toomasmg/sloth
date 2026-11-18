@@ -1,8 +1,9 @@
-import { app, shell } from 'electron'
+import { shell } from 'electron'
 import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
 import { basename, join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import { GitError, isDir, normPath, validBranchName } from './git-run'
+import { registrarActividad } from './perfiles'
 import {
   changeCount,
   commitFiles,
@@ -41,6 +42,7 @@ import {
   validatePr
 } from './git-ops'
 import type { FileChange } from './git-ops'
+import { carpetaFeatures } from '../perfil'
 
 /**
  * Función «git»: cambios del espacio (preparar, sacar, descartar, commit), historial, ramas
@@ -58,7 +60,7 @@ let saved: Saved = { bases: {} }
 const busy = new Set<string>()
 
 function stateFile(): string {
-  return join(app.getPath('userData'), 'features', 'git.json')
+  return join(carpetaFeatures(), 'git.json')
 }
 
 function load(): void {
@@ -427,7 +429,12 @@ const feature: Feature = {
         const cwd = cwdOf(wsId)
         const p = validatePr(input)
         if (isProtected(p.head)) throw new GitError(`No se abre un PR desde ${p.head}.`)
-        return exclusive(wsId as string, () => createPr(cwd, p))
+        return exclusive(wsId as string, async () => {
+          const url = await createPr(cwd, p)
+          const numero = /\/pull\/(\d+)/.exec(url)?.[1]
+          if (numero) registrarActividad({ t: Date.now(), tipo: 'pr', pr: `#${numero}` })
+          return url
+        })
       })
     )
 

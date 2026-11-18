@@ -42,6 +42,12 @@ export interface FeatureContext {
   prepareAccount(acc: Account): void
   /** Si hay alguna terminal abierta con la cuenta: Claude puede estar escribiendo su .claude.json. */
   accountBusy(accountId: string): boolean
+  /** Terminales vivas en el daemon que son de otro perfil (ids de espacio). Esta instancia no las muestra ni las toca. */
+  terminalesAjenas(): string[]
+  /** Las cierra todas. Devuelve cuántas cerró. */
+  cerrarTerminalesAjenas(): Promise<number>
+  /** Reinicia Sloth por un cambio de perfil: las terminales propias quedan vivas en el daemon. */
+  reiniciarPorPerfil(): Promise<void>
   /** Se llama cada vez que se prepara una cuenta, después de instalar settings y hooks. */
   onPrepareAccount(cb: (acc: Account) => void): void
   /** Se llama justo antes de borrar una cuenta del store (sin espacios que la usen). */

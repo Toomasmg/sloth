@@ -14,6 +14,7 @@ import { buildInvitation, decideInvite, looksLikeInvitation, parseInvitation, ty
 import { escribirJsonAtomico, leerJson, respaldar } from '../json-file'
 import { avisar } from '../avisos'
 import { registerChatMcp } from './chat-mcp'
+import { carpetaFeatures } from '../perfil'
 
 /**
  * Función «chat» (lado main): config de Supabase, login con GitHub (PKCE) y sesión cifrada.
@@ -89,7 +90,7 @@ const avatarOf = (v: unknown): string | undefined =>
 const feature: Feature = {
   name: 'chat',
   register(ctx: FeatureContext) {
-    const dir = join(app.getPath('userData'), 'features')
+    const dir = carpetaFeatures()
     const configFile = join(dir, 'chat.json')
 
     let saved: SavedFile = loadSaved()

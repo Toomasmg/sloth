@@ -27,6 +27,7 @@ import { normTicketId, TEMPLATE_COLOR_KEYS, validBranch } from '../shared/templa
 import { baseSettingsFor, syncSharedSetup, unshareSetup } from './setup'
 import { UsageScanner } from './usage'
 import { FEATURES } from './features'
+import { registrarActividad } from './features/perfiles'
 import { hookTokenDe } from '../daemon/auth'
 import { APP_ID } from '../shared/app-id'
 import { currentSettings, initialChrome } from './features/settings'
@@ -49,6 +50,8 @@ import {
   type RevealTarget,
   type Workspace
 } from '../shared/types'
+import { cambiandoDePerfil, iniciarPerfiles, marcarCambioDePerfil, raizDatos } from './perfil'
+import { decidirCierreTerminales, esTerminalPropia, terminalesAjenas } from './perfiles-core'
 
 let win: BrowserWindow | null = null
 const windowListeners: ((w: BrowserWindow) => void)[] = []
@@ -84,7 +87,7 @@ if (!instanciaUnica) app.quit()
 
 // Antes de whenReady para que queden registrados también los errores de arranque. La segunda instancia
 // (la que cierra enseguida) no toca el log ni el marcador: son de la primera.
-const logsDir = join(app.getPath('userData'), 'logs')
+const logsDir = join(raizDatos(), 'logs')
 let inicioSesion = Date.now()
 if (instanciaUnica) {
   iniciarLogger(logsDir)
@@ -160,6 +163,18 @@ function serveRenderer(): void {
 }
 
 app.whenReady().then(async () => {
+  // La segunda instancia sigue unos instantes después de app.quit(): no puede llegar a la migración de perfiles ni a nada que escriba.
+  if (!instanciaUnica) return
+  // Con perfiles ya creados que no se pueden usar no hay un lugar seguro donde trabajar (la raíz quedó congelada): se avisa y no se toca nada.
+  const arranque = iniciarPerfiles()
+  if (arranque.bloqueado) {
+    cerrarSesion(logsDir, inicioSesion)
+    dialog.showErrorBox('Sloth no puede abrir tus perfiles', `${arranque.bloqueado}
+
+No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningún antivirus tenga esos archivos y volvé a abrir Sloth.`)
+    app.exit(1)
+    return
+  }
   serveRenderer()
   const devUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined
   session.defaultSession.setPermissionRequestHandler((_wc, permiso, cb, d) => cb(permisoChromium(permiso, origenConfiable(d.requestingUrl, devUrl), 'mediaTypes' in d ? d.mediaTypes : undefined)))
@@ -246,12 +261,15 @@ app.whenReady().then(async () => {
   }
 
   // Las terminales viven en el daemon (sobreviven al cierre) o, si no hay node, dentro de la app.
+  // El daemon es uno para todos los perfiles: las que ya corrían y no son de un espacio de este perfil no se tocan ni se escuchan.
+  const ajenas = new Set<string>()
+  const esAjena = (id: string): boolean => ajenas.has(id)
   let term: TerminalBackend | undefined
   let termPromise: Promise<TerminalBackend> | undefined
   function backend(): Promise<TerminalBackend> {
     if (!termPromise) {
       termPromise = createTerminalBackend({
-        userDataDir: app.getPath('userData'),
+        userDataDir: raizDatos(),
         appVersion: app.getVersion(),
         resourcesDir: app.isPackaged ? process.resourcesPath : undefined,
         projectRoot: app.isPackaged ? undefined : app.getAppPath(),
@@ -262,16 +280,23 @@ app.whenReady().then(async () => {
       }).then(async (b) => {
         term = b
         b.on('data', (id: string, chunks: PtyChunk[]) => {
+          if (esAjena(id)) return
           send('pty:data', id, chunks)
           for (const l of dataListeners) safe('pty-data', () => l(id, chunks))
         })
         b.on('exit', (id: string, code: number) => {
+          if (esAjena(id)) {
+            ajenas.delete(id)
+            return
+          }
           send('pty:exit', id, code)
           for (const l of exitListeners) safe('pty-exit', () => l(id, code))
           // Un espacio dormido sigue «Dormido» (su terminal se cerró a propósito).
           if (store.workspace(id)) moveAgent(id, 'exit')
         })
-        b.on('hook', onHook)
+        b.on('hook', (p: HookEventPayload) => {
+          if (!esAjena(p.ws)) onHook(p)
+        })
         b.on('permission', onPermission)
         b.on('permission-resolved', (id: string) => send('permission:resolved', id))
         b.on('disconnect', () => {
@@ -286,6 +311,8 @@ app.whenReady().then(async () => {
         // Rehidratar: estado de los agentes que siguieron trabajando con la app cerrada.
         const sessions = await b.list().catch(() => [])
         const running = new Set(sessions.filter((x) => x.running).map((x) => x.id))
+        const propia = (id: string): boolean => esTerminalPropia(id, (x) => store.workspace(x) !== undefined, (x) => store.account(x) !== undefined)
+        for (const id of terminalesAjenas(sessions, propia)) ajenas.add(id)
         for (const [wsId, ev] of Object.entries(b.lastHookEvents())) {
           if (!store.workspace(wsId) || !running.has(wsId)) continue
           const { state, detail } = stateForEvent(ev)
@@ -582,6 +609,7 @@ app.whenReady().then(async () => {
   handle('pty:start', async (_e, id: unknown, cols: unknown, rows: unknown) => {
     if (!idValido(id) || !dimValida(cols) || !dimValida(rows)) throw new Error('Pedido inválido.')
     const b = await backend()
+    if (esAjena(id)) throw new Error('Esa terminal es de otro perfil.')
     // Si ya corre (siguió viva en el daemon), solo se reconecta: no se rearma la cuenta ni el comando.
     const shellChoice = currentSettings().terminal.shell
     const running = b.isRunning(id)
@@ -589,6 +617,7 @@ app.whenReady().then(async () => {
     const { spawn, paste } = toSpawnSpec(spec, cols, rows, shellChoice)
     const result = await b.start(id, spawn)
     const ws = running ? undefined : store.workspace(id)
+    if (ws) registrarActividad({ t: Date.now(), tipo: 'espacio', espacio: ws.name })
     if (ws?.initialPrompt && !ws.initialPromptUsed && spec.claude?.includes('--')) {
       if (paste) pendingPaste.set(id, { text: paste, until: Date.now() + 2 * 60 * 1000 })
       else store.updateWorkspace(id, { initialPromptUsed: true })
@@ -597,22 +626,51 @@ app.whenReady().then(async () => {
     return result
   })
   on('pty:write', (_e, id: unknown, data: unknown) => {
-    if (!idValido(id) || typeof data !== 'string') return
+    if (!idValido(id) || typeof data !== 'string' || esAjena(id)) return
     term?.write(id, data)
     for (const l of writeListeners) safe('pty-write', () => l(id, data))
   })
   on('pty:resize', (_e, id: unknown, cols: unknown, rows: unknown) => {
-    if (idValido(id) && dimValida(cols) && dimValida(rows)) term?.resize(id, cols, rows)
+    if (idValido(id) && dimValida(cols) && dimValida(rows) && !esAjena(id)) term?.resize(id, cols, rows)
   })
   handle('pty:kill', async (_e, id: unknown) => {
     if (!idValido(id)) throw new Error('Pedido inválido.')
-    await (await backend()).kill(id)
+    const b = await backend()
+    if (esAjena(id)) throw new Error('Esa terminal es de otro perfil.')
+    await b.kill(id)
     if (store.workspace(id)) moveAgent(id, 'exit')
   })
 
   // Texto, rutas de archivos copiados o una imagen guardada como PNG (src/main/clipboard-paste.ts).
   handle('clipboard:read', () => clipboardForPaste())
   handle('clipboard:write', (_e, text: unknown) => clipboard.writeText(String(text)))
+
+  async function cerrarTerminalesAjenas(): Promise<number> {
+    const b = await backend()
+    let cerradas = 0
+    for (const id of [...ajenas]) {
+      try {
+        await b.kill(id)
+        ajenas.delete(id)
+        cerradas++
+      } catch (e) {
+        logger.error('perfiles', e)
+      }
+    }
+    return cerradas
+  }
+
+  // Como el cierre que conserva las terminales, pero sin pasar por el cierre de ventana (bandeja, confirmaciones).
+  async function reiniciarPorPerfil(): Promise<void> {
+    marcarCambioDePerfil()
+    marcarCierreLimpio()
+    quitPrepared = true
+    const b = term
+    if (b?.info().mode === 'inprocess') await Promise.race([b.shutdown(), new Promise((r) => setTimeout(r, 5000))]).catch(() => undefined)
+    finishQuit(b)
+    app.relaunch()
+    app.exit(0)
+  }
 
   // Funciones (features): cada una con sus canales feat:<nombre>:<op>.
   for (const f of FEATURES) {
@@ -647,6 +705,9 @@ app.whenReady().then(async () => {
       },
       prepareAccount,
       accountBusy,
+      terminalesAjenas: () => [...ajenas],
+      cerrarTerminalesAjenas,
+      reiniciarPorPerfil,
       onPrepareAccount: (cb) => prepareListeners.push(cb),
       onRemoveAccount: (cb) => removeListeners.push(cb),
       restartTerminal: async (id) => {
@@ -664,6 +725,15 @@ app.whenReady().then(async () => {
     } catch (e) {
       console.error(`[función ${f.name}] no se pudo registrar:`, e)
       logger.error(f.name, e)
+    }
+  }
+
+  /** De a una: node-pty en Windows no soporta cerrar varias a la vez (ver daemon/shutdown.ts). */
+  async function cerrarTerminalesPropias(b: TerminalBackend): Promise<void> {
+    const ids = [...store.workspaces.map((w) => w.id), ...store.accounts.map((a) => loginPaneId(a.id))]
+    for (const id of ids) {
+      if (!b.isRunning(id)) continue
+      await b.kill(id).catch((e: unknown) => logger.error('perfiles', e))
     }
   }
 
@@ -685,10 +755,18 @@ app.whenReady().then(async () => {
     marcarCierreLimpio()
     const b = term
     // En proceso no hay daemon que las conserve: se espera el cierre ordenado igual (ver daemon/shutdown.ts).
-    if (b && (!currentSettings().keepTerminalsAlive || b.info().mode === 'inprocess')) {
+    // Al cambiar de perfil el daemon las conserva para cuando se vuelva. Con terminales de otros perfiles
+    // vivas, «Terminales vivas» apagado cierra solo las de este perfil: el daemon sigue con las de los demás.
+    const cierre = decidirCierreTerminales({
+      conservar: currentSettings().keepTerminalsAlive || cambiandoDePerfil(),
+      enProceso: b?.info().mode === 'inprocess',
+      hayAjenas: ajenas.size > 0
+    })
+    if (b && cierre !== 'conservar') {
       e.preventDefault()
       quitPrepared = true
-      void Promise.race([b.shutdown(), new Promise((r) => setTimeout(r, 5000))])
+      const cerrar = cierre === 'apagar' ? b.shutdown() : cerrarTerminalesPropias(b)
+      void Promise.race([cerrar, new Promise((r) => setTimeout(r, 5000))])
         .catch(() => undefined)
         .finally(() => {
           finishQuit(b)

@@ -1,10 +1,11 @@
-import { app, shell } from 'electron'
+import { shell } from 'electron'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { isAbsolute, join } from 'node:path'
 import type { Feature } from './context'
 import { escribirJsonAtomico } from '../json-file'
 import { checkEnvironment, DOCS, repoCandidates, type DocKey, type EnvReport } from './onboarding-env'
+import { carpetaFeatures } from '../perfil'
 
 /**
  * Función «onboarding»: asistente de primera vez. Estado en userData/features/onboarding.json.
@@ -23,7 +24,7 @@ interface OnboardingState {
   updatedAt: number
 }
 
-const file = (): string => join(app.getPath('userData'), 'features', 'onboarding.json')
+const file = (): string => join(carpetaFeatures(), 'onboarding.json')
 
 function load(): OnboardingState {
   try {

@@ -13,7 +13,7 @@ const ip = elegirIp(networkInterfaces())
 test('Celular: prende el servidor del Wi-Fi, muestra el QR y la API solo habla con la clave del QR', async ({ sloth: { app, page } }) => {
   test.skip(!ip, 'Esta PC no tiene una red privada: no hay dónde abrir el servidor.')
   const userData = await app.evaluate(({ app: a }) => a.getPath('userData'))
-  const clave = (): string => (JSON.parse(readFileSync(join(userData, 'features', 'celular.json'), 'utf8')) as { clave: string }).clave
+  const clave = (): string => (JSON.parse(readFileSync(join(userData, 'perfiles', 'principal', 'features', 'celular.json'), 'utf8')) as { clave: string }).clave
 
   await page.keyboard.press('Control+k')
   await page.getByRole('combobox').first().fill('Ver Sloth en el celular')

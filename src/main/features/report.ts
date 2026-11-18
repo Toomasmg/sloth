@@ -26,6 +26,7 @@ import {
   type ReportType,
   type SanitizeContext
 } from './report-core'
+import { raizDatos } from '../perfil'
 
 /**
  * Función «report» (lado main): «Reportar un problema».
@@ -78,7 +79,7 @@ const feature: Feature = {
         accounts: ctx.store.accounts.length,
         workspaces: ctx.store.workspaces.length
       }).map((l) => sanitize(l, hc))
-      const logs = recentLines(readLogTail(logFileFor(app.getPath('userData'))), Date.now()).map((l) => sanitize(l, hc))
+      const logs = recentLines(readLogTail(logFileFor(raizDatos())), Date.now()).map((l) => sanitize(l, hc))
       return { sys, logs }
     }
 
@@ -90,7 +91,7 @@ const feature: Feature = {
       const img = await win.webContents.capturePage()
       const small = img.getSize().width > 1280 ? img.resize({ width: 1280 }) : img
       const png = small.toPNG()
-      const dir = join(app.getPath('userData'), 'reports')
+      const dir = join(raizDatos(), 'reports')
       mkdirSync(dir, { recursive: true })
       // Solo se guarda una captura: la nueva reemplaza a la anterior.
       if (lastShot && existsSync(lastShot.file)) {

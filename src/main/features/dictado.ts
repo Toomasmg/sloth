@@ -22,6 +22,7 @@ import {
 import { ModeloError, asegurarModelo } from '../dictado-modelo'
 import { depsModeloReales } from '../dictado-modelo-real'
 import type { ProgresoModelo, ResultadoDictado, TipoErrorDictado } from '../../shared/dictado'
+import { raizDatos } from '../perfil'
 
 /**
  * Función «dictado»: el micrófono de cada terminal. La UI graba y manda el WAV; acá se transcribe
@@ -40,7 +41,7 @@ function carpetaWhisper(): string {
 }
 
 function carpetaModelos(): string {
-  return join(app.getPath('userData'), 'whisper')
+  return join(raizDatos(), 'whisper')
 }
 
 /** Primero lo bajado a userData; después lo que traiga la carpeta del motor (dev e instalaciones viejas). */

@@ -1,7 +1,7 @@
-import { app } from 'electron'
 import { escribirJsonAtomico, leerJson } from '../json-file'
 import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
+import { carpetaFeatures } from '../perfil'
 
 /**
  * Función «broadcast» (lado main). El envío en sí lo hace la interfaz con `ptyWrite` (y la cola de
@@ -54,7 +54,7 @@ export function clean(raw: unknown): SentEntry | null {
 const feature: Feature = {
   name: 'broadcast',
   register(c: FeatureContext) {
-    file = join(app.getPath('userData'), 'features', 'broadcast.json')
+    file = join(carpetaFeatures(), 'broadcast.json')
     entries = load()
     c.handle('list', () => entries)
     c.handle('add', (raw: unknown) => {

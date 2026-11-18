@@ -1,6 +1,6 @@
-import { app } from 'electron'
 import { join } from 'node:path'
 import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
+import { carpetaFeatures } from '../perfil'
 
 export interface TraySettings {
   /** Al cerrar la ventana, ocultarla en la bandeja en vez de salir. Por defecto no. */
@@ -9,7 +9,7 @@ export interface TraySettings {
 
 const DEFAULTS: TraySettings = { closeToTray: false }
 
-export const featuresDir = (): string => join(app.getPath('userData'), 'features')
+export const featuresDir = (): string => carpetaFeatures()
 const file = (): string => join(featuresDir(), 'tray.json')
 
 

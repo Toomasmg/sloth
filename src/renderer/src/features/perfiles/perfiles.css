@@ -1,0 +1,129 @@
+.f-perfil-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  overflow: hidden;
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+  line-height: 1;
+}
+.f-perfil-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.f-perfil-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+}
+.f-perfil-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.f-perfil-chip-nombre {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.f-perfil-texto {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-13);
+  line-height: 1.5;
+}
+.f-perfil-error {
+  margin: var(--s-2) 0 0;
+  color: var(--danger);
+  font-size: var(--fs-12);
+}
+.f-perfil-vacio {
+  margin: 0;
+  padding: var(--s-3);
+  color: var(--text-3);
+  font-size: var(--fs-12);
+}
+.f-perfil-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.f-perfil-fila {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border-bottom: 1px solid var(--divider);
+}
+.f-perfil-fila-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.f-perfil-nombre {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.f-perfil-activo {
+  padding: 1px var(--s-2);
+  border-radius: var(--r-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: var(--fs-11);
+  font-weight: 500;
+}
+.f-perfil-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--s-1);
+}
+.f-perfil-form,
+.f-perfil-crear {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+.f-perfil-crear {
+  padding: var(--s-3);
+}
+.f-perfil-act-head {
+  padding: var(--s-3) var(--s-3) 0;
+}
+.f-perfil-actividad {
+  padding: var(--s-3);
+}
+.f-perfil-dia {
+  margin: var(--s-2) 0 var(--s-1);
+  color: var(--text-3);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.f-perfil-actividad ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.f-perfil-actividad li {
+  display: flex;
+  gap: var(--s-3);
+  padding: var(--s-1) 0;
+  font-size: var(--fs-13);
+  overflow-wrap: anywhere;
+}
+.f-perfil-hora {
+  flex: none;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
