@@ -51,7 +51,7 @@ import {
   type Workspace
 } from '../shared/types'
 import { cambiandoDePerfil, marcarCambioDePerfil, raizDatos } from './perfil'
-import { terminalesAjenas } from './perfiles-core'
+import { decidirCierreTerminales, esTerminalPropia, terminalesAjenas } from './perfiles-core'
 
 let win: BrowserWindow | null = null
 const windowListeners: ((w: BrowserWindow) => void)[] = []
@@ -273,7 +273,10 @@ app.whenReady().then(async () => {
           for (const l of dataListeners) safe('pty-data', () => l(id, chunks))
         })
         b.on('exit', (id: string, code: number) => {
-          if (esAjena(id)) return
+          if (esAjena(id)) {
+            ajenas.delete(id)
+            return
+          }
           send('pty:exit', id, code)
           for (const l of exitListeners) safe('pty-exit', () => l(id, code))
           // Un espacio dormido sigue «Dormido» (su terminal se cerró a propósito).
@@ -296,7 +299,8 @@ app.whenReady().then(async () => {
         // Rehidratar: estado de los agentes que siguieron trabajando con la app cerrada.
         const sessions = await b.list().catch(() => [])
         const running = new Set(sessions.filter((x) => x.running).map((x) => x.id))
-        for (const id of terminalesAjenas(sessions, (id) => store.workspace(id) !== undefined)) ajenas.add(id)
+        const propia = (id: string): boolean => esTerminalPropia(id, (x) => store.workspace(x) !== undefined, (x) => store.account(x) !== undefined)
+        for (const id of terminalesAjenas(sessions, propia)) ajenas.add(id)
         for (const [wsId, ev] of Object.entries(b.lastHookEvents())) {
           if (!store.workspace(wsId) || !running.has(wsId)) continue
           const { state, detail } = stateForEvent(ev)
@@ -712,6 +716,15 @@ app.whenReady().then(async () => {
     }
   }
 
+  /** De a una: node-pty en Windows no soporta cerrar varias a la vez (ver daemon/shutdown.ts). */
+  async function cerrarTerminalesPropias(b: TerminalBackend): Promise<void> {
+    const ids = [...store.workspaces.map((w) => w.id), ...store.accounts.map((a) => loginPaneId(a.id))]
+    for (const id of ids) {
+      if (!b.isRunning(id)) continue
+      await b.kill(id).catch((e: unknown) => logger.error('perfiles', e))
+    }
+  }
+
   // Al salir: con «Terminales vivas» la conexión se suelta y el daemon sigue; apagado, se cierran sus terminales.
   let quitPrepared = false
   const finishQuit = (b: TerminalBackend | undefined): void => {
@@ -730,12 +743,18 @@ app.whenReady().then(async () => {
     marcarCierreLimpio()
     const b = term
     // En proceso no hay daemon que las conserve: se espera el cierre ordenado igual (ver daemon/shutdown.ts).
-    // Al cambiar de perfil el daemon las conserva para cuando se vuelva.
-    const conservar = currentSettings().keepTerminalsAlive || cambiandoDePerfil()
-    if (b && (!conservar || b.info().mode === 'inprocess')) {
+    // Al cambiar de perfil el daemon las conserva para cuando se vuelva. Con terminales de otros perfiles
+    // vivas, «Terminales vivas» apagado cierra solo las de este perfil: el daemon sigue con las de los demás.
+    const cierre = decidirCierreTerminales({
+      conservar: currentSettings().keepTerminalsAlive || cambiandoDePerfil(),
+      enProceso: b?.info().mode === 'inprocess',
+      hayAjenas: ajenas.size > 0
+    })
+    if (b && cierre !== 'conservar') {
       e.preventDefault()
       quitPrepared = true
-      void Promise.race([b.shutdown(), new Promise((r) => setTimeout(r, 5000))])
+      const cerrar = cierre === 'apagar' ? b.shutdown() : cerrarTerminalesPropias(b)
+      void Promise.race([cerrar, new Promise((r) => setTimeout(r, 5000))])
         .catch(() => undefined)
         .finally(() => {
           finishQuit(b)

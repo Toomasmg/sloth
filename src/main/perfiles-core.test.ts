@@ -3,6 +3,9 @@ import assert from 'node:assert/strict'
 import { join } from 'node:path'
 import {
   aCopiar,
+  clasificarJson,
+  decidirCierreTerminales,
+  esTerminalPropia,
   dentroDe,
   idPerfilValido,
   nombreLibre,
@@ -99,4 +102,41 @@ test('dentroDe: rechaza salir con .. y carpetas hermanas con el mismo prefijo', 
   assert.equal(dentroDe(base, join(base, 'principal', '..', '..', 'x')), false)
   assert.equal(dentroDe(base, join('/a', 'perfiles-x')), false)
   assert.equal(dentroDe(base, join('/a', 'perfiles-x', 'y')), false)
+})
+
+test('terminalesAjenas: la terminal de login de una cuenta propia no es ajena; la de una cuenta de otro perfil sí', () => {
+  const espacios = new Set(['ws-1'])
+  const cuentas = new Set(['cta-propia'])
+  const propia = (id: string): boolean => esTerminalPropia(id, (x) => espacios.has(x), (x) => cuentas.has(x))
+  const sesiones = [
+    { id: 'ws-1', running: true },
+    { id: 'login:cta-propia', running: true },
+    { id: 'login:cta-de-otro-perfil', running: true },
+    { id: 'ws-otro', running: true },
+    { id: 'login:cta-propia-cerrada', running: false }
+  ]
+  assert.deepEqual(terminalesAjenas(sesiones, propia), ['login:cta-de-otro-perfil', 'ws-otro'])
+  assert.equal(propia('login:'), false)
+  assert.equal(propia('ws-1'), true)
+})
+
+test('decidirCierreTerminales: con terminales de otros perfiles el daemon no se apaga entero', () => {
+  const base = { conservar: false, enProceso: false, hayAjenas: false }
+  assert.equal(decidirCierreTerminales(base), 'apagar')
+  assert.equal(decidirCierreTerminales({ ...base, hayAjenas: true }), 'cerrar-propias')
+  assert.equal(decidirCierreTerminales({ ...base, conservar: true, hayAjenas: true }), 'conservar')
+  assert.equal(decidirCierreTerminales({ ...base, conservar: true }), 'conservar')
+  assert.equal(decidirCierreTerminales({ ...base, enProceso: true, hayAjenas: true, conservar: true }), 'apagar')
+})
+
+test('clasificarJson: una versión futura no es corrupta; lo roto o inválido sí', () => {
+  const validar = (v: unknown): Perfil | null => validarMeta(v)
+  assert.equal(clasificarJson('{"id":"principal","nombre":"Mi perfil","creado":1}', validar).estado, 'ok')
+  assert.equal(clasificarJson('\uFEFF{"version":1,"id":"principal","nombre":"Mi perfil","creado":1}', validar).estado, 'ok')
+  assert.equal(clasificarJson('{"version":2,"id":"principal","nombre":"Mi perfil","creado":1,"nuevo":true}', validar).estado, 'futura')
+  assert.equal(clasificarJson('{"version":2,"id":42,"nombre":{"es":"x"}}', validar).estado, 'futura')
+  assert.equal(clasificarJson('{ roto', validar).estado, 'invalida')
+  assert.equal(clasificarJson('[]', validar).estado, 'invalida')
+  assert.equal(clasificarJson('{"version":"x","id":"principal","nombre":"A","creado":1}', validar).estado, 'invalida')
+  assert.equal(clasificarJson('{"id":"../x","nombre":"A","creado":1}', validar).estado, 'invalida')
 })

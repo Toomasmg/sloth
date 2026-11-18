@@ -1,4 +1,6 @@
 import { isAbsolute, relative, resolve } from 'node:path'
+import { accountIdFromLoginPane, isLoginPane } from '../shared/types'
+import { migrar } from './versionado'
 
 export interface Perfil {
   id: string
@@ -89,11 +91,46 @@ export function reconstruirIndice(metas: readonly Perfil[], activoPrevio?: strin
 }
 
 /**
- * Terminales vivas en el daemon que no son de ningún espacio de este perfil. Los ids son UUID de espacio,
- * únicos entre perfiles, así que una que corre sin espacio acá es de otro perfil.
+ * Los ids de espacio son UUID únicos entre perfiles; la terminal de login de una cuenta (`login:<cuenta>`)
+ * no es de ningún espacio pero es de quien tenga esa cuenta.
  */
+export function esTerminalPropia(id: string, tieneEspacio: (id: string) => boolean, tieneCuenta: (id: string) => boolean): boolean {
+  if (tieneEspacio(id)) return true
+  return isLoginPane(id) && tieneCuenta(accountIdFromLoginPane(id))
+}
+
+/** Terminales vivas en el daemon que no son de este perfil. */
 export function terminalesAjenas(sesiones: readonly { id: string; running: boolean }[], esPropia: (id: string) => boolean): string[] {
   return sesiones.filter((s) => s.running && !esPropia(s.id)).map((s) => s.id)
+}
+
+export type CierreTerminales = 'conservar' | 'apagar' | 'cerrar-propias'
+
+/**
+ * Qué hacer con las terminales al salir. Con terminales de otros perfiles vivas en el daemon nunca se lo
+ * apaga entero: «Terminales vivas» apagado en este perfil solo vale para las terminales de este perfil.
+ */
+export function decidirCierreTerminales(o: { conservar: boolean; enProceso: boolean; hayAjenas: boolean }): CierreTerminales {
+  if (o.enProceso) return 'apagar'
+  if (o.conservar) return 'conservar'
+  return o.hayAjenas ? 'cerrar-propias' : 'apagar'
+}
+
+export type LecturaClasificada<T> = { estado: 'ok'; valor: T } | { estado: 'futura' } | { estado: 'invalida' }
+
+/** Una versión más nueva que la que entiende esta Sloth no está rota: no se aparta ni se reescribe. */
+export function clasificarJson<T>(texto: string, validar: (raw: unknown) => T | null): LecturaClasificada<T> {
+  let raw: unknown
+  try {
+    raw = JSON.parse(texto.replace(/^﻿/, ''))
+  } catch {
+    return { estado: 'invalida' }
+  }
+  const v = migrar(raw, {}, 1)
+  if (v.estado === 'futura') return { estado: 'futura' }
+  if (v.estado === 'invalida') return { estado: 'invalida' }
+  const valor = validar(raw)
+  return valor === null ? { estado: 'invalida' } : { estado: 'ok', valor }
 }
 
 export function aCopiar(entradasRaiz: readonly string[]): string[] {
