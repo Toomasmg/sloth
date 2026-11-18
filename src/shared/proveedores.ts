@@ -144,10 +144,15 @@ MOTIVOS_ESPECIFICOS.copilot = {
 /** Con un login compartido del sistema, dos cuentas de Copilot se pisarían entre sí. */
 export const MAX_CUENTAS: Partial<Record<ProveedorId, number>> = { copilot: 1 }
 
-/** Por qué no se puede sumar otra cuenta de ese agente, o undefined si se puede. */
-export function motivoNoAgregar(cuentas: readonly { proveedor?: unknown }[], id: ProveedorId): string | undefined {
+/**
+ * Por qué no se puede sumar otra cuenta de ese agente, o undefined si se puede. El login del sistema es el mismo
+ * para todos los perfiles: `enOtrosPerfiles` son las cuentas de ese agente que ya hay en los demás.
+ */
+export function motivoNoAgregar(cuentas: readonly { proveedor?: unknown }[], id: ProveedorId, enOtrosPerfiles = 0): string | undefined {
   const tope = MAX_CUENTAS[id]
   if (tope === undefined) return undefined
-  if (cuentas.filter((c) => proveedorIdDe(c) === id).length < tope) return undefined
-  return `Ya tenés una cuenta de ${NOMBRE_PROVEEDOR[id]}: su login es del sistema y dos cuentas se pisarían entre sí.`
+  const aca = cuentas.filter((c) => proveedorIdDe(c) === id).length
+  if (aca >= tope) return `Ya tenés una cuenta de ${NOMBRE_PROVEEDOR[id]}: su login es del sistema y dos cuentas se pisarían entre sí.`
+  if (aca + enOtrosPerfiles >= tope) return `Ya tenés una cuenta de ${NOMBRE_PROVEEDOR[id]} en otro perfil: su login es del sistema y es el mismo en todos los perfiles.`
+  return undefined
 }
