@@ -30,13 +30,15 @@ import { podarSegunStore } from '../../poda'
 import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, ticketId } from './acciones'
 import { runClaude } from './claude-run'
 import { proveedorExigido } from '../../proveedores'
+import { motorDe } from './motores'
+import type { MotorTickets, PedidoMotor } from './motor-tickets'
 import { capacidadesDe, nombreProveedor } from '../../../shared/proveedores'
 import type { Account } from '../../../shared/types'
 import type { ConectorDef, ConectorGh, ConectorMcp } from './conector'
 import { crearAlmacen, type Almacen, type ConfigCruda, type FsTickets } from './almacen'
 import { CONECTORES } from './conectores'
 import { deA } from './concurrencia'
-import { buildDescubrirArgs, buildDescubrirPrompt, parseDescubrir, type Descubiertas } from './descubrir'
+import { buildDescubrirPrompt, parseDescubrir, type Descubiertas } from './descubrir'
 import {
   buildRevisarPrompt,
   conPrefijo,
@@ -79,11 +81,8 @@ import { espacioDelTicket } from '../../../shared/templates-shared'
 import { githubRepoOf } from '../team-github'
 import {
   accionesSoportadas,
-  buildAccionArgs,
   buildAccionPrompt,
-  buildDetalleArgs,
   buildDetallePrompt,
-  buildListaArgs,
   buildPrompt,
   conCategoria,
   ConectorFaltaError,
@@ -313,7 +312,8 @@ function defPara(def: ConectorMcp, cuentaId: string): ConectorMcp {
 }
 
 /** Los tickets corren `claude -p`: una cuenta de otro agente nunca cuenta, aunque tenga sesión. */
-const puedeTickets = (a: Account): boolean => capacidadesDe(a)?.tickets === true
+const puedeTickets = (a: Account): boolean => capacidadesDe(a)?.ticketsHeadless === true
+const puedeTrabajar = (a: Account): boolean => capacidadesDe(a)?.tickets === true
 
 const logueadas = (): { id: string; label: string }[] => ctx.store.accounts.filter((a) => puedeTickets(a) && accountStatus(a).loggedIn)
 
@@ -525,7 +525,7 @@ async function start(rawId: unknown, rawAccount?: unknown): Promise<{ id: string
   if (typeof rawAccount === 'string' && rawAccount) {
     const acc = ctx.store.account(rawAccount)
     if (!acc || !accountStatus(acc).loggedIn) throw new Error('Esa cuenta no tiene sesión iniciada.')
-    if (!puedeTickets(acc)) throw new Error(`La cuenta «${acc.label}» es de ${nombreProveedor(acc)}: los tickets todavía solo corren con Claude Code.`)
+    if (!puedeTrabajar(acc)) throw new Error(`La cuenta «${acc.label}» es de ${nombreProveedor(acc)}: los tickets todavía solo corren con Claude Code.`)
     accountId = acc.id
   } else accountId = await pickAccount()
   const ws = await ctx.addWorkspace({
@@ -551,6 +551,7 @@ interface Ejecucion {
   cwd: string
   env: Record<string, string>
   envConfigDir: string
+  motor: MotorTickets
   /** La sesión corrió sin los conectores de claude.ai: su system/init no los trae. */
   sinClaudeAi?: boolean
 }
@@ -573,7 +574,8 @@ function ejecucion(nombre: string, accountId: string, mcp?: ConectorMcp): Ejecuc
   const acc = ctx.store.account(accountId)
   if (!acc) throw new Error(`La cuenta para consultar ${nombre} ya no existe. Elegí otra en Configuración.`)
   const p = proveedorExigido(acc)
-  if (!p.capacidades.tickets) throw new Error(`La cuenta «${acc.label}» es de ${nombreProveedor(acc)}: los tickets todavía solo corren con Claude Code.`)
+  const motor = motorDe(acc)
+  if (!p.capacidades.ticketsHeadless || !motor) throw new Error(`La cuenta «${acc.label}» es de ${nombreProveedor(acc)}: los tickets todavía solo corren con Claude Code.`)
   if (!accountStatus(acc).loggedIn) throw new Error(`La cuenta «${acc.label}» no tiene sesión iniciada.`)
   const exe = p.resolverExe()
   if (!exe) throw new Error('No encontré el ejecutable de Claude Code (claude.exe) en el PATH.')
@@ -581,7 +583,7 @@ function ejecucion(nombre: string, accountId: string, mcp?: ConectorMcp): Ejecuc
   mkdirSync(cwd, { recursive: true })
   // Un MCP propio lento puede tardar más que el tope por defecto de Claude Code en arrancar.
   const env = { MCP_TIMEOUT: '30000', ...baseEnv(p.quitarDelEntorno), ...p.envCuenta(acc.configDir) }
-  const run: Ejecucion = { accountId: acc.id, label: acc.label, exe, cwd, env, envConfigDir: p.envConfigDir }
+  const run: Ejecucion = { accountId: acc.id, label: acc.label, exe, cwd, env, envConfigDir: p.envConfigDir, motor }
   if (!mcp || defPara(mcp, acc.id).herramientas.prefijo.startsWith('mcp__claude_ai_')) return run
   // Conectar todos los de claude.ai solo para no usarlos demora cada consulta. Si la variable no existe en esta
   // versión de Claude Code, no cambia nada: el init los trae igual.
@@ -727,16 +729,16 @@ async function refresh(rawAccount: unknown, rawVueltas?: unknown): Promise<{ cou
   state.lastRun = lastRunTrasError(state.lastRun, undefined, usadas)
   avisar()
   try {
+    const pedido: PedidoMotor = { tarea: 'lista', def: d, model: state.config.model, ajenos: ajenosDe(run, d), limites: lim }
     const r = await runClaude({
       exe: run.exe,
-      // --verbose trae el system/init: de ahí sale qué servidores tenía la sesión de verdad.
-      args: [...buildListaArgs(d, state.config.model, ajenosDe(run, d), lim), '--verbose'],
+      args: run.motor.argv(pedido),
       prompt: buildPrompt(d, state.config.assigneeId),
       cwd: run.cwd,
-      env: run.env,
+      env: { ...run.env, ...run.motor.envExtra(pedido) },
       quien: def.nombre,
       signal: ac.signal,
-      parse: (s) => leerLista(def, d, run, s, efectivos)
+      parse: (s) => leerLista(def, d, run, run.motor.normalizar(s, pedido), efectivos)
     })
     state.tickets = r.tickets
     detalles.clear()
@@ -911,17 +913,19 @@ async function detalle(rawId: unknown, rawFresco?: unknown): Promise<Detalle> {
   const lim = limites()
   const efectivos = limitesEfectivos(lim)
   try {
+    const pedido: PedidoMotor = { tarea: 'detalle', def: dc, model: state.config.model, ajenos: ajenosDe(c, dc), limites: lim }
     const d = await runClaude({
       exe: c.exe,
-      args: buildDetalleArgs(dc, state.config.model, ajenosDe(c, dc), lim),
+      args: c.motor.argv(pedido),
       prompt: buildDetallePrompt(dc, id),
       cwd: c.cwd,
-      env: c.env,
+      env: { ...c.env, ...c.motor.envExtra(pedido) },
       quien: def.nombre,
       timeoutMs: DETALLE_TIMEOUT_MS,
       parse: (s) => {
-        medirUso(def.id, s, efectivos)
-        return parseDetalle(dc, s)
+        const n = c.motor.normalizar(s, pedido)
+        medirUso(def.id, n, efectivos)
+        return parseDetalle(dc, n)
       }
     })
     // Si mientras tanto cambió la lista (otro conector u otra carpeta), este detalle ya no es de ella.
@@ -963,17 +967,19 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
     let minutosTotal: number | undefined
     if (def.via === 'gh') await ghAccion(ghRunCon(), t, a, input, state.me)
     else if (c && dc) {
+      const pedido: PedidoMotor = { tarea: 'accion', def: dc, model: state.config.model, ajenos: ajenosDe(c, dc), limites: lim, accion: a }
       const r = await runClaude({
         exe: c.exe,
-        args: buildAccionArgs(dc, state.config.model, a, ajenosDe(c, dc), lim),
+        args: c.motor.argv(pedido),
         prompt: buildAccionPrompt(dc, a, input),
         cwd: c.cwd,
-        env: c.env,
+        env: { ...c.env, ...c.motor.envExtra(pedido) },
         quien: def.nombre,
         timeoutMs: DETALLE_TIMEOUT_MS,
         parse: (s) => {
-          medirUso(def.id, s, efectivos, true)
-          return parseAccion(dc, s, a)
+          const n = c.motor.normalizar(s, pedido)
+          medirUso(def.id, n, efectivos, true)
+          return parseAccion(dc, n, a)
         }
       })
       minutosTotal = r.minutosTotal
@@ -1018,15 +1024,16 @@ async function descubrir(rawPrefijo: unknown, rawAccount: unknown): Promise<Desc
   descubriendo = true
   try {
     const run = ejecucion('las herramientas', requested ?? state.config.queryAccountId ?? (await pickAccount()))
+    const pedido: PedidoMotor = { tarea: 'descubrir', model: state.config.model, ajenos: [] }
     const r = await runClaude({
       exe: run.exe,
-      args: buildDescubrirArgs(),
+      args: run.motor.argv(pedido),
       prompt,
       cwd: run.cwd,
-      env: run.env,
+      env: { ...run.env, ...run.motor.envExtra(pedido) },
       quien: 'Claude',
       timeoutMs: 90_000,
-      parse: (s) => parseDescubrir(prefijo, s)
+      parse: (s) => parseDescubrir(prefijo, run.motor.normalizar(s, pedido))
     })
     ctx.log(`tickets: descubrir: ${r.herramientas.length} herramientas (${r.fuente})`)
     return r
@@ -1053,16 +1060,17 @@ async function revisarCuentas(raw: unknown): Promise<TicketsSnapshot> {
       const previa = cuentasCache[id]
       try {
         const run = ejecucion('los conectores', id)
+        const pedido: PedidoMotor = { tarea: 'revisar', model: state.config.model, ajenos: [], schema: REVISAR_SCHEMA }
         const r = await runClaude({
           exe: run.exe,
-          args: buildDescubrirArgs(REVISAR_SCHEMA, 'stream-json'),
+          args: run.motor.argv(pedido),
           prompt: buildRevisarPrompt(),
           cwd: run.cwd,
-          env: run.env,
+          env: { ...run.env, ...run.motor.envExtra(pedido) },
           quien: 'Claude',
           timeoutMs: 90_000,
           temprano: (l) => revisarTemprano(l, Date.now()),
-          parse: (s) => revisarCuenta(s, Date.now())
+          parse: (s) => revisarCuenta(run.motor.normalizar(s, pedido), Date.now())
         })
         cuentasCache = { ...cuentasCache, [id]: r }
         ctx.log(`tickets: revisar: ${r.servidores.length} servidores`)
