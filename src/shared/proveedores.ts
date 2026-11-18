@@ -83,3 +83,18 @@ export function motivoSinCapacidad(cuenta: { proveedor?: unknown }, k: keyof Cap
   if (CAPACIDADES[id][k]) return undefined
   return MOTIVOS_ESPECIFICOS[id]?.[k] ?? `${NOMBRE_PROVEEDOR[id]} todavía no soporta esto en Sloth.`
 }
+
+/**
+ * La cuenta sugerida: con sesión y la que menos usó en las últimas 5 h. Una cuenta sin dato de uso
+ * (agente sin esa capacidad, o desconocido) cuenta 0 y ganaría siempre: solo se elige si no hay otra.
+ */
+export function cuentaSugerida(
+  cuentas: { id: string; proveedor?: unknown }[],
+  conSesion: (id: string) => boolean,
+  usado5h: (id: string) => number
+): string | undefined {
+  const conUso = (c: { proveedor?: unknown }): boolean => capacidadesDe(c)?.uso === true
+  const logueadas = cuentas.filter((c) => conSesion(c.id))
+  const pool = [logueadas.filter(conUso), cuentas.filter(conUso), logueadas, cuentas].find((l) => l.length) ?? []
+  return [...pool].sort((a, b) => usado5h(a.id) - usado5h(b.id))[0]?.id
+}

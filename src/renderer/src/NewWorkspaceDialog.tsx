@@ -10,7 +10,7 @@ import { useUi } from './features/host'
 import { useTemplates, openDialog, peekPreselect, takePreselect, usesTicket, type TemplateDto } from './features/templates/store'
 import { TEMPLATE_COLORS, colorHex } from './features/templates/catalog'
 import { setBoardOpen, useSnapshot } from './features/tickets/model'
-import { proveedorIdDe } from '../../shared/proveedores'
+import { cuentaSugerida, proveedorIdDe } from '../../shared/proveedores'
 import { applyVars, folderLabel, missingVars, normTicketId, TEMPLATE_COLOR_KEYS, TICKET_RE, today, validBranch, type VarValues } from '../../shared/templates-shared'
 import './NewWorkspaceDialog.css'
 
@@ -67,10 +67,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
 
   // Sugerida: con sesión y la que menos usó en las últimas 5 h.
   const suggested = useMemo(() => {
-    const logged = accounts.filter((a) => statuses[a.id]?.loggedIn)
-    const pool = logged.length ? logged : accounts
-    const used = (a: Account): number => totalTok(usage[a.id]?.last5h ?? emptyTotals)
-    return [...pool].sort((a, b) => used(a) - used(b))[0]?.id ?? ''
+    return cuentaSugerida(accounts, (id) => statuses[id]?.loggedIn === true, (id) => totalTok(usage[id]?.last5h ?? emptyTotals)) ?? ''
   }, [accounts, statuses, usage])
 
   // Plantilla inicial: la que pidió la barra o la predeterminada. Se lee una vez.

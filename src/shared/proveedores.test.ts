@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { CAPACIDADES, PROVEEDORES_IDS, capacidadesDe, esProveedorId, motivoSinCapacidad, nombreProveedor, proveedorIdDe } from './proveedores'
+import { CAPACIDADES, PROVEEDORES_IDS, capacidadesDe, cuentaSugerida, esProveedorId, motivoSinCapacidad, nombreProveedor, proveedorIdDe } from './proveedores'
 import type { Capacidades } from './proveedores'
 
 test('proveedorIdDe: ausente es claude y desconocido no es ninguno', () => {
@@ -39,4 +39,29 @@ test('nombreProveedor y motivoSinCapacidad', () => {
   assert.equal(motivoSinCapacidad({ proveedor: 'codex' }, 'tickets'), 'Codex todavía no soporta esto en Sloth.')
   assert.match(motivoSinCapacidad({ proveedor: 'codex' }, 'hooks') ?? '', /avisos de permisos desde el celu/)
   assert.match(motivoSinCapacidad({ proveedor: 'otro-agente' }, 'tickets') ?? '', /actualizá Sloth/)
+})
+
+test('cuentaSugerida: una cuenta de Codex (uso 0) no gana por tener menos uso', () => {
+  const cuentas = [{ id: 'cx', proveedor: 'codex' }, { id: 'a' }, { id: 'b', proveedor: 'claude' }]
+  const uso: Record<string, number> = { cx: 0, a: 500, b: 100 }
+  assert.equal(cuentaSugerida(cuentas, () => true, (id) => uso[id]), 'b')
+  assert.equal(cuentaSugerida(cuentas, (id) => id !== 'b', (id) => uso[id]), 'a')
+})
+
+test('cuentaSugerida: sin sesión en Claude se prefiere una Claude sin sesión antes que Codex con sesión, como antes', () => {
+  const cuentas = [{ id: 'cx', proveedor: 'codex' }, { id: 'a' }]
+  assert.equal(cuentaSugerida(cuentas, (id) => id === 'cx', () => 0), 'a')
+})
+
+test('cuentaSugerida: si solo hay Codex o un agente desconocido se usa igual, y sin cuentas no hay nada', () => {
+  assert.equal(cuentaSugerida([{ id: 'cx', proveedor: 'codex' }], () => true, () => 0), 'cx')
+  assert.equal(cuentaSugerida([{ id: 'x', proveedor: 'otro-agente' }], () => false, () => 0), 'x')
+  assert.equal(cuentaSugerida([], () => true, () => 0), undefined)
+})
+
+test('cuentaSugerida con solo cuentas de Claude: con sesión y la de menos uso, o todas si ninguna tiene sesión', () => {
+  const cuentas = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
+  const uso: Record<string, number> = { a: 30, b: 10, c: 5 }
+  assert.equal(cuentaSugerida(cuentas, (id) => id !== 'c', (id) => uso[id]), 'b')
+  assert.equal(cuentaSugerida(cuentas, () => false, (id) => uso[id]), 'c')
 })
