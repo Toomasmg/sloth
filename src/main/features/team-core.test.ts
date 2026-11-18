@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import type { Ticket } from '../../shared/tickets'
 import github from './tickets/conectores/github'
 import gruv from './tickets/conectores/gruv'
-import { buildPeople, personasDe, ticketsActivos, type TeamPr } from './team-core'
+import { buildPeople, personasDe, personasElegidasEquipo, ticketsActivos, type TeamPr } from './team-core'
 
 const t = (id: string, estado: string | undefined, responsable?: string, responsableId?: string): Ticket => ({
   id,
@@ -96,4 +96,16 @@ test('con GitHub como conector, el PR del mismo login cae en la tarjeta del tick
 test('ticketsActivos descarta un estado que no está en la lista', () => {
   const activos = ticketsActivos([t('TCK-1', 'raro', 'Ana')], [{ clave: 'en_curso', nombre: 'En curso', categoria: 'en_curso' }])
   assert.deepEqual(activos, [])
+})
+
+test('personasElegidasEquipo da tarjeta a las elegidas que están en la lista, con el nombre acotado', () => {
+  const lista = [{ id: 'u1', nombre: 'Mateo' }, { id: 'u2', nombre: 'L'.repeat(200) }]
+  assert.deepEqual(personasElegidasEquipo(['u2', 'u9', 'u1'], lista), [{ id: 'u2', nombre: 'L'.repeat(80) }, { id: 'u1', nombre: 'Mateo' }])
+  assert.deepEqual(personasElegidasEquipo(['u1'], undefined), [])
+})
+
+test('una elegida sin tickets tiene tarjeta y se une con la que ya tiene tickets', () => {
+  const activos = ticketsActivos([t('TCK-1', 'en_curso', 'Ana', 'u1')], gruv.estados)
+  const view = buildPeople({ prs: [], tickets: activos, personas: [...personasDe(activos), ...personasElegidasEquipo(['u1', 'u2'], [{ id: 'u1', nombre: 'Ana' }, { id: 'u2', nombre: 'Mateo' }])], mapping: {} })
+  assert.deepEqual(view.people.map((p) => [p.nombre, p.tickets.length]), [['Ana', 1], ['Mateo', 0]])
 })

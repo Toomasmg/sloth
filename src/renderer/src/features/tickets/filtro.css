@@ -1,0 +1,348 @@
+/* Barra de filtros del tablero de tickets (personas, estados, ventana) y panel de grupos. */
+
+.f-tickets-fb {
+  box-sizing: border-box;
+  border-radius: var(--r-lg);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--divider);
+  overflow: hidden;
+}
+.f-tickets-fb-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 4px;
+}
+.f-tickets-fb-toggle {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-13);
+  text-align: left;
+  cursor: pointer;
+}
+.f-tickets-fb-toggle:hover {
+  background: var(--hover);
+}
+.f-tickets-fb-toggle:focus-visible,
+.f-tickets-fb-sel:focus-visible,
+.f-tickets-fb-item:has(input:focus-visible),
+.f-tickets-grupo:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.f-tickets-fb-tit {
+  font-weight: 600;
+}
+.f-tickets-fb-res {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+  font-size: var(--fs-12);
+}
+
+.f-tickets-fb-falta,
+.f-tickets-fb-aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0;
+  padding: 8px 14px;
+  font-size: var(--fs-12);
+  line-height: 1.45;
+  box-shadow: inset 0 1px 0 var(--divider);
+}
+.f-tickets-fb-falta {
+  background: var(--info-soft);
+  color: var(--text);
+}
+.f-tickets-fb-aviso {
+  background: var(--warn-tint);
+  color: var(--text);
+}
+.f-tickets-fb-errpers {
+  align-items: flex-start;
+}
+p.f-tickets-fb-aviso {
+  box-shadow: none;
+  border-radius: var(--r-md);
+  padding: 6px 10px;
+  margin-top: 8px;
+}
+
+.f-tickets-fb-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  padding: 12px 16px 16px;
+  box-shadow: inset 0 1px 0 var(--divider);
+}
+.f-tickets-fb-personas {
+  flex: 2 1 320px;
+}
+.f-tickets-fb-col {
+  flex: 1 1 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.f-tickets-fb-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.f-tickets-fb-h {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  color: var(--text-2);
+  letter-spacing: 0.01em;
+}
+.f-tickets-fb-sub {
+  font-weight: 400;
+  color: var(--text-3);
+}
+
+.f-tickets-fb-fijos,
+.f-tickets-fb-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.f-tickets-fb-fijos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+}
+.f-tickets-fb-lista {
+  max-height: 220px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 2px 8px;
+  padding: 2px;
+  border-radius: var(--r-md);
+  box-shadow: inset 0 0 0 1px var(--divider);
+}
+.f-tickets-fb-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 3px 8px;
+  border-radius: var(--r-md);
+  font-size: var(--fs-13);
+  cursor: pointer;
+}
+.f-tickets-fb-item:hover {
+  background: var(--hover);
+}
+.f-tickets-fb-item.on {
+  background: var(--accent-soft);
+}
+.f-tickets-fb-item.is-fijo {
+  cursor: default;
+  color: var(--text-2);
+}
+.f-tickets-fb-item input[type='checkbox'] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+}
+.f-tickets-fb-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.f-tickets-fb-n {
+  flex: none;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: var(--r-lg);
+  background: var(--btn-2);
+  color: var(--text-2);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  text-align: center;
+}
+.f-tickets-fb-buscar {
+  max-width: 340px;
+}
+.f-tickets-fb-load,
+.f-tickets-fb-vacia p {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  font-size: var(--fs-12);
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.f-tickets-fb-load {
+  padding: 8px 10px;
+  border-radius: var(--r-md);
+  background: var(--info-soft);
+  color: var(--text);
+}
+.f-tickets-fb-load svg {
+  flex: none;
+  margin-top: 2px;
+}
+.f-tickets-fb-vacia {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.f-tickets-fb-nada,
+.f-tickets-fb-pie {
+  margin: 0;
+}
+.f-tickets-fb-pie {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+
+.f-tickets-fb-atajos,
+.f-tickets-fb-estados {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.f-tickets-fb-atajo {
+  height: 30px;
+  padding: 0 14px;
+  font-size: var(--fs-13);
+}
+.f-tickets-fb-atajo.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.f-tickets-fb-chipn {
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+.f-tickets-fb-sel {
+  appearance: none;
+  height: 30px;
+  min-width: 170px;
+  max-width: 100%;
+  padding: 0 28px 0 10px;
+  border: 0;
+  border-radius: var(--r-md);
+  background-color: var(--input-bg);
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-3) 50%), linear-gradient(135deg, var(--text-3) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 50%, calc(100% - 10px) 50%;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  color: var(--text);
+  font: inherit;
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
+  align-self: flex-start;
+}
+.f-tickets-fb-sel:disabled {
+  opacity: 0.5;
+}
+.f-tickets-fb-ayuda {
+  margin: 0;
+  font-size: var(--fs-12);
+  line-height: 1.45;
+  color: var(--text-3);
+}
+
+/* Panel de grupos: reemplaza a las pestañas cuando el conector filtra por personas. */
+.f-tickets-grupos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px 0;
+}
+.f-tickets-grupo {
+  max-width: 100%;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 6px 0 11px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: var(--r-lg);
+  background: var(--card-hover);
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-12);
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px var(--divider);
+}
+.f-tickets-grupo:hover {
+  filter: brightness(1.12);
+}
+.f-tickets-grupo.on {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.f-tickets-grupo.sin-traer {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
+  border-style: dashed;
+}
+.f-tickets-grupo.con-error {
+  color: var(--danger-fg);
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
+.f-tickets-grupo-n {
+  min-width: 0;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.f-tickets-grupo-sin {
+  padding-right: 6px;
+  color: var(--text-3);
+  font-size: var(--fs-11);
+  font-weight: 400;
+}
+.f-tickets-grupo .f-tickets-badge {
+  min-width: 20px;
+  height: 18px;
+}
+.f-tickets-grupo > svg {
+  margin-right: 5px;
+}
+.f-tickets-vacio-filtro {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}

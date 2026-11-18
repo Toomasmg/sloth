@@ -14,12 +14,16 @@ import {
   type Disponibilidad,
   type Estado,
   type EstadoBase,
+  type FiltroVista,
   type Modelo,
+  type PendientesLista,
+  type PersonaEquipo,
   type ServidorMcp,
   type Ticket,
   type TicketsConfig,
   type TicketsSnapshot,
-  type UsoPorDia
+  type UsoPorDia,
+  VENTANA_MAX
 } from '../../../shared/tickets'
 import type { Feature, FeatureContext } from '../context'
 import { accountStatus } from '../../accounts'
@@ -28,7 +32,8 @@ import { readTeamConfig, repoKey, TEAM_DIR } from '../team-config-core'
 import { escribirJsonAtomico } from '../../json-file'
 import { podarSegunStore } from '../../poda'
 import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, ticketId } from './acciones'
-import { runClaude } from './claude-run'
+import { PlazoError, runClaude } from './claude-run'
+import { alcanceAPedir, conteos, estadosValidos, filtroDe, leidoTras, mezclar, paraEquipo, pendientesDe, personasValidas, sinPendientes, ventanaValida, visibles } from './alcance'
 import { proveedorExigido } from '../../proveedores'
 import { motorDe } from './motores'
 import { etiquetarAgente, type MotorTickets, type PedidoMotor } from './motor-tickets'
@@ -55,6 +60,7 @@ import {
   revisarTemprano,
   sanearCache,
   servidorDeLaLista,
+  ServidorPendienteError,
   servidoresDeSalida,
   usable
 } from './cuentas'
@@ -76,7 +82,8 @@ import {
   type ArchivoPropios,
   type ConectorRegistrado
 } from './propios'
-import { costoValido, diaLocal, lastRunTrasError, leerUso, limitesEfectivos, sumarUso, textoFlagViejo, textoTope, TopeVueltasError, vueltasValidas, type LimitesEfectivos, type UsoCorrida } from './uso'
+import { conReintento as reintentar, type PresupuestoReintento } from './reintento'
+import { COSTO_MIN, costoValido, diaLocal, lastRunTrasError, leerUso, limitesEfectivos, sumarUso, textoFlagViejo, textoTope, TopeVueltasError, vueltasValidas, type LimitesEfectivos, type UsoCorrida } from './uso'
 import { ASSIGNEE_MAX, assigneeValido, conConector, sinLista, type TicketsState } from './estado'
 import { ghAccion, ghDetalle, ghLista, ghYo, repoValido, type GhRun } from './gh'
 import { GitError, run as correr } from '../git-run'
@@ -87,11 +94,14 @@ import {
   accionesSoportadas,
   buildAccionPrompt,
   buildDetallePrompt,
+  buildPersonasArgs,
+  buildPersonasPrompt,
   buildPrompt,
   comandoDeTicket,
   conCategoria,
   ConectorFaltaError,
   estadosPorDefecto,
+  filtraPersonas,
   HerramientaFaltaError,
   info,
   leeDetalle,
@@ -99,6 +109,7 @@ import {
   parseAccion,
   parseClaudeOutput,
   parseDetalle,
+  parsePersonas,
   type ResultadoLista
 } from './motor'
 import { mcpAjenos } from './mcp-ajenos'
@@ -116,6 +127,11 @@ import { carpetaFeatures } from '../../perfil'
  */
 
 const DETALLE_TIMEOUT_MS = 90_000
+/** Una lista grande (varias personas, terminados) tarda más que un detalle; el plazo de las demás consultas no cambia. */
+const LISTA_TIMEOUT_MS = 300_000
+const PERSONAS_TIMEOUT_MS = 120_000
+/** Todos los intentos de una consulta juntos no pasan de esto. */
+const REINTENTOS_TOTAL_MS = 300_000
 
 let ctx: FeatureContext
 let state: TicketsState
@@ -380,6 +396,20 @@ function motorExperimental(): boolean | undefined {
   return p !== undefined && TICKETS_EXPERIMENTAL.includes(p) ? true : undefined
 }
 
+const pendientesVista = (def: ConectorDef): PendientesLista | undefined =>
+  state.fetchedAt === undefined ? undefined : pendientesDe(filtroDe(state.config, def), state.leido, def, state.me)
+
+function vistaFiltro(def: ConectorDef): Pick<TicketsSnapshot, 'filtro' | 'personas' | 'personasAt' | 'conteos' | 'pendientes'> {
+  const filtro = filtroDe(state.config, def)
+  return {
+    filtro,
+    personas: state.personas,
+    personasAt: state.personasAt,
+    conteos: { ...conteos(state.tickets, filtro, state.me, def, Date.now()), ...(state.leido?.noLeidos ? { noLeidos: state.leido.noLeidos } : {}) },
+    pendientes: pendientesVista(def)
+  }
+}
+
 function snapshot(): TicketsSnapshot {
   const id = state.config.conectorId
   const def = buscar(id)
@@ -393,7 +423,7 @@ function snapshot(): TicketsSnapshot {
       origen: r.origen,
       aceptado: r.origen.tipo === 'equipo' ? aceptado(r) : undefined
     })),
-    tickets: def ? state.tickets : [],
+    tickets: def ? ticketsVisibles(def) : [],
     estados: def ? conCategoria(def, estados(def)) : [],
     me: state.me,
     fetchedAt: state.fetchedAt,
@@ -411,7 +441,8 @@ function snapshot(): TicketsSnapshot {
     avisosPropios: avisosPropios.length ? avisosPropios : undefined,
     cuentas: vistaCuentas(),
     revisando: descubriendo,
-    motorExperimental: motorExperimental()
+    motorExperimental: motorExperimental(),
+    ...(def && conFiltro(def) ? vistaFiltro(def) : {})
   }
 }
 
@@ -453,6 +484,10 @@ export interface TicketsParaEquipo {
   confirmar: boolean
   /** Con gh, la carpeta de cada ticket: el #12 de otro repo es otro ticket. */
   carpetas?: Record<string, string>
+  /** Solo con conectores que filtran por personas: `tickets` ya viene acotado a lo elegido, con todo lo abierto (sin pasar por el filtro de estados). */
+  filtro?: FiltroVista
+  personas?: PersonaEquipo[]
+  pendientes?: PendientesLista
 }
 
 /** Lo que trajo el conector activo, para la vista Equipo (incluye los estados 'hecho' para poder descartarlos). */
@@ -468,13 +503,14 @@ export function ticketsParaEquipo(): TicketsParaEquipo {
   return {
     ...base,
     conector: { id: def.id, nombre: def.nombre, via: def.via },
-    tickets: state.tickets,
+    tickets: conFiltro(def) ? paraEquipo(state.tickets, filtroDe(state.config, def), state.me, def, Date.now()) : state.tickets,
     estados: [...porClave.values()],
     fetchedAt: state.fetchedAt,
     fetchedBy: state.fetchedBy,
     lastRun: state.lastRun,
     lastError: state.lastError,
-    carpetas: def.via === 'gh' ? carpetasDe() : undefined
+    carpetas: def.via === 'gh' ? carpetasDe() : undefined,
+    ...(conFiltro(def) ? { filtro: filtroDe(state.config, def), personas: state.personas, pendientes: pendientesVista(def) } : {})
   }
 }
 
@@ -648,8 +684,9 @@ function ejecucion(nombre: string, accountId: string, mcp?: ConectorMcp): Ejecuc
   if (!exe) throw new Error(p.id === 'claude' ? 'No encontré el ejecutable de Claude Code (claude.exe) en el PATH.' : `No encontré ${nombreProveedor(acc)} en el PATH. ${p.comoInstalar}`)
   const cwd = join(carpeta(), 'tickets-run')
   mkdirSync(cwd, { recursive: true })
-  // Un MCP propio lento puede tardar más que el tope por defecto de Claude Code en arrancar.
-  const env = { MCP_TIMEOUT: '30000', ...baseEnv(p.quitarDelEntorno), ...p.envCuenta(acc.configDir) }
+  // Un MCP propio lento puede tardar más que el tope por defecto de Claude Code en arrancar. Con el tope de salida por defecto
+  // (25.000 tokens) una página grande de tickets se rechaza y, sin herramientas para leer el archivo, la consulta da vueltas hasta el plazo.
+  const env = { MCP_TIMEOUT: '30000', MAX_MCP_OUTPUT_TOKENS: '50000', ...baseEnv(p.quitarDelEntorno), ...p.envCuenta(acc.configDir) }
   const run: Ejecucion = { accountId: acc.id, label: acc.label, exe, cwd, env, envConfigDir: p.envConfigDir, motor, agente: ETIQUETA_AGENTE[p.id] }
   if (!mcp || defPara(mcp, acc.id).herramientas.prefijo.startsWith('mcp__claude_ai_')) return run
   // Conectar todos los de claude.ai solo para no usarlos demora cada consulta. Si la variable no existe en esta
@@ -723,23 +760,48 @@ async function refreshGh(def: ConectorGh): Promise<{ count: number }> {
  * runClaude convierte en Error común lo que tire parse: el texto para la persona se arma acá.
  * Una lista vacía sin el servidor (o sin sus herramientas) en la sesión no es «no hay tickets».
  */
-function leerLista(def: ConectorMcp, d: ConectorMcp, run: Ejecucion, s: string, lim: LimitesEfectivos): ResultadoLista {
+function leerLista(def: ConectorMcp, d: ConectorMcp, run: Ejecucion, s: string, lim: LimitesEfectivos, porAlcance: boolean): ResultadoLista {
   const sesion = servidoresDeSalida(s)
   if (sesion) actualizarDesdeInit(run.accountId, sesion, run.sinClaudeAi)
   medirUso(def.id, s, lim)
+  const costo = leerUso(s)?.costUsd
   let r: ResultadoLista
   try {
-    r = parseClaudeOutput(d, s)
+    r = parseClaudeOutput(d, s, porAlcance)
   } catch (e) {
-    if (e instanceof ConectorFaltaError) throw new Error(textoCuenta(def, problemaEnSesion(def, d.herramientas.prefijo, sesion) ?? { tipo: 'falta' }, run) ?? e.message)
+    if (e instanceof ConectorFaltaError) throw errorDeSesion(def, problemaEnSesion(def, d.herramientas.prefijo, sesion) ?? { tipo: 'falta' }, run, e.message, costo)
     throw e
   }
   if (!r.tickets.length) {
     const p = problemaEnSesion(def, d.herramientas.prefijo, sesion)
-    if (p) throw new Error(textoCuenta(def, p, run) ?? `«${run.label}» no pudo leer ${def.nombre}. Tocá «Volver a revisar».`)
+    if (p) throw errorDeSesion(def, p, run, `«${run.label}» no pudo leer ${def.nombre}. Tocá «Volver a revisar».`, costo)
   }
   return r
 }
+
+const errorDeSesion = (def: ConectorMcp, p: Disponibilidad, run: Ejecucion, porDefecto: string, costoUsd?: number): Error => {
+  const msg = textoCuenta(def, p, run) ?? porDefecto
+  return p.tipo === 'tiene' && p.estado === 'pending' ? new ServidorPendienteError(msg, costoUsd) : new Error(msg)
+}
+
+/**
+ * Si la sesión arrancó antes de que el servidor termine de conectar, se vuelve a intentar (hasta tres veces, cada intento
+ * fallido dura unos 7 s y casi no cuesta): sin esto, entre una de cada tres y una de cada dos consultas daba un error
+ * engañoso. Entre todos los intentos no pasan de 5 minutos ni del tope de costo: cada uno recibe lo que queda.
+ */
+const conReintento = <T>(maxCostUsd: number | undefined, corre: (p: PresupuestoReintento) => Promise<T>): Promise<T> =>
+  reintentar(corre, {
+    intentosMax: 3,
+    tiempoMaxMs: REINTENTOS_TOTAL_MS,
+    minimoMs: 15_000,
+    costoMaxUsd: costoValido(maxCostUsd),
+    minimoUsd: COSTO_MIN,
+    reintentable: (e) => e instanceof ServidorPendienteError,
+    costoDe: (e) => (e instanceof ServidorPendienteError ? e.costoUsd : undefined)
+  })
+
+/** Lo que queda del tope de costo para un intento; sin tope, el de la configuración (que puede no tener). */
+const conRestante = (lim: ReturnType<typeof limites>, p: PresupuestoReintento): ReturnType<typeof limites> => ({ ...lim, maxCostUsd: p.restanteUsd ?? lim.maxCostUsd })
 
 /** Los topes de la config; `maxTurns` pisa el de la config solo para una consulta ya validada. */
 const limites = (maxTurns?: number): { maxTurns?: number; maxCostUsd?: number } => ({
@@ -769,8 +831,57 @@ const legible = (e: unknown, run?: Ejecucion): unknown => {
   return t ? new Error(t) : e
 }
 
-async function refresh(rawAccount: unknown, rawVueltas?: unknown): Promise<{ count: number; tokens?: number }> {
+/** El conector filtra por personas: lo que se ve es lo propio, lo de las personas elegidas, por estado y dentro de la ventana. */
+const conFiltro = (def: ConectorDef): boolean => def.via === 'mcp' && filtraPersonas(def)
+
+function ticketsVisibles(def: ConectorDef): Ticket[] {
+  return conFiltro(def) ? visibles(state.tickets, filtroDe(state.config, def), state.me, def, Date.now()) : state.tickets
+}
+
+/** Las personas se piden aparte y una sola vez; después, a pedido. Solo guarda id y nombre. */
+async function leerPersonas(def: ConectorMcp, d: ConectorMcp, run: Ejecucion, signal: AbortSignal, lim: ReturnType<typeof limites>): Promise<void> {
+  const efectivos = limitesEfectivos(lim)
+  const personas = await conReintento(lim.maxCostUsd, (p) => {
+    const pedido = pedidoPara(run, { tarea: 'personas', def: d, model: state.config.model, ajenos: ajenosDe(run, d), limites: conRestante(lim, p) })
+    return runClaude({
+      ...lanzamiento(run, pedido),
+      ...opcionesMotor(run, pedido),
+      prompt: buildPersonasPrompt(d),
+      cwd: run.cwd,
+      env: { ...run.env, ...run.motor.envExtra(pedido) },
+      quien: def.nombre,
+      timeoutMs: Math.min(PERSONAS_TIMEOUT_MS, p.restanteMs),
+      signal,
+      parse: (s) => {
+        const n = run.motor.normalizar(s, pedido)
+        const sesion = servidoresDeSalida(n)
+        if (sesion) actualizarDesdeInit(run.accountId, sesion, run.sinClaudeAi)
+        medirUso(def.id, n, efectivos)
+        try {
+          return parsePersonas(d, n)
+        } catch (e) {
+          if (e instanceof ConectorFaltaError) throw errorDeSesion(def, problemaEnSesion(def, d.herramientas.prefijo, sesion) ?? { tipo: 'falta' }, run, e.message, leerUso(n)?.costUsd)
+          throw e
+        }
+      }
+    })
+  })
+  if (!personas.length) throw new Error(`${def.nombre} no devolvió personas. Probá de nuevo.`)
+  state.personas = personas
+  state.personasAt = Date.now()
+}
+
+/** Gruv conectado que no terminó en su plazo: el problema es el tamaño de la lista, no la conexión ni la autenticación. */
+function textoPlazo(def: ConectorMcp, run: Ejecucion, e: PlazoError): string {
+  const d = dispEn(def, run.accountId)
+  if (d.tipo === 'tiene' && d.estado === 'connected')
+    return `${def.nombre} está conectado, pero tardó más de ${e.segundos} s en armar la lista (hay muchos tickets). Probá de nuevo; si sigue, sacá personas o estados del filtro, o acortá la ventana de días.`
+  return e.message
+}
+
+async function refresh(rawAccount: unknown, rawVueltas?: unknown, rawModo?: unknown): Promise<{ count: number; tokens?: number }> {
   if (running) throw new Error('Ya hay una consulta en curso.')
+  if (rawModo !== undefined && rawModo !== 'todo' && rawModo !== 'faltante') throw new Error('Modo de actualización inválido.')
   const def = activo()
   let usadas = limitesEfectivos(state.config).vueltas
   if (rawVueltas !== undefined && rawVueltas !== null) {
@@ -792,26 +903,45 @@ async function refresh(rawAccount: unknown, rawVueltas?: unknown): Promise<{ cou
   const d = defPara(def, run.accountId)
   const lim = limites(usadas)
   const efectivos = limitesEfectivos(lim)
+  const porAlcance = conFiltro(d)
+  const filtro = filtroDe(state.config, d)
+  const ahora = Date.now()
+  const pendiente = pendientesDe(filtro, state.leido, d, state.me)
+  const todo = rawModo !== 'faltante' || pendiente.todo
+  if (porAlcance && !todo && sinPendientes(pendiente)) return { count: ticketsVisibles(def).length }
+  const alcance = porAlcance ? alcanceAPedir(filtro, pendiente, d, ahora, state.me, todo) : undefined
   const ac = new AbortController()
   running = ac
   state.lastRun = lastRunTrasError(state.lastRun, undefined, usadas)
   avisar()
   try {
-    const pedido = pedidoPara(run, { tarea: 'lista', def: d, model: state.config.model, ajenos: ajenosDe(run, d), limites: lim })
-    const r = await runClaude({
-      ...lanzamiento(run, pedido),
-      ...opcionesMotor(run, pedido),
-      prompt: buildPrompt(d, state.config.assigneeId),
-      cwd: run.cwd,
-      env: { ...run.env, ...run.motor.envExtra(pedido) },
-      quien: def.nombre,
-      signal: ac.signal,
-      parse: (s) => leerLista(def, d, run, run.motor.normalizar(s, pedido), efectivos)
+    // La primera vez se piden las personas en paralelo con la lista: no suman tiempo. Si fallan, la lista sigue y se vuelven a pedir en la próxima.
+    const personasListas =
+      porAlcance && !state.personas
+        ? leerPersonas(def, d, run, ac.signal, lim).catch((e: unknown) => {
+            if (!ac.signal.aborted) ctx.log(`tickets: no pude leer las personas de ${def.nombre}: ${(e as Error).message}`)
+          })
+        : undefined
+    const r = await conReintento(lim.maxCostUsd, (p) => {
+      const pedido = pedidoPara(run, { tarea: 'lista', def: d, model: state.config.model, ajenos: ajenosDe(run, d), limites: conRestante(lim, p) })
+      return runClaude({
+        ...lanzamiento(run, pedido),
+        ...opcionesMotor(run, pedido),
+        prompt: buildPrompt(d, state.config.assigneeId, alcance),
+        cwd: run.cwd,
+        env: { ...run.env, ...run.motor.envExtra(pedido) },
+        quien: def.nombre,
+        timeoutMs: Math.min(LISTA_TIMEOUT_MS, p.restanteMs),
+        signal: ac.signal,
+        parse: (s) => leerLista(def, d, run, run.motor.normalizar(s, pedido), efectivos, porAlcance)
+      })
     })
-    state.tickets = r.tickets
+    await personasListas
+    if (r.me) state.me = r.me
+    state.tickets = alcance ? mezclar(state.tickets, r.tickets, alcance, state.me, todo) : r.tickets
+    if (alcance) state.leido = leidoTras(filtro, state.leido, alcance, todo, d, r.noLeidos)
     detalles.clear()
     if (r.estados?.length) state.estados = r.estados
-    if (r.me) state.me = r.me
     state.fetchedAt = Date.now()
     state.fetchedBy = run.accountId
     state.leidoCon = d.herramientas.prefijo
@@ -819,14 +949,83 @@ async function refresh(rawAccount: unknown, rawVueltas?: unknown): Promise<{ cou
     delete state.lastError
     noDisponible = {}
     state.config.queryAccountId = run.accountId
-    return { count: r.tickets.length, tokens: r.tokens }
+    return { count: ticketsVisibles(def).length, tokens: r.tokens }
   } catch (e) {
+    ac.abort()
     // Con Claude el tope llega en el sobre y medirUso lo anota; con otro motor lo corta cortarSi antes de parsear: ese gasto también cuenta.
     if (e instanceof TopeVueltasError && run.motor.id !== 'claude') registrarUso(def.id, e.uso)
-    const msg = e instanceof ConectorFaltaError ? (textoCuenta(def, { tipo: 'falta' }, run) ?? e.message) : (legible(e, run) as Error).message
+    const msg =
+      e instanceof ConectorFaltaError
+        ? (textoCuenta(def, { tipo: 'falta' }, run) ?? e.message)
+        : e instanceof PlazoError
+          ? textoPlazo(def, run, e)
+          : (legible(e, run) as Error).message
     state.lastRun = lastRunTrasError(state.lastRun, e, usadas)
     state.lastError = msg
     throw new Error(msg)
+  } finally {
+    running = null
+    changed()
+  }
+}
+
+/** Todo se valida antes de tocar nada: los argumentos del IPC no vienen validados. Cambiar el filtro no consulta; `refresh` con modo «faltante» lee solo lo que falta. */
+function setFiltro(raw: unknown): TicketsSnapshot {
+  if (!raw || typeof raw !== 'object') throw new Error('Filtro inválido.')
+  const def = activo()
+  if (!conFiltro(def)) throw new Error(`${def.nombre} no filtra por personas desde Sloth.`)
+  const p = raw as Record<string, unknown>
+  const c: TicketsConfig = { ...state.config, projectRepos: { ...state.config.projectRepos } }
+  if ('personasElegidas' in p) {
+    const v = personasValidas(def, p.personasElegidas)
+    if (!v) throw new Error('Las personas elegidas no son válidas (hasta 20, con el id que da el conector).')
+    const conocidas = state.personas
+    if (conocidas && v.some((id) => !conocidas.some((x) => x.id === id))) throw new Error('Esa persona no está en la lista. Actualizá las personas.')
+    if (v.length) c.personasElegidas = v
+    else delete c.personasElegidas
+  }
+  if ('incluirSinAsignar' in p) {
+    if (typeof p.incluirSinAsignar !== 'boolean') throw new Error('«Sin asignar» tiene que ser sí o no.')
+    if (p.incluirSinAsignar) c.incluirSinAsignar = true
+    else delete c.incluirSinAsignar
+  }
+  if ('estadosElegidos' in p) {
+    const v = p.estadosElegidos === null ? [] : estadosValidos(p.estadosElegidos, def.estados.map((e) => e.clave))
+    if (!v) throw new Error(`Algún estado elegido no es de ${def.nombre}.`)
+    if (v.length) c.estadosElegidos = v
+    else delete c.estadosElegidos
+  }
+  if ('ventanaDias' in p) {
+    if (p.ventanaDias === null) delete c.ventanaDias
+    else {
+      const v = ventanaValida(p.ventanaDias)
+      if (v === undefined) throw new Error(`La ventana va de 1 a ${VENTANA_MAX} días.`)
+      c.ventanaDias = v
+    }
+  }
+  state.config = c
+  changed()
+  return snapshot()
+}
+
+/** Vuelve a pedir la lista de personas (id y nombre) con la cuenta que consulta. */
+async function actualizarPersonas(rawAccount: unknown): Promise<TicketsSnapshot> {
+  if (running) throw new Error('Ya hay una consulta en curso.')
+  const def = activo()
+  if (!conFiltro(def) || def.via !== 'mcp') throw new Error(`${def.nombre} no lista personas desde Sloth.`)
+  const requested = typeof rawAccount === 'string' && rawAccount ? rawAccount : undefined
+  const run = ejecucion(def.nombre, requested ?? state.config.queryAccountId ?? (await pickAccount(def)), def)
+  chequearCuenta(def, run)
+  const d = defPara(def, run.accountId)
+  const ac = new AbortController()
+  running = ac
+  avisar()
+  try {
+    await leerPersonas(def, d, run, ac.signal, limites())
+    state.config.queryAccountId = run.accountId
+    return snapshot()
+  } catch (e) {
+    throw new Error(e instanceof PlazoError ? textoPlazo(def, run, e) : (legible(e, run) as Error).message)
   } finally {
     running = null
     changed()
@@ -1281,7 +1480,9 @@ const feature: Feature = {
     recargarPropios(state.config)
     cargarCuentas()
     c.handle('state', () => snapshot())
-    c.handle('refresh', (acc: unknown, vueltas: unknown) => refresh(acc, vueltas))
+    c.handle('refresh', (acc: unknown, vueltas: unknown, modo: unknown) => refresh(acc, vueltas, modo))
+    c.handle('setFiltro', (p: unknown) => setFiltro(p))
+    c.handle('personas', (acc: unknown) => actualizarPersonas(acc))
     c.handle('cancel', () => {
       running?.abort()
       return true

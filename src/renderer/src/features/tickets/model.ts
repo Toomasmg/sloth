@@ -76,6 +76,17 @@ export const setBoardOpen = (v: boolean): void => {
   open = v
   notify()
 }
+/** Equipo manda a elegir personas: el tablero se abre con la barra de filtros desplegada. */
+let pideFiltro = false
+export const pedirFiltroPersonas = (): void => {
+  pideFiltro = true
+  setBoardOpen(true)
+}
+export const consumirPedidoFiltro = (): boolean => {
+  const v = pideFiltro
+  pideFiltro = false
+  return v
+}
 export const getSnapshot = (): Snapshot | null => snap
 export const useSnapshot = (): Snapshot | null => useSyncExternalStore(subscribe, () => snap)
 export const useBoardOpen = (): boolean => useSyncExternalStore(subscribe, () => open)

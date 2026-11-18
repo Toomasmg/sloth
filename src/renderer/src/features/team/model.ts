@@ -65,6 +65,8 @@ export interface TeamSnapshot {
     model: string
     confirmar: boolean
     carpetas?: Record<string, string>
+    /** Solo con conectores que filtran por personas: qué personas se eligieron en Tickets y qué falta traer. */
+    filtro?: { personasElegidas: number; incluirSinAsignar: boolean; ventanaDias: number; sinTraer: string[]; faltaTodo: boolean }
   }
   githubRunning: boolean
   /** team.json no se puede guardar: lo vinculado a mano se pierde al reiniciar. */

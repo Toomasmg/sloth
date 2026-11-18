@@ -51,6 +51,8 @@ export interface ConectorMcp extends ConectorBase {
     apoyo?: string[]
     /** De lectura, permitidas además del apoyo solo en esa acción. */
     apoyoEn?: Partial<Record<Accion, string[]>>
+    /** De lectura y también de `lista`: con ella se arma la lista de personas para filtrar por responsable. Va junto con `pistas.listaPor` y `pistas.personas`. */
+    personas?: string
   }
   pistas: {
     /** conId lleva `{id}` una sola vez. */
@@ -58,7 +60,15 @@ export interface ConectorMcp extends ConectorBase {
     lista: string
     /** Sin esto no hay paso 3 ni "estados" en el ejemplo. */
     estados?: string
+    /** Cómo leer los tickets de cada responsable: lleva {asignados} (la lista de ids, entre comillas JSON) y {desde} (YYYY-MM-DD). */
+    listaPor?: string
+    /** Se suma a `listaPor` cuando se piden también los terminados; admite {desde}. */
+    listaHechos?: string
+    /** Cómo armar la lista de personas con `herramientas.personas`. */
+    personas?: string
     detalle: PasoLlamada[]
+    /** De qué campos de lo que traen los pasos de detalle sale la descripción del ticket. Sin esto, el detalle no la pide. */
+    descripcion?: string
     /** Cuándo usar las herramientas de apoyo; admite solo `{ticket}`. */
     apoyo?: string
     acciones: Partial<Record<Accion, PistaAccion>>
@@ -303,7 +313,7 @@ function validarGh(raw: Obj): void {
 function validarMcp(raw: Obj): void {
   const { o } = validarBase(raw, ['herramientas', 'pistas'])
   const H = `${R}.herramientas`
-  const h = objeto(o.herramientas, H, ['prefijo', 'lista', 'detalle', 'escritura', 'negar'], ['apoyo', 'apoyoEn'])
+  const h = objeto(o.herramientas, H, ['prefijo', 'lista', 'detalle', 'escritura', 'negar'], ['apoyo', 'apoyoEn', 'personas'])
   campo(h.prefijo, `${H}.prefijo`, 64, PREFIJO_RE)
   const deLista = herramientas(h.lista, `${H}.lista`, 1, 20)
   const deDetalle = herramientas(h.detalle, `${H}.detalle`, 0, 20)
@@ -321,22 +331,37 @@ function validarMcp(raw: Obj): void {
     const choca = herramientas(x, `${H}.apoyoEn.${a}`, 1, 5).find((t) => negar.includes(t) || deEscritura.includes(t))
     if (choca) fallar(`${H}.apoyoEn.${a}`, `«${choca}» no puede ser de apoyo y estar negada o escribir`)
   }
+  const dePersonas = 'personas' in h ? herramienta(h.personas, `${H}.personas`) : undefined
+  if (dePersonas !== undefined && !deLista.includes(dePersonas)) fallar(`${H}.personas`, 'tiene que estar también en herramientas.lista')
   if ('criterio' in escritura && !deDetalle.length) fallar(`${H}.escritura.criterio`, 'tildar criterios necesita herramientas de detalle (de ahí salen sus ids)')
 
   const P = `${R}.pistas`
-  const p = objeto(o.pistas, P, ['yo', 'lista', 'detalle', 'acciones'], ['estados', 'apoyo'])
+  const p = objeto(o.pistas, P, ['yo', 'lista', 'detalle', 'acciones'], ['estados', 'apoyo', 'listaPor', 'listaHechos', 'personas', 'descripcion'])
   const yo = objeto(p.yo, `${P}.yo`, ['conId', 'sinId'])
   const conId = campo(yo.conId, `${P}.yo.conId`, PISTA_MAX)
   if (conId.split('{id}').length !== 2 || LLAVES.test(conId.replace('{id}', ''))) fallar(`${P}.yo.conId`, 'tiene que llevar {id} una sola vez y ninguna otra llave')
   campo(yo.sinId, `${P}.yo.sinId`, PISTA_MAX)
   campo(p.lista, `${P}.lista`, PISTA_MAX)
   if ('estados' in p) campo(p.estados, `${P}.estados`, PISTA_MAX)
+  if ('listaPor' in p) {
+    soloPlaceholders(p.listaPor, `${P}.listaPor`, ['asignados', 'desde'])
+    if (!(p.listaPor as string).includes('{asignados}')) fallar(`${P}.listaPor`, 'tiene que llevar {asignados}')
+  }
+  if ('listaHechos' in p) soloPlaceholders(p.listaHechos, `${P}.listaHechos`, ['desde'])
+  if ('personas' in p) campo(p.personas, `${P}.personas`, PISTA_MAX)
+  if (!('listaPor' in p) !== (dePersonas === undefined) || !('personas' in p) !== (dePersonas === undefined))
+    fallar(P, 'herramientas.personas, pistas.personas y pistas.listaPor van juntas')
+  if ('listaHechos' in p && !('listaPor' in p)) fallar(`${P}.listaHechos`, 'necesita pistas.listaPor')
   if ('apoyo' in p) soloPlaceholders(p.apoyo, `${P}.apoyo`, ['ticket'])
   if (!('apoyo' in p) !== !apoyo.length) fallar(`${P}.apoyo`, 'la pista de apoyo y las herramientas de apoyo van juntas')
   if (Object.keys(apoyoEn).length && !('apoyo' in p)) fallar(`${H}.apoyoEn`, 'necesita la pista de apoyo')
 
   const pasos = lista(p.detalle, `${P}.detalle`, 0, 20)
   if (!pasos.length !== !deDetalle.length) fallar(`${P}.detalle`, 'hay pasos de detalle sin herramientas de detalle o al revés')
+  if ('descripcion' in p) {
+    campo(p.descripcion, `${P}.descripcion`, PISTA_MAX)
+    if (!pasos.length) fallar(`${P}.descripcion`, 'necesita pasos de detalle de donde sacarla')
+  }
   pasos.forEach((x, i) => {
     const r = `${P}.detalle[${i}]`
     const paso = objeto(x, r, ['herramienta', 'args'])

@@ -7,6 +7,7 @@
 import {
   ACCIONES,
   categoriaDe,
+  SIN_ASIGNAR,
   SIN_CONECTOR,
   type Accion,
   type Comentario,
@@ -15,13 +16,23 @@ import {
   type Detalle,
   type Estado,
   type EstadoBase,
+  type PersonaEquipo,
   type Ticket,
   type Yo
 } from '../../../shared/tickets'
 import { ACCIONES_GH, ID_MAX, ID_SEGURO_RE, idNormalizado, nombreCompleto, PERSONA_POR_DEFECTO, regexDeId, regexDePersona, type ArgValor, type ConectorDef, type ConectorMcp } from './conector'
 import { costoValido, VUELTAS_DEFECTO, vueltasValidas } from './uso'
+import { fechaValida, type AlcanceLista } from './alcance'
 
 const MAX_TICKETS = 250
+/** Con filtro por personas la lista junta lo de varias consultas. */
+const MAX_TICKETS_ALCANCE = 600
+const MAX_PERSONAS = 500
+const NO_LEIDOS_MAX = 100_000
+const DESCRIPCION_MAX = 120
+/** La descripción que se lee al abrir un ticket: más larga que la de la lista, pero acotada. */
+export const DESCRIPCION_DETALLE_MAX = 1500
+const DESCRIPCION_LINEAS_MAX = 25
 const MAX_CRITERIOS = 5
 const MAX_CRITERIOS_DETALLE = 30
 
@@ -32,6 +43,7 @@ export const OUTPUT_SCHEMA = {
   type: 'object',
   properties: {
     error: { type: 'string' },
+    no_leidos: { type: 'number' },
     estados: {
       type: 'array',
       items: {
@@ -59,14 +71,7 @@ export const OUTPUT_SCHEMA = {
           responsable: { type: 'string' },
           responsable_id: { type: 'string' },
           descripcion: { type: 'string' },
-          criterios: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: { texto: { type: 'string' }, hecho: { type: 'boolean' } },
-              required: ['texto', 'hecho']
-            }
-          }
+          fecha: { type: 'string' }
         },
         required: ['id', 'titulo', 'estado']
       }
@@ -79,6 +84,7 @@ export const DETAIL_SCHEMA = {
   type: 'object',
   properties: {
     error: { type: 'string' },
+    descripcion: { type: 'string' },
     criterios: {
       type: 'array',
       items: {
@@ -152,6 +158,8 @@ export interface ResultadoLista {
   /** En el orden de las columnas, si Claude los pudo leer. */
   estados?: EstadoBase[]
   me?: Yo
+  /** Cuántos tickets había y no entraron en la lista (tope de la lista o páginas que no se leyeron). */
+  noLeidos?: number
   costUsd?: number
   tokens?: number
   durationMs?: number
@@ -228,12 +236,15 @@ export const idValido = (def: ConectorDef, v: unknown): string | null => idNorma
 /** El comando con el que arranca el espacio de un ticket; solo lo tienen los conectores que lo declaran (gruv, con `/ticket`). */
 export const comandoDeTicket = (def: ConectorDef): string | null => def.comandoTicket ?? null
 
+/** Ofrece filtrar por responsable solo el conector que declara cómo listar personas. */
+export const filtraPersonas = (def: ConectorDef): boolean => def.via === 'mcp' && def.herramientas.personas !== undefined && def.pistas.listaPor !== undefined && def.pistas.personas !== undefined
+
 export const leeDetalle = (def: ConectorDef): boolean => def.via === 'gh' || def.herramientas.detalle.length > 0
 
 /** `soloLectura`: un incluido sin probar se puede leer pero no ofrece acciones. */
 export function info(def: ConectorDef | undefined, idPedido: string, soloLectura = false): ConectorInfo {
   if (!def)
-    return { id: idPedido, nombre: idPedido === SIN_CONECTOR ? 'Sin conector' : idPedido, verificado: false, via: 'mcp', disponible: false, acciones: [], leeDetalle: false, ejemploId: '', estados: [], comandoTicket: null, idRegex: ID_LIBRE, idMayusculas: false }
+    return { id: idPedido, nombre: idPedido === SIN_CONECTOR ? 'Sin conector' : idPedido, verificado: false, via: 'mcp', disponible: false, acciones: [], leeDetalle: false, ejemploId: '', estados: [], comandoTicket: null, idRegex: ID_LIBRE, idMayusculas: false, filtraPersonas: false }
   return {
     id: def.id,
     nombre: def.nombre,
@@ -246,7 +257,8 @@ export function info(def: ConectorDef | undefined, idPedido: string, soloLectura
     estados: def.estados.map((e) => ({ ...e })),
     comandoTicket: comandoDeTicket(def),
     idRegex: def.idRegex,
-    idMayusculas: def.idMayusculas
+    idMayusculas: def.idMayusculas,
+    filtraPersonas: filtraPersonas(def)
   }
 }
 
@@ -293,13 +305,15 @@ export function buildArgs(
 }
 
 /**
- * Lee los tickets de TODO el equipo (no solo los de la cuenta) para que la app pueda separar
- * «Míos», «Del equipo» y «Sin asignar». `assigneeId` fija quién sos si ya se configuró.
+ * Con `alcance` y un conector que sabe listar por responsable (`pistas.listaPor`), lee los tickets propios
+ * y los de las personas pedidas, desde una fecha. Sin eso, lee los de TODO el equipo para que la app pueda
+ * separar «Míos», «Del equipo» y «Sin asignar». `assigneeId` fija quién sos si ya se configuró.
  */
-export function buildPrompt(def: ConectorMcp, assigneeId: string): string {
+export function buildPrompt(def: ConectorMcp, assigneeId: string, alcance?: AlcanceLista): string {
   const n = def.nombre
-  const { yo, lista, estados } = def.pistas
+  const { yo, lista, estados, listaPor, listaHechos } = def.pistas
   const ej = def.ejemplo
+  const porAlcance = alcance !== undefined && listaPor !== undefined
   const primero = def.estados.find((e) => e.categoria !== 'hecho')
   const ejemplo = {
     yo: { id: '<tu id>', nombre: '<tu nombre>' },
@@ -314,22 +328,32 @@ export function buildPrompt(def: ConectorMcp, assigneeId: string): string {
         url: '<link al ticket, si lo da>',
         responsable: '<nombre>',
         responsable_id: '<id>',
-        descripcion: '…',
-        criterios: [{ texto: '…', hecho: false }]
+        ...(porAlcance ? { fecha: '<fecha ISO>' } : { descripcion: '…' })
       }
     ]
   }
+  const paso2 = porAlcance ? pasoPorAlcance(listaPor, listaHechos, alcance) : lista
+  const campos = porAlcance
+    ? `"responsable" es el nombre de quien tiene asignado el ticket y "responsable_id" su id; si nadie lo tiene, no pongas ninguno de los dos. "fecha" es la fecha en formato ISO que dice el paso 2. Lo abierto se devuelve siempre, sea cual sea su "fecha"; solo los cerrados con "fecha" anterior a ${alcance.desde} no se devuelven. No agregues descripción ni criterios. Si el "total" de alguna consulta dice que hay más tickets de los que leíste, poné en "no_leidos" cuántos faltaron (la suma); si leíste todo, no pongas "no_leidos".`
+    : `"responsable" es el nombre de quien tiene asignado el ticket y "responsable_id" su id; si nadie lo tiene, no pongas ninguno de los dos. "descripcion" es el texto de la descripción en una línea, recortado a ${DESCRIPCION_MAX} caracteres, si la trae.`
   return [
     `Tarea de solo lectura. No modifiques nada en ${n}: no comentes, no muevas, no asignes, no tildes nada.`,
     `1. Armá "yo" con tu id y tu nombre en ${n}. ${assigneeId ? yo.conId.replace('{id}', () => assigneeId) : yo.sinId}`,
-    `2. ${lista}`,
+    `2. ${paso2}`,
     ...(estados ? [`3. ${estados}`] : []),
-    '"responsable" es el nombre de quien tiene asignado el ticket y "responsable_id" su id; si nadie lo tiene, no pongas ninguno de los dos. "descripcion" es el texto de la descripción en una línea, recortado a 200 caracteres, si la trae. "criterios" son hasta 5 criterios de aceptación, con "texto" (máx. 120 caracteres) y "hecho" (true o false), si los trae.',
+    campos,
     'Respondé SOLO con un JSON, sin texto antes ni después y sin bloque de código, con esta forma:',
     J(ejemplo),
     'Si un campo opcional no viene, no lo pongas. Si no hay tickets, devolvé "tickets":[].',
     `Si no tenés ninguna herramienta de ${n} disponible, respondé exactamente ${J({ error: def.faltaConector.clave, tickets: [] })}.`
   ].join('\n')
+}
+
+/** Los ids van a la consulta como datos entre comillas JSON; «tu id» es el que se sacó en el paso 1. */
+function pasoPorAlcance(listaPor: string, listaHechos: string | undefined, a: AlcanceLista): string {
+  const asignados = J(['tu id', ...a.personas, ...(a.sinAsignar ? [SIN_ASIGNAR] : [])])
+  const texto = listaPor.replaceAll('{asignados}', () => asignados).replaceAll('{desde}', () => a.desde)
+  return `${texto}${a.hechos && listaHechos ? ` ${listaHechos.replaceAll('{desde}', () => a.desde)}` : ''} Donde el responsable es "tu id", usá el id del paso 1.`
 }
 
 export interface PermisosConsulta {
@@ -351,12 +375,77 @@ const completos = (def: ConectorMcp, xs: readonly string[]): string[] => xs.map(
 export const buildListaArgs = (def: ConectorMcp, model: string, ajenos: readonly string[] = [], limites?: Limites): string[] =>
   buildArgs(model, { allow: completos(def, permisosPorConsulta(def).lista), deny: negadas(def), schema: OUTPUT_SCHEMA, extraDeny: ajenos, ...limites })
 
+const PERSONAS_SCHEMA = {
+  type: 'object',
+  properties: {
+    error: { type: 'string' },
+    personas: {
+      type: 'array',
+      items: { type: 'object', properties: { id: { type: 'string' }, nombre: { type: 'string' } }, required: ['id', 'nombre'] }
+    }
+  },
+  required: ['personas']
+}
+
+/** Solo id y nombre: ni mails ni teléfonos salen de la consulta. */
+export function buildPersonasPrompt(def: ConectorMcp): string {
+  const n = def.nombre
+  return [
+    `Tarea de solo lectura. No modifiques nada en ${n}.`,
+    def.pistas.personas ?? '',
+    'Respondé SOLO con un JSON, sin texto antes ni después y sin bloque de código, con esta forma:',
+    J({ personas: [{ id: '<id>', nombre: '<nombre>' }] }),
+    'No pongas mails, teléfonos ni otro dato de las personas: solo "id" y "nombre". No repitas ids.',
+    `Si no tenés ninguna herramienta de ${n} disponible, respondé exactamente ${J({ error: def.faltaConector.clave, personas: [] })}.`
+  ].join('\n')
+}
+
+export function buildPersonasArgs(def: ConectorMcp, model: string, ajenos: readonly string[] = [], limites?: Limites): string[] {
+  const tool = def.herramientas.personas
+  return buildArgs(model, { allow: tool ? completos(def, [tool]) : [], deny: negadas(def), schema: PERSONAS_SCHEMA, extraDeny: ajenos, ...limites })
+}
+
+/** Lee la lista de personas. Tira ConectorFaltaError si la cuenta no tiene el conector. */
+export function parsePersonas(def: ConectorMcp, stdout: string): PersonaEquipo[] {
+  const { data } = parseEnvelope(def, stdout)
+  return normalizePersonas(def, (data as { personas?: unknown } | null)?.personas)
+}
+
+/** Un nombre que trae un correo o un teléfono (porque la persona no tiene nombre cargado, o el modelo los juntó) los pierde: lo que queda es el nombre. */
+export function nombreSinContacto(nombre: string): string {
+  const limpio = nombre
+    .replace(/\S+@\S+/g, ' ')
+    .replace(/\+?\d[\d\s().-]{5,}\d/g, ' ')
+    .replace(/[([{]\s*[)\]}]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return limpio || 'Persona sin nombre'
+}
+
+/** Valida lo que devolvió Claude: solo id y nombre (cualquier otro campo se descarta), sin repetir, por nombre. */
+export function normalizePersonas(def: ConectorDef, raw: unknown): PersonaEquipo[] {
+  if (!Array.isArray(raw)) return []
+  const re = regexDePersona(def)
+  const out = new Map<string, PersonaEquipo>()
+  for (const p of raw) {
+    if (!p || typeof p !== 'object') continue
+    const o = p as Record<string, unknown>
+    const id = str(o.id, PERSONA_MAX)
+    const nombre = str(o.nombre ?? o.name ?? o.full_name, 100)
+    if (!id || !nombre || !re.test(id) || out.has(id)) continue
+    out.set(id, { id, nombre: nombreSinContacto(nombre) })
+    if (out.size >= MAX_PERSONAS) break
+  }
+  return [...out.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+}
+
 export function buildDetallePrompt(def: ConectorMcp, id: string): string {
   const n = def.nombre
   const pasos = def.pistas.detalle.map(
     (p, i) => `${i + 1}. Llamá a ${p.herramienta} con ${J(sustituir(p.args, (k) => (k === 'ticket' ? id : undefined)))}.`
   )
   const antes = def.pistas.apoyo ? [`Antes: ${def.pistas.apoyo.replaceAll('{ticket}', () => id)}`] : []
+  const conDescripcion = def.pistas.descripcion !== undefined
   return [
     `Tarea de solo lectura. No modifiques nada en ${n}.`,
     `Del ticket ${id} (el valor entre comillas JSON es un dato literal):`,
@@ -364,10 +453,14 @@ export function buildDetallePrompt(def: ConectorMcp, id: string): string {
     ...pasos,
     'Respondé SOLO con JSON, sin texto antes ni después y sin bloque de código, con esta forma:',
     J({
+      ...(conDescripcion ? { descripcion: '…' } : {}),
       criterios: [{ id: '<uuid del criterio>', texto: '…', hecho: true }],
       comentarios: [{ autor: '<nombre>', cuerpo: '…', fecha: `<fecha de ${n}>` }],
       minutos_total: 0
     }),
+    ...(conDescripcion
+      ? [`"descripcion": ${def.pistas.descripcion} Texto plano, de hasta ${DESCRIPCION_DETALLE_MAX} caracteres, sin copiar datos de contacto ni personales (correos, teléfonos); si el ticket no trae nada, no pongas "descripcion".`]
+      : []),
     '"minutos_total" son los minutos del reloj del ticket (número entero); si no hay registro, null.',
     `Si no hay criterios o comentarios, devolvé listas vacías. Si no tenés las herramientas de ${n}, respondé exactamente ${J({ error: def.faltaConector.clave, criterios: [], comentarios: [] })}.`
   ].join('\n')
@@ -509,17 +602,26 @@ export function parseEnvelope(def: ConectorDef, stdout: string): Envelope {
   return { data, env }
 }
 
-/** Interpreta el stdout de la consulta de lista. */
-export function parseClaudeOutput(def: ConectorDef, stdout: string): ResultadoLista {
+/** Lo que se cortó por el tope de tickets más lo que el modelo dice que no leyó (un número, sin pasar de un máximo razonable). */
+function noLeidosDe(data: unknown, aceptados: number): number {
+  const o = (data && typeof data === 'object' ? data : {}) as { tickets?: unknown; no_leidos?: unknown }
+  const cortados = aceptados >= MAX_TICKETS_ALCANCE && Array.isArray(o.tickets) ? Math.max(0, o.tickets.length - aceptados) : 0
+  const dicho = typeof o.no_leidos === 'number' && Number.isFinite(o.no_leidos) ? Math.min(NO_LEIDOS_MAX, Math.max(0, Math.round(o.no_leidos))) : 0
+  return Math.min(NO_LEIDOS_MAX, cortados + dicho)
+}
+
+/** Interpreta el stdout de la consulta de lista. Con `porAlcance` los terminados no se descartan acá: el filtro decide. */
+export function parseClaudeOutput(def: ConectorDef, stdout: string, porAlcance = false): ResultadoLista {
   const { data, env } = parseEnvelope(def, stdout)
   const denied = env.permission_denials
-  const tickets = normalizeTickets(def, data)
+  const tickets = normalizeTickets(def, data, porAlcance ? { conservarHechos: true, max: MAX_TICKETS_ALCANCE } : undefined)
   // Sin tickets y con herramientas negadas o inexistentes: no es «no tenés tickets».
   if (!tickets.length && Array.isArray(denied) && denied.length) {
     throw new Error(`Claude no pudo usar las herramientas de ${def.nombre} (permiso negado). Probá de nuevo.`)
   }
   const estados = normalizeEstados(def, (data as { estados?: unknown })?.estados)
   const me = normYo(def, (data as { yo?: unknown })?.yo)
+  const noLeidos = porAlcance ? noLeidosDe(data, tickets.length) : 0
   const usage = env.usage as Record<string, number> | undefined
   const tokens = usage
     ? ['input_tokens', 'output_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens'].reduce(
@@ -531,6 +633,7 @@ export function parseClaudeOutput(def: ConectorDef, stdout: string): ResultadoLi
     tickets,
     estados,
     me,
+    ...(noLeidos > 0 ? { noLeidos } : {}),
     costUsd: typeof env.total_cost_usd === 'number' ? env.total_cost_usd : undefined,
     tokens,
     durationMs: typeof env.duration_ms === 'number' ? env.duration_ms : undefined,
@@ -540,6 +643,30 @@ export function parseClaudeOutput(def: ConectorDef, stdout: string): ResultadoLi
 
 const minutosDe = (m: unknown): number | null => (typeof m === 'number' && Number.isFinite(m) ? Math.max(0, Math.round(m)) : null)
 
+/**
+ * La descripción viene de afuera: texto plano, sin caracteres de control ni de dirección, con sus saltos de
+ * línea (pocos y sin renglones vacíos de más) y acotada. Se muestra como texto, nunca como HTML.
+ */
+export function normDescripcion(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined
+  const lineas = v
+    .slice(0, DESCRIPCION_DETALLE_MAX * 2)
+    .replace(/\r\n?/g, '\n')
+    .replace(/[^\S\n]+/g, ' ')
+    .replace(/[\p{Cc}\p{Cf}]/gu, (c) => (c === '\n' ? c : ''))
+    .split('\n')
+    .map((l) => l.trim())
+  const out: string[] = []
+  for (const l of lineas) {
+    if (!l && (!out.length || !out[out.length - 1])) continue
+    out.push(l)
+    if (out.length >= DESCRIPCION_LINEAS_MAX) break
+  }
+  const s = out.join('\n').trim()
+  if (!s) return undefined
+  return s.length > DESCRIPCION_DETALLE_MAX ? `${s.slice(0, DESCRIPCION_DETALLE_MAX - 1).trimEnd()}…` : s
+}
+
 /** Lee el detalle. Tira ConectorFaltaError si la cuenta no tiene el conector. */
 export function parseDetalle(def: ConectorMcp, stdout: string): Detalle {
   const { data, env } = parseEnvelope(def, stdout)
@@ -547,9 +674,10 @@ export function parseDetalle(def: ConectorMcp, stdout: string): Detalle {
   const criterios = normCriterios(o.criterios, MAX_CRITERIOS_DETALLE)
   const comentarios = normComentarios(o.comentarios)
   const minutos = minutosDe(o.minutos_total)
-  if (!criterios.length && !comentarios.length && minutos === null && def.herramientas.detalle.some((t) => deniedTool(env, t)))
+  const descripcion = def.pistas.descripcion === undefined ? undefined : normDescripcion(o.descripcion)
+  if (!criterios.length && !comentarios.length && minutos === null && !descripcion && def.herramientas.detalle.some((t) => deniedTool(env, t)))
     throw new Error(`${def.nombre} no dejó leer el detalle con esta cuenta (permiso negado).`)
-  return { criterios, comentarios, minutos }
+  return { criterios, comentarios, minutos, ...(descripcion ? { descripcion } : {}) }
 }
 
 /** Lee la respuesta de una escritura. Tira HerramientaFaltaError si la herramienta no existe. */
@@ -577,14 +705,15 @@ export function normEstado(v: unknown): string | undefined {
 }
 
 /** Valida y limpia lo que devolvió Claude (no confiamos en la forma). */
-export function normalizeTickets(def: ConectorDef, raw: unknown): Ticket[] {
+export function normalizeTickets(def: ConectorDef, raw: unknown, opts: { conservarHechos?: boolean; max?: number } = {}): Ticket[] {
   const list = Array.isArray(raw)
     ? raw
     : raw && typeof raw === 'object' && Array.isArray((raw as { tickets?: unknown }).tickets)
       ? (raw as { tickets: unknown[] }).tickets
       : null
   if (!list) throw new Error('La respuesta no trae una lista de tickets.')
-  const ocultas = clavesOcultas(def)
+  const ocultas = opts.conservarHechos ? [] : clavesOcultas(def)
+  const max = opts.max ?? MAX_TICKETS
   const out = new Map<string, Ticket>()
   for (const item of list) {
     if (!item || typeof item !== 'object') continue
@@ -611,8 +740,10 @@ export function normalizeTickets(def: ConectorDef, raw: unknown): Ticket[] {
     if (desc) t.descripcion = desc
     const criterios = normCriterios(o.criterios)
     if (criterios.length) t.criterios = criterios
+    const fecha = fechaValida(o.fecha)
+    if (fecha) t.fecha = fecha
     out.set(id, t)
-    if (out.size >= MAX_TICKETS) break
+    if (out.size >= max) break
   }
   return [...out.values()]
 }

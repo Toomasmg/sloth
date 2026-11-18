@@ -4,10 +4,11 @@
  * Módulo puro (lo corre `node --test` con type stripping): sin enums, namespaces ni parameter
  * properties, y los tipos se importan con `type`.
  */
-import { MODELOS, SIN_CONECTOR, type Corrida, type EstadoBase, type Modelo, type Ticket, type TicketsConfig, type UsoPorDia, type Yo } from '../../../shared/tickets'
+import { MODELOS, SIN_CONECTOR, type AlcanceLeido, type Corrida, type EstadoBase, type Modelo, type PersonaEquipo, type Ticket, type TicketsConfig, type UsoPorDia, type Yo } from '../../../shared/tickets'
 import { ID_CONECTOR_RE, ID_MAX, ID_SEGURO_RE, PREFIJO_RE, regexDePersona, type ConectorDef } from './conector'
 import { CONECTOR_LEGADO } from './conectores'
-import { idValido, normalizeEstados, normEstado, normYo } from './motor'
+import { estadosValidos, personasValidas, ventanaValida } from './alcance'
+import { idValido, normalizeEstados, normEstado, normalizePersonas, normYo } from './motor'
 import { costoValido, sanearUso, vueltasValidas } from './uso'
 
 /** 'error': el archivo está pero no se pudo leer (bloqueado, sin permiso…); no es lo mismo que corrupto. */
@@ -27,6 +28,11 @@ export interface TicketsState {
   /** Lo gastado por día y conector, para el acumulado de Ajustes. */
   uso?: UsoPorDia
   lastError?: string
+  /** Las personas del equipo (solo id y nombre) para elegir a quién filtrar, y cuándo se leyeron. */
+  personas?: PersonaEquipo[]
+  personasAt?: number
+  /** Qué cubre `tickets`: lo que falta leer al cambiar el filtro se pide aparte. */
+  leido?: AlcanceLeido
   /** gruvMtimeMs: el mtime del gruv.json migrado; si gruv.json cambia, se vuelve a migrar. */
   migradoDe?: { archivo: 'gruv.json'; en: number; gruvMtimeMs?: number }
   config: TicketsConfig
@@ -125,8 +131,35 @@ function sanearConfig(raw: unknown, buscar: Buscar): TicketsConfig {
     confirmRefresh: c.confirmRefresh !== false,
     servidores: sanearServidores(c.servidores),
     maxTurns: vueltasValidas(c.maxTurns),
-    maxCostUsd: costoValido(c.maxCostUsd)
+    maxCostUsd: costoValido(c.maxCostUsd),
+    ...sanearFiltro(c, buscar(conectorId))
   })
+}
+
+/** Lo que no sirve se descarta de a uno: una persona o un estado mal puestos no tiran el resto de la configuración. */
+function sanearFiltro(c: Obj, def: ConectorDef | undefined): Partial<TicketsConfig> {
+  const personas = def ? personasValidas(def, c.personasElegidas) : null
+  const estados = def && Array.isArray(c.estadosElegidos) ? estadosValidos(c.estadosElegidos.filter((e) => typeof e === 'string' && def.estados.some((x) => x.clave === e)), def.estados.map((e) => e.clave)) : null
+  return {
+    personasElegidas: personas?.length ? personas : undefined,
+    incluirSinAsignar: c.incluirSinAsignar === true ? true : undefined,
+    estadosElegidos: estados?.length ? estados : undefined,
+    ventanaDias: ventanaValida(c.ventanaDias)
+  }
+}
+
+function sanearLeido(raw: unknown, def: ConectorDef | undefined): AlcanceLeido | undefined {
+  if (!esObjeto(raw)) return undefined
+  const ventanaDias = ventanaValida(raw.ventanaDias)
+  const personas = def ? personasValidas(def, raw.personas) : null
+  if (ventanaDias === undefined || !personas) return undefined
+  const noLeidos = typeof raw.noLeidos === 'number' && Number.isInteger(raw.noLeidos) && raw.noLeidos > 0 ? Math.min(raw.noLeidos, 100_000) : undefined
+  return { personas, sinAsignar: raw.sinAsignar === true, hechos: raw.hechos === true, ventanaDias, ...(noLeidos ? { noLeidos } : {}) }
+}
+
+function sanearPersonas(raw: unknown, def: ConectorDef | undefined): PersonaEquipo[] | undefined {
+  const p = def ? normalizePersonas(def, raw) : []
+  return p.length ? p : undefined
 }
 
 function sanearTickets(raw: unknown, def: ConectorDef | undefined): Ticket[] {
@@ -169,6 +202,9 @@ function armar(o: Obj, config: TicketsConfig, buscar: Buscar, migradoDe: unknown
     lastRun: sanearCorrida(o.lastRun),
     uso: sanearUso(o.uso),
     lastError: noVacio(o.lastError),
+    personas: sanearPersonas(o.personas, def),
+    personasAt: numero(o.personasAt),
+    leido: sanearLeido(o.leido, def),
     migradoDe: m === undefined ? undefined : sinVacios({ archivo: 'gruv.json' as const, en: m, gruvMtimeMs }),
     config
   })
@@ -204,6 +240,9 @@ export function conConector(s: TicketsState, conectorId: string): TicketsState {
   delete previos[conectorId]
   const config = sinVacios({
     ...s.config,
+    personasElegidas: undefined,
+    incluirSinAsignar: undefined,
+    estadosElegidos: undefined,
     conectorId,
     assigneeId,
     assigneePrevios: Object.keys(previos).length ? previos : undefined,

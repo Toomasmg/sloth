@@ -289,6 +289,16 @@ export function personasDe(tickets: readonly TeamTicket[]): PersonaConector[] {
   return out
 }
 
+/** Las personas elegidas en el filtro de Tickets, con su nombre, para que tengan tarjeta aunque todavía no tengan tickets activos. */
+export function personasElegidasEquipo(ids: readonly string[], personas: readonly { id: string; nombre: string }[] | undefined): PersonaConector[] {
+  const out: PersonaConector[] = []
+  for (const id of ids) {
+    const p = personas?.find((x) => x.id === id)
+    if (p) out.push({ id: p.id, nombre: p.nombre.slice(0, 80) })
+  }
+  return out
+}
+
 /**
  * Arma las tarjetas: una por persona del conector (con sus tickets) y les suma los PRs de su login de
  * GitHub (mapeo a mano primero; si no, por nombre cuando hay un solo candidato). Los autores de

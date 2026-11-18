@@ -755,6 +755,7 @@
   line-height: 1.6;
   color: var(--g-dc);
   overflow-wrap: anywhere;
+  white-space: pre-line;
 }
 .f-tickets-progress {
   height: 4px;
