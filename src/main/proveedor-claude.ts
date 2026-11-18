@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { CAPACIDADES } from '../shared/proveedores'
 import { resolveClaudeExe } from './features/tickets/claude-run'
 import { claudeWithPrompt } from './shell-args'
-import type { Proveedor } from './proveedores'
+import type { Proveedor } from './proveedor-tipos'
 
 function readJson(path: string): unknown {
   try {

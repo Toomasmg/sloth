@@ -2,8 +2,9 @@ import { ACCIONES, CATEGORIAS, type Accion, type Categoria } from '../../../../s
 import { PLACEHOLDERS } from '../../../../main/features/tickets/conector'
 import { pareceDeLectura } from '../../../../main/features/tickets/propios'
 import { ACCION_ETIQUETA, argsPorDefecto, FORMATOS, revisarComando, revisarId, type Borrador, type FormatoId, type Rol } from './borrador'
-import type { Cambiar } from './Asistente'
 import { Button, Input, Select } from '../../ui'
+
+export type Cambiar = (f: (b: Borrador) => Borrador) => void
 
 const ROLES: { rol: Rol; etiqueta: string; lectura: boolean }[] = [
   { rol: 'lista', etiqueta: 'Lista', lectura: true },

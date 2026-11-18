@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import type { SpawnSpec } from '../shared/daemon-protocol'
-import type { ShellChoice } from './features/settings-model'
+import type { ShellChoice } from '../shared/settings-model'
 import { shellArgs, shellLaunch, type ShellFamily } from './shell-args'
 import { entornoLimpio } from './env-limpio'
 

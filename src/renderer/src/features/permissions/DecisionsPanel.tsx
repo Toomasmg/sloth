@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import type { DecisionEntry } from '../../../../main/features/permissions'
-import type { PermissionRule } from '../../../../main/features/permissions-core'
+import type { DecisionEntry, PermissionRule } from '../../../../shared/permissions-core'
 import { cleanError } from '../../format'
 import { Modal } from '../../Modal'
 import { removeRule, setRule, undoDecision } from './api'

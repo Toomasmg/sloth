@@ -19,32 +19,21 @@ import {
   permitirDesdeAviso,
   ruleFor,
   shouldNotify,
+  type DecisionEntry,
   type PermissionChoice,
   type PermissionKind,
   type PermissionRule
-} from './permissions-core'
+} from '../../shared/permissions-core'
 import { dentroDelRepoReal, type PathFs } from './permissions-paths'
 import { carpetaFeatures } from '../perfil'
+
+export type { DecisionEntry }
 
 /**
  * Función «permissions» (lado main): pedidos de permiso de Claude, reglas «Permitir siempre» por
  * espacio, historial de decisiones de hoy y avisos de Windows. Todo es por eventos: sin timers.
  * Persiste en userData/features/permissions.json (escritura atómica).
  */
-
-export interface DecisionEntry {
-  id: string
-  at: number
-  workspaceId: string
-  spaceName: string
-  tool: string
-  kind: PermissionKind
-  label: string
-  /** once: permitido una vez · always: regla guardada · rule: lo aplicó una regla · deny · terminal */
-  tag: 'once' | 'always' | 'rule' | 'deny' | 'terminal'
-  ruleId?: string
-  undone?: boolean
-}
 
 interface State {
   rules: PermissionRule[]

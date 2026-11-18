@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, normalize, type SlothSettings } from './settings-model'
+import { DEFAULT_SETTINGS, normalize, type SlothSettings } from '../../shared/settings-model'
 
 type Obj = Record<string, unknown>
 

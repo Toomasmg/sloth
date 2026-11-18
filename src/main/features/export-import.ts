@@ -12,7 +12,7 @@ import { featuresDir } from './tray-settings'
 import { perfilActivo } from '../perfil'
 import { encryptText, MIN_PASSWORD } from './export-crypto'
 import { normalizeSupabaseUrl } from './chat-config'
-import { normalize, type SlothSettings } from './settings-model'
+import { normalize, type SlothSettings } from '../../shared/settings-model'
 import {
   buildPlan,
   cuentaExportada,

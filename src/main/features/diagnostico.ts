@@ -1,8 +1,6 @@
 import { app } from 'electron'
 import { arch, homedir, platform, release } from 'node:os'
 import type { Feature } from './context'
-// Import circular a propósito: FEATURES se lee recién cuando se pide el texto, con todo ya cargado.
-import { FEATURES } from './index'
 import { currentSettings } from './settings'
 import { huboCrashPrevio, tomarCrashPrevio } from '../diag/estado'
 import { textoDiagnostico, type DatosDiagnostico } from '../diag/diagnostico-texto'
@@ -11,6 +9,13 @@ import { leerErrorRenderer } from '../diag/error-renderer'
 import { redactar } from '../diag/redactar'
 import { logger } from '../logger-global'
 import { raizDatos } from '../perfil'
+
+// La lista la fija features/index.ts al armar FEATURES, para no importarlo en círculo.
+let nombresFeatures: string[] = []
+
+export function fijarNombresFeatures(n: string[]): void {
+  nombresFeatures = n
+}
 
 function ajustesBooleanos(): Record<string, boolean> {
   const salida: Record<string, boolean> = {}
@@ -43,7 +48,7 @@ const feature: Feature = {
         node: process.versions.node,
         chrome: process.versions.chrome,
         so: `${platform()} ${release()} ${arch()}`,
-        features: FEATURES.map((f) => f.name),
+        features: nombresFeatures,
         cuentas: ctx.store.accounts.length,
         espacios: ctx.store.workspaces.length,
         ajustes: ajustesBooleanos(),

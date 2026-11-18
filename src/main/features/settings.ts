@@ -13,7 +13,7 @@ import {
   type SettingsPayload,
   type SlothSettings,
   type ThemeChoice
-} from './settings-model'
+} from '../../shared/settings-model'
 import { SURFACE } from '../../shared/surfaces'
 import { carpetaFeatures } from '../perfil'
 

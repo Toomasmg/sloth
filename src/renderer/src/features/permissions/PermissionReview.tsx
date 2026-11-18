@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { Account, PermissionPrompt, Workspace } from '../../../../shared/types'
-import { alwaysLabel, changesOf, explanationOf, filesOf, kindOf, titleOf, type FileChange } from '../../../../main/features/permissions-core'
+import { alwaysLabel, changesOf, explanationOf, filesOf, kindOf, titleOf, type FileChange } from '../../../../shared/permissions-core'
 import { Modal } from '../../Modal'
 import { PermissionIcon } from '../../icons/SlothIcons'
 import { CheckGlyph } from '../git/glyphs'

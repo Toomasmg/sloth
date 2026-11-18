@@ -30,6 +30,20 @@ export interface PermissionRule {
   createdAt: number
 }
 
+export interface DecisionEntry {
+  id: string
+  at: number
+  workspaceId: string
+  spaceName: string
+  tool: string
+  kind: PermissionKind
+  label: string
+  /** once: permitido una vez · always: regla guardada · rule: lo aplicó una regla · deny · terminal */
+  tag: 'once' | 'always' | 'rule' | 'deny' | 'terminal'
+  ruleId?: string
+  undone?: boolean
+}
+
 export const FILE_EDIT_TOOLS: ReadonlySet<string> = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
 export const NET_TOOLS: ReadonlySet<string> = new Set(['WebFetch', 'WebSearch'])
 
