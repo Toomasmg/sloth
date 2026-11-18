@@ -4,7 +4,9 @@ import { useUi } from '../host'
 import { AddAccountIcon, MoreIcon, TeamIcon, UpdateIcon } from '../../icons/SlothIcons'
 import { fmtTok, totalTok, usageTitle } from '../../format'
 import { LogoMark } from '../../Logo'
-import { loginPaneId, type Account } from '../../../../shared/types'
+import { loginPaneId, type Account, type AgenteDisponible } from '../../../../shared/types'
+import { capacidadesDe, motivoSinCapacidad, nombreProveedor, proveedorIdDe } from '../../../../shared/proveedores'
+import { formularioCuenta } from './agente-form'
 import type { ChatConfigView, ChatSnapshot } from '../../../../shared/chat'
 import { esHostSupabase } from '../../../../shared/chat-text'
 import { SHORTCUT_ACTIONS, bindingOf, comboFromEvent, findConflict, keyTokenOf, setShortcutCapture, type ShortcutAction } from '../../shortcuts'
@@ -140,6 +142,8 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
   const [name, setName] = useState('')
   const [plan, setPlan] = useState('Pro')
   const [nameErr, setNameErr] = useState(false)
+  const [proveedor, setProveedor] = useState('claude')
+  const [agentes, setAgentes] = useState<AgenteDisponible[]>([])
   const [confirm, setConfirm] = useState<string | null>(null)
   /** Fila con el menú «más» abierto (usar mi setup, quitar). */
   const [menu, setMenu] = useState<string | null>(null)
@@ -152,6 +156,14 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
     })
   }
 
+  useEffect(() => {
+    if (!adding) return
+    api.agentes().then(setAgentes, () => setAgentes([]))
+  }, [adding])
+
+  const form = formularioCuenta(proveedor, agentes)
+  const esCodex = form.mostrarSelector && proveedor === 'codex'
+
   const addAccount = (e: FormEvent): void => {
     e.preventDefault()
     const n = name.trim()
@@ -161,11 +173,12 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
     }
     setNameErr(false)
     save(async () => {
-      const acc: Account = await api.addAccount(n)
-      if (plan.trim()) await updateSettings({ accountPlans: { [acc.id]: plan.trim() } })
+      const acc: Account = await api.addAccount(n, esCodex ? 'codex' : undefined)
+      if (!esCodex && plan.trim()) await updateSettings({ accountPlans: { [acc.id]: plan.trim() } })
       await ui.reload()
       setAdding(false)
       setName('')
+      setProveedor('claude')
       onClose()
       ui.openPane(loginPaneId(acc.id))
     })
@@ -184,23 +197,40 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
     <>
       {adding && (
         <form className="f-set-card f-set-form f-set-form-add" onSubmit={addAccount} noValidate>
-          <div className="f-set-form-title">Nueva cuenta de Claude</div>
+          <div className="f-set-form-title">{form.titulo}</div>
+          {form.mostrarSelector && (
+            <label className="f-set-stack">
+              <span className="f-set-label">Agente</span>
+              <Select value={proveedor} onChange={(e) => setProveedor(e.target.value)}>
+                <option value="claude">Claude Code</option>
+                <option value="codex">Codex</option>
+              </Select>
+            </label>
+          )}
           <div className="f-set-form-row">
             <label className="f-set-stack grow2">
               <span className="f-set-label">Nombre para reconocerla</span>
               <Input value={name} placeholder="Ej.: Trabajo de Ana" onChange={(e) => setName(e.target.value)} aria-invalid={nameErr} />
             </label>
-            <label className="f-set-stack grow1">
-              <span className="f-set-label">Plan</span>
-              <Select value={plan} onChange={(e) => setPlan(e.target.value)}>
-                {PLAN_SUGGESTIONS.map((x) => (
-                  <option key={x} value={x}>
-                    {x}
-                  </option>
-                ))}
-              </Select>
-            </label>
+            {form.mostrarPlan && (
+              <label className="f-set-stack grow1">
+                <span className="f-set-label">Plan</span>
+                <Select value={plan} onChange={(e) => setPlan(e.target.value)}>
+                  {PLAN_SUGGESTIONS.map((x) => (
+                    <option key={x} value={x}>
+                      {x}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+            )}
           </div>
+          {form.aviso && <p className="f-set-hint">{form.aviso}</p>}
+          {form.avisoVersion && (
+            <p role="alert" className="form-error">
+              {form.avisoVersion}
+            </p>
+          )}
           {nameErr && (
             <p role="alert" className="form-error">
               Poné un nombre para la cuenta.
@@ -233,6 +263,7 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
           const spaces = ui.workspaces.filter((w) => w.accountId === a.id).length
           const busy = confirm === a.id
           const u = ui.usage[a.id]
+          const motivoSetup = capacidadesDe(a)?.setupCompartido === true ? undefined : motivoSinCapacidad(a, 'setupCompartido')
           return (
             <div key={a.id} className="f-set-acc" style={{ '--acc': color } as React.CSSProperties}>
               <div className="f-set-row">
@@ -240,7 +271,15 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
                   {a.label.slice(0, 1).toUpperCase()}
                 </span>
                 <div className="f-set-row-text">
-                  <span className="f-set-row-title">{a.label}</span>
+                  <span className="f-set-row-title">
+                    {a.label}
+                    {a.proveedor !== undefined && proveedorIdDe(a) !== 'claude' && (
+                      <>
+                        {' '}
+                        <Tag>{nombreProveedor(a)}</Tag>
+                      </>
+                    )}
+                  </span>
                   <span className="f-set-hint">
                     {spaces === 1 ? '1 espacio' : `${spaces} espacios`}
                     {logged && st?.email ? ` · ${st.email}` : ''}
@@ -311,13 +350,14 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
               </div>
               {menu === a.id && !busy && (
                 <div className="f-set-acc-menu" role="menu" aria-label={`Acciones de ${a.label}`}>
-                  <label className="switch" role="menuitem" title="Enlaza tus skills, agents, hooks, plugins, settings y MCP de ~/.claude">
+                  <label className="switch" role="menuitem" title={motivoSetup ?? 'Enlaza tus skills, agents, hooks, plugins, settings y MCP de ~/.claude'}>
                     <span className="switch-text">
                       Usar mi setup de <span className="mono">~/.claude</span>
                     </span>
-                    <input type="checkbox" role="switch" checked={a.shareSetup !== false} onChange={() => toggleShare(a)} />
+                    <input type="checkbox" role="switch" checked={!motivoSetup && a.shareSetup !== false} disabled={!!motivoSetup} onChange={() => toggleShare(a)} />
                     <span className="switch-track" aria-hidden="true" />
                   </label>
+                  {motivoSetup && <span className="f-set-hint">{motivoSetup}</span>}
                   <Button variant="danger" size="sm" role="menuitem" onClick={() => {
                       setMenu(null)
                       setConfirm(a.id)
