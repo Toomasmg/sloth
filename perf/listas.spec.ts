@@ -176,12 +176,12 @@ for (const n of TABLERO_N) {
       running: false,
       tickets
     }
-    await page.evaluate(() => {
-      const w = window as unknown as { __aviso: number }
-      window.sloth.feat.on('feat:tickets:changed', () => {
-        w.__aviso = performance.now()
+    await page.evaluate((total) => {
+      const w = window as unknown as { __aviso?: number }
+      window.sloth.feat.on('feat:tickets:changed', (snap) => {
+        if (w.__aviso === undefined && (snap as { tickets?: unknown[] } | undefined)?.tickets?.length === total) w.__aviso = performance.now()
       })
-    })
+    }, n)
     await armar(page, '.f-tickets-row')
     await app.evaluate(({ BrowserWindow }, snap) => BrowserWindow.getAllWindows()[0].webContents.send('feat:tickets:changed', snap), fake)
     const primerRenderMs = await cobrar(page)
