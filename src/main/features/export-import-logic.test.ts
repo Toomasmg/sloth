@@ -6,6 +6,7 @@ import type { Account, Workspace } from '../../shared/types'
 import { encryptText, WRONG_PASSWORD } from './export-crypto'
 import {
   buildPlan,
+  cuentaExportada,
   exportRules,
   exportSpaces,
   exportTemplates,
@@ -112,6 +113,20 @@ test('parseImport en cuentas: elementos inválidos, label faltante o larga, y du
   assert.deepEqual(p.cuentas, [
     { label: 'Trabajo', shareSetup: true },
     { label: 'Casa', shareSetup: false }
+  ])
+})
+
+test('cuentaExportada no escribe proveedor para claude, conserva uno desconocido y parseImport descarta ids inválidos', () => {
+  assert.deepEqual(cuentaExportada(acc('a1', 'Trabajo')), { label: 'Trabajo', shareSetup: true })
+  assert.deepEqual(cuentaExportada({ ...acc('a1', 'Trabajo'), proveedor: 'claude' }, 'Max'), { label: 'Trabajo', shareSetup: true, plan: 'Max' })
+  assert.deepEqual(cuentaExportada({ ...acc('a1', 'Trabajo'), proveedor: 'xx' }), { label: 'Trabajo', shareSetup: true, proveedor: 'xx' })
+  assert.deepEqual(cuentaExportada({ ...acc('a1', 'Trabajo'), proveedor: 'No Valido!' }), { label: 'Trabajo', shareSetup: true })
+  const p = parse({ cuentas: [{ label: 'a', proveedor: 'xx' }, { label: 'b', proveedor: 5 }, { label: 'c', proveedor: 'claude' }, { label: 'd', proveedor: 'x y' }] })
+  assert.deepEqual(p.cuentas, [
+    { label: 'a', shareSetup: true, proveedor: 'xx' },
+    { label: 'b', shareSetup: true },
+    { label: 'c', shareSetup: true },
+    { label: 'd', shareSetup: true }
   ])
 })
 

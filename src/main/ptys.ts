@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import type { SpawnSpec } from '../shared/daemon-protocol'
 import type { ShellChoice } from './features/settings-model'
 import { shellArgs, shellLaunch, type ShellFamily } from './shell-args'
+import { entornoLimpio } from './env-limpio'
 
 export { shellArgs, type ShellFamily }
 
@@ -44,30 +45,8 @@ export function resolveShell(choice: ShellChoice): { file: string; family: Shell
   return hasPwsh() ? { file: 'pwsh.exe', family: 'ps' } : { file: 'powershell.exe', family: 'ps' }
 }
 
-/**
- * Entorno limpio para cada terminal: se quitan las variables que harían que Claude use otra
- * cuenta (API keys) o crea que corre anidado dentro de otra sesión de Claude Code.
- */
-export function baseEnv(): Record<string, string> {
-  const env: Record<string, string> = {}
-  for (const [k, v] of Object.entries(process.env)) {
-    if (v === undefined) continue
-    const key = k.toUpperCase()
-    if (
-      key === 'CLAUDECODE' ||
-      key.startsWith('CLAUDE_CODE_') ||
-      key === 'CLAUDE_CONFIG_DIR' ||
-      key === 'ANTHROPIC_API_KEY' ||
-      key === 'ANTHROPIC_AUTH_TOKEN' ||
-      key.startsWith('ELECTRON_') ||
-      key.startsWith('ANTIREA_') ||
-      key.startsWith('SLOTH_')
-    )
-      continue
-    env[k] = v
-  }
-  env.TERM_PROGRAM = 'Sloth'
-  return env
+export function baseEnv(quitarDelAgente: (claveMayus: string) => boolean): Record<string, string> {
+  return entornoLimpio(process.env, quitarDelAgente)
 }
 
 /**

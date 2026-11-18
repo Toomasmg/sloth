@@ -10,13 +10,13 @@ import { accountStatus, createAccount } from './accounts'
 import { installInto, stateForEvent, writeHookScript, type HookEventPayload } from './hooks'
 import { esFalsoFinal, pendientes, registrar as registrarFondo, venceEn, type Fondo } from './segundo-plano-core'
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
-import { claudeWithPrompt, pastePayload } from './shell-args'
+import { pastePayload } from './shell-args'
 import { avisar } from './avisos'
 import { iniciarLogger, logger } from './logger-global'
 import { marcarCrashPrevio } from './diag/estado'
 import { cerrarSesion, iniciarSesion } from './sesion-marcador'
 import { textoSeguro } from './diag/texto-seguro'
-import { resolveClaudeExe } from './features/tickets/claude-run'
+import { armarEnvCuenta, proveedorDe, proveedorExigido } from './proveedores'
 import { initialPromptProblem } from '../shared/initial-prompt'
 import { nextAgentState, type AgentInput } from './agent-machine'
 import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
@@ -334,7 +334,8 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
   }
 
   function accountEnv(acc: Account): Record<string, string> {
-    return { ...baseEnv(), CLAUDE_CONFIG_DIR: acc.configDir, SLOTH_ACCOUNT: acc.label }
+    const p = proveedorExigido(acc)
+    return armarEnvCuenta(p, acc, baseEnv(p.quitarDelEntorno))
   }
 
   /** Si hay alguna terminal abierta con esta cuenta (Claude puede estar escribiendo su .claude.json). */
@@ -347,6 +348,8 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
 
   /** Deja la cuenta lista antes de abrir Claude: settings + hooks y tu setup compartido. */
   function prepareAccount(acc: Account): void {
+    // Una cuenta de un agente que esta versión no conoce no se toca: ni hooks ni setup de Claude en su carpeta.
+    if (!proveedorDe(acc)) return
     installInto(acc.configDir, baseSettingsFor(acc))
     const report = syncSharedSetup(acc, !accountBusy(acc.id))
     if (report.skipped.length) {
@@ -359,7 +362,7 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
 
   /** Claude guarda cada conversación en projects/<cwd con separadores como '-'>. */
   function hasPreviousConversation(acc: Account, cwd: string): boolean {
-    const dir = join(acc.configDir, 'projects', cwd.replace(/[^A-Za-z0-9]/g, '-'))
+    const dir = join(acc.configDir, proveedorExigido(acc).carpetaHistorial, cwd.replace(/[^A-Za-z0-9]/g, '-'))
     try {
       return existsSync(dir) && readdirSync(dir).some((f) => f.endsWith('.jsonl'))
     } catch {
@@ -391,21 +394,23 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     }
     if (!ws.autoStartClaude) return undefined
     // Un «!» inicial Claude Code lo correría como comando de la terminal: ese prompt no se manda.
-    if (ws.initialPrompt && !ws.initialPromptUsed && !initialPromptProblem(ws.initialPrompt)) return claudeWithPrompt(ws.initialPrompt)
-    if (ws.resume !== false && hasPreviousConversation(acc, ws.cwd)) return ['claude', '--continue']
-    return ['claude']
+    const p = proveedorExigido(acc)
+    if (ws.initialPrompt && !ws.initialPromptUsed && !initialPromptProblem(ws.initialPrompt)) return p.argvInteractivo({ prompt: ws.initialPrompt })
+    return p.argvInteractivo({ continuar: ws.resume !== false && hasPreviousConversation(acc, ws.cwd) })
   }
 
   function specFor(paneId: string, b: TerminalBackend): PtySpec {
     if (isLoginPane(paneId)) {
       const acc = requireAccount(accountIdFromLoginPane(paneId))
+      const p = proveedorExigido(acc)
       prepareAccount(acc)
       // Primer arranque de Claude con esta carpeta: pide tema y login.
-      return { cwd: homedir(), env: accountEnv(acc), claude: ['claude'], claudeExe: resolveClaudeExe() }
+      return { cwd: homedir(), env: accountEnv(acc), claude: p.argvInteractivo({}), claudeExe: p.resolverExe() }
     }
     const ws = store.workspace(paneId)
     if (!ws) throw new Error('Ese espacio ya no existe.')
     const acc = requireAccount(ws.accountId)
+    const p = proveedorExigido(acc)
     if (!existsSync(ws.cwd)) throw new Error(`No existe la carpeta ${ws.cwd}`)
     prepareAccount(acc)
     const env = {
@@ -415,7 +420,7 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
       SLOTH_TOKEN: hookTokenDe(b.hookToken, ws.id)
     }
     const claude = claudeCommand(ws, acc)
-    return { cwd: ws.cwd, env, claude, claudeExe: claude ? resolveClaudeExe() : undefined }
+    return { cwd: ws.cwd, env, claude, claudeExe: claude ? p.resolverExe() : undefined }
   }
 
   // Un iframe o una página que se cuele en la ventana no puede mandar pedidos al núcleo: solo vale el origen de la app.
@@ -481,6 +486,7 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     if (!idValido(id) || typeof share !== 'boolean') throw new Error('Pedido inválido.')
     const acc = store.updateAccount(id, { shareSetup: share })
     if (!acc) throw new Error('Esa cuenta ya no existe.')
+    proveedorExigido(acc)
     if (!acc.shareSetup) {
       unshareSetup(acc)
       installInto(acc.configDir, {})

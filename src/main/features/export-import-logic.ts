@@ -15,6 +15,7 @@
 import type { Account, Workspace } from '../../shared/types'
 import { TEMPLATE_COLOR_KEYS } from '../../shared/templates-shared'
 import { initialPromptProblem } from '../../shared/initial-prompt'
+import { PROVEEDOR_DEFECTO, PROVEEDOR_ID_RE } from '../../shared/proveedores'
 import { normalizeSupabaseUrl } from './chat-config'
 import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, THEMES, UI_FONT, SHORTCUT_IDS, canonicalCombo, type AccentChoice } from './settings-model'
 import { decryptText, type Encrypted, WRONG_PASSWORD } from './export-crypto'
@@ -31,6 +32,14 @@ export interface ExportedAccount {
   shareSetup: boolean
   /** Plan escrito a mano («Pro», «Max»…). Es una etiqueta: nunca sale de credenciales. */
   plan?: string
+  /** Solo si no es claude: los archivos exportados con Claude quedan idénticos. */
+  proveedor?: string
+}
+export function cuentaExportada(a: Account, plan?: string): ExportedAccount {
+  const c: ExportedAccount = { label: a.label, shareSetup: a.shareSetup !== false }
+  if (plan) c.plan = plan
+  if (a.proveedor !== undefined && a.proveedor !== PROVEEDOR_DEFECTO && PROVEEDOR_ID_RE.test(a.proveedor)) c.proveedor = a.proveedor
+  return c
 }
 export interface ExportedSpace {
   nombre: string
@@ -331,6 +340,7 @@ export function parseImport(text: string): ParsedImport {
     const c: ExportedAccount = { label, shareSetup: bool(a, 'shareSetup', true) }
     const plan = planOf(a.plan)
     if (plan) c.plan = plan
+    if (typeof a.proveedor === 'string' && a.proveedor !== PROVEEDOR_DEFECTO && PROVEEDOR_ID_RE.test(a.proveedor)) c.proveedor = a.proveedor
     cuentas.push(c)
   })
 

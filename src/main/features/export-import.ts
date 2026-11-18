@@ -12,6 +12,7 @@ import { normalizeSupabaseUrl } from './chat-config'
 import { normalize, type SlothSettings } from './settings-model'
 import {
   buildPlan,
+  cuentaExportada,
   exportRules,
   exportSpaces,
   exportTemplates,
@@ -221,12 +222,7 @@ const feature: Feature = {
         const used = new Set(ws.map((w) => w.accountId))
         doc.cuentas = ctx.store.accounts
           .filter((a) => used.has(a.id))
-          .map((a) => {
-            const c: NonNullable<ExportDoc['cuentas']>[number] = { label: a.label, shareSetup: a.shareSetup !== false }
-            const plan = settings.accountPlans[a.id]
-            if (plan) c.plan = plan
-            return c
-          })
+          .map((a) => cuentaExportada(a, settings.accountPlans[a.id]))
         doc.espacios = exportSpaces(ws, ctx.store.accounts, (id) => settings.accountColors[id])
         if (sel.permisos) {
           const perms = exportRules(readSlothRules(), ws)
@@ -397,7 +393,7 @@ const feature: Feature = {
         for (const c of parsed.cuentas) {
           if (ctx.store.accounts.some((a) => a.label.trim().toLowerCase() === c.label.trim().toLowerCase())) continue
           try {
-            const acc = { ...createAccount(c.label), shareSetup: c.shareSetup }
+            const acc = { ...createAccount(c.label, c.proveedor), shareSetup: c.shareSetup }
             ctx.store.addAccount(acc)
             try {
               ctx.prepareAccount(acc)
