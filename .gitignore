@@ -5,3 +5,5 @@ dist/
 test-results/
 playwright-report/
 vendor/
+perf/reporte*
+perf/resultados/
