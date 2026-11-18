@@ -8,6 +8,7 @@ export default {
   verificado: true,
   idRegex: '^[A-Z][A-Z0-9]*-\\d{1,7}$',
   idMayusculas: true,
+  comandoTicket: '/ticket',
   ejemplo: { id: 'TCK-1234', estado: 'en_revision', prioridad: 'severidad', proyecto: 'espacio o proyecto' },
   herramientas: {
     prefijo: 'mcp__claude_ai_Gruv__',

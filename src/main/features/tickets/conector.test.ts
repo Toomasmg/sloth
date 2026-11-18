@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ConectorInvalidoError, nombreCompleto, regexDeId, regexDePersona, validarConector, type ConectorMcp } from './conector'
+import { COMANDOS_PROHIBIDOS, ConectorInvalidoError, idNormalizado, idParaComando, nombreCompleto, problemaComandoTicket, regexDeId, regexDePersona, validarConector, type ConectorMcp } from './conector'
 import { CONECTORES, conectorPorId } from './conectores'
 import github from './conectores/github'
 import gruv from './conectores/gruv'
@@ -38,7 +38,7 @@ test('Gruv valida y la copia es nueva, igual e idempotente', () => {
 })
 
 test('el registro trae Gruv y GitHub validados', () => {
-  assert.deepEqual(CONECTORES.slice(0, 2).map((c) => c.id), ['gruv', 'github'])
+  assert.deepEqual(CONECTORES.map((c) => c.id).filter((id) => id === 'gruv' || id === 'github'), ['github', 'gruv'])
   assert.deepEqual(conectorPorId('github'), github)
   assert.deepEqual(conectorPorId('gruv'), gruv)
   assert.equal(conectorPorId('trello'), undefined)
@@ -187,4 +187,40 @@ test('regexDePersona: la del conector, cacheada, o la de siempre', () => {
   assert.equal(regexDePersona(d), regexDePersona(d))
   assert.equal(regexDePersona(d).test('abc'), true)
   assert.equal(regexDePersona(d).test('abc1'), false)
+})
+
+test('comandoTicket: opcional, con forma de comando y sin nada que llegue raro a la terminal', () => {
+  for (const ok of ['/ticket', '/mi:cmd', '/a', '/x_y-z9', `/${'a'.repeat(39)}`]) {
+    const d = con('comandoTicket', ok) as ConectorMcp
+    assert.equal(validarConector(d).comandoTicket, ok)
+  }
+  for (const mal of ['ticket', '/Ticket', '/a b', '/x;rm', '/ticket\n', '/ticket\r', '/', '/1a', '/$(x)', '/a|b', `/${'a'.repeat(40)}`, 5, '', null, ['/ticket']])
+    rechaza(con('comandoTicket', mal), /comandoTicket/)
+  const sin = validarConector(con('comandoTicket', BORRAR))
+  assert.equal('comandoTicket' in sin, false)
+  assert.equal(validarConector(github).comandoTicket, undefined)
+})
+
+test('comandoTicket: los comandos de Claude que cambian la sesión, la cuenta o los permisos no pasan', () => {
+  for (const c of ['/logout', '/login', '/add-dir', '/config', '/permissions', '/mcp', '/plugin', '/exit', '/clear', '/model', '/install-github-app'])
+    rechaza(con('comandoTicket', c), /comandoTicket.*no puede ser el del ticket/)
+  for (const c of COMANDOS_PROHIBIDOS) assert.notEqual(problemaComandoTicket(`/${c}`), null, c)
+  for (const ok of ['/ticket', '/mi:cmd', '/plugin:logout', '/logout2', '/clear-ticket']) assert.equal(problemaComandoTicket(ok), null, ok)
+})
+
+test('idNormalizado e idParaComando: la forma la fija el conector, y lo que va a la terminal pasa por normTicketId', () => {
+  const g = validarConector(gruv)
+  assert.equal(idNormalizado(g, ' abc-12 '), 'ABC-12')
+  assert.equal(idNormalizado(g, '123'), null)
+  assert.equal(idNormalizado(g, 7), null)
+  const num = { idRegex: String.raw`^\d+$`, idMayusculas: false }
+  assert.equal(idParaComando(num, '123'), '123')
+  assert.equal(idParaComando(num, 'abc'), null)
+  const minusculas = { idRegex: String.raw`^[a-z]+-\d+$`, idMayusculas: false }
+  assert.equal(idParaComando(minusculas, 'proj-12'), 'proj-12')
+  const numeral = { idRegex: String.raw`^#\d+$`, idMayusculas: false }
+  assert.equal(idNormalizado(numeral, '#12'), '#12')
+  assert.equal(idParaComando(numeral, '#12'), null)
+  assert.equal(idParaComando({ idRegex: '^.+$', idMayusculas: false }, 'a b'), null)
+  assert.equal(idParaComando({ idRegex: '^.+$', idMayusculas: false }, 'a..b'), null)
 })

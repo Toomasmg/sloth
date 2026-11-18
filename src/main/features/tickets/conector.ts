@@ -5,6 +5,7 @@
  * properties, y los tipos se importan con `type`.
  */
 import { ACCIONES, CATEGORIAS, type Accion, type Estado } from '../../../shared/tickets'
+import { normTicketId } from '../../../shared/templates-shared'
 
 export type ArgValor = string | number | boolean | null | { [k: string]: ArgValor }
 
@@ -29,6 +30,8 @@ export interface ConectorBase {
   idMayusculas: boolean
   /** Forma del id de persona, anclada como idRegex. Sin esto, letras, números y guiones. */
   personaId?: string
+  /** Comando de Claude con el que arranca el espacio de un ticket (p. ej. /ticket). Sin él, el espacio no lleva primer mensaje. */
+  comandoTicket?: string
   ejemplo: { id: string; estado: string; prioridad: string; proyecto: string }
   estados: Estado[]
   /** Lo que responde Claude cuando la cuenta no tiene el conector, y lo que se le muestra a la persona. */
@@ -105,6 +108,26 @@ const NOMBRE_RE = /^[\p{L}\p{N}][\p{L}\p{N} ._&-]{0,39}$/u
 const CLAVE_ESTADO_RE = /^[a-z0-9_]{1,40}$/
 const CLAVE_FALTA_RE = /^[a-z_]{3,40}$/
 export const PREFIJO_RE = /^mcp__[A-Za-z0-9_-]+__$/
+/** Llega a la terminal como primer mensaje: una barra y un nombre en minúsculas, sin espacios ni nada de shell. 40 caracteres como máximo. */
+export const COMANDO_TICKET_RE = /^\/[a-z][a-z0-9:_-]{0,38}$/
+/**
+ * Comandos incorporados de Claude Code y Codex que cambian la sesión, la cuenta o los permisos: un conector
+ * (que puede venir de un repo o de un archivo) no los puede fijar como primer mensaje de cada espacio.
+ * Es una lista negra: no cubre los comandos de plugins ni los del repo; por eso el diálogo de revisión
+ * muestra siempre el comando antes de aceptar.
+ */
+export const COMANDOS_PROHIBIDOS: ReadonlySet<string> = new Set([
+  'add-dir', 'agents', 'allowed-tools', 'approvals', 'bug', 'clear', 'config', 'doctor', 'exit', 'hooks', 'ide', 'init', 'install-github-app', 'install-slack-app',
+  'login', 'logout', 'mcp', 'memory', 'model', 'new', 'permissions', 'plugin', 'plugins', 'privacy-settings', 'quit', 'resume', 'rewind', 'sandbox', 'settings',
+  'terminal-setup', 'upgrade'
+])
+
+/** Por qué un comando de ticket no sirve; null si cumple la forma y no es uno de los prohibidos. */
+export function problemaComandoTicket(c: string): string | null {
+  if (!COMANDO_TICKET_RE.test(c)) return 'tiene que empezar con / y seguir con una letra minúscula, números, guiones, _ o dos puntos, como /ticket'
+  if (COMANDOS_PROHIBIDOS.has(c.slice(1))) return `${c} es un comando de Claude que cambia la sesión, la cuenta o los permisos: no puede ser el del ticket`
+  return null
+}
 export const CORTO_RE = /^[A-Za-z0-9_-]{1,64}$/
 const ARG_RE = /^[a-z_][A-Za-z0-9_]{0,40}$/
 const ARGS_PROF_MAX = 3
@@ -230,7 +253,7 @@ const en = (xs: readonly string[], v: unknown): boolean => typeof v === 'string'
 
 const R = 'conector'
 const CLAVES_BASE = ['id', 'nombre', 'via', 'verificado', 'idRegex', 'idMayusculas', 'ejemplo', 'estados', 'faltaConector']
-const OPCIONALES_BASE = ['personaId']
+const OPCIONALES_BASE = ['personaId', 'comandoTicket']
 
 /** Valida lo común a toda vía y devuelve el objeto con las claves de estado. */
 function validarBase(raw: Obj, extras: readonly string[]): { o: Obj; claves: string[] } {
@@ -241,6 +264,11 @@ function validarBase(raw: Obj, extras: readonly string[]): { o: Obj; claves: str
   const mayusculas = booleano(o.idMayusculas, `${R}.idMayusculas`)
   const re = idRegex(o.idRegex, `${R}.idRegex`)
   if ('personaId' in o) idRegex(o.personaId, `${R}.personaId`)
+  if ('comandoTicket' in o) {
+    const c = campo(o.comandoTicket, `${R}.comandoTicket`, 40)
+    const problema = problemaComandoTicket(c)
+    if (problema) fallar(`${R}.comandoTicket`, problema)
+  }
 
   const claves = lista(o.estados, `${R}.estados`, 1, 30).map((x, i) => {
     const r = `${R}.estados[${i}]`
@@ -342,12 +370,25 @@ export function validarConector(raw: unknown): ConectorDef {
   return copia as ConectorDef
 }
 
-const regexes = new WeakMap<ConectorDef, RegExp>()
+const regexes = new WeakMap<object, RegExp>()
 
-export function regexDeId(def: ConectorDef): RegExp {
+export function regexDeId(def: Pick<ConectorBase, 'idRegex'>): RegExp {
   let re = regexes.get(def)
   if (!re) regexes.set(def, (re = compilar(def.idRegex)))
   return re
+}
+
+/** El id normalizado si es válido para el conector; si no, null. Lo usan el motor, el tablero y el diálogo de espacio nuevo. */
+export function idNormalizado(def: Pick<ConectorBase, 'idRegex' | 'idMayusculas'>, v: unknown): string | null {
+  if (typeof v !== 'string') return null
+  const s = def.idMayusculas ? v.trim().toUpperCase() : v.trim()
+  return s.length <= ID_MAX && ID_SEGURO_RE.test(s) && regexDeId(def).test(s) ? s : null
+}
+
+/** El id con el que arranca un espacio que lleva comando: el del conector y, además, uno que main acepta como `ticket` (lo que llega a la terminal). */
+export function idParaComando(def: Pick<ConectorBase, 'idRegex' | 'idMayusculas'>, v: unknown): string | null {
+  const id = idNormalizado(def, v)
+  return id !== null && normTicketId(id) !== undefined ? id : null
 }
 
 const personas = new WeakMap<ConectorDef, RegExp>()

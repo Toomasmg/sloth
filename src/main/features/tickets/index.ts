@@ -88,6 +88,7 @@ import {
   buildAccionPrompt,
   buildDetallePrompt,
   buildPrompt,
+  comandoDeTicket,
   conCategoria,
   ConectorFaltaError,
   estadosPorDefecto,
@@ -98,7 +99,6 @@ import {
   parseAccion,
   parseClaudeOutput,
   parseDetalle,
-  usaComandoTicket,
   type ResultadoLista
 } from './motor'
 import { mcpAjenos } from './mcp-ajenos'
@@ -535,10 +535,11 @@ function hasRepo(rawId: unknown): boolean {
   return Boolean(repoFor(state.tickets.find((t) => t.id === id)))
 }
 
-/** «Empezar en Sloth»: crea el espacio del ticket (si el conector usa /ticket, arranca con `/ticket <id>`). */
+/** «Empezar en Sloth»: crea el espacio del ticket (si el conector declara un comando, arranca con `<comando> <id>`). */
 async function start(rawId: unknown, rawAccount?: unknown): Promise<{ id: string; created: boolean }> {
   const def = activo()
   const id = ticketId(def, rawId)
+  const comando = comandoDeTicket(def)
   const repoPath = repoFor(state.tickets.find((t) => t.id === id))
   const existing = espacioDelTicket(ctx.store.workspaces, id, repoPath, def.via === 'gh')
   if (existing) {
@@ -559,11 +560,11 @@ async function start(rawId: unknown, rawAccount?: unknown): Promise<{ id: string
     accountId,
     autoStartClaude: true,
     ticket: id,
-    initialPrompt: usaComandoTicket(def) ? `/ticket ${id}` : undefined,
+    initialPrompt: comando ? `${comando} ${id}` : undefined,
     resume: true
   })
   registrarActividad({ t: Date.now(), tipo: 'ticket', ticket: id, espacio: ws.name })
-  // El /ticket de la terminal suele asignarlo o moverlo: el detalle guardado deja de valer.
+  // El comando de la terminal suele asignar o mover el ticket: el detalle guardado deja de valer.
   detalles.delete(id)
   ctx.ui({ type: 'open-pane', id: ws.id })
   return { id: ws.id, created: true }

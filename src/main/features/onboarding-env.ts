@@ -1,5 +1,6 @@
 /**
  * Chequeo del entorno para el asistente de bienvenida: Claude Code, Node ≥ 18, git, gh y su sesión.
+ * Claude Code es el único requisito duro: Node, git y gh son opcionales (`optional`) y no frenan el primer uso.
  * Sin Electron (solo node:*): se prueba con binarios falsos. Siempre execFile con un array de
  * argumentos, timeout y windowsHide; nunca shell. Los .cmd de npm no se ejecutan: se corre su
  * cli.js con node, que es lo mismo sin pasar por cmd.exe.
@@ -155,8 +156,8 @@ export async function checkEnvironment(opts: EnvOptions = {}): Promise<EnvReport
   const ghPath = findInPath(exe('gh'), pathEnv, isFile)
 
   const nodeCheck = async (): Promise<CheckItem> => {
-    const base = { id: 'node' as const, label: 'Node.js 18 o más', doc: 'node' as const }
-    const fix = { fix: 'Hace falta para que las terminales sigan vivas al cerrar Sloth. Instalá la versión LTS y reiniciá Sloth.', command: 'winget install OpenJS.NodeJS.LTS' }
+    const base = { id: 'node' as const, label: 'Node.js 18 o más', doc: 'node' as const, optional: true }
+    const fix = { fix: 'Sloth lo usa para mantener las terminales vivas aunque cierres la app. Sin Node las terminales andan igual, pero se cierran con Sloth. Instalá la versión LTS y reiniciá Sloth.', command: 'winget install OpenJS.NodeJS.LTS' }
     if (!nodePath) return { ...base, state: 'missing', ...fix }
     const r = await run(nodePath, ['--version'], t)
     const v = firstLine(r.stdout)
@@ -180,8 +181,8 @@ export async function checkEnvironment(opts: EnvOptions = {}): Promise<EnvReport
   }
 
   const gitCheck = async (): Promise<CheckItem> => {
-    const base = { id: 'git' as const, label: 'Git', doc: 'git' as const }
-    const fix = { fix: 'Hace falta para los worktrees, el diff y las ramas.', command: 'winget install Git.Git' }
+    const base = { id: 'git' as const, label: 'Git', doc: 'git' as const, optional: true }
+    const fix = { fix: 'Sin Git no hay ramas, cambios ni PRs en Sloth. Las terminales y los espacios andan igual. Instalalo si trabajás con repos de git y reiniciá Sloth.', command: 'winget install Git.Git' }
     if (!gitPath) return { ...base, state: 'missing', ...fix }
     const r = await run(gitPath, ['--version'], t)
     const m = /(\d+\.\d+\.\d+)/.exec(r.stdout)

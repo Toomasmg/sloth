@@ -30,6 +30,6 @@ function registrar(defs: readonly unknown[]): ConectorDef[] {
   return out
 }
 
-export const CONECTORES: readonly ConectorDef[] = registrar([gruv, github, jira, linear, asana, notion, clickup, monday, azureDevops, gitlab, shortcut, youtrack])
+export const CONECTORES: readonly ConectorDef[] = registrar([github, jira, linear, gruv, asana, notion, clickup, monday, azureDevops, gitlab, shortcut, youtrack])
 
 export const conectorPorId = (id: string): ConectorDef | undefined => CONECTORES.find((c) => c.id === id)

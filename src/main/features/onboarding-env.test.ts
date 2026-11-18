@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { repoCandidates } from './onboarding-env'
+import { checkEnvironment, repoCandidates } from './onboarding-env'
 
 test('los repos que ya usás van primero, sin duplicados y como mucho 8', () => {
   const home = mkdtempSync(join(tmpdir(), 'sloth-repos-'))
@@ -34,4 +34,18 @@ test('busca repos en las rutas comunes de Windows con barras bien escapadas', ()
   const vistos: string[] = []
   repoCandidates(String.raw`C:\Users\x`, [], () => false, (p) => (vistos.push(p), []))
   for (const p of [String.raw`C:\dev\work`, String.raw`C:\dev`, String.raw`D:\dev\work`]) assert.ok(vistos.includes(p), p)
+})
+
+test('sin Node ni git el chequeo los marca faltantes pero opcionales; Claude Code sigue siendo requisito', async () => {
+  const r = await checkEnvironment({ pathEnv: '', home: 'Z:/h', appData: 'Z:/a', isFile: () => false, run: async () => ({ ok: false, code: null, stdout: '', stderr: '', error: 'no' }) })
+  const por = Object.fromEntries(r.items.map((i) => [i.id, i]))
+  for (const id of ['node', 'git'] as const) {
+    assert.equal(por[id].optional, true, id)
+    assert.equal(por[id].state, 'missing', id)
+    assert.ok(por[id].fix && por[id].command, id)
+  }
+  assert.match(por.node.fix ?? '', /terminales andan igual/)
+  assert.match(por.git.fix ?? '', /terminales y los espacios andan igual/)
+  assert.equal(por.claude.state, 'missing')
+  assert.notEqual(por.claude.optional, true)
 })

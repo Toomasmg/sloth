@@ -3,7 +3,7 @@
  * ConectorMcp. Módulo puro: la validación es la misma que usa main (`validarPropio`).
  */
 import { ACCIONES, type Accion, type Estado } from '../../../../shared/tickets'
-import { ConectorInvalidoError, PLACEHOLDERS, type ArgValor, type ConectorDef, type ConectorMcp, type PasoLlamada } from '../../../../main/features/tickets/conector'
+import { ConectorInvalidoError, PLACEHOLDERS, problemaComandoTicket, type ArgValor, type ConectorDef, type ConectorMcp, type PasoLlamada } from '../../../../main/features/tickets/conector'
 import { ESTADO_EN_SNAKE, faltaConector, PISTA_ESTADOS } from '../../../../main/features/tickets/conectores/comun'
 import { jsonCanonico, validarPropio } from '../../../../main/features/tickets/propios'
 
@@ -28,6 +28,8 @@ export interface Borrador {
   formato: FormatoId
   regexPropia: string
   ejemploId: string
+  /** Comando con el que arranca el espacio de un ticket; vacío o ausente = sin comando. */
+  comandoTicket?: string
   estados: Estado[]
   pistas: { yoConId: string; yoSinId: string; lista: string; pedirEstados: boolean; apoyo: string }
   /** El conector que se está editando: lo que el asistente no maneja se toma de acá. */
@@ -179,6 +181,7 @@ export function aDef(b: Borrador): ConectorMcp {
     idRegex: regex,
     idMayusculas: mayusculas,
     ...(o?.personaId !== undefined ? { personaId: o.personaId } : {}),
+    ...(b.comandoTicket?.trim() ? { comandoTicket: b.comandoTicket.trim() } : {}),
     ejemplo: { id: b.ejemploId, estado: estadoEj, prioridad: o?.ejemplo.prioridad ?? 'prioridad', proyecto: o?.ejemplo.proyecto ?? 'proyecto' },
     estados: b.estados.map((e) => ({ ...e })),
     faltaConector: o && o.nombre === b.nombre ? { ...o.faltaConector } : faltaConector(b.id, b.nombre),
@@ -236,6 +239,7 @@ export function deDef(def: ConectorMcp): Borrador {
     formato,
     regexPropia: formato === 'propio' ? def.idRegex : '',
     ejemploId: def.ejemplo.id,
+    ...(def.comandoTicket !== undefined ? { comandoTicket: def.comandoTicket } : {}),
     estados: def.estados.map((e) => ({ ...e })),
     pistas: {
       yoConId: def.pistas.yo.conId,
@@ -266,6 +270,14 @@ export function validarBorrador(b: Borrador): Revision {
     if (!(e instanceof ConectorInvalidoError)) throw e
     return { ok: false, ruta: e.ruta, mensaje: e.message.replace(`Conector inválido en ${e.ruta}: `, '') }
   }
+}
+
+/** Mensaje de por qué el comando del ticket no sirve; null si está vacío o es válido (misma regla que main). */
+export function revisarComando(b: Borrador): string | null {
+  const c = b.comandoTicket?.trim()
+  if (!c) return null
+  const problema = problemaComandoTicket(c)
+  return problema && `${problema[0].toUpperCase()}${problema.slice(1)}.`
 }
 
 /** Si el ejemplo de id cumple el formato elegido; con el mensaje del problema si no. */
