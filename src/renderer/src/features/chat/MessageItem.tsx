@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { memo, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { ArrowBendUpLeft, ArrowClockwise, CircleNotch, Copy, DotsThree, PencilSimple, Smiley, Trash, WarningCircle } from '@phosphor-icons/react'
 import { CHAT_REACTIONS, type ChatMessage, type ChatReactionEmoji } from '../../../../shared/chat'
 import { ContextMenu, IconButton, Menu, Tooltip, toast, type MenuItem } from '../../ui'
@@ -40,7 +40,7 @@ interface Props {
 
 const emojiIcon = (e: string): React.JSX.Element => <span className="f-chat-emoji">{e}</span>
 
-export function MessageItem({ msg, mine, me, head, extras, seen, flash, active, onToggle, onCloseBar, onReply, onEdit, onJump }: Props): React.JSX.Element {
+export const MessageItem = memo(function MessageItem({ msg, mine, me, head, extras, seen, flash, active, onToggle, onCloseBar, onReply, onEdit, onJump }: Props): React.JSX.Element {
   const [ctx, setCtx] = useState<{ x: number; y: number } | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [below, setBelow] = useState(false)
@@ -311,4 +311,4 @@ export function MessageItem({ msg, mine, me, head, extras, seen, flash, active, 
       )}
     </li>
   )
-}
+})

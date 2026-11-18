@@ -1,3 +1,6 @@
+import { memo } from 'react'
+import { SpaceIcon } from '../../icons/SlothIcons'
+import { SPACE_CHIP, SPACE_LABEL, type SpaceStatus } from '../broadcast/state'
 import { prioRank, tintFor, type Categoria } from './model'
 
 /** Piezas compartidas por la lista y el detalle de tickets. */
@@ -53,3 +56,59 @@ export function Av({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' | '
     </span>
   )
 }
+
+export interface TarjetaTicketProps {
+  id: string
+  titulo: string
+  estado: string
+  estadoClase: string
+  prioridad?: string
+  responsable?: string
+  mine: boolean
+  sel: boolean
+  espacio?: string
+  espacioEstado: SpaceStatus | null
+  onSelect: (id: string) => void
+  /** Solo en la lista con ventana: marca el `li` para medirlo y dice su lugar entre todos para los lectores de pantalla. */
+  total?: number
+  pos?: number
+}
+
+/** Una fila de la lista de tickets. Solo recibe valores simples para que `memo` la salte si su ticket no cambió. */
+export const TarjetaTicket = memo(function TarjetaTicket(p: TarjetaTicketProps): React.JSX.Element {
+  return (
+    <li data-tid={p.total === undefined ? undefined : p.id} aria-setsize={p.total} aria-posinset={p.pos}>
+      <button type="button" className={`f-tickets-row ${p.sel ? 'sel' : ''}`} aria-current={p.sel ? 'true' : undefined} onClick={() => p.onSelect(p.id)}>
+        <span className="f-tickets-row-top">
+          <span className="f-tickets-code mono">{p.id}</span>
+          {p.espacio !== undefined && p.espacioEstado && (
+            <span className={`chip f-tickets-space ${SPACE_CHIP[p.espacioEstado]}`}>
+              <SpaceIcon size={11} strokeWidth={2.2} />
+              <span className="f-tickets-ellipsis">
+                {p.espacio} · {SPACE_LABEL[p.espacioEstado]}
+              </span>
+            </span>
+          )}
+        </span>
+        <span className="f-tickets-row-title">{p.titulo}</span>
+        <span className="f-tickets-row-meta">
+          <span className={`f-tickets-st f-tickets-st-${p.estadoClase}`}>{p.estado}</span>
+          {p.prioridad && (
+            <span className="f-tickets-prio" style={{ color: prioTone(p.prioridad) }}>
+              <PrioGlyph p={p.prioridad} />
+              {p.prioridad}
+            </span>
+          )}
+          {p.responsable ? (
+            <span className="f-tickets-who">
+              <Av name={p.responsable} size="sm" />
+              {p.mine ? 'Vos' : p.responsable}
+            </span>
+          ) : (
+            <span className="f-tickets-muted">Sin asignar</span>
+          )}
+        </span>
+      </button>
+    </li>
+  )
+})
