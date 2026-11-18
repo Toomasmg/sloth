@@ -1,4 +1,4 @@
-export const PROVEEDORES_IDS = ['claude'] as const
+export const PROVEEDORES_IDS = ['claude', 'codex'] as const
 export type ProveedorId = (typeof PROVEEDORES_IDS)[number]
 export const PROVEEDOR_DEFECTO: ProveedorId = 'claude'
 
@@ -16,4 +16,70 @@ export const PROVEEDOR_ID_RE = /^[a-z0-9-]{1,32}$/
 export function proveedorIdDe(cuenta: { proveedor?: unknown }): ProveedorId | undefined {
   if (cuenta.proveedor === undefined) return PROVEEDOR_DEFECTO
   return esProveedorId(cuenta.proveedor) ? cuenta.proveedor : undefined
+}
+
+export interface Capacidades {
+  hooks: boolean
+  statusline: boolean
+  setupCompartido: boolean
+  tickets: boolean
+  chatMcp: boolean
+  historial: boolean
+  moverCuenta: boolean
+  dormir: boolean
+  uso: boolean
+  overrideClaude: boolean
+}
+
+const TODAS: Capacidades = {
+  hooks: true,
+  statusline: true,
+  setupCompartido: true,
+  tickets: true,
+  chatMcp: true,
+  historial: true,
+  moverCuenta: true,
+  dormir: true,
+  uso: true,
+  overrideClaude: true
+}
+
+const NINGUNA: Capacidades = {
+  hooks: false,
+  statusline: false,
+  setupCompartido: false,
+  tickets: false,
+  chatMcp: false,
+  historial: false,
+  moverCuenta: false,
+  dormir: false,
+  uso: false,
+  overrideClaude: false
+}
+
+export const CAPACIDADES: Record<ProveedorId, Capacidades> = { claude: TODAS, codex: NINGUNA }
+
+export const NOMBRE_PROVEEDOR: Record<ProveedorId, string> = { claude: 'Claude Code', codex: 'Codex' }
+
+export function nombreProveedor(cuenta: { proveedor?: unknown }): string {
+  const id = proveedorIdDe(cuenta)
+  return id === undefined ? 'Agente desconocido' : NOMBRE_PROVEEDOR[id]
+}
+
+/** undefined si el agente de la cuenta no se conoce: quien lo use decide qué hacer (en general, no lanzar nada). */
+export function capacidadesDe(cuenta: { proveedor?: unknown }): Capacidades | undefined {
+  const id = proveedorIdDe(cuenta)
+  return id === undefined ? undefined : CAPACIDADES[id]
+}
+
+const MOTIVOS_ESPECIFICOS: Partial<Record<ProveedorId, Partial<Record<keyof Capacidades, string>>>> = {
+  codex: { hooks: 'Con Codex no hay avisos de permisos desde el celu: Codex todavía no se los manda a Sloth.' }
+}
+
+/** Por qué la cuenta no puede usar esa función, o undefined si puede. */
+export function motivoSinCapacidad(cuenta: { proveedor?: unknown }, k: keyof Capacidades): string | undefined {
+  const id = proveedorIdDe(cuenta)
+  if (id === undefined) return 'Esta cuenta es de un agente que esta versión de Sloth no conoce; actualizá Sloth.'
+  if (CAPACIDADES[id][k]) return undefined
+  return MOTIVOS_ESPECIFICOS[id]?.[k] ?? `${NOMBRE_PROVEEDOR[id]} todavía no soporta esto en Sloth.`
 }
