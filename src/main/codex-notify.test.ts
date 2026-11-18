@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { MOTIVO_AJENO, MOTIVO_SIN_NODE, avisoUnaVez, depsNotifyReales, desinstalarNotify, prepararNotify, type DepsNotify } from './codex-notify'
+import { MOTIVO_AJENO, MOTIVO_CAMBIO, MOTIVO_DUDOSO, MOTIVO_SIN_NODE, avisoUnaVez, depsNotifyReales, desinstalarNotify, prepararNotify, type DepsNotify } from './codex-notify'
 
 const DIR = 'C:/cuentas/a'
 const FILE = join(DIR, 'config.toml')
@@ -20,8 +20,11 @@ function falso(inicial?: string, opciones: { falloEscribir?: Error; falloLeer?: 
     respaldar(f) {
       llamadas.push(`respaldar ${f}`)
     },
-    escribir(f, t) {
+    escribir(f, t, previo, verificar) {
       if (opciones.falloEscribir) throw opciones.falloEscribir
+      const problema = verificar(t)
+      if (problema) throw Object.assign(new Error(problema), { code: 'EVERIF' })
+      if (texto !== previo) throw Object.assign(new Error('cambió'), { code: 'ECAMBIO' })
       llamadas.push(`escribir ${f}`)
       texto = t
     }
@@ -119,6 +122,64 @@ test('con archivos de verdad: respaldo una sola vez, sin restos de tmp y el orig
     assert.equal(readFileSync(`${file}.sloth-bak`, 'utf8'), original)
     assert.deepEqual(readdirSync(dir).sort(), ['config.toml', 'config.toml.sloth-bak'])
     assert.equal(existsSync(join(dir, 'auth.json')), false)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('un TOML que no se entiende o con claves repetidas no se toca ni se respalda', () => {
+  for (const inicial of ['a = """sin cerrar\n', 'a = 1\na = 2\n', '[t]\n[t]\n', 'a = \n']) {
+    const f = falso(inicial)
+    assert.equal(prepararNotify(DIR, 'node', SCRIPT, f.deps), MOTIVO_DUDOSO)
+    assert.deepEqual(f.llamadas, [])
+    assert.equal(f.archivo(), inicial)
+  }
+})
+
+test('desinstalar con un TOML dudoso que dice sloth-notify no lo toca', () => {
+  const inicial = 'a = """x\n# sloth-notify\n'
+  const f = falso(inicial)
+  assert.equal(desinstalarNotify(DIR, f.deps), MOTIVO_DUDOSO)
+  assert.deepEqual(f.llamadas, [])
+})
+
+test('si la verificación posterior falla, no se escribe', () => {
+  const f = falso('a = 1\n')
+  const mala: DepsNotify = { ...f.deps, escribir: (file, texto, previo, verificar) => f.deps.escribir(file, `${texto}a = 2\n`, previo, verificar) }
+  assert.equal(prepararNotify(DIR, 'node', SCRIPT, mala), MOTIVO_DUDOSO)
+  assert.equal(f.archivo(), 'a = 1\n')
+})
+
+test('config.toml que cambia entre la lectura y el rename: se aborta, no se pierde lo de Codex y no quedan tmp', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sloth-notify-carrera-'))
+  try {
+    const file = join(dir, 'config.toml')
+    writeFileSync(file, 'a = 1\n')
+    const deps: DepsNotify = {
+      ...depsNotifyReales,
+      leer(f) {
+        const t = depsNotifyReales.leer(f)
+        writeFileSync(f, `${t}[projects.x]\ntrust_level = "trusted"\n`)
+        return t
+      }
+    }
+    assert.equal(prepararNotify(dir, 'node', SCRIPT, deps), MOTIVO_CAMBIO)
+    assert.equal(readFileSync(file, 'utf8'), 'a = 1\n[projects.x]\ntrust_level = "trusted"\n')
+    assert.deepEqual(readdirSync(dir).filter((x) => x.includes('.tmp-')), [])
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('con archivos de verdad: un archivo raro no se escribe y no deja respaldo ni tmp', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sloth-notify-raro-'))
+  try {
+    const file = join(dir, 'config.toml')
+    const raro = 'a = """x \\""" y"""\nb = 1\nb = 2\n'
+    writeFileSync(file, raro)
+    assert.equal(prepararNotify(dir, 'node', SCRIPT, depsNotifyReales), MOTIVO_DUDOSO)
+    assert.equal(readFileSync(file, 'utf8'), raro)
+    assert.deepEqual(readdirSync(dir), ['config.toml'])
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
