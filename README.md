@@ -46,6 +46,7 @@ Sloth le da a cada cuenta su propia carpeta de configuración y a cada tarea un 
 - **Equipo y chat**: en qué anda cada uno (GitHub con `gh`, solo lectura) y chat de equipo con tu propio proyecto de Supabase. Ver [`docs/chat-equipo.md`](docs/chat-equipo.md) y [`docs/team-config.md`](docs/team-config.md).
 - **Llevar la configuración a otra PC**: un archivo `.sloth`, con contraseña opcional. Nunca incluye tokens, credenciales ni sesiones.
 - **Actualizaciones**: desde los releases de este repo. Nada se descarga solo y actualizar no corta las terminales.
+- **Privacidad**: qué guarda Sloth, qué sale de tu PC y cómo borrarlo, en [`PRIVACY.md`](PRIVACY.md).
 
 </details>
 
