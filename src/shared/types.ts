@@ -1,3 +1,5 @@
+import type { ProveedorId } from './proveedores'
+
 /** Una cuenta de Claude: su propio CLAUDE_CONFIG_DIR, con su login y sus settings. */
 export interface Account {
   id: string
@@ -6,6 +8,8 @@ export interface Account {
   createdAt: number
   /** Usar el setup de ~/.claude (skills, agents, hooks, plugins, settings, MCP). Por defecto sí. */
   shareSetup?: boolean
+  /** Agente de terminal de la cuenta. Ausente = claude. Puede ser un id que esta versión no conoce: se resuelve con proveedorDe. */
+  proveedor?: ProveedorId | (string & {})
 }
 
 export interface AccountStatus {

@@ -1,0 +1,354 @@
+{
+  "exe": "C:\\Users\\yo\\.local\\bin\\claude.exe",
+  "modos": [
+    {
+      "nombre": "nuevo",
+      "argv": [
+        "claude"
+      ],
+      "lanzamiento": {
+        "cmd": {
+          "conExe": {
+            "args": [
+              "/k",
+              "C:\\Users\\yo\\.local\\bin\\claude.exe"
+            ],
+            "env": {}
+          },
+          "sinExe": {
+            "args": [
+              "/k",
+              "set NoDefaultCurrentDirectoryInExePath=1& claude& set NoDefaultCurrentDirectoryInExePath="
+            ],
+            "env": {}
+          }
+        },
+        "ps": {
+          "conExe": {
+            "args": [
+              "-NoLogo",
+              "-NoExit",
+              "-EncodedCommand",
+              "JgAgAEMAOgBcAFUAcwBlAHIAcwBcAHkAbwBcAC4AbABvAGMAYQBsAFwAYgBpAG4AXABjAGwAYQB1AGQAZQAuAGUAeABlAA=="
+            ],
+            "env": {}
+          },
+          "sinExe": {
+            "args": [
+              "-NoLogo",
+              "-NoExit",
+              "-EncodedCommand",
+              "JgAgAGMAbABhAHUAZABlAA=="
+            ],
+            "env": {}
+          }
+        },
+        "posix": {
+          "conExe": {
+            "args": [
+              "--login",
+              "-i",
+              "-c",
+              "MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' 'C:\\Users\\yo\\.local\\bin\\claude.exe'; exec bash --login -i"
+            ],
+            "env": {}
+          },
+          "sinExe": {
+            "args": [
+              "--login",
+              "-i",
+              "-c",
+              "MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' claude; exec bash --login -i"
+            ],
+            "env": {}
+          }
+        }
+      }
+    },
+    {
+      "nombre": "continuar",
+      "argv": [
+        "claude",
+        "--continue"
+      ],
+      "lanzamiento": {
+        "cmd": {
+          "conExe": {
+            "args": [
+              "/k",
+              "C:\\Users\\yo\\.local\\bin\\claude.exe --continue"
+            ],
+            "env": {}
+          },
+          "sinExe": {
+            "args": [
+              "/k",
+              "set NoDefaultCurrentDirectoryInExePath=1& claude --continue& set NoDefaultCurrentDirectoryInExePath="
+            ],
+            "env": {}
+          }
+        },
+        "ps": {
+          "conExe": {
+            "args": [
+              "-NoLogo",
+              "-NoExit",
+              "-EncodedCommand",
+              "JgAgAEMAOgBcAFUAcwBlAHIAcwBcAHkAbwBcAC4AbABvAGMAYQBsAFwAYgBpAG4AXABjAGwAYQB1AGQAZQAuAGUAeABlACAALQAtAGMAbwBuAHQAaQBuAHUAZQA="
+            ],
+            "env": {}
+          },
+          "sinExe": {
+            "args": [
+              "-NoLogo",
+              "-NoExit",
+              "-EncodedCommand",
+              "JgAgAGMAbABhAHUAZABlACAALQAtAGMAbwBuAHQAaQBuAHUAZQA="
+            ],
+            "env": {}
+          }
+        },
+        "posix": {
+          "conExe": {
+            "args": [
+              "--login",
+              "-i",
+              "-c",
+              "MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' 'C:\\Users\\yo\\.local\\bin\\claude.exe' --continue; exec bash --login -i"
+            ],
+            "env": {}
+          },
+          "sinExe": {
+            "args": [
+              "--login",
+              "-i",
+              "-c",
+              "MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' claude --continue; exec bash --login -i"
+            ],
+            "env": {}
+          }
+        }
+      }
+    },
+    {
+      "nombre": "con prompt",
+      "argv": [
+        "claude",
+        "--",
+        "/ticket PROJ-12"
+      ],
+      "lanzamiento": {
+        "cmd": {
+          "conExe": {
+            "args": [
+              "/k",
+              "C:\\Users\\yo\\.local\\bin\\claude.exe"
+            ],
+            "env": {},
+            "paste": "/ticket PROJ-12"
+          },
+          "sinExe": {
+            "args": [
+              "/k",
+              "set NoDefaultCurrentDirectoryInExePath=1& claude& set NoDefaultCurrentDirectoryInExePath="
+            ],
+            "env": {},
+            "paste": "/ticket PROJ-12"
+          }
+        },
+        "ps": {
+          "conExe": {
+            "args": [
+              "-NoLogo",
+              "-NoExit",
+              "-EncodedCommand",
+              "JgAgAHsAIAAkAFAAUwBOAGEAdABpAHYAZQBDAG8AbQBtAGEAbgBkAEEAcgBnAHUAbQBlAG4AdABQAGEAcwBzAGkAbgBnACAAPQAgACcATABlAGcAYQBjAHkAJwA7ACAAJABwACAAPQAgACQAZQBuAHYAOgBTAEwATwBUAEgAXwBQAFIATwBNAFAAVAA7ACAAUgBlAG0AbwB2AGUALQBJAHQAZQBtACAARQBuAHYAOgBTAEwATwBUAEgAXwBQAFIATwBNAFAAVAAgAC0ARQByAHIAbwByAEEAYwB0AGkAbwBuACAASQBnAG4AbwByAGUAOwAgACYAIABDADoAXABVAHMAZQByAHMAXAB5AG8AXAAuAGwAbwBjAGEAbABcAGIAaQBuAFwAYwBsAGEAdQBkAGUALgBlAHgAZQAgAC0ALQAgACQAcAAgAH0A"
+            ],
+            "env": {
+              "SLOTH_PROMPT": "\"/ticket PROJ-12\""
+            }
+          },
+          "sinExe": {
+            "args": [
+              "-NoLogo",
+              "-NoExit",
+              "-EncodedCommand",
+              "JgAgAGMAbABhAHUAZABlAA=="
+            ],
+            "env": {},
+            "paste": "/ticket PROJ-12"
+          }
+        },
+        "posix": {
+          "conExe": {
+            "args": [
+              "--login",
+              "-i",
+              "-c",
+              "p=$SLOTH_PROMPT; unset SLOTH_PROMPT; MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' 'C:\\Users\\yo\\.local\\bin\\claude.exe' -- \"$p\"; unset p; exec bash --login -i"
+            ],
+            "env": {
+              "SLOTH_PROMPT": "/ticket PROJ-12"
+            }
+          },
+          "sinExe": {
+            "args": [
+              "--login",
+              "-i",
+              "-c",
+              "MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' claude; exec bash --login -i"
+            ],
+            "env": {},
+            "paste": "/ticket PROJ-12"
+          }
+        }
+      }
+    },
+    {
+      "nombre": "con prompt que parece opción",
+      "argv": [
+        "claude",
+        "--",
+        "--dangerously hola \"mundo\" & más"
+      ],
+      "lanzamiento": {
+        "cmd": {
+          "conExe": {
+            "args": [
+              "/k",
+              "C:\\Users\\yo\\.local\\bin\\claude.exe"
+            ],
+            "env": {},
+            "paste": "--dangerously hola \"mundo\" & más"
+          },
+          "sinExe": {
+            "args": [
+              "/k",
+              "set NoDefaultCurrentDirectoryInExePath=1& claude& set NoDefaultCurrentDirectoryInExePath="
+            ],
+            "env": {},
+            "paste": "--dangerously hola \"mundo\" & más"
+          }
+        },
+        "ps": {
+          "conExe": {
+            "args": [
+              "-NoLogo",
+              "-NoExit",
+              "-EncodedCommand",
+              "JgAgAHsAIAAkAFAAUwBOAGEAdABpAHYAZQBDAG8AbQBtAGEAbgBkAEEAcgBnAHUAbQBlAG4AdABQAGEAcwBzAGkAbgBnACAAPQAgACcATABlAGcAYQBjAHkAJwA7ACAAJABwACAAPQAgACQAZQBuAHYAOgBTAEwATwBUAEgAXwBQAFIATwBNAFAAVAA7ACAAUgBlAG0AbwB2AGUALQBJAHQAZQBtACAARQBuAHYAOgBTAEwATwBUAEgAXwBQAFIATwBNAFAAVAAgAC0ARQByAHIAbwByAEEAYwB0AGkAbwBuACAASQBnAG4AbwByAGUAOwAgACYAIABDADoAXABVAHMAZQByAHMAXAB5AG8AXAAuAGwAbwBjAGEAbABcAGIAaQBuAFwAYwBsAGEAdQBkAGUALgBlAHgAZQAgAC0ALQAgACQAcAAgAH0A"
+            ],
+            "env": {
+              "SLOTH_PROMPT": "\"--dangerously hola \\\"mundo\\\" & más\""
+            }
+          },
+          "sinExe": {
+            "args": [
+              "-NoLogo",
+              "-NoExit",
+              "-EncodedCommand",
+              "JgAgAGMAbABhAHUAZABlAA=="
+            ],
+            "env": {},
+            "paste": "--dangerously hola \"mundo\" & más"
+          }
+        },
+        "posix": {
+          "conExe": {
+            "args": [
+              "--login",
+              "-i",
+              "-c",
+              "p=$SLOTH_PROMPT; unset SLOTH_PROMPT; MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' 'C:\\Users\\yo\\.local\\bin\\claude.exe' -- \"$p\"; unset p; exec bash --login -i"
+            ],
+            "env": {
+              "SLOTH_PROMPT": "--dangerously hola \"mundo\" & más"
+            }
+          },
+          "sinExe": {
+            "args": [
+              "--login",
+              "-i",
+              "-c",
+              "MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' claude; exec bash --login -i"
+            ],
+            "env": {},
+            "paste": "--dangerously hola \"mundo\" & más"
+          }
+        }
+      }
+    },
+    {
+      "nombre": "con prompt y continuar",
+      "argv": [
+        "claude",
+        "--",
+        "hola"
+      ],
+      "lanzamiento": {
+        "cmd": {
+          "conExe": {
+            "args": [
+              "/k",
+              "C:\\Users\\yo\\.local\\bin\\claude.exe"
+            ],
+            "env": {},
+            "paste": "hola"
+          },
+          "sinExe": {
+            "args": [
+              "/k",
+              "set NoDefaultCurrentDirectoryInExePath=1& claude& set NoDefaultCurrentDirectoryInExePath="
+            ],
+            "env": {},
+            "paste": "hola"
+          }
+        },
+        "ps": {
+          "conExe": {
+            "args": [
+              "-NoLogo",
+              "-NoExit",
+              "-EncodedCommand",
+              "JgAgAEMAOgBcAFUAcwBlAHIAcwBcAHkAbwBcAC4AbABvAGMAYQBsAFwAYgBpAG4AXABjAGwAYQB1AGQAZQAuAGUAeABlAA=="
+            ],
+            "env": {},
+            "paste": "hola"
+          },
+          "sinExe": {
+            "args": [
+              "-NoLogo",
+              "-NoExit",
+              "-EncodedCommand",
+              "JgAgAGMAbABhAHUAZABlAA=="
+            ],
+            "env": {},
+            "paste": "hola"
+          }
+        },
+        "posix": {
+          "conExe": {
+            "args": [
+              "--login",
+              "-i",
+              "-c",
+              "MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' 'C:\\Users\\yo\\.local\\bin\\claude.exe'; exec bash --login -i"
+            ],
+            "env": {},
+            "paste": "hola"
+          },
+          "sinExe": {
+            "args": [
+              "--login",
+              "-i",
+              "-c",
+              "MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' claude; exec bash --login -i"
+            ],
+            "env": {},
+            "paste": "hola"
+          }
+        }
+      }
+    }
+  ]
+}
