@@ -85,11 +85,11 @@ function escribirReporte(): void {
       .filter((f) => f.caso === caso)
       .map(
         (f) =>
-          `| ${f.n} | ${f.nodosItem} | ${f.nodosTotal} | ${f.primerRenderMs} | ${f.scroll.ms} | ${f.scroll.frameMean} | ${f.scroll.frameP95} | ${f.scroll.lafCount} (${f.scroll.lafTotalMs} ms) | ${f.mutacionesPorSeg} | ${f.rerenderMs ?? '-'} |`
+          `| ${f.n} | ${f.nodosItem} | ${f.nodosTotal} | ${f.primerRenderMs} | ${f.scroll.ms} | ${f.scroll.frameMean} | ${f.scroll.frameP95} | ${f.scroll.lafCount} (${f.scroll.lafTotalMs} ms) | ${f.mutacionesPorSeg} | ${f.rerenderMs ?? f.desdeAvisoMs ?? '-'} |`
       )
       .join('\n')
   const cab =
-    '| N | nodos de ítem | nodos totales | primer render (ms) | scroll (ms) | frame medio (ms) | frame p95 (ms) | LoAF | mutaciones/s en reposo | re-render (ms) |\n|---|---|---|---|---|---|---|---|---|---|'
+    '| N | nodos de ítem | nodos totales | primer render (ms) | scroll (ms) | frame medio (ms) | frame p95 (ms) | LoAF | mutaciones/s en reposo | chat: re-render, tablero: desde el aviso (ms) |\n|---|---|---|---|---|---|---|---|---|---|'
   writeFileSync(
     join('perf', `reporte${sufijo}.md`),
     `# Reporte de perf\n\n${maquina.cpu} (${maquina.nucleos} núcleos), ${maquina.ramGB} GB, ${maquina.so}, ${maquina.fecha}\n\n## Chat (mensajes)\n\n${cab}\n${t('chat')}\n\n## Tablero (tarjetas)\n\n${cab}\n${t('tablero')}\n`
@@ -176,9 +176,19 @@ for (const n of TABLERO_N) {
       running: false,
       tickets
     }
+    await page.evaluate(() => {
+      const w = window as unknown as { __aviso: number }
+      window.sloth.feat.on('feat:tickets:changed', () => {
+        w.__aviso = performance.now()
+      })
+    })
     await armar(page, '.f-tickets-row')
     await app.evaluate(({ BrowserWindow }, snap) => BrowserWindow.getAllWindows()[0].webContents.send('feat:tickets:changed', snap), fake)
     const primerRenderMs = await cobrar(page)
+    const desdeAvisoMs = await page.evaluate((ms) => {
+      const w = window as unknown as { __aviso: number; __t0: number }
+      return Math.round((w.__t0 + ms - w.__aviso) * 10) / 10
+    }, primerRenderMs)
     await page.evaluate(() => {
       let el = document.querySelector('.f-tickets-rows')?.parentElement ?? null
       while (el && !/(auto|scroll)/.test(getComputedStyle(el).overflowY)) el = el.parentElement
@@ -188,6 +198,6 @@ for (const n of TABLERO_N) {
     const k = await contar(page, sc, '.f-tickets-row')
     const scroll = await scrollear(page, sc)
     const mutacionesPorSeg = await mutacionesEnReposo(page, REPOSO_MS)
-    filas.push({ caso: 'tablero', n, nodosItem: k.item, nodosTotal: k.total, primerRenderMs, scroll, mutacionesPorSeg })
+    filas.push({ caso: 'tablero', n, nodosItem: k.item, nodosTotal: k.total, primerRenderMs, scroll, mutacionesPorSeg, desdeAvisoMs })
   })
 }

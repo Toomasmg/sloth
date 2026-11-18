@@ -18,6 +18,8 @@ export interface Fila {
   scroll: Scroll
   mutacionesPorSeg: number
   rerenderMs?: number
+  /** Del aviso que le llega a la UI hasta la primera tarjeta pintada: deja afuera lo que tarda el banco en mandar el dato. */
+  desdeAvisoMs?: number
 }
 
 const r1 = (n: number): number => Math.round(n * 10) / 10
@@ -27,6 +29,7 @@ export function armar(page: Page, selector: string): Promise<void> {
     const w = window as unknown as { __listo: Promise<number> }
     w.__listo = new Promise<number>((resolve) => {
       const t0 = performance.now()
+      ;(window as unknown as { __t0: number }).__t0 = t0
       const fin = (): void => {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve(performance.now() - t0)))
       }
