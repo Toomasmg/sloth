@@ -55,7 +55,7 @@ test('normalizar es identidad y el motor no suma entorno', () => {
 test('motorDe: cuentas viejas y de claude usan el motor de claude', () => {
   assert.equal(motorDe({}), motorClaude)
   assert.equal(motorDe({ proveedor: 'claude' }), motorClaude)
-  assert.equal(motorDe({ proveedor: 'codex' }), undefined)
+  assert.notEqual(motorDe({ proveedor: 'codex' }), motorClaude)
   assert.equal(motorDe({ proveedor: 'futuro' }), undefined)
 })
 

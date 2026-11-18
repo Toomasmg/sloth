@@ -14,6 +14,10 @@ export interface PedidoMotor {
   limites?: Limites
   accion?: Accion
   schema?: object
+  /** Nombres de los servidores MCP que tiene la cuenta en su config (Codex). Claude los ignora. */
+  servidoresCuenta?: readonly string[]
+  /** Servidor del conector, sin el prefijo `mcp__` ni el `__` final. Claude lo ignora. */
+  servidorElegido?: string
 }
 
 export interface MotorTickets {
