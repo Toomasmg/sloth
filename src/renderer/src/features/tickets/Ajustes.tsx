@@ -3,6 +3,7 @@ import { useUi } from '../host'
 import { cleanError } from '../../format'
 import { CloseIcon } from '../../icons/SlothIcons'
 import { SIN_CONECTOR, type ConectorPropioVista, type ConectorResumen, type UsoAcum } from '../../../../shared/tickets'
+import { diaLocal, VUELTAS_DEFECTO, VUELTAS_MAX } from '../../../../shared/tickets-uso'
 import { fmtCosto, resumenUso, setSnapshot, type Snapshot } from './model'
 import { CuentasConectores, textoDisponibilidad } from './CuentasConectores'
 import { aceptarYUsar, AvisoHerramientas, deDondeViene, etiquetaOrigen, Propios } from './Propios'
@@ -24,12 +25,6 @@ const ningunaLoTiene = (snap: Snapshot, c: ConectorResumen): boolean => {
   if (c.via !== 'mcp') return false
   const revisadas = Object.values(snap.cuentas).filter((v) => v.revisadaEn)
   return revisadas.length > 0 && revisadas.every((v) => v.conectores[c.id]?.tipo === 'falta')
-}
-
-const hoyLocal = (): string => {
-  const f = new Date()
-  const dos = (n: number): string => String(n).padStart(2, '0')
-  return `${f.getFullYear()}-${dos(f.getMonth() + 1)}-${dos(f.getDate())}`
 }
 
 function CampoTope({ etiqueta, valor, vacio, min, max, paso, nota, onGuardar }: {
@@ -78,7 +73,7 @@ function CampoTope({ etiqueta, valor, vacio, min, max, paso, nota, onGuardar }: 
 function resumenDeUso(snap: Snapshot): { total: ReturnType<typeof resumenUso>; porConector: { id: string; nombre: string; hoy: UsoAcum; semana: UsoAcum }[] } | null {
   const uso = snap.uso
   if (!uso || Object.keys(uso).length === 0) return null
-  const hoy = hoyLocal()
+  const hoy = diaLocal(Date.now())
   const ids = [...new Set(Object.values(uso).flatMap((d) => Object.keys(d)))]
   const porConector = ids.map((id) => ({ id, nombre: snap.conectores.find((c) => c.id === id)?.nombre ?? id, ...resumenUso(uso, hoy, id) }))
   return { total: resumenUso(uso, hoy), porConector: porConector.length > 1 ? porConector : [] }
@@ -233,9 +228,9 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => voi
           <CampoTope
             etiqueta="Tope de vueltas por consulta"
             valor={snap.config.maxTurns}
-            vacio="40"
+            vacio={String(VUELTAS_DEFECTO)}
             min={1}
-            max={200}
+            max={VUELTAS_MAX}
             paso={1}
             onGuardar={(v) => set({ maxTurns: v })}
           />

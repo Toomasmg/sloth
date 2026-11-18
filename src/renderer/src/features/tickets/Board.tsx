@@ -9,6 +9,7 @@ import { openSettings } from '../settings/bus'
 import type { Workspace } from '../../../../shared/types'
 import { categoriaDe, SIN_CONECTOR } from '../../../../shared/tickets'
 import { espacioDelTicket } from '../../../../shared/templates-shared'
+import { VUELTAS_DEFECTO, VUELTAS_MAX } from '../../../../shared/tickets-uso'
 import {
   etiquetaTablero,
   isMine,
@@ -327,7 +328,7 @@ export function Board(): React.JSX.Element {
   }
   const topeVueltas = Boolean(snap?.lastError) && !running && !unavailable && snap?.lastRun?.tope === 'vueltas'
   const offline = Boolean(snap?.lastError) && !running && !unavailable && !topeVueltas
-  const vueltasActuales = snap?.lastRun?.maxTurns ?? 40
+  const vueltasActuales = snap?.lastRun?.maxTurns ?? VUELTAS_DEFECTO
   const ultimaConsulta = snap?.lastRun ? textoUltimaConsulta(snap.lastRun) : ''
 
   const bodyLoading = !snap || (running && tickets.length === 0)
@@ -590,9 +591,9 @@ export function Board(): React.JSX.Element {
                     </span>
                     <button
                       type="button"
-                      className="f-tickets-b f-tickets-b--xs f-tickets-b--solid-danger"
-                      onClick={() => void refresh(Math.min(200, 2 * vueltasActuales))}
-                      disabled={running || vueltasActuales >= 200}
+                      className="f-tickets-b f-tickets-b--xs f-tickets-b--pri"
+                      onClick={() => void refresh(Math.min(VUELTAS_MAX, 2 * vueltasActuales))}
+                      disabled={running || vueltasActuales >= VUELTAS_MAX}
                     >
                       Continuar con más vueltas
                     </button>
