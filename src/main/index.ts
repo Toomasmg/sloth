@@ -24,7 +24,7 @@ import { avisarNotify, desinstalarNotify, prepararNotify } from './codex-notify'
 import { entornoDeTerminal } from './hook-env-core'
 import { detectarAgentes } from './agentes'
 import { initialPromptProblem } from '../shared/initial-prompt'
-import { nextAgentState, type AgentInput } from './agent-machine'
+import { nextAgentState, salidaDeDoneSinHooks, type AgentInput } from './agent-machine'
 import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
 import { clipboardForPaste } from './clipboard-paste'
 import { createWorktree } from './git'
@@ -695,6 +695,11 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     if (!idValido(id) || typeof data !== 'string' || esAjena(id)) return
     term?.write(id, data)
     for (const l of writeListeners) safe('pty-write', () => l(id, data))
+    // Un agente sin hooks (Codex) no manda nada que lo saque de «terminó» al empezar otro turno. Lo que escribís en su
+    // terminal sí: vuelve a «idle» (no a «working», que no se puede saber) y el próximo aviso de terminó suena de nuevo.
+    const ws = store.workspace(id)
+    const acc = ws && store.account(ws.accountId)
+    if (acc && salidaDeDoneSinHooks(agents.get(id)?.state, capacidadesDe(acc)?.hooks !== false, data)) moveAgent(id, { hook: 'idle' })
   })
   on('pty:resize', (_e, id: unknown, cols: unknown, rows: unknown) => {
     if (idValido(id) && dimValida(cols) && dimValida(rows) && !esAjena(id)) term?.resize(id, cols, rows)
