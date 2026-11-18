@@ -19,6 +19,7 @@ import {
   type Yo
 } from '../../../shared/tickets'
 import { ACCIONES_GH, ID_MAX, ID_SEGURO_RE, nombreCompleto, PERSONA_POR_DEFECTO, regexDeId, regexDePersona, type ArgValor, type ConectorDef, type ConectorMcp } from './conector'
+import { costoValido, VUELTAS_DEFECTO, vueltasValidas } from './uso'
 
 const MAX_TICKETS = 250
 const MAX_CRITERIOS = 5
@@ -154,6 +155,7 @@ export interface ResultadoLista {
   costUsd?: number
   tokens?: number
   durationMs?: number
+  numTurns?: number
 }
 
 /** Sobre de `claude -p --output-format json`: el JSON estructurado (o el texto parseado) y el sobre crudo. */
@@ -247,7 +249,16 @@ export function info(def: ConectorDef | undefined, idPedido: string, soloLectura
   }
 }
 
-export function buildArgs(model: string, o: { allow: string[]; deny: string[]; schema: unknown; extraDeny?: readonly string[] }): string[] {
+export interface Limites {
+  maxTurns?: number
+  maxCostUsd?: number
+}
+
+export function buildArgs(
+  model: string,
+  o: { allow: string[]; deny: string[]; schema: unknown; extraDeny?: readonly string[] } & Limites
+): string[] {
+  const usd = costoValido(o.maxCostUsd)
   return [
     '-p',
     '--output-format',
@@ -273,7 +284,10 @@ export function buildArgs(model: string, o: { allow: string[]; deny: string[]; s
     '--settings',
     J({ disableAllHooks: true }),
     '--json-schema',
-    J(o.schema)
+    J(o.schema),
+    '--max-turns',
+    String(vueltasValidas(o.maxTurns) ?? VUELTAS_DEFECTO),
+    ...(usd === undefined ? [] : ['--max-budget-usd', String(usd)])
   ]
 }
 
@@ -333,8 +347,8 @@ export function permisosPorConsulta(def: ConectorMcp): PermisosConsulta {
 
 const completos = (def: ConectorMcp, xs: readonly string[]): string[] => xs.map((t) => nombreCompleto(def, t))
 
-export const buildListaArgs = (def: ConectorMcp, model: string, ajenos: readonly string[] = []): string[] =>
-  buildArgs(model, { allow: completos(def, permisosPorConsulta(def).lista), deny: negadas(def), schema: OUTPUT_SCHEMA, extraDeny: ajenos })
+export const buildListaArgs = (def: ConectorMcp, model: string, ajenos: readonly string[] = [], limites?: Limites): string[] =>
+  buildArgs(model, { allow: completos(def, permisosPorConsulta(def).lista), deny: negadas(def), schema: OUTPUT_SCHEMA, extraDeny: ajenos, ...limites })
 
 export function buildDetallePrompt(def: ConectorMcp, id: string): string {
   const n = def.nombre
@@ -358,8 +372,8 @@ export function buildDetallePrompt(def: ConectorMcp, id: string): string {
   ].join('\n')
 }
 
-export const buildDetalleArgs = (def: ConectorMcp, model: string, ajenos: readonly string[] = []): string[] =>
-  buildArgs(model, { allow: completos(def, permisosPorConsulta(def).detalle), deny: negadas(def), schema: DETAIL_SCHEMA, extraDeny: ajenos })
+export const buildDetalleArgs = (def: ConectorMcp, model: string, ajenos: readonly string[] = [], limites?: Limites): string[] =>
+  buildArgs(model, { allow: completos(def, permisosPorConsulta(def).detalle), deny: negadas(def), schema: DETAIL_SCHEMA, extraDeny: ajenos, ...limites })
 
 const NOTA_HORAS = 'En dato.minutos_total poné el total del reloj del ticket que devuelve la herramienta, en minutos enteros; si no lo trae, null.'
 
@@ -396,13 +410,14 @@ export function buildAccionPrompt(def: ConectorMcp, a: Accion, i: AccionInput): 
   ].join('\n')
 }
 
-export function buildAccionArgs(def: ConectorMcp, model: string, a: Accion, ajenos: readonly string[] = []): string[] {
+export function buildAccionArgs(def: ConectorMcp, model: string, a: Accion, ajenos: readonly string[] = [], limites?: Limites): string[] {
   const tool = nombreCompleto(def, herramientaDe(def, a))
   return buildArgs(model, {
     allow: completos(def, permisosPorConsulta(def).acciones[a] ?? []),
     deny: negadas(def).filter((t) => t !== tool),
     schema: ACCION_SCHEMA,
-    extraDeny: ajenos
+    extraDeny: ajenos,
+    ...limites
   })
 }
 
@@ -515,7 +530,8 @@ export function parseClaudeOutput(def: ConectorDef, stdout: string): ResultadoLi
     me,
     costUsd: typeof env.total_cost_usd === 'number' ? env.total_cost_usd : undefined,
     tokens,
-    durationMs: typeof env.duration_ms === 'number' ? env.duration_ms : undefined
+    durationMs: typeof env.duration_ms === 'number' ? env.duration_ms : undefined,
+    numTurns: typeof env.num_turns === 'number' && Number.isFinite(env.num_turns) ? env.num_turns : undefined
   }
 }
 

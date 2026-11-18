@@ -1173,3 +1173,15 @@
 .f-tickets-cuentas-elegir {
   max-width: 420px;
 }
+
+.f-tickets-uso {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+.f-tickets-countbar .f-tickets-uso {
+  margin-left: auto;
+  text-align: right;
+}
