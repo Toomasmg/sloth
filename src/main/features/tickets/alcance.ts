@@ -12,7 +12,6 @@ import {
   VENTANA_DEFECTO,
   VENTANA_MAX,
   type AlcanceLeido,
-  type Categoria,
   type ConteosTickets,
   type FiltroVista,
   type PendientesLista,
@@ -25,8 +24,6 @@ import { regexDePersona, type ConectorDef } from './conector'
 const DIA_MS = 24 * 60 * 60 * 1000
 const ESTADOS_ELEGIDOS_MAX = 30
 const CLAVE_RE = /^[a-z0-9_]{1,40}$/
-/** Estados que se ven si la persona no eligió: lo que se está trabajando, lo que espera revisión y lo terminado. */
-const CATEGORIAS_POR_DEFECTO: readonly Categoria[] = ['en_curso', 'revision', 'hecho']
 
 /** Qué se le pide al conector en una consulta: a quién y desde cuándo (YYYY-MM-DD). Los propios van siempre. */
 export interface AlcanceLista {
@@ -62,7 +59,8 @@ export function estadosValidos(raw: unknown, conocidas: readonly string[]): stri
   return out
 }
 
-export const estadosPorDefecto = (def: ConectorDef): string[] => def.estados.filter((e) => CATEGORIAS_POR_DEFECTO.includes(e.categoria)).map((e) => e.clave)
+/** Sin elegir se ven todos los estados: lo abierto, sea cual sea, y lo terminado dentro de la ventana. Los atajos son para acotar. */
+export const estadosPorDefecto = (def: ConectorDef): string[] => def.estados.map((e) => e.clave)
 
 /** Lo guardado con los valores por defecto resueltos y lo que ya no sirve (estados que el conector no tiene) descartado. */
 export function filtroDe(c: Pick<TicketsConfig, 'personasElegidas' | 'incluirSinAsignar' | 'estadosElegidos' | 'ventanaDias'>, def: ConectorDef): FiltroVista {
@@ -111,14 +109,16 @@ export function alcanceAPedir(f: FiltroVista, p: PendientesLista, def: ConectorD
   }
 }
 
-/** Lo leído después de una consulta; `todo` reemplaza lo anterior y si no se suma. */
-export function leidoTras(f: FiltroVista, previo: AlcanceLeido | undefined, pedido: AlcanceLista, todo: boolean, def: ConectorDef): AlcanceLeido {
+/** Lo leído después de una consulta; `todo` reemplaza lo anterior y si no se suma. La ventana guardada es la más corta que se trajo: lo de antes no se vuelve a leer más largo. */
+export function leidoTras(f: FiltroVista, previo: AlcanceLeido | undefined, pedido: AlcanceLista, todo: boolean, def: ConectorDef, noLeidos = 0): AlcanceLeido {
   const base = todo || !previo ? { personas: [], sinAsignar: false } : previo
+  const sinLeer = (todo || !previo ? 0 : (previo.noLeidos ?? 0)) + noLeidos
   return {
     personas: [...new Set([...base.personas, ...pedido.personas])],
     sinAsignar: base.sinAsignar || pedido.sinAsignar,
     hechos: hayHechos(f, def) && (todo || !previo ? pedido.hechos : previo.hechos),
-    ventanaDias: todo || !previo ? f.ventanaDias : Math.max(previo.ventanaDias, f.ventanaDias)
+    ventanaDias: todo || !previo ? f.ventanaDias : Math.min(previo.ventanaDias, f.ventanaDias),
+    ...(sinLeer > 0 ? { noLeidos: sinLeer } : {})
   }
 }
 
@@ -140,6 +140,14 @@ function dentroDelAlcance(t: Ticket, f: FiltroVista, me: Yo | undefined): boolea
   return t.responsableId !== undefined && f.personasElegidas.includes(t.responsableId)
 }
 
+/** Lo mío que está abierto no lo oculta nunca el filtro de estados: es lo que la persona tiene que hacer. */
+const abiertoMio = (t: Ticket, me: Yo | undefined, def: ConectorDef): boolean => esMio(me, t) && !esHecho(t, def)
+
+/** Un estado que el conector no conoce no se puede elegir ni descartar en el filtro: pasa. */
+function estadoPasa(t: Ticket, f: FiltroVista, def: ConectorDef): boolean {
+  return t.estado === undefined || f.estadosElegidos.includes(t.estado) || !def.estados.some((e) => e.clave === t.estado)
+}
+
 /** La ventana corta solo lo terminado: lo abierto, de quien sea, se ve siempre. Sin fecha válida no se descarta. */
 function dentroDeLaVentana(t: Ticket, f: FiltroVista, def: ConectorDef, ahora: number): boolean {
   if (!esHecho(t, def)) return true
@@ -148,9 +156,12 @@ function dentroDeLaVentana(t: Ticket, f: FiltroVista, def: ConectorDef, ahora: n
 }
 
 export function visibles(tickets: readonly Ticket[], f: FiltroVista, me: Yo | undefined, def: ConectorDef, ahora: number): Ticket[] {
-  return tickets.filter(
-    (t) => dentroDelAlcance(t, f, me) && dentroDeLaVentana(t, f, def, ahora) && (t.estado === undefined || f.estadosElegidos.includes(t.estado))
-  )
+  return tickets.filter((t) => dentroDelAlcance(t, f, me) && dentroDeLaVentana(t, f, def, ahora) && (abiertoMio(t, me, def) || estadoPasa(t, f, def)))
+}
+
+/** Lo que ve Equipo: todo lo abierto de lo elegido, sin pasar por el filtro de estados, y lo terminado dentro de la ventana. */
+export function paraEquipo(tickets: readonly Ticket[], f: FiltroVista, me: Yo | undefined, def: ConectorDef, ahora: number): Ticket[] {
+  return tickets.filter((t) => dentroDelAlcance(t, f, me) && dentroDeLaVentana(t, f, def, ahora))
 }
 
 export function conteos(tickets: readonly Ticket[], f: FiltroVista, me: Yo | undefined, def: ConectorDef, ahora: number): ConteosTickets {
@@ -161,7 +172,7 @@ export function conteos(tickets: readonly Ticket[], f: FiltroVista, me: Yo | und
   for (const t of tickets) {
     const enAlcance = dentroDelAlcance(t, f, me)
     const enVentana = dentroDeLaVentana(t, f, def, ahora)
-    const enEstado = t.estado === undefined || f.estadosElegidos.includes(t.estado)
+    const enEstado = abiertoMio(t, me, def) || estadoPasa(t, f, def)
     if (enAlcance && enVentana && t.estado !== undefined) porEstado[t.estado] = (porEstado[t.estado] ?? 0) + 1
     if (enAlcance && enVentana && enEstado) {
       const quien = esMio(me, t) && me?.id ? me.id : t.responsable ? (t.responsableId ?? t.responsable) : SIN_ASIGNAR

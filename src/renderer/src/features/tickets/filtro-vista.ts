@@ -48,8 +48,12 @@ export function atajosDe(estados: readonly Estado[]): Atajo[] {
 
 export const atajoActivo = (a: Atajo, elegidos: readonly string[]): boolean => a.claves.every((c) => elegidos.includes(c))
 
-/** Prende o apaga todos los estados de un atajo; null si dejaría el filtro sin ningún estado. */
-export function alternarAtajo(a: Atajo, elegidos: readonly string[]): string[] | null {
+/** Todos los estados elegidos: es el valor por defecto, y los atajos sirven para acotarlo. */
+export const todosLosEstados = (estados: readonly Estado[], elegidos: readonly string[]): boolean => estados.every((e) => elegidos.includes(e.clave))
+
+/** Prende o apaga todos los estados de un atajo; con todos elegidos, acota a ese atajo. Null si dejaría el filtro sin ningún estado. */
+export function alternarAtajo(a: Atajo, elegidos: readonly string[], todos = false): string[] | null {
+  if (todos) return [...a.claves]
   const sigue = atajoActivo(a, elegidos) ? elegidos.filter((c) => !a.claves.includes(c)) : [...new Set([...elegidos, ...a.claves])]
   return sigue.length ? sigue : null
 }
@@ -134,6 +138,8 @@ export function resumenFiltro(f: FiltroVista, personas: readonly PersonaEquipo[]
   if (nombres.length <= 2) quien.push(...nombres)
   else quien.push(nombres[0]!, `${nombres.length - 1} más`)
   if (f.incluirSinAsignar) quien.push('sin asignar')
+  const ventana = tieneHechos(estados, f.estadosElegidos) ? ` · terminados de los últimos ${f.ventanaDias} ${f.ventanaDias === 1 ? 'día' : 'días'}` : ''
+  if (todosLosEstados(estados, f.estadosElegidos)) return `${quien.join(', ')} · todo lo abierto${ventana}`
   const atajos = atajosDe(estados)
   const cubiertas = new Set<string>()
   const que: string[] = []
@@ -144,7 +150,6 @@ export function resumenFiltro(f: FiltroVista, personas: readonly PersonaEquipo[]
   }
   for (const c of f.estadosElegidos) if (!cubiertas.has(c)) que.push(estados.find((e) => e.clave === c)?.nombre ?? c)
   const estadosTxt = que.length > 3 ? `${que.slice(0, 3).join(', ')} y ${que.length - 3} más` : que.join(', ')
-  const ventana = tieneHechos(estados, f.estadosElegidos) ? ` · terminados de los últimos ${f.ventanaDias} ${f.ventanaDias === 1 ? 'día' : 'días'}` : ''
   return `${quien.join(', ')} · ${estadosTxt}${ventana}`
 }
 
@@ -156,6 +161,12 @@ export function textoFaltante(p: PendientesLista, f: FiltroVista, personas: read
     n === 1 ? nombreSeguro(personas?.find((x) => x.id === p.personas[0])?.nombre ?? 'una persona', 30) : n > 1 ? `${n} personas` : ''
   const sin = p.sinAsignar ? 'los sin asignar' : ''
   return `Todavía no se trajeron los tickets de ${[quien, sin].filter(Boolean).join(' ni de ')}.`
+}
+
+/** Cuando la lectura se topó con un tope: lo que se ve no es todo lo que hay. */
+export function textoNoLeidos(noLeidos: number, mostrando: number): string {
+  const mas = noLeidos === 1 ? '1 ticket más' : `${noLeidos} tickets más`
+  return `Hay al menos ${mas} que no se trajeron: se muestran ${mostrando}. Sacá personas del filtro o acortá la ventana de terminados para ver el resto.`
 }
 
 export const hayFaltante = (p: PendientesLista | undefined): p is PendientesLista => p !== undefined && (p.todo || p.personas.length > 0 || p.sinAsignar)

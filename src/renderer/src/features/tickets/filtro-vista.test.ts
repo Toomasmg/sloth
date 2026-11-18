@@ -16,7 +16,9 @@ import {
   opcionesVentana,
   ordenarPorGrupo,
   resumenFiltro,
-  textoFaltante
+  textoFaltante,
+  textoNoLeidos,
+  todosLosEstados
 } from './filtro-vista'
 
 const ESTADOS: Estado[] = gruv.estados
@@ -129,4 +131,23 @@ test('lo que falta traer se dice en una frase y se detecta', () => {
 test('las opciones de ventana incluyen la que ya está guardada', () => {
   assert.deepEqual(opcionesVentana(4), [1, 2, 4, 7, 14])
   assert.deepEqual(opcionesVentana(3), [1, 2, 3, 4, 7, 14])
+})
+
+const TODOS = ESTADOS.map((e) => e.clave)
+
+test('con todos los estados (el valor por defecto) el resumen lo dice y los atajos acotan en vez de apagarse', () => {
+  assert.equal(todosLosEstados(ESTADOS, TODOS), true)
+  assert.equal(todosLosEstados(ESTADOS, ['en_curso', 'cerrado']), false)
+  assert.equal(resumenFiltro(F({ estadosElegidos: TODOS }), PERSONAS, ESTADOS), 'vos · todo lo abierto · terminados de los últimos 4 días')
+  assert.equal(resumenFiltro(F({ estadosElegidos: TODOS.filter((c) => c !== 'cerrado') }), PERSONAS, ESTADOS), 'vos · En curso, Revisión / QA, Abierto y 2 más')
+  const [curso, revision, hecho] = atajosDe(ESTADOS)
+  assert.deepEqual(alternarAtajo(curso!, TODOS, true), ['en_curso'])
+  assert.deepEqual(alternarAtajo(revision!, TODOS, true), ['en_revision', 'pre_rtd', 'en_qa'])
+  assert.deepEqual(alternarAtajo(hecho!, TODOS, true), ['cerrado'])
+  assert.deepEqual(alternarAtajo(revision!, ['en_curso'], false), ['en_curso', 'en_revision', 'pre_rtd', 'en_qa'])
+})
+
+test('el aviso de lo que no se trajo dice cuánto falta y cuánto se muestra', () => {
+  assert.match(textoNoLeidos(40, 12), /al menos 40 tickets más.*se muestran 12/)
+  assert.match(textoNoLeidos(1, 3), /al menos 1 ticket más/)
 })

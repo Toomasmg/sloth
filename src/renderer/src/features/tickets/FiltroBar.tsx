@@ -16,7 +16,9 @@ import {
   opcionesVentana,
   resumenFiltro,
   textoFaltante,
+  textoNoLeidos,
   tieneHechos,
+  todosLosEstados,
   type Grupo
 } from './filtro-vista'
 import './filtro.css'
@@ -170,6 +172,7 @@ function Estados({ snap, filtro, aplicar }: Pick<Props, 'snap' | 'filtro' | 'apl
   const [nota, setNota] = useState('')
   const estados = snap.conector.estados
   const atajos = atajosDe(estados)
+  const todos = todosLosEstados(estados, filtro.estadosElegidos)
   const porEstado = snap.conteos?.porEstado ?? {}
   const cambiar = (sigue: string[] | null): void => {
     if (!sigue) return setNota('Dejá al menos un estado elegido.')
@@ -180,10 +183,13 @@ function Estados({ snap, filtro, aplicar }: Pick<Props, 'snap' | 'filtro' | 'apl
     <div className="f-tickets-fb-sec">
       <h3 className="f-tickets-fb-h">Estados</h3>
       <div role="group" aria-label="Atajos de estado" className="f-tickets-fb-atajos">
+        <button type="button" className={`f-tickets-chipf f-tickets-fb-atajo ${todos ? 'on' : ''}`} aria-pressed={todos} onClick={() => aplicar({ estadosElegidos: null })}>
+          Todos
+        </button>
         {atajos.map((a) => {
-          const on = atajoActivo(a, filtro.estadosElegidos)
+          const on = !todos && atajoActivo(a, filtro.estadosElegidos)
           return (
-            <button key={a.id} type="button" className={`f-tickets-chipf f-tickets-fb-atajo ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => cambiar(alternarAtajo(a, filtro.estadosElegidos))}>
+            <button key={a.id} type="button" className={`f-tickets-chipf f-tickets-fb-atajo ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => cambiar(alternarAtajo(a, filtro.estadosElegidos, todos))}>
               {a.nombre}
             </button>
           )
@@ -206,6 +212,9 @@ function Estados({ snap, filtro, aplicar }: Pick<Props, 'snap' | 'filtro' | 'apl
           )
         })}
       </div>
+      <p className="f-tickets-fb-ayuda">
+        {todos ? 'Se ve todo lo abierto y lo terminado dentro de la ventana. Los atajos sirven para acotar.' : 'Estás acotando por estado.'} Lo tuyo que está abierto se ve siempre.
+      </p>
       {nota && (
         <p className="f-tickets-fb-aviso" role="alert">
           <WarningCircle size={13} weight="fill" aria-hidden="true" /> {nota}
@@ -286,6 +295,11 @@ export function FiltroBar(props: Props): React.JSX.Element {
           )}
         </p>
       )}
+      {snap.conteos?.noLeidos ? (
+        <p className="f-tickets-fb-aviso" role="status">
+          <WarningCircle size={13} weight="fill" aria-hidden="true" /> <span>{textoNoLeidos(snap.conteos.noLeidos, snap.tickets.length)}</span>
+        </p>
+      ) : null}
       {errores.length > 0 && !running && (
         <p className="f-tickets-fb-aviso f-tickets-fb-errpers" role="alert">
           <WarningCircle size={13} weight="fill" aria-hidden="true" />

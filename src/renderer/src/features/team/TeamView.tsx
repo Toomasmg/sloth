@@ -423,8 +423,7 @@ export function TeamView(): React.JSX.Element {
               Tickets de {n}: los tuyos
               {snap.tickets.filtro.personasElegidas > 0 &&
                 ` y los de ${snap.tickets.filtro.personasElegidas === 1 ? '1 persona elegida' : `${snap.tickets.filtro.personasElegidas} personas elegidas`}`}
-              {snap.tickets.filtro.incluirSinAsignar && ', más los sin asignar'}. Lo terminado, de los últimos {snap.tickets.filtro.ventanaDias}{' '}
-              {snap.tickets.filtro.ventanaDias === 1 ? 'día' : 'días'}.{' '}
+              {snap.tickets.filtro.incluirSinAsignar && ', más los sin asignar'}. Se ve todo lo que tienen en curso, en revisión o bloqueado, sin importar cuándo se creó.{' '}
               <button type="button" className="btn sm ghost" onClick={elegirPersonas}>
                 Elegir personas
               </button>

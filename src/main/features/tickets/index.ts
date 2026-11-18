@@ -33,7 +33,7 @@ import { escribirJsonAtomico } from '../../json-file'
 import { podarSegunStore } from '../../poda'
 import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, ticketId } from './acciones'
 import { PlazoError, runClaude } from './claude-run'
-import { alcanceAPedir, conteos, estadosValidos, filtroDe, leidoTras, mezclar, pendientesDe, personasValidas, sinPendientes, ventanaValida, visibles } from './alcance'
+import { alcanceAPedir, conteos, estadosValidos, filtroDe, leidoTras, mezclar, paraEquipo, pendientesDe, personasValidas, sinPendientes, ventanaValida, visibles } from './alcance'
 import { proveedorExigido } from '../../proveedores'
 import { motorDe } from './motores'
 import { etiquetarAgente, type MotorTickets, type PedidoMotor } from './motor-tickets'
@@ -82,7 +82,8 @@ import {
   type ArchivoPropios,
   type ConectorRegistrado
 } from './propios'
-import { costoValido, diaLocal, lastRunTrasError, leerUso, limitesEfectivos, sumarUso, textoFlagViejo, textoTope, TopeVueltasError, vueltasValidas, type LimitesEfectivos, type UsoCorrida } from './uso'
+import { conReintento as reintentar, type PresupuestoReintento } from './reintento'
+import { COSTO_MIN, costoValido, diaLocal, lastRunTrasError, leerUso, limitesEfectivos, sumarUso, textoFlagViejo, textoTope, TopeVueltasError, vueltasValidas, type LimitesEfectivos, type UsoCorrida } from './uso'
 import { ASSIGNEE_MAX, assigneeValido, conConector, sinLista, type TicketsState } from './estado'
 import { ghAccion, ghDetalle, ghLista, ghYo, repoValido, type GhRun } from './gh'
 import { GitError, run as correr } from '../git-run'
@@ -129,6 +130,8 @@ const DETALLE_TIMEOUT_MS = 90_000
 /** Una lista grande (varias personas, terminados) tarda más que un detalle; el plazo de las demás consultas no cambia. */
 const LISTA_TIMEOUT_MS = 300_000
 const PERSONAS_TIMEOUT_MS = 120_000
+/** Todos los intentos de una consulta juntos no pasan de esto. */
+const REINTENTOS_TOTAL_MS = 300_000
 
 let ctx: FeatureContext
 let state: TicketsState
@@ -402,7 +405,7 @@ function vistaFiltro(def: ConectorDef): Pick<TicketsSnapshot, 'filtro' | 'person
     filtro,
     personas: state.personas,
     personasAt: state.personasAt,
-    conteos: conteos(state.tickets, filtro, state.me, def, Date.now()),
+    conteos: { ...conteos(state.tickets, filtro, state.me, def, Date.now()), ...(state.leido?.noLeidos ? { noLeidos: state.leido.noLeidos } : {}) },
     pendientes: pendientesVista(def)
   }
 }
@@ -481,7 +484,7 @@ export interface TicketsParaEquipo {
   confirmar: boolean
   /** Con gh, la carpeta de cada ticket: el #12 de otro repo es otro ticket. */
   carpetas?: Record<string, string>
-  /** Solo con conectores que filtran por personas: `tickets` ya viene filtrado. */
+  /** Solo con conectores que filtran por personas: `tickets` ya viene acotado a lo elegido, con todo lo abierto (sin pasar por el filtro de estados). */
   filtro?: FiltroVista
   personas?: PersonaEquipo[]
   pendientes?: PendientesLista
@@ -500,7 +503,7 @@ export function ticketsParaEquipo(): TicketsParaEquipo {
   return {
     ...base,
     conector: { id: def.id, nombre: def.nombre, via: def.via },
-    tickets: ticketsVisibles(def),
+    tickets: conFiltro(def) ? paraEquipo(state.tickets, filtroDe(state.config, def), state.me, def, Date.now()) : state.tickets,
     estados: [...porClave.values()],
     fetchedAt: state.fetchedAt,
     fetchedBy: state.fetchedBy,
@@ -761,35 +764,44 @@ function leerLista(def: ConectorMcp, d: ConectorMcp, run: Ejecucion, s: string, 
   const sesion = servidoresDeSalida(s)
   if (sesion) actualizarDesdeInit(run.accountId, sesion, run.sinClaudeAi)
   medirUso(def.id, s, lim)
+  const costo = leerUso(s)?.costUsd
   let r: ResultadoLista
   try {
     r = parseClaudeOutput(d, s, porAlcance)
   } catch (e) {
-    if (e instanceof ConectorFaltaError) throw errorDeSesion(def, problemaEnSesion(def, d.herramientas.prefijo, sesion) ?? { tipo: 'falta' }, run, e.message)
+    if (e instanceof ConectorFaltaError) throw errorDeSesion(def, problemaEnSesion(def, d.herramientas.prefijo, sesion) ?? { tipo: 'falta' }, run, e.message, costo)
     throw e
   }
   if (!r.tickets.length) {
     const p = problemaEnSesion(def, d.herramientas.prefijo, sesion)
-    if (p) throw errorDeSesion(def, p, run, `«${run.label}» no pudo leer ${def.nombre}. Tocá «Volver a revisar».`)
+    if (p) throw errorDeSesion(def, p, run, `«${run.label}» no pudo leer ${def.nombre}. Tocá «Volver a revisar».`, costo)
   }
   return r
 }
 
-const errorDeSesion = (def: ConectorMcp, p: Disponibilidad, run: Ejecucion, porDefecto: string): Error => {
+const errorDeSesion = (def: ConectorMcp, p: Disponibilidad, run: Ejecucion, porDefecto: string, costoUsd?: number): Error => {
   const msg = textoCuenta(def, p, run) ?? porDefecto
-  return p.tipo === 'tiene' && p.estado === 'pending' ? new ServidorPendienteError(msg) : new Error(msg)
+  return p.tipo === 'tiene' && p.estado === 'pending' ? new ServidorPendienteError(msg, costoUsd) : new Error(msg)
 }
 
-/** Si la sesión arrancó antes de que el servidor termine de conectar, se vuelve a intentar (hasta tres veces, cada intento fallido dura unos 7 s y casi no cuesta): sin esto, entre una de cada tres y una de cada dos consultas daba un error engañoso. */
-async function conReintento<T>(corre: () => Promise<T>): Promise<T> {
-  for (let intento = 1; ; intento++) {
-    try {
-      return await corre()
-    } catch (e) {
-      if (!(e instanceof ServidorPendienteError) || intento >= 3) throw e
-    }
-  }
-}
+/**
+ * Si la sesión arrancó antes de que el servidor termine de conectar, se vuelve a intentar (hasta tres veces, cada intento
+ * fallido dura unos 7 s y casi no cuesta): sin esto, entre una de cada tres y una de cada dos consultas daba un error
+ * engañoso. Entre todos los intentos no pasan de 5 minutos ni del tope de costo: cada uno recibe lo que queda.
+ */
+const conReintento = <T>(maxCostUsd: number | undefined, corre: (p: PresupuestoReintento) => Promise<T>): Promise<T> =>
+  reintentar(corre, {
+    intentosMax: 3,
+    tiempoMaxMs: REINTENTOS_TOTAL_MS,
+    minimoMs: 15_000,
+    costoMaxUsd: costoValido(maxCostUsd),
+    minimoUsd: COSTO_MIN,
+    reintentable: (e) => e instanceof ServidorPendienteError,
+    costoDe: (e) => (e instanceof ServidorPendienteError ? e.costoUsd : undefined)
+  })
+
+/** Lo que queda del tope de costo para un intento; sin tope, el de la configuración (que puede no tener). */
+const conRestante = (lim: ReturnType<typeof limites>, p: PresupuestoReintento): ReturnType<typeof limites> => ({ ...lim, maxCostUsd: p.restanteUsd ?? lim.maxCostUsd })
 
 /** Los topes de la config; `maxTurns` pisa el de la config solo para una consulta ya validada. */
 const limites = (maxTurns?: number): { maxTurns?: number; maxCostUsd?: number } => ({
@@ -829,29 +841,31 @@ function ticketsVisibles(def: ConectorDef): Ticket[] {
 /** Las personas se piden aparte y una sola vez; después, a pedido. Solo guarda id y nombre. */
 async function leerPersonas(def: ConectorMcp, d: ConectorMcp, run: Ejecucion, signal: AbortSignal, lim: ReturnType<typeof limites>): Promise<void> {
   const efectivos = limitesEfectivos(lim)
-  const pedido = pedidoPara(run, { tarea: 'personas', def: d, model: state.config.model, ajenos: ajenosDe(run, d), limites: lim })
-  const personas = await conReintento(() => runClaude({
-    ...lanzamiento(run, pedido),
-    ...opcionesMotor(run, pedido),
-    prompt: buildPersonasPrompt(d),
-    cwd: run.cwd,
-    env: { ...run.env, ...run.motor.envExtra(pedido) },
-    quien: def.nombre,
-    timeoutMs: PERSONAS_TIMEOUT_MS,
-    signal,
-    parse: (s) => {
-      const n = run.motor.normalizar(s, pedido)
-      const sesion = servidoresDeSalida(n)
-      if (sesion) actualizarDesdeInit(run.accountId, sesion, run.sinClaudeAi)
-      medirUso(def.id, n, efectivos)
-      try {
-        return parsePersonas(d, n)
-      } catch (e) {
-        if (e instanceof ConectorFaltaError) throw errorDeSesion(def, problemaEnSesion(def, d.herramientas.prefijo, sesion) ?? { tipo: 'falta' }, run, e.message)
-        throw e
+  const personas = await conReintento(lim.maxCostUsd, (p) => {
+    const pedido = pedidoPara(run, { tarea: 'personas', def: d, model: state.config.model, ajenos: ajenosDe(run, d), limites: conRestante(lim, p) })
+    return runClaude({
+      ...lanzamiento(run, pedido),
+      ...opcionesMotor(run, pedido),
+      prompt: buildPersonasPrompt(d),
+      cwd: run.cwd,
+      env: { ...run.env, ...run.motor.envExtra(pedido) },
+      quien: def.nombre,
+      timeoutMs: Math.min(PERSONAS_TIMEOUT_MS, p.restanteMs),
+      signal,
+      parse: (s) => {
+        const n = run.motor.normalizar(s, pedido)
+        const sesion = servidoresDeSalida(n)
+        if (sesion) actualizarDesdeInit(run.accountId, sesion, run.sinClaudeAi)
+        medirUso(def.id, n, efectivos)
+        try {
+          return parsePersonas(d, n)
+        } catch (e) {
+          if (e instanceof ConectorFaltaError) throw errorDeSesion(def, problemaEnSesion(def, d.herramientas.prefijo, sesion) ?? { tipo: 'falta' }, run, e.message, leerUso(n)?.costUsd)
+          throw e
+        }
       }
-    }
-  }))
+    })
+  })
   if (!personas.length) throw new Error(`${def.nombre} no devolvió personas. Probá de nuevo.`)
   state.personas = personas
   state.personasAt = Date.now()
@@ -908,24 +922,24 @@ async function refresh(rawAccount: unknown, rawVueltas?: unknown, rawModo?: unkn
             if (!ac.signal.aborted) ctx.log(`tickets: no pude leer las personas de ${def.nombre}: ${(e as Error).message}`)
           })
         : undefined
-    const pedido = pedidoPara(run, { tarea: 'lista', def: d, model: state.config.model, ajenos: ajenosDe(run, d), limites: lim })
-    const r = await conReintento(() =>
-      runClaude({
+    const r = await conReintento(lim.maxCostUsd, (p) => {
+      const pedido = pedidoPara(run, { tarea: 'lista', def: d, model: state.config.model, ajenos: ajenosDe(run, d), limites: conRestante(lim, p) })
+      return runClaude({
         ...lanzamiento(run, pedido),
         ...opcionesMotor(run, pedido),
         prompt: buildPrompt(d, state.config.assigneeId, alcance),
         cwd: run.cwd,
         env: { ...run.env, ...run.motor.envExtra(pedido) },
         quien: def.nombre,
-        timeoutMs: LISTA_TIMEOUT_MS,
+        timeoutMs: Math.min(LISTA_TIMEOUT_MS, p.restanteMs),
         signal: ac.signal,
         parse: (s) => leerLista(def, d, run, run.motor.normalizar(s, pedido), efectivos, porAlcance)
       })
-    )
+    })
     await personasListas
     if (r.me) state.me = r.me
     state.tickets = alcance ? mezclar(state.tickets, r.tickets, alcance, state.me, todo) : r.tickets
-    if (alcance) state.leido = leidoTras(filtro, state.leido, alcance, todo, d)
+    if (alcance) state.leido = leidoTras(filtro, state.leido, alcance, todo, d, r.noLeidos)
     detalles.clear()
     if (r.estados?.length) state.estados = r.estados
     state.fetchedAt = Date.now()

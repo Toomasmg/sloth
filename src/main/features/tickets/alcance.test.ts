@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import type { AlcanceLeido, Ticket } from '../../../shared/tickets'
 import { conectorPorId } from './conectores'
 import type { ConectorMcp } from './conector'
-import { alcanceAPedir, conteos, diaDesde, estadosPorDefecto, estadosValidos, fechaValida, filtroDe, leidoTras, mezclar, pendientesDe, personasValidas, sinPendientes, ventanaValida, visibles } from './alcance'
+import { alcanceAPedir, conteos, diaDesde, estadosPorDefecto, estadosValidos, fechaValida, filtroDe, leidoTras, mezclar, paraEquipo, pendientesDe, personasValidas, sinPendientes, ventanaValida, visibles } from './alcance'
 
 const GRUV = conectorPorId('gruv') as ConectorMcp
 const AHORA = Date.parse('2026-11-18T15:00:00Z')
@@ -15,8 +15,8 @@ const mio = (id: string, o: Partial<Ticket> = {}): Ticket => t(id, { responsable
 const de = (id: string, persona: string, o: Partial<Ticket> = {}): Ticket => t(id, { responsable: persona, responsableId: `u-${persona}`, ...o })
 const F = (o: Parameters<typeof filtroDe>[0] = {}): ReturnType<typeof filtroDe> => filtroDe(o, GRUV)
 
-test('sin elegir, se ve en curso, revisión/QA y terminado, con 4 días', () => {
-  assert.deepEqual(estadosPorDefecto(GRUV), ['en_curso', 'en_revision', 'pre_rtd', 'en_qa', 'cerrado'])
+test('sin elegir, se ven todos los estados (lo abierto, sea cual sea, y lo terminado) con 4 días de ventana', () => {
+  assert.deepEqual(estadosPorDefecto(GRUV), ['abierto', 'en_curso', 'bloqueado', 'en_revision', 'pre_rtd', 'en_qa', 'rechazado', 'cerrado'])
   assert.deepEqual(F(), { personasElegidas: [], incluirSinAsignar: false, estadosElegidos: estadosPorDefecto(GRUV), ventanaDias: 4 })
   assert.deepEqual(F({ estadosElegidos: ['bloqueado', 'zzz'], ventanaDias: 9 }).estadosElegidos, ['bloqueado'])
 })
@@ -56,11 +56,61 @@ test('lo abierto se ve siempre, de quien sea; lo terminado, solo dentro de la ve
   assert.deepEqual(visibles(ts, f, YO, GRUV, AHORA).map((x) => x.id), ['M-VIEJO', 'M-CERRADO', 'T-VIEJO', 'T-NUEVO', 'T-CERRADO', 'T-SIN-FECHA'])
 })
 
-test('sin asignar solo si se pide, y el estado filtra', () => {
-  const ts = [t('S', { fecha: iso(1) }), mio('M', { estado: 'bloqueado' }), mio('E', { estado: 'en_qa' })]
-  assert.deepEqual(visibles(ts, F(), YO, GRUV, AHORA).map((x) => x.id), ['E'])
-  assert.deepEqual(visibles(ts, F({ incluirSinAsignar: true }), YO, GRUV, AHORA).map((x) => x.id), ['S', 'E'])
-  assert.deepEqual(visibles(ts, F({ estadosElegidos: ['bloqueado'] }), YO, GRUV, AHORA).map((x) => x.id), ['M'])
+test('sin asignar solo si se pide, y el estado filtra lo de los demás', () => {
+  const ts = [t('S', { fecha: iso(1) }), de('B', 'Mateo', { estado: 'bloqueado' }), de('E', 'Mateo', { estado: 'en_qa' })]
+  const f = { personasElegidas: ['u-Mateo'] }
+  assert.deepEqual(visibles(ts, F(f), YO, GRUV, AHORA).map((x) => x.id), ['B', 'E'])
+  assert.deepEqual(visibles(ts, F({ ...f, incluirSinAsignar: true }), YO, GRUV, AHORA).map((x) => x.id), ['S', 'B', 'E'])
+  assert.deepEqual(visibles(ts, F({ ...f, estadosElegidos: ['en_qa'] }), YO, GRUV, AHORA).map((x) => x.id), ['E'])
+})
+
+test('por defecto se ve todo lo abierto: abierto, bloqueado y rechazado, míos y de las personas elegidas', () => {
+  const ts = [
+    ...['abierto', 'en_curso', 'bloqueado', 'en_revision', 'pre_rtd', 'en_qa', 'rechazado'].map((e) => mio(`M-${e}`, { estado: e })),
+    ...['abierto', 'bloqueado', 'rechazado'].map((e) => de(`T-${e}`, 'Mateo', { estado: e }))
+  ]
+  assert.equal(visibles(ts, F({ personasElegidas: ['u-Mateo'] }), YO, GRUV, AHORA).length, ts.length)
+  assert.equal(visibles(ts, F(), YO, GRUV, AHORA).length, 7)
+})
+
+test('lo mío abierto no lo oculta nunca el filtro de estados; lo mío terminado sí pasa por el filtro y la ventana', () => {
+  const ts = [
+    mio('A', { estado: 'abierto' }),
+    mio('B', { estado: 'bloqueado' }),
+    mio('C', { estado: 'cerrado', fecha: iso(1) }),
+    mio('D', { estado: 'cerrado', fecha: iso(9) }),
+    de('X', 'Mateo', { estado: 'abierto' })
+  ]
+  const solo = F({ personasElegidas: ['u-Mateo'], estadosElegidos: ['en_curso'] })
+  assert.deepEqual(visibles(ts, solo, YO, GRUV, AHORA).map((x) => x.id), ['A', 'B'])
+  assert.deepEqual(visibles(ts, F({ personasElegidas: ['u-Mateo'], estadosElegidos: ['en_curso', 'cerrado'] }), YO, GRUV, AHORA).map((x) => x.id), ['A', 'B', 'C'])
+  assert.equal(conteos(ts, solo, YO, GRUV, AHORA).porPersona['u-yo'], 2)
+})
+
+test('un estado que el conector no conoce no se puede descartar con el filtro', () => {
+  const ts = [mio('A', { estado: 'nuevo' }), de('B', 'Mateo', { estado: 'nuevo' }), de('C', 'Mateo', { estado: 'en_qa' })]
+  assert.deepEqual(visibles(ts, F({ personasElegidas: ['u-Mateo'], estadosElegidos: ['en_curso'] }), YO, GRUV, AHORA).map((x) => x.id), ['A', 'B'])
+})
+
+test('Equipo recibe todo lo abierto de lo elegido sin pasar por el filtro de estados, y lo terminado dentro de la ventana', () => {
+  const ts = [
+    mio('M', { estado: 'bloqueado' }),
+    de('T1', 'Mateo', { estado: 'bloqueado' }),
+    de('T2', 'Mateo', { estado: 'en_revision', fecha: iso(30) }),
+    de('T3', 'Mateo', { estado: 'cerrado', fecha: iso(1) }),
+    de('T4', 'Mateo', { estado: 'cerrado', fecha: iso(8) }),
+    de('OTRO', 'Lola', { estado: 'bloqueado' })
+  ]
+  const f = F({ personasElegidas: ['u-Mateo'], estadosElegidos: ['en_curso'] })
+  assert.deepEqual(paraEquipo(ts, f, YO, GRUV, AHORA).map((x) => x.id), ['M', 'T1', 'T2', 'T3'])
+  assert.deepEqual(visibles(ts, f, YO, GRUV, AHORA).map((x) => x.id), ['M'])
+})
+
+test('el contador de lo mío cuenta lo mismo que el tablero con los estados por defecto', () => {
+  const ts = [mio('A', { estado: 'abierto' }), mio('B', { estado: 'en_curso' }), mio('C', { estado: 'rechazado' })]
+  const vistos = visibles(ts, F(), YO, GRUV, AHORA)
+  assert.equal(vistos.length, 3)
+  assert.equal(conteos(ts, F(), YO, GRUV, AHORA).porPersona['u-yo'], vistos.length)
 })
 
 test('sin saber quién sos, solo se ve lo de las personas elegidas', () => {
@@ -72,9 +122,9 @@ test('conteos por persona, por estado, ocultos y sin fecha', () => {
   const f = F({ personasElegidas: ['u-Mateo'], incluirSinAsignar: true })
   const ts = [mio('A'), mio('B', { estado: 'en_qa', fecha: iso(1) }), de('C', 'Mateo', { fecha: iso(1) }), t('D'), de('E', 'Lola'), de('F', 'Mateo', { estado: 'abierto', fecha: iso(1) })]
   const c = conteos(ts, f, YO, GRUV, AHORA)
-  assert.deepEqual(c.porPersona, { 'u-yo': 2, 'u-Mateo': 1, sin_asignar: 1 })
+  assert.deepEqual(c.porPersona, { 'u-yo': 2, 'u-Mateo': 2, sin_asignar: 1 })
   assert.deepEqual(c.porEstado, { en_curso: 3, en_qa: 1, abierto: 1 })
-  assert.equal(c.ocultos, 2)
+  assert.equal(c.ocultos, 1)
   assert.equal(c.sinFecha, 2)
 })
 
@@ -102,6 +152,28 @@ test('lo que se pide: solo lo pendiente, o todo si se actualiza', () => {
   const pedido = alcanceAPedir(f, p, GRUV, AHORA, YO, false)
   assert.deepEqual(leidoTras(f, leido, pedido, false, GRUV), { personas: ['u-Mateo', 'u-Lola'], sinAsignar: true, hechos: true, ventanaDias: 4 })
   assert.deepEqual(leidoTras(f, leido, alcanceAPedir(f, p, GRUV, AHORA, YO, true), true, GRUV).personas, ['u-Mateo', 'u-Lola'])
+})
+
+test('una lectura parcial con ventana más corta guarda la ventana que trajo, y alargarla después vuelve a pedir los terminados', () => {
+  const leido: AlcanceLeido = { personas: ['u-Mateo'], sinAsignar: false, hechos: true, ventanaDias: 14 }
+  const corta = F({ personasElegidas: ['u-Mateo', 'u-Lola'], ventanaDias: 4 })
+  const pedido = alcanceAPedir(corta, pendientesDe(corta, leido, GRUV, YO), GRUV, AHORA, YO, false)
+  assert.deepEqual(pedido.personas, ['u-Lola'])
+  assert.equal(pedido.desde, '2026-11-14')
+  const tras = leidoTras(corta, leido, pedido, false, GRUV)
+  assert.equal(tras.ventanaDias, 4)
+  assert.equal(pendientesDe(F({ personasElegidas: ['u-Mateo', 'u-Lola'], ventanaDias: 14 }), tras, GRUV, YO).todo, true)
+  assert.equal(pendientesDe(F({ personasElegidas: ['u-Mateo', 'u-Lola'], ventanaDias: 4 }), tras, GRUV, YO).todo, false)
+})
+
+test('lo que no se trajo por un tope se acumula en lo parcial y se reemplaza al leer todo', () => {
+  const f = F({ personasElegidas: ['u-Mateo'] })
+  const pedido = { personas: ['u-Mateo'], sinAsignar: false, hechos: true, desde: '2026-11-14' }
+  const uno = leidoTras(f, undefined, pedido, true, GRUV, 30)
+  assert.equal(uno.noLeidos, 30)
+  assert.equal(leidoTras(f, uno, pedido, false, GRUV, 5).noLeidos, 35)
+  assert.equal(leidoTras(f, uno, pedido, true, GRUV, 0).noLeidos, undefined)
+  assert.equal(leidoTras(f, undefined, pedido, true, GRUV).noLeidos, undefined)
 })
 
 test('mezclar: lo releído reemplaza a lo viejo y lo demás queda', () => {
