@@ -6,7 +6,7 @@ import { homedir, totalmem } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { Store } from './store'
-import { accountStatus, createAccount } from './accounts'
+import { accountStatus, createAccount, motivoNoAgregarCuenta } from './accounts'
 import { hayNode, installInto, notifyScriptPath, stateForEvent, writeHookScript, type HookEventPayload } from './hooks'
 import { esFalsoFinal, pendientes, registrar as registrarFondo, venceEn, type Fondo } from './segundo-plano-core'
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
@@ -18,12 +18,13 @@ import { marcarCrashPrevio } from './diag/estado'
 import { cerrarSesion, iniciarSesion } from './sesion-marcador'
 import { textoSeguro } from './diag/texto-seguro'
 import { argvPanelCuenta, armarEnvCuenta, proveedorDe, proveedorExigido, type Proveedor } from './proveedores'
-import { NOMBRE_PROVEEDOR, capacidadesDe, esProveedorId, motivoSinCapacidad } from '../shared/proveedores'
+import { NOMBRE_PROVEEDOR, capacidadesDe, esProveedorId, motivoNoAgregar, motivoSinCapacidad } from '../shared/proveedores'
 import { lectorLimites, limitesDeCuenta } from './codex-limites'
 import type { LecturaLimitesCodex } from '../shared/celular'
 import { avisarNotify, desinstalarNotify, prepararNotify } from './codex-notify'
 import { entornoDeTerminal } from './hook-env-core'
-import { detectarAgentes } from './agentes'
+import { detectarAgentes, powerShell7Disponible } from './agentes'
+import { AVISO_POWERSHELL_7 } from './copilot-exe'
 import { initialPromptProblem } from '../shared/initial-prompt'
 import { nextAgentState, salidaDeDoneSinHooks, type AgentInput } from './agent-machine'
 import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
@@ -510,10 +511,13 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
 
   handle('accounts:agentes', () => detectarAgentes())
 
-  handle('accounts:add', (_e, label: unknown, proveedor?: unknown) => {
+  handle('accounts:add', async (_e, label: unknown, proveedor?: unknown) => {
     if (typeof label !== 'string' || label.length > 80) throw new Error('El nombre de la cuenta tiene que ser un texto de hasta 80 caracteres.')
     if (proveedor !== undefined && !esProveedorId(proveedor)) throw new Error('Agente inválido.')
     store.exigirEscritura()
+    const motivo = proveedor === undefined ? undefined : motivoNoAgregarCuenta(store.accounts, proveedor)
+    if (motivo) throw new Error(motivo)
+    if (proveedor === 'copilot' && !(await powerShell7Disponible())) throw new Error(AVISO_POWERSHELL_7)
     const nueva = createAccount(label, proveedor)
     const acc = { ...nueva, shareSetup: proveedorExigido(nueva).capacidades.setupCompartido }
     store.addAccount(acc)

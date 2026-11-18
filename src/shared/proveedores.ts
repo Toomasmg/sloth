@@ -1,4 +1,4 @@
-export const PROVEEDORES_IDS = ['claude', 'codex'] as const
+export const PROVEEDORES_IDS = ['claude', 'codex', 'copilot'] as const
 export type ProveedorId = (typeof PROVEEDORES_IDS)[number]
 export const PROVEEDOR_DEFECTO: ProveedorId = 'claude'
 
@@ -63,16 +63,16 @@ const NINGUNA: Capacidades = {
   limitesExperimental: false
 }
 
-export const CAPACIDADES: Record<ProveedorId, Capacidades> = { claude: TODAS, codex: { ...NINGUNA, avisoTurno: true, limitesExperimental: true } }
+export const CAPACIDADES: Record<ProveedorId, Capacidades> = { claude: TODAS, codex: { ...NINGUNA, avisoTurno: true, limitesExperimental: true }, copilot: { ...NINGUNA } }
 
-export const NOMBRE_PROVEEDOR: Record<ProveedorId, string> = { claude: 'Claude Code', codex: 'Codex' }
+export const NOMBRE_PROVEEDOR: Record<ProveedorId, string> = { claude: 'Claude Code', codex: 'Codex', copilot: 'GitHub Copilot' }
 
 export function nombreProveedor(cuenta: { proveedor?: unknown }): string {
   const id = proveedorIdDe(cuenta)
   return id === undefined ? 'Agente desconocido' : NOMBRE_PROVEEDOR[id]
 }
 
-export const ETIQUETA_AGENTE: Record<ProveedorId, string> = { claude: 'Claude', codex: 'Codex' }
+export const ETIQUETA_AGENTE: Record<ProveedorId, string> = { claude: 'Claude', codex: 'Codex', copilot: 'Copilot' }
 
 /** Nombre corto del agente de la cuenta para un texto; 'el agente' si no se conoce. */
 export function agenteDe(cuenta: { proveedor?: unknown }): string {
@@ -128,4 +128,31 @@ export function cuentaSugerida(
   const logueadas = cuentas.filter((c) => conSesion(c.id))
   const pool = [logueadas.filter(conUso), cuentas.filter(conUso), logueadas, cuentas].find((l) => l.length) ?? []
   return [...pool].sort((a, b) => usado5h(a.id) - usado5h(b.id))[0]?.id
+}
+
+MOTIVOS_ESPECIFICOS.copilot = {
+  hooks: 'Con Copilot no hay avisos de permisos desde el celu todavía.',
+  tickets: 'Los tickets todavía solo corren con Claude Code: ni las consultas ni el trabajo por ticket usan cuentas de Copilot.',
+  historial: 'El historial todavía solo lee las conversaciones de Claude Code.',
+  moverCuenta: 'Mover espacios todavía solo anda entre cuentas de Claude Code.',
+  uso: 'Copilot no informa cuánto te queda: Sloth no puede mostrar el uso.',
+  statusline: 'Copilot no ejecuta un comando externo para la barra de estado.',
+  setupCompartido: 'El setup compartido es el de tu carpeta de Claude Code: no aplica a Copilot.',
+  overrideClaude: 'Estos reemplazos de comando son de Claude Code.'
+}
+
+/** Con un login compartido del sistema, dos cuentas de Copilot se pisarían entre sí. */
+export const MAX_CUENTAS: Partial<Record<ProveedorId, number>> = { copilot: 1 }
+
+/**
+ * Por qué no se puede sumar otra cuenta de ese agente, o undefined si se puede. El login del sistema es el mismo
+ * para todos los perfiles: `enOtrosPerfiles` son las cuentas de ese agente que ya hay en los demás.
+ */
+export function motivoNoAgregar(cuentas: readonly { proveedor?: unknown }[], id: ProveedorId, enOtrosPerfiles = 0): string | undefined {
+  const tope = MAX_CUENTAS[id]
+  if (tope === undefined) return undefined
+  const aca = cuentas.filter((c) => proveedorIdDe(c) === id).length
+  if (aca >= tope) return `Ya tenés una cuenta de ${NOMBRE_PROVEEDOR[id]}: su login es del sistema y dos cuentas se pisarían entre sí.`
+  if (aca + enOtrosPerfiles >= tope) return `Ya tenés una cuenta de ${NOMBRE_PROVEEDOR[id]} en otro perfil: su login es del sistema y es el mismo en todos los perfiles.`
+  return undefined
 }

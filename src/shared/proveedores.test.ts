@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { CAPACIDADES, agenteComun, agenteDe, PROVEEDORES_IDS, capacidadesDe, cuentaSugerida, esProveedorId, motivoSinCapacidad, nombreProveedor, proveedorIdDe } from './proveedores'
+import { CAPACIDADES, agenteComun, agenteDe, PROVEEDORES_IDS, capacidadesDe, cuentaSugerida, esProveedorId, motivoNoAgregar, motivoSinCapacidad, nombreProveedor, proveedorIdDe } from './proveedores'
 import type { Capacidades } from './proveedores'
 
 test('proveedorIdDe: ausente es claude y desconocido no es ninguno', () => {
@@ -21,7 +21,7 @@ test('esProveedorId solo acepta ids del registro', () => {
 })
 
 test('capacidades: claude las tiene todas y codex ninguna', () => {
-  assert.deepEqual([...PROVEEDORES_IDS], ['claude', 'codex'])
+  assert.deepEqual([...PROVEEDORES_IDS], ['claude', 'codex', 'copilot'])
   for (const k of Object.keys(CAPACIDADES.claude) as (keyof Capacidades)[]) {
     if (k === 'limitesExperimental' || k === 'avisoTurno') continue
     assert.equal(CAPACIDADES.claude[k], true, `claude ${k}`)
@@ -98,4 +98,27 @@ test('motivoSinCapacidad: motivos permanentes de Codex', () => {
     assert.notEqual(motivoSinCapacidad({ proveedor: 'codex' }, k), 'Codex todavía no soporta esto en Sloth.', k)
     assert.equal(motivoSinCapacidad({}, k), undefined, k)
   }
+})
+
+test('copilot: sin capacidades, con motivos propios y sin compartir el objeto con codex', () => {
+  assert.equal(proveedorIdDe({ proveedor: 'copilot' }), 'copilot')
+  assert.equal(nombreProveedor({ proveedor: 'copilot' }), 'GitHub Copilot')
+  assert.equal(Object.values(capacidadesDe({ proveedor: 'copilot' }) ?? {}).some(Boolean), false)
+  assert.notEqual(CAPACIDADES.copilot, CAPACIDADES.codex)
+  assert.match(motivoSinCapacidad({ proveedor: 'copilot' }, 'tickets') ?? '', /Copilot/)
+  assert.match(motivoSinCapacidad({ proveedor: 'copilot' }, 'uso') ?? '', /no informa cuánto te queda/)
+  assert.equal(motivoSinCapacidad({ proveedor: 'copilot' }, 'dormir'), 'GitHub Copilot todavía no soporta esto en Sloth.')
+})
+
+test('motivoNoAgregar: claude sin tope, copilot una sola cuenta y los desconocidos no cuentan', () => {
+  assert.equal(motivoNoAgregar([{}, {}, {}], 'claude'), undefined)
+  assert.equal(motivoNoAgregar([{}, { proveedor: 'codex' }], 'copilot'), undefined)
+  assert.equal(motivoNoAgregar([{ proveedor: 'otro-agente' }], 'copilot'), undefined)
+  assert.match(motivoNoAgregar([{ proveedor: 'copilot' }], 'copilot') ?? '', /^Ya tenés una cuenta de GitHub Copilot: su login es del sistema/)
+})
+
+test('agenteDe y agenteComun con Copilot', () => {
+  assert.equal(agenteDe({ proveedor: 'copilot' }), 'Copilot')
+  assert.equal(agenteComun([{ proveedor: 'copilot' }, { proveedor: 'copilot' }]), 'Copilot')
+  assert.equal(agenteComun([{ proveedor: 'copilot' }, { proveedor: 'codex' }]), undefined)
 })
