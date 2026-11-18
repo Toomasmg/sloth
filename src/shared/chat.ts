@@ -1,7 +1,7 @@
 /**
  * Chat del equipo (personas, no agentes) sobre el Supabase PROPIO del equipo. v0.5.
  *
- * Arquitectura (ver docs/chat-supabase.md y el PLAN):
+ * Arquitectura (ver docs/chat-equipo.md y el PLAN):
  *  - TODO lo de Supabase (cliente, sesión, realtime) vive en el proceso MAIN
  *    (src/main/features/chat*.ts). El renderer nunca ve tokens: solo estos tipos por `feat:chat:*`.
  *  - Login con GitHub vía Supabase Auth, flujo PKCE: navegador del sistema + callback en un
