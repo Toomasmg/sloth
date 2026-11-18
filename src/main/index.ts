@@ -707,6 +707,7 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     const spec: PtySpec = running ? { cwd: homedir(), env: {} } : specFor(id, b)
     const { spawn, paste } = toSpawnSpec(spec, cols, rows, shellChoice)
     const result = await b.start(id, spawn)
+    tamPc.set(id, { cols, rows })
     const ws = running ? undefined : store.workspace(id)
     if (ws) registrarActividad({ t: Date.now(), tipo: 'espacio', espacio: ws.name })
     if (ws?.initialPrompt && !ws.initialPromptUsed && spec.claude?.includes('--')) {
@@ -722,8 +723,9 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     if (store.workspace(id)) moveAgent(id, 'start')
     return result
   })
-  on('pty:write', (_e, id: unknown, data: unknown) => {
-    if (!idValido(id) || typeof data !== 'string' || esAjena(id)) return
+  // El tamaño que le dio la PC a cada terminal: el celu la muestra igual y, si la achica, después la devuelve a este.
+  const tamPc = new Map<string, { cols: number; rows: number }>()
+  const escribirPty = (id: string, data: string): void => {
     term?.write(id, data)
     for (const l of writeListeners) safe('pty-write', () => l(id, data))
     // Un agente sin hooks (Codex) no manda nada que lo saque de «terminó» al empezar otro turno. Lo que escribís en su
@@ -731,9 +733,15 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     const ws = store.workspace(id)
     const acc = ws && store.account(ws.accountId)
     if (acc && salidaDeDoneSinHooks(agents.get(id)?.state, capacidadesDe(acc)?.hooks !== false, data)) moveAgent(id, { hook: 'idle' })
+  }
+  on('pty:write', (_e, id: unknown, data: unknown) => {
+    if (!idValido(id) || typeof data !== 'string' || esAjena(id)) return
+    escribirPty(id, data)
   })
   on('pty:resize', (_e, id: unknown, cols: unknown, rows: unknown) => {
-    if (idValido(id) && dimValida(cols) && dimValida(rows) && !esAjena(id)) term?.resize(id, cols, rows)
+    if (!idValido(id) || !dimValida(cols) || !dimValida(rows) || esAjena(id)) return
+    tamPc.set(id, { cols, rows })
+    term?.resize(id, cols, rows)
   })
   handle('pty:kill', async (_e, id: unknown) => {
     if (!idValido(id)) throw new Error('Pedido inválido.')
@@ -796,6 +804,13 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
       onPtyData: (cb) => dataListeners.push(cb),
       onPtyExit: (cb) => exitListeners.push(cb),
       onPtyWrite: (cb) => writeListeners.push(cb),
+      writePty: (id, data) => {
+        if (!esAjena(id)) escribirPty(id, data)
+      },
+      ptySize: (id) => tamPc.get(id) ?? null,
+      resizePty: (id, cols, rows) => {
+        if (!esAjena(id)) term?.resize(id, cols, rows)
+      },
       agents: () => agents,
       setAgent,
       addWorkspace,

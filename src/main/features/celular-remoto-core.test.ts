@@ -34,7 +34,7 @@ test('celuActivo mira los últimos 75 s', () => {
 })
 
 test('huella ignora ahora y ve lo demás', () => {
-  const e: EstadoCelular = { ahora: 1, aprobar: false, cuentas: [], sesiones: [], pedidos: [] }
+  const e: EstadoCelular = { ahora: 1, aprobar: false, terminal: false, cuentas: [], sesiones: [], pedidos: [] }
   assert.equal(huella(e), huella({ ...e, ahora: 2 }))
   assert.notEqual(huella(e), huella({ ...e, aprobar: true }))
 })

@@ -187,6 +187,12 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
             <p className={v.aprobar ? 'f-cel-aviso' : 'f-cel-nota'}>
               Cualquiera con el QR (o la clave) podría aprobar comandos de Claude. Prendelo solo en una red de confianza. Apagado, el celu muestra el pedido pero lo respondés en la PC.
             </p>
+            <Switch checked={v.terminal} onChange={(on) => void hacer('terminal', on)}>
+              Abrir las terminales desde el celu
+            </Switch>
+            <p className={v.terminal ? 'f-cel-aviso' : 'f-cel-nota'}>
+              Desde el celu vas a poder ver la terminal de cada espacio y escribir en ella como si estuvieras en la PC. Quien tenga el QR (o la clave) puede correr cualquier comando en esta PC. Solo anda en el Wi-Fi de casa, no en «Desde cualquier red».
+            </p>
             <p className="f-cel-aviso" role="note">
               Lo que va entre el celu y la PC viaja cifrado en tu Wi-Fi, con una clave que está solo en el QR. Aun así la página no puede verificarse: alguien que manipule tu red a propósito podría robarte la clave. Usalo en una red propia; en una pública, de hotel o compartida, usá «Desde cualquier red», que va cifrado de punta a punta.
             </p>

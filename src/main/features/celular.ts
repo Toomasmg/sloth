@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
 import { networkInterfaces } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import type { PendingPermission } from '../daemon-client'
 import type { HookEventPayload } from '../hooks'
@@ -14,6 +14,7 @@ import { agenteDe, capacidadesDe } from '../../shared/proveedores'
 import { limitesDeCuenta } from '../codex-limites'
 import { armarEstado, claveValida, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type TipoAviso } from './celular-core'
 import { crearFuenteWifi, type FuenteDeEstado, type ProveedorDeEstado } from './celular-servidor'
+import { nuevoVisor, ponerFoto, salidaDesde, sumarSalida, tamanoActual, vencidos, type Visor } from './celular-terminal-core'
 import { crearFuenteRemota, type CambioRemoto } from './celular-remoto'
 import { sesionChat } from './chat'
 import { kindOf, labelOf } from '../../shared/permissions-core'
@@ -36,6 +37,8 @@ interface Config {
   puerto: number
   clave: string
   aprobar: boolean
+  /** Ver y escribir en las terminales desde el celu (solo en el Wi-Fi). */
+  terminal: boolean
   ntfy: { encendido: boolean; tema: string; servidor: string; token?: string; temaRenovado?: boolean }
   remoto: { encendido: boolean; aprobar: boolean; secreto: string }
 }
@@ -47,7 +50,7 @@ const nuevoToken = (): string => randomBytes(32).toString('base64url')
 const nuevoTema = (): string => `sloth-${randomBytes(12).toString('hex')}`
 
 function porDefecto(): Config {
-  return { encendido: false, puerto: PUERTO_POR_DEFECTO, clave: nuevoToken(), aprobar: false, ntfy: { encendido: false, tema: nuevoTema(), servidor: NTFY_POR_DEFECTO }, remoto: { encendido: false, aprobar: false, secreto: nuevoToken() } }
+  return { encendido: false, puerto: PUERTO_POR_DEFECTO, clave: nuevoToken(), aprobar: false, terminal: false, ntfy: { encendido: false, tema: nuevoTema(), servidor: NTFY_POR_DEFECTO }, remoto: { encendido: false, aprobar: false, secreto: nuevoToken() } }
 }
 
 function cargar(): { cfg: Config; claveNueva: boolean } {
@@ -63,6 +66,7 @@ function cargar(): { cfg: Config; claveNueva: boolean } {
     puerto: puertoValido(raw.puerto) ? raw.puerto : base.puerto,
     clave: claveValida(raw.clave) ? raw.clave : base.clave,
     aprobar: raw.aprobar === true,
+    terminal: raw.terminal === true,
     ntfy: {
       encendido: temaOk && raw.ntfy?.encendido === true,
       tema: temaOk ? temaGuardado : base.ntfy.tema,
@@ -111,6 +115,21 @@ const feature: Feature = {
     let remotoEstado: RemotoVista['estado'] = 'apagado'
     let remotoError: string | null = null
     let celuActivo = false
+    const visores = new Map<string, Visor>()
+    let vencedor: NodeJS.Timeout | null = null
+    let xterm: { js: string; css: string } | null | undefined
+
+    const leerXterm = (): { js: string; css: string } | null => {
+      if (xterm !== undefined) return xterm
+      try {
+        const js = require.resolve('@xterm/xterm/lib/xterm.js')
+        xterm = { js: readFileSync(js, 'utf8'), css: readFileSync(join(dirname(js), '../css/xterm.css'), 'utf8') }
+      } catch (e) {
+        ctx.log('no encontré xterm para el celu:', (e as Error).message)
+        xterm = null
+      }
+      return xterm
+    }
 
     const guardar = (): void => {
       try {
@@ -139,6 +158,7 @@ const feature: Feature = {
       puerto: cfg.puerto,
       enlace: fuente && ipServida ? `http://${ipServida}:${cfg.puerto}/#k=${cfg.clave}` : null,
       aprobar: cfg.aprobar,
+      terminal: cfg.terminal,
       ntfy: {
         encendido: cfg.ntfy.encendido,
         tema: cfg.ntfy.tema,
@@ -199,6 +219,7 @@ const feature: Feature = {
         return armarEstado({
           ahora: Date.now(),
           aprobar: cfg.aprobar,
+          terminal: cfg.terminal,
           cuentas: cuentas.map((a) => ({ id: a.id, label: a.label })),
           espacios: ctx.store.workspaces.map((w) => ({ id: w.id, name: w.name, accountId: w.accountId })),
           agentes: ctx.agents(),
@@ -214,8 +235,77 @@ const feature: Feature = {
       },
       puedeAprobar: () => cfg.aprobar,
       clave: () => cfg.clave,
-      icono: leerIcono
+      icono: leerIcono,
+      async terminal(p) {
+        if (!cfg.terminal) return { status: 403, error: 'La terminal desde el celu está apagada en Sloth.' }
+        if (!ctx.store.workspace(p.id)) return { status: 404, error: 'Ese espacio ya no está en la PC.' }
+        const b = await ctx.backend()
+        const viva = b.isRunning(p.id)
+        let v = visores.get(p.id)
+        if (!v && viva) {
+          v = nuevoVisor(Date.now())
+          visores.set(p.id, v)
+          programarVencer()
+          // Corriendo, start devuelve el buffer sin arrancar nada; el spawn vacío hace que, si justo se cerró, falle en vez de abrir otra shell.
+          try {
+            const foto = await b.start(p.id, { file: '', args: [], cwd: '', env: {}, cols: 80, rows: 24 })
+            ponerFoto(v, foto.chunks, foto.upTo)
+          } catch {
+            visores.delete(p.id)
+            v = undefined
+          }
+        }
+        if (v) v.usadoEn = Date.now()
+        if (v && viva && p.escribir) ctx.writePty(p.id, p.escribir)
+        if (v && viva && p.tam) {
+          if (p.tam === 'pc') devolverTamano(p.id, v)
+          else {
+            v.ajustado = p.tam
+            v.pcAlAjustar = ctx.ptySize(p.id)
+            ctx.resizePty(p.id, p.tam.cols, p.tam.rows)
+          }
+        }
+        const tam = tamanoActual(v, ctx.ptySize(p.id))
+        const salida = v ? salidaDesde(v, p.desde) : { reinicio: p.desde !== -1, datos: '', hasta: 0 }
+        return { ...salida, viva: viva && !!v, cols: tam.cols, rows: tam.rows, ajustado: !!v?.ajustado }
+      },
+      xterm: leerXterm
     }
+
+    function devolverTamano(id: string, v: Visor): void {
+      if (!v.ajustado) return
+      v.ajustado = null
+      v.pcAlAjustar = null
+      const pc = ctx.ptySize(id)
+      if (pc) ctx.resizePty(id, pc.cols, pc.rows)
+    }
+
+    function soltarVisores(ids: string[] = [...visores.keys()]): void {
+      for (const id of ids) {
+        const v = visores.get(id)
+        if (v) devolverTamano(id, v)
+        visores.delete(id)
+      }
+      if (!visores.size && vencedor) {
+        clearInterval(vencedor)
+        vencedor = null
+      }
+    }
+
+    function programarVencer(): void {
+      if (vencedor) return
+      vencedor = setInterval(() => soltarVisores(vencidos(visores, Date.now())), 10_000)
+      vencedor.unref()
+    }
+
+    ctx.onPtyData((id, chunks) => {
+      const v = visores.get(id)
+      if (v) sumarSalida(v, chunks)
+    })
+    ctx.onPtyExit((id) => {
+      const v = visores.get(id)
+      if (v) v.ajustado = null
+    })
 
     async function detener(): Promise<void> {
       const f = fuente
@@ -383,9 +473,20 @@ const feature: Feature = {
     })
 
     ctx.handle('regenerar', () => {
+      soltarVisores()
       cfg.clave = nuevoToken()
       guardar()
       ctx.log('clave regenerada: los celus anteriores quedan afuera')
+      avisar()
+      return vista()
+    })
+
+    ctx.handle('terminal', (on: unknown) => {
+      if (typeof on !== 'boolean') throw new Error('Valor inválido.')
+      cfg.terminal = on
+      if (!on) soltarVisores()
+      guardar()
+      ctx.log(`terminal desde el celu ${on ? 'prendida' : 'apagada'}`)
       avisar()
       return vista()
     })
@@ -466,6 +567,7 @@ const feature: Feature = {
     })
 
     detenerTodo = async () => {
+      soltarVisores()
       if (revisor) clearInterval(revisor)
       revisor = null
       await Promise.all([detener(), detenerRemota()])
