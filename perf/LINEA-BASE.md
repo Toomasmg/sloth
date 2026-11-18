@@ -59,3 +59,13 @@ Tablero, N=2000:
 Otra corrida dio 9 ms en los tres casos. Sin el memo (solo el reloj) el re-render quedó en 65/106/98 ms: lo que baja el costo es el memo, y el reloj evita que el tick de expiración renderice la conversación entera.
 
 Decisión: el chat no se virtualiza. Con el re-render por debajo de la meta de 25 ms y el DOM acotado a 300 mensajes por el tope `MAX_CACHED`, la ventana virtual agregaría riesgo (scroll anclado, mensajes en vivo mientras se mira historial, saltos a citas y búsqueda, selección, foco y lectores de pantalla) sin un beneficio medible. Las metas de `[data-mid]` < 100 y nodos < 1000 quedan sin aplicar al chat. Si se sube `MAX_CACHED` o se pagina más historial, se reevalúa con `lib/ventana-virtual.ts`, que ya existe con tests y lo usa el tablero en E-3.
+
+## Tablero después de E-3 (tarjeta en memo, ventana virtual con más de 100 tarjetas)
+
+| N tarjetas | `.f-tickets-row` | nodos totales | primer render (ms) | desde el aviso (ms) | LoAF en el scroll | frame p95 (ms) |
+|---|---|---|---|---|---|---|
+| 50 | 50 (base 50) | 672 (base 672) | 399 (base 387 a 404) | 363 (base 361) | 2 (368 ms) | 215 (arranque en frío, como en la base) |
+| 500 | 12 (base 500) | 217 (base 6072) | 362 (base 559 a 768) | 221 (base 377) | 2 (268 ms) | 18.6 |
+| 2000 | 12 (base 2000) | 217 (base 24072) | 740 (corridas: 739, 783, 899, 1004, 1376; base 1874 a 2378) | 108 (base 1163) | 2 (311 ms; otras corridas 300, 429, 591; base 1328 a 1810) | 17.4 |
+
+La columna «desde el aviso» es lo que tarda la UI desde que le llega `feat:tickets:changed` hasta pintar la primera tarjeta; el «primer render» del banco suma además lo que tarda el propio banco en mandar las 2000 tarjetas por CDP (unos 600 a 700 ms que el código no controla), por eso la meta de 600 ms se juzga con la primera. Con N <= 100 el DOM es idéntico al de antes (50: 672 nodos antes y después) y las capturas de `e2e/` no cambian. El scroll del banco baja de a 800 px por cuadro hasta el final, así que su duración depende de la altura total y no mejora.
