@@ -21,6 +21,7 @@ import { View } from '../../ui/View'
 import { Button, EmptyState } from '../../ui'
 import { TeamIcon } from '../../icons/SlothIcons'
 import { cleanError, fmtTok } from '../../format'
+import { pedirFiltroPersonas } from '../tickets/model'
 import type { Workspace } from '../../../../shared/types'
 import { espacioDelTicket } from '../../../../shared/templates-shared'
 import {
@@ -115,6 +116,10 @@ export function TeamView(): React.JSX.Element {
   const pedirTraer = (): void => {
     if (conector?.via === 'mcp' && snap?.tickets.confirmar) setConfirmar(true)
     else void traer()
+  }
+  const elegirPersonas = (): void => {
+    close()
+    pedirFiltroPersonas()
   }
   const noPreguntar = (checked: boolean): void => {
     ui.invoke('feat:tickets:setConfig', { confirmRefresh: !checked }).catch((e) => setErr(cleanError(e)))
@@ -288,7 +293,13 @@ export function TeamView(): React.JSX.Element {
           <ul className="f-team-list">{p.prs.map(prRow)}</ul>
         </section>
       )}
-      {!p.tickets.length && !p.prs.length && <p className="hint f-team-none">Sin tickets activos ni PRs abiertos.</p>}
+      {!p.tickets.length && !p.prs.length && (
+        <p className="hint f-team-none">
+          {p.idConector && snap.tickets.filtro?.sinTraer.includes(p.idConector)
+            ? `Todavía no se trajeron sus tickets: tocá «Traer de ${n}».`
+            : 'Sin tickets activos ni PRs abiertos.'}
+        </p>
+      )}
     </article>
   )
 
@@ -315,7 +326,7 @@ export function TeamView(): React.JSX.Element {
             {conector &&
               (ticketsRunning ? (
                 <>
-                  <CircleNotch size={12} className="spin" aria-hidden="true" /> Consultando {n}…{conector.via === 'mcp' ? ' (hasta 3 min)' : ''}
+                  <CircleNotch size={12} className="spin" aria-hidden="true" /> Consultando {n}…{conector.via === 'mcp' ? (snap.tickets.filtro ? ' (puede tardar hasta 5 min)' : ' (hasta 3 min)') : ''}
                 </>
               ) : snap.tickets.fetchedAt ? (
                 `${n} ${timeAgo(snap.tickets.fetchedAt)}${snap.tickets.fetchedBy ? ` con ${accLabel(snap.tickets.fetchedBy)}` : ''}${snap.tickets.lastRun?.tokens ? ` (~${fmtTok(snap.tickets.lastRun.tokens)} tokens)` : ''}`
@@ -357,8 +368,9 @@ export function TeamView(): React.JSX.Element {
           <div className="f-team-bar f-team-confirm" role="alertdialog" aria-label={`Confirmar consulta a ${n}`}>
             <WarningCircle size={16} weight="fill" aria-hidden="true" className="f-team-warn" />
             <span>
-              Para leer {n} se abre Claude sin ventana con la cuenta de Tickets (modelo {snap.tickets.model}) y usa tokens de esa cuenta. Trae los tickets
-              de todo el equipo; acá se ven los que están en curso, en revisión y bloqueados. Solo lee: no cambia nada en {n}.
+              Para leer {n} se abre Claude sin ventana con la cuenta de Tickets (modelo {snap.tickets.model}) y usa tokens de esa cuenta. {snap.tickets.filtro
+                ? `Trae los tuyos${snap.tickets.filtro.personasElegidas ? ` y los de ${snap.tickets.filtro.personasElegidas === 1 ? 'la persona' : `las ${snap.tickets.filtro.personasElegidas} personas`} que elegiste en Tickets` : ''}; acá se ven los que están en curso, en revisión y bloqueados. Solo lee: no cambia nada en ${n}.`
+                : `Trae los tickets de todo el equipo; acá se ven los que están en curso, en revisión y bloqueados. Solo lee: no cambia nada en ${n}.`}
             </span>
             <label className="check">
               <input type="checkbox" onChange={(e) => noPreguntar(e.target.checked)} />
@@ -403,6 +415,19 @@ export function TeamView(): React.JSX.Element {
           {info && !err && (
             <p className="f-team-msg f-team-ok" role="status">
               {info}
+            </p>
+          )}
+
+          {conector && snap.tickets.filtro && (
+            <p className="hint f-team-msg f-team-filtro">
+              Tickets de {n}: los tuyos
+              {snap.tickets.filtro.personasElegidas > 0 &&
+                ` y los de ${snap.tickets.filtro.personasElegidas === 1 ? '1 persona elegida' : `${snap.tickets.filtro.personasElegidas} personas elegidas`}`}
+              {snap.tickets.filtro.incluirSinAsignar && ', más los sin asignar'}. Lo terminado, de los últimos {snap.tickets.filtro.ventanaDias}{' '}
+              {snap.tickets.filtro.ventanaDias === 1 ? 'día' : 'días'}.{' '}
+              <button type="button" className="btn sm ghost" onClick={elegirPersonas}>
+                Elegir personas
+              </button>
             </p>
           )}
 
