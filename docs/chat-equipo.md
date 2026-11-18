@@ -108,11 +108,14 @@ Cada línea es un chequeo. Si alguno falla, la tabla dice qué hacer.
 
 | Chequeo | Si falla, qué hacer |
 |---|---|
-| Conexión | La URL está mal escrita o el proyecto está pausado. Revisá la Project URL y, si hace falta, tocá **Restore project** en Supabase. |
-| GitHub habilitado | Falta el paso 3. Activá GitHub en **Authentication → Sign In / Providers**. |
-| Tablas | Falta el SQL del paso 2. Volvé a pegar `supabase/setup.sql` entero. |
-| Funciones | Lo mismo: volvé a pegar `supabase/setup.sql` entero. |
-| Versión del esquema | «Aplicá la migración 0009» significa volver a pegar `supabase/setup.sql` entero. Pasa tras actualizar Sloth. |
+| Servidor | Si dice «Host propio», es un aviso: Sloth le manda la clave pública a ese servidor. Confirmá que es el tuyo. |
+| Conexión | La URL está mal escrita, la clave es otra o el proyecto está pausado. Revisá la Project URL y la clave publishable y, si hace falta, tocá **Restore project** en Supabase. |
+| Login con GitHub | Falta el paso 3. Activá GitHub en **Authentication → Sign In / Providers** y sumá la Redirect URL. |
+| Tablas del chat | Falta el SQL del paso 2. Volvé a pegar `supabase/setup.sql` entero y esperá un minuto. |
+| Funciones del chat | Lo mismo: volvé a pegar `supabase/setup.sql` entero. Si dice «Seguridad», la clave pública pudo ejecutar una función que no debería: pegalo de nuevo. |
+| Versión del esquema | Si falta la migración 0009 o tu esquema es más viejo, volvé a pegar `supabase/setup.sql` entero. Pasa tras actualizar Sloth. Si es más nuevo, actualizá Sloth. |
+
+El chequeo usa solo la clave pública, no escribe nada en tu proyecto y no guarda ni muestra la clave.
 
 ## 5. Invitar a tu equipo
 
