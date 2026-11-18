@@ -11,15 +11,21 @@ interface Sub {
   ultimo: number
 }
 
+/**
+ * `ahora` es un reloj monotónico (performance.now) y decide a quién le toca: si la hora de pared
+ * retrocede o salta no frena a nadie. `epoch` (Date.now) solo alimenta la `marca` que ven los componentes.
+ */
 export function crearReloj(
   ahora: () => number,
+  epoch: () => number,
   programar: (fn: () => void, ms: number) => unknown,
   cancelar: (handle: unknown) => void,
   visible: () => boolean
 ): Reloj {
   const subs = new Set<Sub>()
-  let marca = ahora()
+  let marca = epoch()
   let timer: unknown = null
+  let venceTimer = Infinity
 
   const parar = (): void => {
     if (timer === null) return
@@ -27,20 +33,29 @@ export function crearReloj(
     timer = null
   }
 
+  // El timer sigue al próximo vencimiento real (ultimo + cadaMs), no al período mínimo: cambiar la
+  // lista de suscriptores nunca lo corre hacia adelante. Si queda un timer más temprano que el
+  // necesario, el tick lo reacomoda sin notificar a nadie de más.
   const armar = (): void => {
+    if (subs.size === 0 || !visible()) {
+      parar()
+      return
+    }
+    let vence = Infinity
+    for (const s of subs) vence = Math.min(vence, s.ultimo + s.cadaMs)
+    if (timer !== null && venceTimer <= vence) return
     parar()
-    if (subs.size === 0 || !visible()) return
-    let min = Infinity
-    for (const s of subs) min = Math.min(min, s.cadaMs)
-    timer = programar(tick, min)
+    venceTimer = vence
+    timer = programar(tick, Math.max(0, vence - ahora()))
   }
 
   function tick(): void {
     timer = null
-    marca = ahora()
+    const n = ahora()
+    marca = epoch()
     for (const s of [...subs]) {
-      if (!subs.has(s) || marca - s.ultimo < s.cadaMs) continue
-      s.ultimo = marca
+      if (!subs.has(s) || n - s.ultimo < s.cadaMs) continue
+      s.ultimo = n
       s.cb()
     }
     armar()
@@ -48,13 +63,13 @@ export function crearReloj(
 
   return {
     suscribir(cb, cadaMs) {
-      if (subs.size === 0) marca = ahora()
-      const sub: Sub = { cb, cadaMs, ultimo: marca }
+      if (subs.size === 0) marca = epoch()
+      const sub: Sub = { cb, cadaMs, ultimo: ahora() }
       subs.add(sub)
       armar()
       return () => {
         subs.delete(sub)
-        armar()
+        if (subs.size === 0) parar()
       }
     },
     reanudar() {
@@ -62,12 +77,14 @@ export function crearReloj(
         parar()
         return
       }
-      marca = ahora()
+      marca = epoch()
+      const n = ahora()
       for (const s of [...subs]) {
         if (!subs.has(s)) continue
-        s.ultimo = marca
+        s.ultimo = n
         s.cb()
       }
+      parar()
       armar()
     },
     marca: () => marca

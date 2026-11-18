@@ -2,6 +2,7 @@ import { useCallback, useSyncExternalStore } from 'react'
 import { crearReloj } from './reloj-core'
 
 const reloj = crearReloj(
+  () => performance.now(),
   () => Date.now(),
   (fn, ms) => setTimeout(fn, ms),
   (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
