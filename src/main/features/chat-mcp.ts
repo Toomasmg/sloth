@@ -12,7 +12,7 @@ import { crearAtencion } from './chat-mcp-atencion'
 import { argsAlta, argsBaja, leerRegistro, MCP_SCRIPT_NAME, planificar, type Registro } from './chat-mcp-registro'
 import { CHAT_MCP_SCRIPT } from './chat-mcp-script'
 import { AVISO_PROVEEDOR_DESCONOCIDO, proveedorDe } from '../proveedores'
-import { nombreProveedor } from '../../shared/proveedores'
+import { capacidadesDe, nombreProveedor } from '../../shared/proveedores'
 import { hayNode, writeIfChanged } from '../hooks'
 import { escribirJsonAtomico } from '../json-file'
 import { carpetaFeatures, raizDatos } from '../perfil'
@@ -151,7 +151,7 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
     const p = proveedorDe(acc)
     if (!p) return set('error', AVISO_PROVEEDOR_DESCONOCIDO)
     // Registrar el MCP es escribir el .claude.json de la cuenta: con otro agente no se toca nada.
-    if (!p.capacidades.chatMcp) return set('error', `Esta cuenta es de ${nombreProveedor(acc)}: el chat con MCP todavía no está disponible.`)
+    if (!p.capacidades.chatMcp) return set('no-soportado', `Esta cuenta es de ${nombreProveedor(acc)}: el chat con MCP todavía no está disponible.`)
     const quiere = !baja && debeRegistrar(cfg, acc.id, existentes())
     if (!quiere && invalidarToken(acc.id)) save()
     if (!existsSync(acc.configDir)) return set('error', 'Falta la carpeta de la cuenta.')
@@ -201,7 +201,7 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
     cfg = { ...cfg, cuentas: cfg.cuentas.filter((id) => id !== acc.id), ...sinGrant(cfg, acc.id) }
     save()
     void programar(acc, true).then(() => {
-      if (regs.get(acc.id)?.state !== 'ok') ctx.log('chat-mcp: no se pudo sacar el MCP de la cuenta borrada:', regs.get(acc.id)?.detail ?? '')
+      if (regs.get(acc.id)?.state !== 'ok' && regs.get(acc.id)?.state !== 'no-soportado') ctx.log('chat-mcp: no se pudo sacar el MCP de la cuenta borrada:', regs.get(acc.id)?.detail ?? '')
       regs.delete(acc.id)
       colas.delete(acc.id)
       emitConfig()
@@ -328,6 +328,10 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
 
   ctx.handle('mcpSetAccounts', (raw: unknown): ChatMcpView => {
     const cuentas = validarCuentas(raw, existentes())
+    for (const id of cuentas) {
+      const acc = ctx.store.account(id)
+      if (acc && capacidadesDe(acc)?.chatMcp !== true) throw new Error(`La cuenta «${acc.label}» es de ${nombreProveedor(acc)}: el chat con MCP todavía no está disponible.`)
+    }
     cfg = { ...cfg, cuentas }
     for (const id of Object.keys(cfg.tokens)) if (!cuentas.includes(id)) invalidarToken(id)
     save()

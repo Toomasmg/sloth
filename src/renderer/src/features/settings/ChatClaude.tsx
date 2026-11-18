@@ -22,6 +22,8 @@ function estado(a: ChatMcpAccountReg, elegida: boolean): string {
       return 'No encontré Claude Code en el PATH: no se tocó nada'
     case 'error':
       return a.detail ?? 'No se pudo configurar'
+    case 'no-soportado':
+      return a.detail ?? 'Esta cuenta es de otro agente: el chat con MCP todavía no está disponible'
   }
 }
 
@@ -91,7 +93,7 @@ export function ChatClaudeGroup(): React.JSX.Element {
                     <input
                       type="checkbox"
                       checked={elegida}
-                      disabled={!view.enabled || busy}
+                      disabled={!view.enabled || busy || a.state === 'no-soportado'}
                       onChange={(e) => void run('feat:chat:mcpSetAccounts', alternarCuenta(view.cuentas, a.accountId, e.target.checked))}
                     />
                     <strong>{a.label}</strong>
