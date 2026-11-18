@@ -393,7 +393,7 @@ const feature: Feature = {
         for (const c of parsed.cuentas) {
           if (ctx.store.accounts.some((a) => a.label.trim().toLowerCase() === c.label.trim().toLowerCase())) continue
           try {
-            const acc = { ...createAccount(c.label), shareSetup: c.shareSetup, ...(c.proveedor ? { proveedor: c.proveedor } : {}) }
+            const acc = { ...createAccount(c.label, c.proveedor), shareSetup: c.shareSetup }
             ctx.store.addAccount(acc)
             try {
               ctx.prepareAccount(acc)
