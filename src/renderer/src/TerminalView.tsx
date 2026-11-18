@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useRef } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import type { PtyChunk } from '../../shared/types'
 import { joinPaths } from '../../shared/paste-paths'
 import { api, onPtyData, onPtyExit } from './api'
@@ -8,6 +9,11 @@ import { subscribeSettings, termOptions } from './features/settings/store'
 import { usePaneVisible } from './visibility'
 import { PANES_FIT_EVENT } from './layout/store'
 import { MicDictado } from './features/dictado/MicDictado'
+
+/** window.open con la URL: setWindowOpenHandler (main) la manda al navegador del sistema. */
+function abrirLink(uri: string): void {
+  if (/^https?:\/\//i.test(uri)) window.open(uri)
+}
 
 interface Props {
   id: string
@@ -36,7 +42,10 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
     const term = new Terminal({
       ...opts,
       cursorBlink: opts.cursorBlink && document.visibilityState === 'visible',
-      allowProposedApi: true
+      allowProposedApi: true,
+      // Links OSC 8 (los que arma Claude Code). El handler por defecto de xterm abre una ventana en blanco
+      // y después navega: el main la rechaza por no ser https y el link no abría nada.
+      linkHandler: { activate: (_e, uri) => abrirLink(uri) }
     })
     // Claude Code dibuja su propio cursor en la caja de texto. El cursor real lo vuelve a mostrar ConPTY
     // en cada cuadro, a veces a mitad del redibujo, y salta por la pantalla. Mientras Claude está abierto
@@ -64,6 +73,8 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
+    // URLs sueltas en el texto, sin OSC 8.
+    term.loadAddon(new WebLinksAddon((_e, uri) => abrirLink(uri)))
     term.open(el)
     try {
       fit.fit()
