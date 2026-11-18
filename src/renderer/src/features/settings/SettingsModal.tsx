@@ -6,7 +6,7 @@ import type { SectionId, SettingsTab } from './bus'
 import { NAV, navOf, normalizeTab, searchSettings } from './search'
 import { updateSettings, type SettingsPatch } from './store'
 import { SaveContext, errText, type SaveFn } from './ui'
-import { AboutSection, AccountsSection, AppearanceSection, BackupSection, GeneralSection, NotificationsSection, ShortcutsSection, TeamSection, TemplatesSection, TerminalSection, TicketsSection, UpdatesSection } from './sections'
+import { AboutSection, AccountsSection, AppearanceSection, BackupSection, GeneralSection, NotificationsSection, ShortcutsSection, TeamSection, TemplatesSection, TerminalSection, TicketsSection, UpdatesSection, RendimientoSection } from './sections'
 import { PerfilesSection } from '../perfiles/PerfilesSection'
 
 interface Toast {
@@ -123,6 +123,7 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
                 {sec === 'perfiles' && <PerfilesSection />}
                 {sec === 'apariencia' && <AppearanceSection />}
                 {sec === 'terminal' && <TerminalSection />}
+                {sec === 'rendimiento' && <RendimientoSection />}
                 {sec === 'atajos' && <ShortcutsSection />}
                 {sec === 'notif' && <NotificationsSection onClose={onClose} />}
                 {sec === 'plantillas' && <TemplatesSection />}

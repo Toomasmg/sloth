@@ -41,6 +41,25 @@ export interface NotifySettings {
   soundOut: boolean
 }
 
+/** Tope de las terminales (y de lo que corre en ellas: Claude, builds, tests) en un perfil de energía. */
+export interface PerfilRendimiento {
+  /** RAM máxima entre todas las terminales, en MB. 0 = sin límite. */
+  ramMB: number
+  /** Núcleos lógicos que pueden usar. 0 = todos. */
+  nucleos: number
+}
+
+export interface RendimientoSettings {
+  enchufada: PerfilRendimiento
+  /** Con la notebook a batería: si `bateriaDistinta` está apagado se usa el de enchufada. */
+  bateria: PerfilRendimiento
+  bateriaDistinta: boolean
+}
+
+/** Por debajo de 2 GB Claude se queda sin memoria enseguida: el límite más bajo que se acepta. */
+export const RAM_MB = { min: 2048, max: 1_048_576, step: 512 } as const
+export const NUCLEOS_MAX = 64
+
 /** Opciones de «Dormir espacios inactivos» (minutos; 0 = nunca). */
 export const SLEEP_MINUTES = [0, 15, 30, 60, 120] as const
 export type SleepMinutes = (typeof SLEEP_MINUTES)[number]
@@ -84,6 +103,8 @@ export interface SlothSettings {
   lightMode: boolean
   /** Atajos personalizados: id → combinación canónica («Ctrl Shift K»). Sin entrada = el por defecto. */
   shortcuts: Partial<Record<ShortcutId, string>>
+  /** Límites de RAM y núcleos de las terminales, enchufada y a batería (lo aplica features/rendimiento.ts). */
+  rendimiento: RendimientoSettings
 }
 
 /** Lo que main manda a la interfaz (get, set, reset y el evento «changed»). */
@@ -170,12 +191,13 @@ export const DEFAULT_SETTINGS: SlothSettings = {
   notify: { done: true, perm: true, team: true, soundIn: true, soundOut: true },
   updateChannel: 'estable',
   lightMode: false,
-  shortcuts: {}
+  shortcuts: {},
+  rendimiento: { enchufada: { ramMB: 0, nucleos: 0 }, bateria: { ramMB: 0, nucleos: 0 }, bateriaDistinta: false }
 }
 
 /** Secciones que se pueden restaurar por separado (`reset`). */
-export type SettingsSection = 'apariencia' | 'terminal' | 'cuentas' | 'general' | 'notif' | 'atajos' | 'updates'
-export const SECTIONS: readonly SettingsSection[] = ['apariencia', 'terminal', 'cuentas', 'general', 'notif', 'atajos', 'updates']
+export type SettingsSection = 'apariencia' | 'terminal' | 'cuentas' | 'general' | 'notif' | 'atajos' | 'updates' | 'rendimiento'
+export const SECTIONS: readonly SettingsSection[] = ['apariencia', 'terminal', 'cuentas', 'general', 'notif', 'atajos', 'updates', 'rendimiento']
 
 export const cloneSettings = (s: SlothSettings): SlothSettings => ({
   ...s,
@@ -183,7 +205,8 @@ export const cloneSettings = (s: SlothSettings): SlothSettings => ({
   accountColors: { ...s.accountColors },
   accountPlans: { ...s.accountPlans },
   notify: { ...s.notify },
-  shortcuts: { ...s.shortcuts }
+  shortcuts: { ...s.shortcuts },
+  rendimiento: { ...s.rendimiento, enchufada: { ...s.rendimiento.enchufada }, bateria: { ...s.rendimiento.bateria } }
 })
 
 /* ---------- Atajos: formato canónico «Ctrl Alt Shift Tecla» ---------- */
@@ -262,6 +285,20 @@ function lineHeight(v: unknown): number {
   return r
 }
 
+function ramMB(v: unknown): number {
+  if (v === 0) return 0
+  return intIn(v, RAM_MB.min, RAM_MB.max, 'La RAM máxima (en MB, 0 = sin límite)')
+}
+
+function perfilRendimiento(cur: PerfilRendimiento, v: unknown, where: string): PerfilRendimiento {
+  if (!isObj(v)) throw new Error(`${where} tiene que ser un objeto.`)
+  checkKeys(v, ['ramMB', 'nucleos'], `${where}.`)
+  const out = { ...cur }
+  if ('ramMB' in v) out.ramMB = ramMB(v.ramMB)
+  if ('nucleos' in v) out.nucleos = intIn(v.nucleos, 0, NUCLEOS_MAX, 'Los núcleos (0 = todos)')
+  return out
+}
+
 function planText(v: unknown): string {
   if (typeof v !== 'string') throw new Error('El plan tiene que ser texto.')
   const t = v.trim()
@@ -292,7 +329,7 @@ export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOp
     patch,
     [
       'theme', 'density', 'uiFontSize', 'accent', 'terminal', 'accountColors', 'accountPlans', 'openAtLogin', 'confirmClosePanes',
-      'reopenSpaces', 'keepTerminalsAlive', 'confirmQuit', 'sleepAfterMin', 'editor', 'projectsDir', 'sounds', 'soundName', 'noMolestar', 'notify', 'updateChannel', 'lightMode', 'shortcuts'
+      'reopenSpaces', 'keepTerminalsAlive', 'confirmQuit', 'sleepAfterMin', 'editor', 'projectsDir', 'sounds', 'soundName', 'noMolestar', 'notify', 'updateChannel', 'lightMode', 'shortcuts', 'rendimiento'
     ],
     ''
   )
@@ -339,6 +376,14 @@ export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOp
     if ('team' in n) next.notify.team = bool(n.team, '«Mensajes del equipo»')
     if ('soundIn' in n) next.notify.soundIn = bool(n.soundIn, '«Sonido al recibir mensajes»')
     if ('soundOut' in n) next.notify.soundOut = bool(n.soundOut, '«Sonido al enviar mensajes»')
+  }
+  if ('rendimiento' in patch) {
+    const r = patch.rendimiento
+    if (!isObj(r)) throw new Error('rendimiento tiene que ser un objeto.')
+    checkKeys(r, ['enchufada', 'bateria', 'bateriaDistinta'], 'rendimiento.')
+    if ('enchufada' in r) next.rendimiento.enchufada = perfilRendimiento(next.rendimiento.enchufada, r.enchufada, 'rendimiento.enchufada')
+    if ('bateria' in r) next.rendimiento.bateria = perfilRendimiento(next.rendimiento.bateria, r.bateria, 'rendimiento.bateria')
+    if ('bateriaDistinta' in r) next.rendimiento.bateriaDistinta = bool(r.bateriaDistinta, '«Otro límite con batería»')
   }
   if ('accountColors' in patch) {
     const c = patch.accountColors
@@ -407,6 +452,12 @@ export function normalize(raw: unknown): SlothSettings {
   for (const k of scalars) if (k in src) tryPatch({ [k]: src[k] })
   if (isObj(src.terminal)) for (const [k, v] of Object.entries(src.terminal)) tryPatch({ terminal: { [k]: v } })
   if (isObj(src.notify)) for (const [k, v] of Object.entries(src.notify)) tryPatch({ notify: { [k]: v } })
+  if (isObj(src.rendimiento)) {
+    const r = src.rendimiento
+    if ('bateriaDistinta' in r) tryPatch({ rendimiento: { bateriaDistinta: r.bateriaDistinta } })
+    for (const perfil of ['enchufada', 'bateria'] as const)
+      if (isObj(r[perfil])) for (const [k, v] of Object.entries(r[perfil])) tryPatch({ rendimiento: { [perfil]: { [k]: v } } })
+  }
   if (isObj(src.accountColors))
     for (const [id, v] of Object.entries(src.accountColors).slice(0, MAX_ACCOUNT_COLORS)) tryPatch({ accountColors: { [id]: v } })
   if (isObj(src.accountPlans))
@@ -456,6 +507,9 @@ export function resetSection(current: SlothSettings, section: unknown): SlothSet
       break
     case 'updates':
       next.updateChannel = d.updateChannel
+      break
+    case 'rendimiento':
+      next.rendimiento = cloneSettings(d).rendimiento
       break
     default:
       throw new Error('Sección desconocida.')

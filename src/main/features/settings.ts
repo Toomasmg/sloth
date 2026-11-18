@@ -147,6 +147,14 @@ function applyLoginItem(): void {
   }
 }
 
+const alCambiar = new Set<(s: SlothSettings) => void>()
+
+/** Para las funciones de main que aplican un ajuste (rendimiento): corre en cada cambio guardado. */
+export function onSettingsChanged(cb: (s: SlothSettings) => void): () => void {
+  alCambiar.add(cb)
+  return () => alCambiar.delete(cb)
+}
+
 function commit(next: SlothSettings): SettingsPayload {
   const loginChanged = next.openAtLogin !== settings.openAtLogin
   settings = next
@@ -155,6 +163,13 @@ function commit(next: SlothSettings): SettingsPayload {
   if (loginChanged) applyLoginItem()
   const p = payload()
   ctxRef?.emit('changed', p)
+  for (const cb of alCambiar) {
+    try {
+      cb(settings)
+    } catch (e) {
+      ctxRef?.log('[settings] onSettingsChanged', e)
+    }
+  }
   return p
 }
 

@@ -115,7 +115,8 @@ export function Slider({
   max,
   step = 1,
   format,
-  onChange
+  onChange,
+  wide
 }: {
   id: string
   label: string
@@ -125,9 +126,11 @@ export function Slider({
   step?: number
   format(v: number): string
   onChange(v: number): void
+  /** Valor con texto («Sin límite», «8 de 14»): más ancho para que no se parta. */
+  wide?: boolean
 }): React.JSX.Element {
   return (
-    <div className="f-set-slider">
+    <div className={`f-set-slider ${wide ? 'wide' : ''}`}>
       <input
         id={id}
         type="range"
