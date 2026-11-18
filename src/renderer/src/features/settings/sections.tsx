@@ -165,6 +165,14 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
     })
   }
 
+  /** «Avisar cuando termina» de una cuenta de Codex: si no se puede activar (ya hay un notify propio, falta node) la pantalla muestra el motivo. */
+  const toggleAviso = (acc: Account): void => {
+    save(async () => {
+      await api.setAvisoDeTurno(acc.id, acc.avisoDeTurno !== true)
+      await ui.reload()
+    })
+  }
+
   const conLectura = ui.accounts.filter((a) => capacidadesDe(a)?.limitesExperimental === true && a.limitesExperimentales === true).map((a) => a.id)
   const claveLectura = conLectura.join(',')
   /** Sin la clave: todavía leyendo. null: sin dato. */
@@ -295,6 +303,8 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
           const u = conUso ? ui.usage[a.id] : undefined
           const motivoSetup = capacidadesDe(a)?.setupCompartido === true ? undefined : motivoSinCapacidad(a, 'setupCompartido')
           const conLimites = capacidadesDe(a)?.limitesExperimental === true
+          // Claude avisa por sus hooks siempre; solo el agente que avisa por notify tiene este switch.
+          const conAviso = capacidadesDe(a)?.avisoTurno === true && capacidadesDe(a)?.hooks !== true
           const leyendoLimites = conLimites && a.limitesExperimentales === true
           const filasL = leyendoLimites ? filasLimites(limites[a.id]) : []
           return (
@@ -414,6 +424,18 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
                         <span className="switch-track" aria-hidden="true" />
                       </label>
                       <span className="f-set-hint">Sloth abre Codex un momento para preguntarle cuánto te queda. Puede fallar si Codex cambia; con una API key no aplica.</span>
+                    </>
+                  )}
+                  {conAviso && (
+                    <>
+                      <label className="switch" role="menuitem" title="Agrega una línea «notify» al config.toml de esta cuenta de Codex.">
+                        <span className="switch-text">
+                          Avisar cuando termina <Tag>Experimental</Tag>
+                        </span>
+                        <input type="checkbox" role="switch" checked={a.avisoDeTurno === true} onChange={() => toggleAviso(a)} />
+                        <span className="switch-track" aria-hidden="true" />
+                      </label>
+                      <span className="f-set-hint">Agrega una línea «notify» al config.toml de la cuenta, nunca pisa una tuya y se saca al apagarlo. Si Codex no la ejecuta, no pasa nada: solo no llega el aviso.</span>
                     </>
                   )}
                   <Button variant="danger" size="sm" role="menuitem" onClick={() => {
