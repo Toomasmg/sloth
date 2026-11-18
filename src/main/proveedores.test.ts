@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { PROVEEDORES, proveedorDe } from './proveedores'
+import { PROVEEDORES, armarEnvCuenta, proveedorDe } from './proveedores'
 import { claudeWithPrompt } from './shell-args'
 
 test('proveedorDe: sin campo o con un valor desconocido es claude', () => {
@@ -23,4 +23,10 @@ test('claude: env, rutas y argv', () => {
   assert.deepEqual(p.argvInteractivo({ resumir: 'abc' }), ['claude', '--resume', 'abc'])
   assert.deepEqual(p.argvInteractivo({ prompt: '--x\ny' }), claudeWithPrompt('--x\ny'))
   assert.deepEqual(p.argvInteractivo({ prompt: 'hola', continuar: true }), ['claude', '--', 'hola'])
+})
+
+test('armarEnvCuenta: base, CLAUDE_CONFIG_DIR y SLOTH_ACCOUNT, en ese orden', () => {
+  const env = armarEnvCuenta(PROVEEDORES.claude, { configDir: 'C:/x', label: 'Mi cuenta' }, { PATH: 'p', TERM_PROGRAM: 'Sloth' })
+  assert.deepEqual(env, { PATH: 'p', TERM_PROGRAM: 'Sloth', CLAUDE_CONFIG_DIR: 'C:/x', SLOTH_ACCOUNT: 'Mi cuenta' })
+  assert.deepEqual(Object.keys(env), ['PATH', 'TERM_PROGRAM', 'CLAUDE_CONFIG_DIR', 'SLOTH_ACCOUNT'])
 })

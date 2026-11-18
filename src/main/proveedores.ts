@@ -27,3 +27,8 @@ export const PROVEEDORES: Record<ProveedorId, Proveedor> = { claude }
 export function proveedorDe(cuenta: { proveedor?: unknown }): Proveedor {
   return PROVEEDORES[proveedorIdDe(cuenta)]
 }
+
+/** Mismas claves y orden que se armaban antes en accountEnv: base, variable de config del proveedor y SLOTH_ACCOUNT. */
+export function armarEnvCuenta(p: Proveedor, cuenta: { configDir: string; label: string }, base: Record<string, string>): Record<string, string> {
+  return { ...base, ...p.envCuenta(cuenta.configDir), SLOTH_ACCOUNT: cuenta.label }
+}
