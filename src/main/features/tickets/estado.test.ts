@@ -303,3 +303,53 @@ test('leidoCon: se conserva un prefijo válido, se descarta uno raro y se va con
   assert.equal(sanearEstado({ ...TICKETS_V2, leidoCon: 'otra cosa' }, conectorPorId)?.leidoCon, undefined)
   assert.ok(s && !('leidoCon' in sinLista(s)))
 })
+
+test('un tickets.json v2 de antes de los topes carga igual y no suma claves', () => {
+  const viejo = { ...TICKETS_V2, lastRun: { tokens: 10, costUsd: 0.01, durationMs: 900 } }
+  const s = sanearEstado(viejo, conectorPorId)
+  assert.ok(s)
+  assert.deepEqual(s.lastRun, { tokens: 10, costUsd: 0.01, durationMs: 900 })
+  for (const k of ['maxTurns', 'maxCostUsd']) assert.ok(!(k in s.config), k)
+  assert.ok(!('uso' in s))
+})
+
+test('los topes y el uso válidos se conservan y los malos se descartan', () => {
+  const bueno = sanearEstado(
+    {
+      ...TICKETS_V2,
+      lastRun: { tokens: 1, numTurns: 12, maxTurns: 40, tope: 'vueltas' },
+      uso: { '2026-11-17': { gruv: { corridas: 1, costUsd: 0.2, vueltas: 12, durationMs: 50 } } },
+      config: { ...TICKETS_V2.config, maxTurns: 25, maxCostUsd: 1.5 }
+    },
+    conectorPorId
+  )
+  assert.ok(bueno)
+  assert.equal(bueno.config.maxTurns, 25)
+  assert.equal(bueno.config.maxCostUsd, 1.5)
+  assert.deepEqual(bueno.lastRun, { tokens: 1, numTurns: 12, maxTurns: 40, tope: 'vueltas' })
+  assert.equal(bueno.uso?.['2026-11-17'].gruv.vueltas, 12)
+
+  const malo = sanearEstado(
+    {
+      ...TICKETS_V2,
+      lastRun: { tokens: 1, numTurns: '3', maxTurns: '9', tope: 'x' },
+      uso: { raro: { gruv: { corridas: 1 } }, '2026-11-17': { 'Mal Id': { corridas: 1, costUsd: 0, vueltas: 0, durationMs: 0 } } },
+      config: { ...TICKETS_V2.config, maxTurns: '9', maxCostUsd: -2 }
+    },
+    conectorPorId
+  )
+  assert.ok(malo)
+  assert.ok(!('maxTurns' in malo.config))
+  assert.ok(!('maxCostUsd' in malo.config))
+  assert.deepEqual(malo.lastRun, { tokens: 1 })
+  assert.ok(!('uso' in malo))
+  assert.deepEqual(sanearEstado(malo, conectorPorId), malo)
+  assert.deepEqual(sanearEstado(bueno, conectorPorId), bueno)
+})
+
+test('sinLista y conConector conservan lo gastado', () => {
+  const s = sanearEstado({ ...TICKETS_V2, uso: { '2026-11-17': { gruv: { corridas: 1, costUsd: 0, vueltas: 1, durationMs: 1 } } } }, conectorPorId)
+  assert.ok(s)
+  assert.deepEqual(sinLista(s).uso, s.uso)
+  assert.deepEqual(conConector(s, 'github').uso, s.uso)
+})

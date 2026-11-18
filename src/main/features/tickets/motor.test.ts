@@ -87,11 +87,14 @@ const NUEVAS: Record<string, (args: unknown[]) => unknown> = {
   parseAccion: ([out, ac]) => parseAccion(GRUV, s(out), a(ac))
 }
 
-/** Diferencias deliberadas con 0.6.4 en los args: sin skills ni comandos, y el modo de permisos fijo. */
+/**
+ * Diferencias deliberadas con 0.6.4 en los args: sin skills ni comandos, el modo de permisos fijo y,
+ * al final, `--max-turns 40` (red de seguridad nueva: 0.6.4 no ponía tope de vueltas).
+ */
 function conModoPermisos(args: string[]): string[] {
   const i = args.indexOf('--no-session-persistence')
   assert.ok(i >= 0, 'el golden debería tener --no-session-persistence')
-  return [...args.slice(0, i + 1), '--disable-slash-commands', '--permission-mode', 'default', ...args.slice(i + 1)]
+  return [...args.slice(0, i + 1), '--disable-slash-commands', '--permission-mode', 'default', ...args.slice(i + 1), '--max-turns', '40']
 }
 
 const CLASES: Record<string, string> = { NoGruvError: ConectorFaltaError.name, ToolMissingError: HerramientaFaltaError.name, Error: Error.name }
@@ -287,4 +290,28 @@ test('los MCP ajenos van a --disallowedTools en la lista, el detalle y las accio
     for (const a of ajenos) assert.ok(negadasDe(args).includes(a), a)
   }
   assert.ok(!negadasDe(buildListaArgs(GRUV, 'haiku')).includes('mcp__claude_ai_Slack'))
+})
+
+test('--max-turns sale de un entero validado y cae a 40 con cualquier otra cosa', () => {
+  const turnos = (args: string[]): string[] => args.slice(args.indexOf('--max-turns'))
+  assert.deepEqual(turnos(buildListaArgs(GRUV, 'haiku', [], { maxTurns: 7 })), ['--max-turns', '7'])
+  assert.deepEqual(turnos(buildDetalleArgs(GRUV, 'haiku', [], { maxTurns: 200 })), ['--max-turns', '200'])
+  assert.deepEqual(turnos(buildAccionArgs(GRUV, 'haiku', accionesSoportadas(GRUV)[0], [], { maxTurns: 1 })), ['--max-turns', '1'])
+  const malos: unknown[] = [0, 201, 999, NaN, Infinity, 1.5, -3, '9', null]
+  for (const maxTurns of malos) assert.deepEqual(turnos(buildListaArgs(GRUV, 'haiku', [], { maxTurns: maxTurns as number })), ['--max-turns', '40'], String(maxTurns))
+  assert.equal(buildListaArgs(GRUV, 'haiku').filter((a) => a === '--max-turns').length, 1)
+})
+
+test('--max-budget-usd solo va con un costo válido y en texto', () => {
+  const args = buildListaArgs(GRUV, 'haiku', [], { maxCostUsd: 2.5 })
+  assert.deepEqual(args.slice(-2), ['--max-budget-usd', '2.5'])
+  for (const maxCostUsd of [0, -1, 101, NaN, Infinity, '2' as unknown as number]) {
+    assert.ok(!buildListaArgs(GRUV, 'haiku', [], { maxCostUsd }).includes('--max-budget-usd'), String(maxCostUsd))
+  }
+  assert.ok(!buildListaArgs(GRUV, 'haiku').includes('--max-budget-usd'))
+})
+
+test('parseClaudeOutput trae las vueltas del sobre', () => {
+  const sobre = JSON.stringify({ type: 'result', subtype: 'success', num_turns: 5, result: '', structured_output: { tickets: [] } })
+  assert.equal(parseClaudeOutput(GRUV, sobre).numTurns, 5)
 })
