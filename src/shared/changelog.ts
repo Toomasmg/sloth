@@ -9,6 +9,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.0',
+    date: '2026-11-18',
+    title: 'Perfiles, más agentes y el celu cifrado',
+    items: [
+      'Perfiles: separá tu trabajo (por ejemplo Trabajo y Personal) y cada perfil tiene sus espacios, tickets, chat y ajustes. Se manejan desde Configuración → Perfiles y, con dos o más, desde la barra de arriba. Cambiar de perfil reinicia Sloth. La primera vez que abrís esta versión, Sloth copia tus datos a «Mi perfil» y deja un respaldo; tu carpeta de antes queda intacta.',
+      'Codex: si lo tenés instalado, al agregar una cuenta podés elegir el agente. Probá con cuidado, es nuevo: el medidor de límites y el aviso «terminó» son experimentales y vienen apagados, y los tickets con Codex son solo de consulta.',
+      'Copilot: se puede agregar una cuenta de GitHub Copilot. Comparte el login del sistema (Sloth no guarda ninguna credencial), por eso hay una sola, y en Windows hace falta PowerShell 7.',
+      'Celular por Wi-Fi: ahora va cifrado. Escaneá el QR de nuevo en cada celu que ya tenías emparejado.',
+      'Nuevo en Ctrl+K: «Copiar diagnóstico», con versiones y errores recientes sin claves ni rutas tuyas. Si Sloth se cerró mal la vez anterior, te avisa al abrir.',
+      'Tickets: cada consulta tiene un tope de vueltas y de costo estimado, y si se corta podés continuar con más vueltas. En Ajustes ves cuánto usaste.',
+      'Teclado: F6 y Shift+F6 saltan entre la barra, el riel, la lateral y los paneles, y Tab vuelve a salir de la paleta.',
+      'Más prolijo por dentro: el modelo de dictado se baja la primera vez que lo usás y el instalador pesa menos, git cancelado ya no deja procesos colgados, tus archivos de datos llevan versión y se respaldan antes de migrar, y Sloth pasa a Electron 45.3.',
+      'Si algo de esto no anda como esperabas, copiá el diagnóstico y mandalo.'
+    ]
+  },
+  {
     version: '0.6.28',
     date: '2026-11-17',
     title: 'Más seguro por dentro',
