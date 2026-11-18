@@ -6,6 +6,7 @@ import { EmptyState, IconButton, Menu, type MenuItem } from '../../ui'
 import { Composer, type ComposerHandle } from './Composer'
 import { MessageItem } from './MessageItem'
 import { activeReduce, scrolledFar } from './active-msg'
+import { vigilarVencimiento } from './expiracion'
 import { SearchBar } from './SearchBar'
 import { proximoVencimiento, seenUpTo, startsGroup, typingText } from './message-ops'
 import { Av, dayLabel, sameDay } from './view-utils'
@@ -47,8 +48,6 @@ const TOO_OLD = 'Ese mensaje es muy viejo para mostrarlo acá.'
 const FLASH_MS = 1600
 const MAX_JUMP_PAGES = Math.ceil(MAX_CACHED / PAGE)
 const NOTICE_MS = 6000
-const EXPIRY_MIN_MS = 1000
-const MAX_TIMEOUT_MS = 2 ** 31 - 1
 let updateHintShown = false
 
 /**
@@ -102,11 +101,19 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
   }, [conv.kind, conv.id])
 
   useEffect(() => {
-    const now = Date.now()
-    const next = proximoVencimiento(stored, retention, now)
+    const next = proximoVencimiento(stored, retention, Date.now())
     if (next === undefined) return
-    const t = setTimeout(() => setVenc((n) => n + 1), Math.min(Math.max(next - now, EXPIRY_MIN_MS), MAX_TIMEOUT_MS))
-    return () => clearTimeout(t)
+    const vigilia = vigilarVencimiento(next, Date.now, setTimeout, (h) => clearTimeout(h as ReturnType<typeof setTimeout>), () => setVenc((n) => n + 1))
+    const revisar = (): void => {
+      if (document.visibilityState === 'visible') vigilia.revisar()
+    }
+    document.addEventListener('visibilitychange', revisar)
+    window.addEventListener('focus', revisar)
+    return () => {
+      document.removeEventListener('visibilitychange', revisar)
+      window.removeEventListener('focus', revisar)
+      vigilia.parar()
+    }
   }, [stored, retention, venc])
 
   // El aviso de la actualización 0004 sale una sola vez por sesión.
