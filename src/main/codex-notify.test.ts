@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { CONFIG_INICIAL, prepararCarpetaCodex } from './proveedor-codex'
 import { MOTIVO_AJENO, MOTIVO_CAMBIO, MOTIVO_DUDOSO, MOTIVO_SIN_NODE, avisoUnaVez, depsNotifyReales, desinstalarNotify, prepararNotify, type DepsNotify } from './codex-notify'
 
 const DIR = 'C:/cuentas/a'
@@ -180,6 +181,21 @@ test('con archivos de verdad: un archivo raro no se escribe y no deja respaldo n
     assert.equal(prepararNotify(dir, 'node', SCRIPT, depsNotifyReales), MOTIVO_DUDOSO)
     assert.equal(readFileSync(file, 'utf8'), raro)
     assert.deepEqual(readdirSync(dir), ['config.toml'])
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('sin config.toml, preparar la carpeta primero deja el almacén en archivo y después el notify', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'sloth-notify-m2-'))
+  try {
+    prepararCarpetaCodex(dir)
+    assert.equal(prepararNotify(dir, 'node', SCRIPT, depsNotifyReales), undefined)
+    const texto = readFileSync(join(dir, 'config.toml'), 'utf8')
+    assert.ok(texto.includes(CONFIG_INICIAL))
+    assert.ok(texto.startsWith('notify = ['))
+    assert.equal(desinstalarNotify(dir, depsNotifyReales), undefined)
+    assert.equal(readFileSync(join(dir, 'config.toml'), 'utf8'), CONFIG_INICIAL)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

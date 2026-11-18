@@ -373,7 +373,18 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
 
   /** Con el aviso activado deja el `notify` de Sloth en la cuenta; apagado, saca el que puso Sloth. Devuelve el motivo si no quedó como se pidió. */
   function ajustarNotify(acc: Account): string | undefined {
-    const motivo = acc.avisoDeTurno === true ? prepararNotify(acc.configDir, hayNode() ? 'node' : undefined, notifyScriptPath()) : desinstalarNotify(acc.configDir)
+    let motivo: string | undefined
+    if (acc.avisoDeTurno === true) {
+      try {
+        // Sin config.toml queda el de siempre (con el almacén de credenciales en archivo), no uno que solo tenga el notify.
+        proveedorExigido(acc).prepararCarpeta(acc.configDir)
+        motivo = prepararNotify(acc.configDir, hayNode() ? 'node' : undefined, notifyScriptPath())
+      } catch (e) {
+        motivo = `No pude preparar la carpeta de la cuenta de Codex (${(e as NodeJS.ErrnoException).code ?? 'error'}).`
+      }
+    } else {
+      motivo = desinstalarNotify(acc.configDir)
+    }
     if (motivo) avisarNotify(motivo)
     return motivo
   }
