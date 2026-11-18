@@ -4,8 +4,22 @@ import fs, { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSy
 import { syncBuiltinESMExports } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
-import { iniciarPerfilesFs, leerMeta, rutasPerfiles, type ResultadoArranque } from './perfiles-fs'
-import { validarIndice } from './perfiles-core'
+import {
+  borrarPerfilFs,
+  cambiarActivoFs,
+  crearPerfilFs,
+  guardarFoto,
+  guardarGhLogin,
+  iniciarPerfilesFs,
+  leerFotoDataUrl,
+  leerMeta,
+  MAX_BYTES_FOTO,
+  renombrarPerfilFs,
+  rutasPerfiles,
+  tieneFoto,
+  type ResultadoArranque
+} from './perfiles-fs'
+import { validarIndice, type IndicePerfiles } from './perfiles-core'
 
 const AHORA = 1_700_000_000_000
 const ahora = (): number => AHORA
@@ -301,5 +315,235 @@ test('restos que no se pueden borrar no frenan el arranque: van como aviso', () 
   }
   assert.equal(r.error, undefined)
   assert.match(r.aviso ?? '', /EBUSY/)
+  rmSync(d, { recursive: true })
+})
+
+const azarFijo = (...ids: string[]): (() => string) => {
+  let i = 0
+  return () => ids[i++] ?? `x${i++}`
+}
+
+function conPrincipal(): string {
+  const d = raiz()
+  escribir(d, 'sloth-state.json', JSON.stringify({ version: 1, accounts: [], workspaces: [], openPanes: [] }))
+  escribir(d, 'features/settings.json', '{"version":1}')
+  assert.equal(iniciarPerfilesFs(d, ahora).error, undefined)
+  return d
+}
+
+const indiceDe = (d: string): IndicePerfiles => {
+  const i = validarIndice(JSON.parse(readFileSync(join(d, 'perfiles.json'), 'utf8')))
+  assert.ok(i)
+  return i
+}
+
+const PNG_MIN = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(32, 7)])
+
+test('crear: carpeta con perfil.json y features vacío, índice actualizado, el activo no cambia', () => {
+  const d = conPrincipal()
+  const p = crearPerfilFs(d, '  Trabajo  ', AHORA + 5, azarFijo('abc123'))
+  assert.deepEqual(p, { id: 'p-abc123', nombre: 'Trabajo', creado: AHORA + 5 })
+  assert.deepEqual(leerMeta(join(d, 'perfiles', 'p-abc123')), p)
+  assert.deepEqual(readdirSync(join(d, 'perfiles', 'p-abc123', 'features')), [])
+  const i = indiceDe(d)
+  assert.equal(i.activo, 'principal')
+  assert.deepEqual(i.perfiles.map((x) => x.id), ['principal', 'p-abc123'])
+  assert.deepEqual(readdirSync(join(d, 'perfiles')).filter((n) => n.startsWith('.')), [])
+  rmSync(d, { recursive: true })
+})
+
+test('crear: nombre repetido con otras mayúsculas, vacío, largo o con control se rechaza sin tocar nada', () => {
+  const d = conPrincipal()
+  const antes = readFileSync(join(d, 'perfiles.json'), 'utf8')
+  for (const n of ['MI PERFIL', 'mi perfil', '', '   ', 'x'.repeat(41), 'a\nb', 'a\u0000b', 'a\u202eb', 7, null]) {
+    assert.throws(() => crearPerfilFs(d, n, AHORA, azarFijo('zzz')), Error, String(n))
+  }
+  assert.equal(readFileSync(join(d, 'perfiles.json'), 'utf8'), antes)
+  assert.deepEqual(readdirSync(join(d, 'perfiles')), ['principal'])
+  rmSync(d, { recursive: true })
+})
+
+test('crear: si el id al azar ya existe como carpeta usa otro', () => {
+  const d = conPrincipal()
+  mkdirSync(join(d, 'perfiles', 'p-uno'))
+  const p = crearPerfilFs(d, 'Otro', AHORA, azarFijo('uno', 'dos'))
+  assert.equal(p.id, 'p-dos')
+  rmSync(d, { recursive: true })
+})
+
+test('crear: si no se puede escribir el índice la carpeta nueva se saca y el índice queda como estaba', () => {
+  const d = conPrincipal()
+  const antes = readFileSync(join(d, 'perfiles.json'), 'utf8')
+  const real = fs.renameSync
+  const m = mock.method(fs, 'renameSync', (de: string, a: string) => {
+    if (String(a).endsWith('perfiles.json')) throw Object.assign(new Error('EROFS'), { code: 'EROFS' })
+    return real(de, a)
+  })
+  syncBuiltinESMExports()
+  try {
+    assert.throws(() => crearPerfilFs(d, 'Nuevo', AHORA, azarFijo('nnn')))
+  } finally {
+    m.mock.restore()
+    syncBuiltinESMExports()
+  }
+  assert.equal(readFileSync(join(d, 'perfiles.json'), 'utf8'), antes)
+  assert.equal(existsSync(join(d, 'perfiles', 'p-nnn')), false)
+  rmSync(d, { recursive: true })
+})
+
+test('renombrar: actualiza perfil.json y el índice; rechaza repetido y nombres malos', () => {
+  const d = conPrincipal()
+  const p = crearPerfilFs(d, 'Trabajo', AHORA, azarFijo('t1'))
+  const r = renombrarPerfilFs(d, p.id, 'Casa')
+  assert.equal(r.nombre, 'Casa')
+  assert.equal(leerMeta(join(d, 'perfiles', p.id))?.nombre, 'Casa')
+  assert.equal(indiceDe(d).perfiles.find((x) => x.id === p.id)?.nombre, 'Casa')
+  assert.throws(() => renombrarPerfilFs(d, p.id, 'mi PERFIL'), /Ya hay/)
+  assert.throws(() => renombrarPerfilFs(d, p.id, 'a\u200bb'))
+  assert.equal(renombrarPerfilFs(d, p.id, 'CASA').nombre, 'CASA')
+  rmSync(d, { recursive: true })
+})
+
+test('cambiar activo: solo toca `activo` del índice y exige un perfil existente', () => {
+  const d = conPrincipal()
+  const p = crearPerfilFs(d, 'Trabajo', AHORA, azarFijo('t1'))
+  const antes = indiceDe(d)
+  cambiarActivoFs(d, p.id)
+  assert.deepEqual(indiceDe(d), { ...antes, activo: p.id })
+  assert.throws(() => cambiarActivoFs(d, 'p-fantasma'), /no existe/)
+  assert.equal(indiceDe(d).activo, p.id)
+  rmSync(d, { recursive: true })
+})
+
+test('borrar: mueve a respaldos con su contenido, saca el perfil del índice y no pisa un respaldo previo', () => {
+  const d = conPrincipal()
+  const p = crearPerfilFs(d, 'Trabajo', AHORA, azarFijo('t1'))
+  escribir(d, `perfiles/${p.id}/features/notas.json`, '{"clave":"valor"}')
+  escribir(d, `perfiles/${p.id}/sloth-state.json`, '{"version":1}')
+  mkdirSync(join(d, 'respaldos', `perfil-${p.id}-${AHORA}`), { recursive: true })
+  const destino = borrarPerfilFs(d, p.id, AHORA)
+  assert.equal(destino, join(d, 'respaldos', `perfil-${p.id}-${AHORA}-1`))
+  assert.equal(readFileSync(join(destino, 'features', 'notas.json'), 'utf8'), '{"clave":"valor"}')
+  assert.deepEqual(leerMeta(destino), p)
+  assert.equal(existsSync(join(d, 'perfiles', p.id)), false)
+  assert.deepEqual(indiceDe(d).perfiles.map((x) => x.id), ['principal'])
+  rmSync(d, { recursive: true })
+})
+
+test('borrar: no el activo, no el último, no uno que no existe', () => {
+  const d = conPrincipal()
+  assert.throws(() => borrarPerfilFs(d, 'principal', AHORA), /activo/)
+  const p = crearPerfilFs(d, 'Trabajo', AHORA, azarFijo('t1'))
+  cambiarActivoFs(d, p.id)
+  assert.throws(() => borrarPerfilFs(d, p.id, AHORA), /activo/)
+  assert.throws(() => borrarPerfilFs(d, 'p-fantasma', AHORA), /no existe/)
+  assert.deepEqual(readdirSync(join(d, 'respaldos')).filter((n) => n.startsWith('perfil-')), [])
+  assert.equal(existsSync(join(d, 'perfiles', p.id, 'perfil.json')), true)
+  borrarPerfilFs(d, 'principal', AHORA)
+  assert.throws(() => borrarPerfilFs(d, p.id, AHORA), /activo|último/)
+  rmSync(d, { recursive: true })
+})
+
+test('borrar: si el índice no se puede escribir el perfil vuelve a su lugar', () => {
+  const d = conPrincipal()
+  const p = crearPerfilFs(d, 'Trabajo', AHORA, azarFijo('t1'))
+  escribir(d, `perfiles/${p.id}/features/notas.json`, 'datos')
+  const real = fs.renameSync
+  const m = mock.method(fs, 'renameSync', (de: string, a: string) => {
+    if (String(a).endsWith('perfiles.json')) throw Object.assign(new Error('EROFS'), { code: 'EROFS' })
+    return real(de, a)
+  })
+  syncBuiltinESMExports()
+  try {
+    assert.throws(() => borrarPerfilFs(d, p.id, AHORA))
+  } finally {
+    m.mock.restore()
+    syncBuiltinESMExports()
+  }
+  assert.equal(readFileSync(join(d, 'perfiles', p.id, 'features', 'notas.json'), 'utf8'), 'datos')
+  assert.deepEqual(indiceDe(d).perfiles.map((x) => x.id), ['principal', p.id])
+  rmSync(d, { recursive: true })
+})
+
+test('borrar: si el rename cruza de disco (EXDEV) copia, verifica y recién ahí borra el origen', () => {
+  const d = conPrincipal()
+  const p = crearPerfilFs(d, 'Trabajo', AHORA, azarFijo('t1'))
+  escribir(d, `perfiles/${p.id}/features/notas.json`, 'datos importantes')
+  const real = fs.renameSync
+  const m = mock.method(fs, 'renameSync', (de: string, a: string) => {
+    if (String(de).endsWith(p.id) && String(a).includes('respaldos')) throw Object.assign(new Error('EXDEV'), { code: 'EXDEV' })
+    return real(de, a)
+  })
+  syncBuiltinESMExports()
+  let destino: string
+  try {
+    destino = borrarPerfilFs(d, p.id, AHORA)
+  } finally {
+    m.mock.restore()
+    syncBuiltinESMExports()
+  }
+  assert.equal(readFileSync(join(destino, 'features', 'notas.json'), 'utf8'), 'datos importantes')
+  assert.equal(existsSync(join(d, 'perfiles', p.id)), false)
+  rmSync(d, { recursive: true })
+})
+
+test('ids con ../, mayúsculas, rutas absolutas o nombres reservados se rechazan en todas las operaciones', () => {
+  const d = conPrincipal()
+  crearPerfilFs(d, 'Trabajo', AHORA, azarFijo('t1'))
+  const sentinela = join(d, 'sentinela')
+  mkdirSync(sentinela)
+  for (const id of ['../sentinela', '..', '../..', 'principal/../../sentinela', 'Principal', 'con', 'nul', 'C:\\Windows', '/etc', '', 7, null, undefined, 'p-t1/../principal']) {
+    assert.throws(() => renombrarPerfilFs(d, id, 'X'), Error, String(id))
+    assert.throws(() => cambiarActivoFs(d, id), Error, String(id))
+    assert.throws(() => borrarPerfilFs(d, id, AHORA), Error, String(id))
+    assert.throws(() => guardarFoto(d, id, PNG_MIN), Error, String(id))
+    assert.throws(() => leerFotoDataUrl(d, id), Error, String(id))
+    assert.throws(() => guardarGhLogin(d, id, 'octo'), Error, String(id))
+  }
+  assert.equal(existsSync(sentinela), true)
+  assert.deepEqual(readdirSync(join(d, 'respaldos')).filter((n) => n.startsWith('perfil-')), [])
+  assert.equal(tieneFoto(d, '../sentinela'), false)
+  rmSync(d, { recursive: true })
+})
+
+test('foto: guarda PNG, JPEG y WebP, devuelve data URL y rechaza lo que no es imagen o pesa de más', () => {
+  const d = conPrincipal()
+  assert.equal(tieneFoto(d, 'principal'), false)
+  assert.equal(leerFotoDataUrl(d, 'principal'), null)
+  guardarFoto(d, 'principal', PNG_MIN)
+  assert.equal(tieneFoto(d, 'principal'), true)
+  assert.equal(leerFotoDataUrl(d, 'principal'), `data:image/png;base64,${PNG_MIN.toString('base64')}`)
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(16)])
+  guardarFoto(d, 'principal', jpeg)
+  assert.match(leerFotoDataUrl(d, 'principal') ?? '', /^data:image\/jpeg;base64,/)
+  const webp = Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(4), Buffer.from('WEBPVP8 '), Buffer.alloc(8)])
+  guardarFoto(d, 'principal', webp)
+  assert.match(leerFotoDataUrl(d, 'principal') ?? '', /^data:image\/webp;base64,/)
+  const previa = leerFotoDataUrl(d, 'principal')
+  assert.throws(() => guardarFoto(d, 'principal', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>')), /PNG, JPEG o WebP/)
+  assert.throws(() => guardarFoto(d, 'principal', Buffer.from('MZ\u0090\u0000 no soy una imagen')), /PNG, JPEG o WebP/)
+  assert.throws(() => guardarFoto(d, 'principal', Buffer.alloc(0)), /512 KB/)
+  assert.throws(() => guardarFoto(d, 'principal', Buffer.concat([PNG_MIN, Buffer.alloc(MAX_BYTES_FOTO)])), /512 KB/)
+  assert.equal(leerFotoDataUrl(d, 'principal'), previa)
+  assert.deepEqual(readdirSync(join(d, 'perfiles', 'principal')).filter((n) => n.endsWith('.tmp')), [])
+  rmSync(d, { recursive: true })
+})
+
+test('foto: un archivo foto.png alterado a mano (no es imagen o es enorme) no se devuelve', () => {
+  const d = conPrincipal()
+  escribir(d, 'perfiles/principal/foto.png', 'texto plano')
+  assert.equal(leerFotoDataUrl(d, 'principal'), null)
+  escribir(d, 'perfiles/principal/foto.png', Buffer.concat([PNG_MIN, Buffer.alloc(MAX_BYTES_FOTO)]))
+  assert.equal(leerFotoDataUrl(d, 'principal'), null)
+  rmSync(d, { recursive: true })
+})
+
+test('guardarGhLogin valida el login y lo deja en perfil.json y en el índice', () => {
+  const d = conPrincipal()
+  assert.throws(() => guardarGhLogin(d, 'principal', 'con espacio'), /inválido/)
+  assert.throws(() => guardarGhLogin(d, 'principal', '../x'), /inválido/)
+  guardarGhLogin(d, 'principal', 'octo-cat')
+  assert.equal(leerMeta(join(d, 'perfiles', 'principal'))?.ghLogin, 'octo-cat')
+  assert.equal(indiceDe(d).perfiles[0]?.ghLogin, 'octo-cat')
   rmSync(d, { recursive: true })
 })

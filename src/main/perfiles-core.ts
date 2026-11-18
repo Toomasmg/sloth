@@ -26,8 +26,11 @@ const CONTROL = /[\u0000-\u001f\u007f-\u009f]/
 const ENGANOSO = /[​-‏‪-‮⁦-⁩﻿]/
 const GH_LOGIN = /^[A-Za-z0-9-]{1,39}$/
 const MAX_NOMBRE = 40
+export const MAX_PERFILES = 50
 
 const esObjeto = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+
+export const loginGhValido = (s: unknown): s is string => typeof s === 'string' && GH_LOGIN.test(s)
 
 export const idPerfilValido = (id: unknown): id is string => typeof id === 'string' && ID.test(id) && !RESERVADO_WINDOWS.test(id)
 
@@ -56,7 +59,7 @@ export function validarMeta(raw: unknown): Perfil | null {
   if (!nombre || typeof raw.creado !== 'number' || !Number.isFinite(raw.creado) || raw.creado < 0) return null
   const p: Perfil = { id: raw.id, nombre, creado: raw.creado }
   if (raw.ghLogin !== undefined) {
-    if (typeof raw.ghLogin !== 'string' || !GH_LOGIN.test(raw.ghLogin)) return null
+    if (!loginGhValido(raw.ghLogin)) return null
     p.ghLogin = raw.ghLogin
   }
   return p
