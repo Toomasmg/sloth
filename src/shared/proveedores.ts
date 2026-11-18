@@ -140,3 +140,14 @@ MOTIVOS_ESPECIFICOS.copilot = {
   setupCompartido: 'El setup compartido es el de tu carpeta de Claude Code: no aplica a Copilot.',
   overrideClaude: 'Estos reemplazos de comando son de Claude Code.'
 }
+
+/** Con un login compartido del sistema, dos cuentas de Copilot se pisarían entre sí. */
+export const MAX_CUENTAS: Partial<Record<ProveedorId, number>> = { copilot: 1 }
+
+/** Por qué no se puede sumar otra cuenta de ese agente, o undefined si se puede. */
+export function motivoNoAgregar(cuentas: readonly { proveedor?: unknown }[], id: ProveedorId): string | undefined {
+  const tope = MAX_CUENTAS[id]
+  if (tope === undefined) return undefined
+  if (cuentas.filter((c) => proveedorIdDe(c) === id).length < tope) return undefined
+  return `Ya tenés una cuenta de ${NOMBRE_PROVEEDOR[id]}: su login es del sistema y dos cuentas se pisarían entre sí.`
+}

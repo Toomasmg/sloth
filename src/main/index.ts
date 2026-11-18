@@ -18,7 +18,7 @@ import { marcarCrashPrevio } from './diag/estado'
 import { cerrarSesion, iniciarSesion } from './sesion-marcador'
 import { textoSeguro } from './diag/texto-seguro'
 import { argvPanelCuenta, armarEnvCuenta, proveedorDe, proveedorExigido, type Proveedor } from './proveedores'
-import { NOMBRE_PROVEEDOR, capacidadesDe, esProveedorId, motivoSinCapacidad } from '../shared/proveedores'
+import { NOMBRE_PROVEEDOR, capacidadesDe, esProveedorId, motivoNoAgregar, motivoSinCapacidad } from '../shared/proveedores'
 import { lectorLimites, limitesDeCuenta } from './codex-limites'
 import type { LecturaLimitesCodex } from '../shared/celular'
 import { avisarNotify, desinstalarNotify, prepararNotify } from './codex-notify'
@@ -514,6 +514,8 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     if (typeof label !== 'string' || label.length > 80) throw new Error('El nombre de la cuenta tiene que ser un texto de hasta 80 caracteres.')
     if (proveedor !== undefined && !esProveedorId(proveedor)) throw new Error('Agente inválido.')
     store.exigirEscritura()
+    const motivo = proveedor === undefined ? undefined : motivoNoAgregar(store.accounts, proveedor)
+    if (motivo) throw new Error(motivo)
     const nueva = createAccount(label, proveedor)
     const acc = { ...nueva, shareSetup: proveedorExigido(nueva).capacidades.setupCompartido }
     store.addAccount(acc)

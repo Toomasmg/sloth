@@ -197,20 +197,21 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
     api.agentes().then(setAgentes, () => setAgentes([]))
   }, [adding])
 
-  const form = formularioCuenta(proveedor, agentes)
-  const esCodex = form.mostrarSelector && proveedor === 'codex'
+  const form = formularioCuenta(proveedor, agentes, ui.accounts)
+  const agenteElegido = proveedor !== 'claude' && form.opciones.some((o) => o.id === proveedor) ? proveedor : undefined
 
   const addAccount = (e: FormEvent): void => {
     e.preventDefault()
     const n = name.trim()
+    if (form.bloqueo) return
     if (!n) {
       setNameErr(true)
       return
     }
     setNameErr(false)
     save(async () => {
-      const acc: Account = await api.addAccount(n, esCodex ? 'codex' : undefined)
-      if (!esCodex && plan.trim()) await updateSettings({ accountPlans: { [acc.id]: plan.trim() } })
+      const acc: Account = await api.addAccount(n, agenteElegido)
+      if (!agenteElegido && plan.trim()) await updateSettings({ accountPlans: { [acc.id]: plan.trim() } })
       await ui.reload()
       setAdding(false)
       setName('')
@@ -238,8 +239,11 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
             <label className="f-set-stack">
               <span className="f-set-label">Agente</span>
               <Select value={proveedor} onChange={(e) => setProveedor(e.target.value)}>
-                <option value="claude">Claude Code</option>
-                <option value="codex">Codex</option>
+                {form.opciones.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.nombre}
+                  </option>
+                ))}
               </Select>
             </label>
           )}
@@ -267,6 +271,11 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
               {form.avisoVersion}
             </p>
           )}
+          {form.bloqueo && (
+            <p role="alert" className="form-error">
+              {form.bloqueo}
+            </p>
+          )}
           {nameErr && (
             <p role="alert" className="form-error">
               Poné un nombre para la cuenta.
@@ -277,7 +286,7 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
             <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>
               Cancelar
             </Button>
-            <Button variant="primary" size="sm" type="submit">
+            <Button variant="primary" size="sm" type="submit" disabled={!!form.bloqueo}>
               Agregar
             </Button>
           </div>

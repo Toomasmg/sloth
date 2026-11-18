@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import type { Feature, FeatureContext } from './context'
 import type { Workspace } from '../../shared/types'
 import { createAccount } from '../accounts'
+import { esProveedorId, motivoNoAgregar } from '../../shared/proveedores'
 import { featuresDir } from './tray-settings'
 import { perfilActivo } from '../perfil'
 import { encryptText, MIN_PASSWORD } from './export-crypto'
@@ -394,6 +395,8 @@ const feature: Feature = {
         for (const c of parsed.cuentas) {
           if (ctx.store.accounts.some((a) => a.label.trim().toLowerCase() === c.label.trim().toLowerCase())) continue
           try {
+            const motivo = c.proveedor !== undefined && esProveedorId(c.proveedor) ? motivoNoAgregar(ctx.store.accounts, c.proveedor) : undefined
+            if (motivo) throw new Error(motivo)
             const nueva = createAccount(c.label, c.proveedor)
             const acc = { ...nueva, shareSetup: shareSetupAlImportar(c.shareSetup, nueva) }
             ctx.store.addAccount(acc)

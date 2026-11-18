@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { CAPACIDADES, agenteComun, agenteDe, PROVEEDORES_IDS, capacidadesDe, cuentaSugerida, esProveedorId, motivoSinCapacidad, nombreProveedor, proveedorIdDe } from './proveedores'
+import { CAPACIDADES, agenteComun, agenteDe, PROVEEDORES_IDS, capacidadesDe, cuentaSugerida, esProveedorId, motivoNoAgregar, motivoSinCapacidad, nombreProveedor, proveedorIdDe } from './proveedores'
 import type { Capacidades } from './proveedores'
 
 test('proveedorIdDe: ausente es claude y desconocido no es ninguno', () => {
@@ -108,4 +108,11 @@ test('copilot: sin capacidades, con motivos propios y sin compartir el objeto co
   assert.match(motivoSinCapacidad({ proveedor: 'copilot' }, 'tickets') ?? '', /Copilot/)
   assert.match(motivoSinCapacidad({ proveedor: 'copilot' }, 'uso') ?? '', /no informa cuánto te queda/)
   assert.equal(motivoSinCapacidad({ proveedor: 'copilot' }, 'dormir'), 'GitHub Copilot todavía no soporta esto en Sloth.')
+})
+
+test('motivoNoAgregar: claude sin tope, copilot una sola cuenta y los desconocidos no cuentan', () => {
+  assert.equal(motivoNoAgregar([{}, {}, {}], 'claude'), undefined)
+  assert.equal(motivoNoAgregar([{}, { proveedor: 'codex' }], 'copilot'), undefined)
+  assert.equal(motivoNoAgregar([{ proveedor: 'otro-agente' }], 'copilot'), undefined)
+  assert.match(motivoNoAgregar([{ proveedor: 'copilot' }], 'copilot') ?? '', /^Ya tenés una cuenta de GitHub Copilot: su login es del sistema/)
 })
