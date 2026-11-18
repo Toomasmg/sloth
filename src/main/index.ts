@@ -1,7 +1,7 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, net, powerMonitor, protocol, session, shell, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import { pathToFileURL } from 'node:url'
 import { normalize, sep } from 'node:path'
-import { existsSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { homedir, totalmem } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -16,7 +16,9 @@ import { iniciarLogger, logger } from './logger-global'
 import { marcarCrashPrevio } from './diag/estado'
 import { cerrarSesion, iniciarSesion } from './sesion-marcador'
 import { textoSeguro } from './diag/texto-seguro'
-import { armarEnvCuenta, proveedorDe, proveedorExigido } from './proveedores'
+import { armarEnvCuenta, proveedorDe, proveedorExigido, type Proveedor } from './proveedores'
+import { NOMBRE_PROVEEDOR, esProveedorId, motivoSinCapacidad } from '../shared/proveedores'
+import { detectarAgentes } from './agentes'
 import { initialPromptProblem } from '../shared/initial-prompt'
 import { nextAgentState, type AgentInput } from './agent-machine'
 import { createTerminalBackend, type PendingPermission, type TerminalBackend } from './daemon-client'
@@ -349,7 +351,11 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
   /** Deja la cuenta lista antes de abrir Claude: settings + hooks y tu setup compartido. */
   function prepareAccount(acc: Account): void {
     // Una cuenta de un agente que esta versión no conoce no se toca: ni hooks ni setup de Claude en su carpeta.
-    if (!proveedorDe(acc)) return
+    const p = proveedorDe(acc)
+    if (!p) return
+    p.prepararCarpeta(acc.configDir)
+    // Los hooks y el setup compartido son de Claude Code: con otro agente ni se escriben.
+    if (!p.capacidades.hooks) return
     installInto(acc.configDir, baseSettingsFor(acc))
     const report = syncSharedSetup(acc, !accountBusy(acc.id))
     if (report.skipped.length) {
@@ -360,14 +366,8 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     for (const l of prepareListeners) safe('preparar cuenta', () => l(acc))
   }
 
-  /** Claude guarda cada conversación en projects/<cwd con separadores como '-'>. */
   function hasPreviousConversation(acc: Account, cwd: string): boolean {
-    const dir = join(acc.configDir, proveedorExigido(acc).carpetaHistorial, cwd.replace(/[^A-Za-z0-9]/g, '-'))
-    try {
-      return existsSync(dir) && readdirSync(dir).some((f) => f.endsWith('.jsonl'))
-    } catch {
-      return false
-    }
+    return proveedorExigido(acc).hayConversacionPrevia(acc.configDir, cwd)
   }
 
   function pasteInitialPrompt(wsId: string): void {
@@ -386,17 +386,26 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
 
   /** argv de Claude para la terminal del espacio (la shell lo quota según su sintaxis en ptys.ts). */
   function claudeCommand(ws: Workspace, acc: Account): string[] | undefined {
-    // Los reemplazos (p. ej. retomar tras mover de cuenta) se aplican aunque el espacio no abra Claude solo.
-    for (const o of commandOverrides) {
-      let cmd: string | undefined
-      safe('override', () => (cmd = o(ws, acc)))
-      if (cmd) return cmd.trim().split(/\s+/)
+    const p = proveedorExigido(acc)
+    // Los reemplazos (p. ej. retomar tras mover de cuenta) escriben comandos de `claude`: con otro agente no corren.
+    if (p.capacidades.overrideClaude) {
+      for (const o of commandOverrides) {
+        let cmd: string | undefined
+        safe('override', () => (cmd = o(ws, acc)))
+        if (cmd) return cmd.trim().split(/\s+/)
+      }
     }
     if (!ws.autoStartClaude) return undefined
     // Un «!» inicial Claude Code lo correría como comando de la terminal: ese prompt no se manda.
-    const p = proveedorExigido(acc)
     if (ws.initialPrompt && !ws.initialPromptUsed && !initialPromptProblem(ws.initialPrompt)) return p.argvInteractivo({ prompt: ws.initialPrompt })
     return p.argvInteractivo({ continuar: ws.resume !== false && hasPreviousConversation(acc, ws.cwd) })
+  }
+
+  /** Con Claude, un exe que no se encuentra sigue como siempre (la shell lo busca). Con otro agente es un error claro: nunca cae a `claude`. */
+  function exeDe(p: Proveedor): string | undefined {
+    const exe = p.resolverExe()
+    if (exe === undefined && p.id !== 'claude') throw new Error(`No encontré ${NOMBRE_PROVEEDOR[p.id]} en el PATH. Instalalo con: ${p.comoInstalar}`)
+    return exe
   }
 
   function specFor(paneId: string, b: TerminalBackend): PtySpec {
@@ -405,7 +414,8 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
       const p = proveedorExigido(acc)
       prepareAccount(acc)
       // Primer arranque de Claude con esta carpeta: pide tema y login.
-      return { cwd: homedir(), env: accountEnv(acc), claude: p.argvInteractivo({}), claudeExe: p.resolverExe() }
+      const exe = exeDe(p)
+      return { cwd: homedir(), env: accountEnv(acc), claude: p.argvLogin(), claudeExe: exe }
     }
     const ws = store.workspace(paneId)
     if (!ws) throw new Error('Ese espacio ya no existe.')
@@ -413,14 +423,11 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     const p = proveedorExigido(acc)
     if (!existsSync(ws.cwd)) throw new Error(`No existe la carpeta ${ws.cwd}`)
     prepareAccount(acc)
-    const env = {
-      ...accountEnv(acc),
-      SLOTH_WS: ws.id,
-      SLOTH_HOOK_URL: b.hookUrl,
-      SLOTH_TOKEN: hookTokenDe(b.hookToken, ws.id)
-    }
+    const env = p.capacidades.hooks
+      ? { ...accountEnv(acc), SLOTH_WS: ws.id, SLOTH_HOOK_URL: b.hookUrl, SLOTH_TOKEN: hookTokenDe(b.hookToken, ws.id) }
+      : { ...accountEnv(acc), SLOTH_WS: ws.id }
     const claude = claudeCommand(ws, acc)
-    return { cwd: ws.cwd, env, claude, claudeExe: claude ? p.resolverExe() : undefined }
+    return { cwd: ws.cwd, env, claude, claudeExe: claude ? exeDe(p) : undefined }
   }
 
   // Un iframe o una página que se cuele en la ventana no puede mandar pedidos al núcleo: solo vale el origen de la app.
@@ -471,10 +478,14 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     }
   })
 
-  handle('accounts:add', (_e, label: unknown) => {
+  handle('accounts:agentes', () => detectarAgentes())
+
+  handle('accounts:add', (_e, label: unknown, proveedor?: unknown) => {
     if (typeof label !== 'string' || label.length > 80) throw new Error('El nombre de la cuenta tiene que ser un texto de hasta 80 caracteres.')
+    if (proveedor !== undefined && !esProveedorId(proveedor)) throw new Error('Agente inválido.')
     store.exigirEscritura()
-    const acc = { ...createAccount(label), shareSetup: true }
+    const nueva = createAccount(label, proveedor)
+    const acc = { ...nueva, shareSetup: proveedorExigido(nueva).capacidades.setupCompartido }
     store.addAccount(acc)
     prepareAccount(acc)
     return acc
@@ -484,6 +495,8 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
 
   handle('accounts:setShareSetup', (_e, id: unknown, share: unknown) => {
     if (!idValido(id) || typeof share !== 'boolean') throw new Error('Pedido inválido.')
+    const previa = store.accounts.find((a) => a.id === id)
+    if (previa && !proveedorExigido(previa).capacidades.setupCompartido) throw new Error(motivoSinCapacidad(previa, 'setupCompartido'))
     const acc = store.updateAccount(id, { shareSetup: share })
     if (!acc) throw new Error('Esa cuenta ya no existe.')
     proveedorExigido(acc)

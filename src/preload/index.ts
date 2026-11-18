@@ -10,7 +10,8 @@ function listen<A extends unknown[]>(channel: string, cb: (...args: A) => void):
 
 const api: SlothApi = {
   getState: () => ipcRenderer.invoke('state:get'),
-  addAccount: (label) => ipcRenderer.invoke('accounts:add', label),
+  addAccount: (label, proveedor) => ipcRenderer.invoke('accounts:add', label, proveedor),
+  agentes: () => ipcRenderer.invoke('accounts:agentes'),
   removeAccount: (id) => ipcRenderer.invoke('accounts:remove', id),
   accountStatuses: () => ipcRenderer.invoke('accounts:statuses'),
   accountUsage: () => ipcRenderer.invoke('accounts:usage'),
