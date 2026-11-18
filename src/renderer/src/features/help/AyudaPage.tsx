@@ -127,7 +127,8 @@ const CODEX_PASOS: string[] = [
   'Configuración › Cuentas › Agregar cuenta: elegí «Codex» en Agente, poné un nombre y tocá Agregar.',
   'Se abre una terminal con «codex login». Iniciá sesión en el navegador, de a una cuenta por vez: el login usa el puerto 1455 y dos a la vez se pisan.',
   'Para cerrar la sesión de una cuenta, corré «codex logout» en la terminal de esa cuenta.',
-  'Con Codex todavía no hay: uso y límites, avisos de permisos desde el celu, tickets, chat MCP, historial, mover espacios a otra cuenta, dormir espacios ni usar tu setup de Claude. Cada lugar donde falta lo dice.'
+  'Cada espacio de Codex abre una conversación nueva: Sloth todavía no retoma la anterior. El primer mensaje de una plantilla o de un espacio nuevo no siempre se manda solo con Codex: si no puede, te avisa y lo escribís a mano.',
+  'Con Codex todavía no hay: uso y límites, avisos de permisos desde el celu, tickets, chat MCP, historial, mover espacios a otra cuenta, dormir espacios ni usar tu setup de Claude. Varios de esos lugares lo dicen; en otros la función simplemente no corre con una cuenta de Codex.'
 ]
 
 const SECTIONS = [

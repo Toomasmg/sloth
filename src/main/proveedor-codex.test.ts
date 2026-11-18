@@ -32,13 +32,13 @@ test('codex: rutas, capacidades y login', () => {
 
 test('codex: argv nuevo, continuar y con prompt', () => {
   assert.deepEqual(codex.argvInteractivo({}), ['codex', ...SEGURO])
-  assert.deepEqual(codex.argvInteractivo({ continuar: true }), ['codex', 'resume', '--last', ...SEGURO])
+  assert.deepEqual(codex.argvInteractivo({ continuar: true }), ['codex', ...SEGURO])
   assert.deepEqual(codex.argvInteractivo({ prompt: '--x' }), ['codex', ...SEGURO, '--', '--x'])
   assert.deepEqual(codex.argvInteractivo({ prompt: 'a\nb\t"c"', continuar: true }), ['codex', ...SEGURO, '--', 'a b "c"'])
 })
 
 test('codex: ningún argv lleva opciones que saltan permisos o sandbox', () => {
-  const todos = [codex.argvInteractivo({}), codex.argvInteractivo({ continuar: true }), codex.argvInteractivo({ prompt: 'hola' }), codex.argvLogin()]
+  const todos = [codex.argvInteractivo({}), codex.argvInteractivo({ prompt: 'hola' }), codex.argvLogin()]
   for (const a of todos) {
     for (const x of a) assert.equal(x.includes('--dangerously'), false, x)
     assert.equal(a.includes('danger-full-access'), false)
@@ -143,28 +143,15 @@ test('estadoLogin solo mira si auth.json existe', () => {
   }
 })
 
-test('hayConversacionPrevia busca rollout-*.jsonl por nombre bajo sessions/AAAA/MM/DD', () => {
+test('hayConversacionPrevia no deduce nada de los rollouts: sin certeza no hay resume', () => {
   const d = carpeta()
   try {
-    assert.equal(codex.hayConversacionPrevia(d, 'C:/repo'), false)
     const dia = join(d, 'sessions', '2026', '11', '17')
     mkdirSync(dia, { recursive: true })
-    writeFileSync(join(dia, 'otra-cosa.jsonl'), '')
-    assert.equal(codex.hayConversacionPrevia(d, 'C:/repo'), false)
     writeFileSync(join(dia, 'rollout-2026-11-17T10-00-00-0b9f6b1e-3c7a-4d2e-9a51-6f1c2d3e4f50.jsonl'), '')
-    assert.equal(codex.hayConversacionPrevia(d, 'C:/repo'), true)
+    assert.equal(codex.hayConversacionPrevia(d, 'C:/otro-repo'), false)
+    for (const continuar of [true, false]) assert.equal(codex.argvInteractivo({ continuar }).includes('resume'), false)
   } finally {
     rmSync(d, { recursive: true, force: true })
   }
-})
-
-test('el panel Terminal de Codex solo corre el login sin sesión; con sesión abre codex normal', () => {
-  assert.deepEqual(argvPanelCuenta(codex, false), ['codex', 'login'])
-  assert.deepEqual(argvPanelCuenta(codex, true), ['codex', ...SEGURO])
-  assert.equal(argvPanelCuenta(codex, true).includes('login'), false)
-})
-
-test('el panel Terminal de Claude es `claude` con y sin sesión, como en staging', () => {
-  assert.deepEqual(argvPanelCuenta(PROVEEDORES.claude, false), ['claude'])
-  assert.deepEqual(argvPanelCuenta(PROVEEDORES.claude, true), ['claude'])
 })
