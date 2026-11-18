@@ -24,6 +24,7 @@ import {
   parseImport,
   readEnvelope,
   sectionSizes,
+  shareSetupAlImportar,
   templatesToSave,
   type Envelope,
   type ExportDoc,
@@ -393,7 +394,8 @@ const feature: Feature = {
         for (const c of parsed.cuentas) {
           if (ctx.store.accounts.some((a) => a.label.trim().toLowerCase() === c.label.trim().toLowerCase())) continue
           try {
-            const acc = { ...createAccount(c.label, c.proveedor), shareSetup: c.shareSetup }
+            const nueva = createAccount(c.label, c.proveedor)
+            const acc = { ...nueva, shareSetup: shareSetupAlImportar(c.shareSetup, nueva) }
             ctx.store.addAccount(acc)
             try {
               ctx.prepareAccount(acc)

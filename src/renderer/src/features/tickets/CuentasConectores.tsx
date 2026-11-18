@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { capacidadesDe, motivoSinCapacidad } from '../../../../shared/proveedores'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
 import type { Disponibilidad } from '../../../../shared/tickets'
@@ -39,7 +40,8 @@ export function CuentasConectores({ snap }: { snap: Snapshot }): React.JSX.Eleme
   const [manual, setManual] = useState<boolean | null>(null)
   const cid = snap.config.conectorId
   const nombre = snap.conector.nombre
-  const logueadas = ui.accounts.filter((a) => ui.statuses[a.id]?.loggedIn)
+  const logueadas = ui.accounts.filter((a) => ui.statuses[a.id]?.loggedIn && capacidadesDe(a)?.tickets === true)
+  const sinTickets = ui.accounts.filter((a) => ui.statuses[a.id]?.loggedIn && capacidadesDe(a)?.tickets !== true)
   const elegida = snap.config.queryAccountId
   const dElegida = elegida ? snap.cuentas[elegida]?.conectores[cid] : undefined
   const autoAbierto = (!!dElegida && dElegida.tipo !== 'tiene') || !logueadas.some((a) => snap.cuentas[a.id]?.revisadaEn)
@@ -62,6 +64,11 @@ export function CuentasConectores({ snap }: { snap: Snapshot }): React.JSX.Eleme
       <summary>Conectores por cuenta</summary>
       <div className="f-tickets-cuentas-cuerpo">
         {logueadas.length === 0 && <p className="f-tickets-cuentas-nota">Ninguna cuenta tiene la sesión iniciada.</p>}
+        {sinTickets.map((a) => (
+          <p key={a.id} className="f-tickets-cuentas-nota">
+            {a.label}: {motivoSinCapacidad(a, 'tickets')}
+          </p>
+        ))}
         <ul className="f-tickets-cuentas-lista">
           {logueadas.map((a) => {
             const v = snap.cuentas[a.id]

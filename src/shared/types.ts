@@ -18,6 +18,16 @@ export interface AccountStatus {
   configDirExists: boolean
 }
 
+export interface AgenteDisponible {
+  id: ProveedorId
+  nombre: string
+  instalado: boolean
+  version?: string
+  /** Falso si la versión instalada es más vieja que la mínima con la que Sloth probó el agente. */
+  versionOk?: boolean
+  comoInstalar?: string
+}
+
 export interface UsageTotals {
   input: number
   output: number
@@ -152,7 +162,9 @@ export interface DaemonInfo {
 
 export interface SlothApi {
   getState(): Promise<AppState>
-  addAccount(label: string): Promise<Account>
+  addAccount(label: string, proveedor?: string): Promise<Account>
+  /** Agentes que se pueden elegir al agregar una cuenta (canal `accounts:agentes`). */
+  agentes(): Promise<AgenteDisponible[]>
   removeAccount(id: string): Promise<void>
   accountStatuses(): Promise<Record<string, AccountStatus>>
   accountUsage(): Promise<Record<string, AccountUsage>>

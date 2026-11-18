@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { loginPaneId, type Account } from '../../../../shared/types'
+import { capacidadesDe, motivoSinCapacidad } from '../../../../shared/proveedores'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
 import { CheckIcon, PermissionIcon, TerminalIcon } from '../../icons/SlothIcons'
@@ -71,9 +72,10 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
     a,
     current: a.id === ws.accountId,
     logged: Boolean(ui.statuses[a.id]?.loggedIn),
+    motivo: capacidadesDe(a)?.moverCuenta === true ? undefined : motivoSinCapacidad(a, 'moverCuenta'),
     spaces: ui.workspaces.filter((w) => w.accountId === a.id).length
   }))
-  const firstPick = rows.find((r) => !r.current && r.logged)?.a.id ?? null
+  const firstPick = rows.find((r) => !r.current && r.logged && !r.motivo)?.a.id ?? null
   const destLabel = accounts.find((a) => a.id === choice)?.label ?? ''
   const blocked = !choice || working || phase !== 'form' || summary === null
 
@@ -183,11 +185,11 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
               ) : (
                 <div role="radiogroup" aria-labelledby="f-move-dest" className="f-move-list">
                   {rows.map((r, i) => {
-                    const pickable = !r.current && r.logged
+                    const pickable = !r.current && r.logged && !r.motivo
                     const picked = pickable && choice === r.a.id
                     return (
                       <div key={r.a.id} className={`f-move-row${i < rows.length - 1 ? ' sep' : ''}`}>
-                        <label className={`f-move-opt${picked ? ' on' : ''}${pickable ? '' : ' off'}`}>
+                        <label className={`f-move-opt${picked ? ' on' : ''}${pickable ? '' : ' off'}`} title={r.motivo}>
                           <input
                             ref={pickable && r.a.id === firstPick ? firstRef : undefined}
                             type="radio"
@@ -206,7 +208,7 @@ export function MoveDialog({ wsId }: { wsId: string }): React.JSX.Element {
                           <span className="f-move-opt-main">
                             <span className="f-move-opt-title">{r.a.label}</span>
                             <span className={`f-move-opt-sub${r.logged ? '' : ' warn'}`}>
-                              {`${spacesTxt(r.spaces)} · ${r.logged ? (ui.statuses[r.a.id]?.email ?? 'Sesión iniciada') : 'Iniciá sesión primero'}`}
+                              {r.motivo ? `${spacesTxt(r.spaces)} · ${r.motivo}` : `${spacesTxt(r.spaces)} · ${r.logged ? (ui.statuses[r.a.id]?.email ?? 'Sesión iniciada') : 'Iniciá sesión primero'}`}
                             </span>
                           </span>
                           {r.current && <span className="f-move-badge">Cuenta actual</span>}

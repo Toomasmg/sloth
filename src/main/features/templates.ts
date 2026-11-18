@@ -2,9 +2,10 @@ import { readFileSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import { accountStatus } from '../accounts'
-import { buildInput, pickSuggested, SUGGESTED, TemplateFile, type Template } from './templates-core'
+import { buildInput, SUGGESTED, TemplateFile, type Template } from './templates-core'
 import { gitRaw, isDir, normPath } from './git-run'
 import type { UsageTotals } from '../../shared/types'
+import { cuentaSugerida } from '../../shared/proveedores'
 import { carpetaFeatures } from '../perfil'
 
 /**
@@ -114,7 +115,7 @@ async function resolveAccount(ctx: FeatureContext, t: Template): Promise<string>
   } catch {
     /* sin datos de uso: se elige entre las que tienen sesión */
   }
-  const id = pickSuggested(
+  const id = cuentaSugerida(
     accounts,
     (aid) => {
       const a = ctx.store.account(aid)

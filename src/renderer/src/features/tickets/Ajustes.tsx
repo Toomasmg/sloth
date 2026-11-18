@@ -3,6 +3,7 @@ import { useUi } from '../host'
 import { cleanError } from '../../format'
 import { CloseIcon } from '../../icons/SlothIcons'
 import { SIN_CONECTOR, type ConectorPropioVista, type ConectorResumen, type UsoAcum } from '../../../../shared/tickets'
+import { capacidadesDe, nombreProveedor } from '../../../../shared/proveedores'
 import { diaLocal, VUELTAS_DEFECTO, VUELTAS_MAX } from '../../../../shared/tickets-uso'
 import { fmtCosto, resumenUso, setSnapshot, type Snapshot } from './model'
 import { CuentasConectores, textoDisponibilidad } from './CuentasConectores'
@@ -180,10 +181,11 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => voi
                 {ui.accounts.map((a) => {
                   const logueada = !!ui.statuses[a.id]?.loggedIn
                   const d = snap.cuentas[a.id]?.conectores[snap.config.conectorId]
+                  const sinTickets = capacidadesDe(a)?.tickets !== true
                   return (
-                    <option key={a.id} value={a.id} disabled={!logueada || d?.tipo === 'falta'}>
+                    <option key={a.id} value={a.id} disabled={sinTickets || !logueada || d?.tipo === 'falta'}>
                       {a.label}
-                      {logueada ? ` · ${textoDisponibilidad(snap.conector.nombre, d)}` : ' (sin sesión)'}
+                      {sinTickets ? ` (${nombreProveedor(a)}: los tickets solo corren con Claude Code)` : logueada ? ` · ${textoDisponibilidad(snap.conector.nombre, d)}` : ' (sin sesión)'}
                     </option>
                   )
                 })}

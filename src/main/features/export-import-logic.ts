@@ -15,7 +15,7 @@
 import type { Account, Workspace } from '../../shared/types'
 import { TEMPLATE_COLOR_KEYS } from '../../shared/templates-shared'
 import { initialPromptProblem } from '../../shared/initial-prompt'
-import { PROVEEDOR_DEFECTO, PROVEEDOR_ID_RE } from '../../shared/proveedores'
+import { PROVEEDOR_DEFECTO, PROVEEDOR_ID_RE, capacidadesDe } from '../../shared/proveedores'
 import { normalizeSupabaseUrl } from './chat-config'
 import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, THEMES, UI_FONT, SHORTCUT_IDS, canonicalCombo, type AccentChoice } from './settings-model'
 import { decryptText, type Encrypted, WRONG_PASSWORD } from './export-crypto'
@@ -35,6 +35,11 @@ export interface ExportedAccount {
   /** Solo si no es claude: los archivos exportados con Claude quedan idénticos. */
   proveedor?: string
 }
+/** El setup compartido es de Claude Code: lo que diga el archivo no lo activa en una cuenta de un agente que no lo tiene. */
+export function shareSetupAlImportar(archivo: boolean, cuenta: { proveedor?: unknown }): boolean {
+  return archivo && capacidadesDe(cuenta)?.setupCompartido !== false
+}
+
 export function cuentaExportada(a: Account, plan?: string): ExportedAccount {
   const c: ExportedAccount = { label: a.label, shareSetup: a.shareSetup !== false }
   if (plan) c.plan = plan

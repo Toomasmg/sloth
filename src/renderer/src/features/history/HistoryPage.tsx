@@ -7,6 +7,7 @@ import { View } from '../../ui/View'
 import { Button, EmptyState } from '../../ui'
 import { HistoryIcon } from '../../icons/SlothIcons'
 import { marks, wordsOf } from '../help/text'
+import { capacidadesDe, motivoSinCapacidad } from '../../../../shared/proveedores'
 import { SessionDetail } from './SessionDetail'
 import {
   filterRows,
@@ -344,11 +345,14 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
                 <button type="button" aria-pressed={acc === 'todas'} onClick={() => setAcc('todas')}>
                   Todas
                 </button>
-                {ui.accounts.map((a) => (
-                  <button key={a.id} type="button" aria-pressed={acc === a.id} onClick={() => setAcc(a.id)}>
-                    {a.label}
-                  </button>
-                ))}
+                {ui.accounts.map((a) => {
+                  const motivo = capacidadesDe(a)?.historial === true ? undefined : motivoSinCapacidad(a, 'historial')
+                  return (
+                    <button key={a.id} type="button" aria-pressed={acc === a.id} disabled={!!motivo} title={motivo} aria-label={motivo ? `${a.label}: ${motivo}` : undefined} onClick={() => setAcc(a.id)}>
+                      {a.label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 

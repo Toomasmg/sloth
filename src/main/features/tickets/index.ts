@@ -30,6 +30,8 @@ import { podarSegunStore } from '../../poda'
 import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, ticketId } from './acciones'
 import { runClaude } from './claude-run'
 import { proveedorExigido } from '../../proveedores'
+import { capacidadesDe, nombreProveedor } from '../../../shared/proveedores'
+import type { Account } from '../../../shared/types'
 import type { ConectorDef, ConectorGh, ConectorMcp } from './conector'
 import { crearAlmacen, type Almacen, type ConfigCruda, type FsTickets } from './almacen'
 import { CONECTORES } from './conectores'
@@ -310,7 +312,10 @@ function defPara(def: ConectorMcp, cuentaId: string): ConectorMcp {
   return d.tipo === 'tiene' && d.adaptado ? conPrefijo(def, d.prefijo) : def
 }
 
-const logueadas = (): { id: string; label: string }[] => ctx.store.accounts.filter((a) => accountStatus(a).loggedIn)
+/** Los tickets corren `claude -p`: una cuenta de otro agente nunca cuenta, aunque tenga sesión. */
+const puedeTickets = (a: Account): boolean => capacidadesDe(a)?.tickets === true
+
+const logueadas = (): { id: string; label: string }[] => ctx.store.accounts.filter((a) => puedeTickets(a) && accountStatus(a).loggedIn)
 
 /** Las otras cuentas que sí pueden usar el conector, para decir dónde está. */
 const otrasCon = (def: ConectorMcp, cuentaId: string): string[] =>
@@ -490,7 +495,7 @@ const tot = (u?: { input: number; output: number; cacheWrite: number; cacheRead:
 
 /** Cuenta con sesión iniciada y menos uso en las últimas 5 h; con un conector MCP, entre las que lo tienen (si se sabe de alguna). */
 async function pickAccount(def?: ConectorDef): Promise<string> {
-  const logged = ctx.store.accounts.filter((a) => accountStatus(a).loggedIn)
+  const logged = ctx.store.accounts.filter((a) => puedeTickets(a) && accountStatus(a).loggedIn)
   if (!logged.length) throw new Error('No hay ninguna cuenta con sesión iniciada.')
   const conConector = def?.via === 'mcp' ? logged.filter((a) => usable(dispEn(def, a.id))) : []
   const entre = conConector.length ? conConector : logged
@@ -520,6 +525,7 @@ async function start(rawId: unknown, rawAccount?: unknown): Promise<{ id: string
   if (typeof rawAccount === 'string' && rawAccount) {
     const acc = ctx.store.account(rawAccount)
     if (!acc || !accountStatus(acc).loggedIn) throw new Error('Esa cuenta no tiene sesión iniciada.')
+    if (!puedeTickets(acc)) throw new Error(`La cuenta «${acc.label}» es de ${nombreProveedor(acc)}: los tickets todavía solo corren con Claude Code.`)
     accountId = acc.id
   } else accountId = await pickAccount()
   const ws = await ctx.addWorkspace({
@@ -567,6 +573,7 @@ function ejecucion(nombre: string, accountId: string, mcp?: ConectorMcp): Ejecuc
   const acc = ctx.store.account(accountId)
   if (!acc) throw new Error(`La cuenta para consultar ${nombre} ya no existe. Elegí otra en Configuración.`)
   const p = proveedorExigido(acc)
+  if (!p.capacidades.tickets) throw new Error(`La cuenta «${acc.label}» es de ${nombreProveedor(acc)}: los tickets todavía solo corren con Claude Code.`)
   if (!accountStatus(acc).loggedIn) throw new Error(`La cuenta «${acc.label}» no tiene sesión iniciada.`)
   const exe = p.resolverExe()
   if (!exe) throw new Error('No encontré el ejecutable de Claude Code (claude.exe) en el PATH.')
@@ -807,6 +814,7 @@ function setConfig(raw: unknown): TicketsSnapshot {
     else {
       const def = buscar(nuevo ?? state.config.conectorId)
       const acc = ctx.store.account(id)
+      if (acc && !puedeTickets(acc)) throw new Error(`La cuenta «${acc.label}» es de ${nombreProveedor(acc)}: los tickets todavía solo corren con Claude Code.`)
       if (def?.via === 'mcp' && acc && id !== state.config.queryAccountId && dispEn(def, id).tipo === 'falta') {
         const msg = textoCuenta(def, { tipo: 'falta' }, { accountId: id, label: acc.label })
         if (msg) throw new Error(msg)
