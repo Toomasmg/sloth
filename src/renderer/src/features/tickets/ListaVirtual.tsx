@@ -38,6 +38,8 @@ interface Props {
   abiertoId: string | undefined
   /** La tarjeta de la fila `i`; su `key` es el id del ticket. */
   fila: (i: number) => React.ReactNode
+  /** Tarjeta que tenía el foco en la lista que esta reemplaza: se dibuja y se enfoca al montar. */
+  enfocarAlMontar?: string | null
 }
 
 /**
@@ -45,7 +47,7 @@ interface Props {
  * las tarjetas que dibuja y deja espaciadores del alto del resto. La tarjeta con foco, la que se está
  * navegando y la abierta se dibujan siempre.
  */
-export function ListaVirtual({ ids, abiertoId, fila }: Props): React.JSX.Element {
+export function ListaVirtual({ ids, abiertoId, fila, enfocarAlMontar }: Props): React.JSX.Element {
   const ulRef = useRef<HTMLUListElement>(null)
   const scrollerRef = useRef<HTMLElement | null>(null)
   const medidas = useRef(new Map<string, number>())
@@ -54,7 +56,7 @@ export function ListaVirtual({ ids, abiertoId, fila }: Props): React.JSX.Element
   const [pos, setPos] = useState<Pos>({ top: 0, vista: 800 })
   const [ver, setVer] = useState(0)
   const [foco, setFoco] = useState<string | null>(null)
-  const [pedido, setPedido] = useState<{ id: string } | null>(null)
+  const [pedido, setPedido] = useState<{ id: string } | null>(enfocarAlMontar ? { id: enfocarAlMontar } : null)
 
   const indices = useMemo(() => new Map(ids.map((id, i) => [id, i])), [ids])
   const alturas = useMemo(() => ids.map((id) => medidas.current.get(id)), [ids, ver])
@@ -142,6 +144,22 @@ export function ListaVirtual({ ids, abiertoId, fila }: Props): React.JSX.Element
       if (siguiendo.current && ul.contains(document.activeElement)) document.activeElement?.scrollIntoView({ block: 'nearest' })
     }
     observador.current = new ResizeObserver(alMedir)
+    // Con otro ancho (ventana, zoom) los títulos cambian de líneas: lo medido ya no vale. Observar de
+    // nuevo cada tarjeta dibujada fuerza una medición nueva aunque su alto no haya cambiado.
+    let ancho = -1
+    const alCambiarAncho = new ResizeObserver(() => {
+      const w = ul.clientWidth
+      const cambio = ancho >= 0 && Math.abs(w - ancho) > 0.5
+      ancho = w
+      if (!cambio) return
+      medidas.current.clear()
+      for (const el of observados.current) {
+        observador.current?.unobserve(el)
+        observador.current?.observe(el)
+      }
+      setVer((v) => v + 1)
+    })
+    alCambiarAncho.observe(ul)
     sincronizarRef.current()
     return () => {
       if (raf) cancelAnimationFrame(raf)
@@ -150,6 +168,7 @@ export function ListaVirtual({ ids, abiertoId, fila }: Props): React.JSX.Element
       objetivo.removeEventListener('wheel', soltar)
       objetivo.removeEventListener('pointerdown', soltar)
       alCambiarVista?.disconnect()
+      alCambiarAncho.disconnect()
       observador.current?.disconnect()
       observador.current = null
       observados.current.clear()
@@ -176,7 +195,9 @@ export function ListaVirtual({ ids, abiertoId, fila }: Props): React.JSX.Element
     }
     for (const id of medidas.current.keys()) if (!indices.has(id)) medidas.current.delete(id)
     sincronizar()
-    if (pedido) {
+    // Si la tarjeta pedida ya no está (refresco o filtro), el pedido no puede quedar esperando: robaría el foco si vuelve.
+    if (pedido && !indices.has(pedido.id)) setPedido(null)
+    else if (pedido) {
       const boton = [...vivos].find((li) => (li as HTMLElement).dataset.tid === pedido.id)?.querySelector('button')
       if (boton) {
         boton.focus()

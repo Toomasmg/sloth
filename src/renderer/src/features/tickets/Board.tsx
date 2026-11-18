@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { View } from '../../ui/View'
 import { cleanError } from '../../format'
@@ -68,6 +68,14 @@ const byIdDesc = (a: Ticket, b: Ticket): number => {
 }
 
 const tabDe = (t: Ticket, me?: Snapshot['me']): Tab => (isMine(t, me) ? 'mios' : t.responsable ? 'equipo' : 'sin')
+
+/** Id de la tarjeta de la lista que tiene el foco; sin `data-tid` (lista normal) se deduce por posición en `ids`. */
+function tarjetaEnfocada(ids: readonly string[]): string | null {
+  const li = document.activeElement?.closest<HTMLElement>('.f-tickets-rows > li')
+  if (!li) return null
+  if (li.dataset.tid) return li.dataset.tid
+  return ids[Array.prototype.indexOf.call(li.parentElement?.children ?? [], li)] ?? null
+}
 
 function RefreshGlyph(): React.JSX.Element {
   return (
@@ -348,6 +356,20 @@ export function Board(): React.JSX.Element {
   const bodyLoading = !snap || (running && tickets.length === 0)
   const showRows = !bodyLoading && visible.length > 0
   const virtual = visible.length > UMBRAL_VENTANA
+  // Al cruzar el umbral se cambia de lista y la tarjeta enfocada se desmonta: se lee ahora, con el DOM viejo todavía puesto.
+  const virtualPrevia = useRef(virtual)
+  const idsPrevios = useRef(ids)
+  const enfocadaAlCambiar = virtualPrevia.current !== virtual ? tarjetaEnfocada(idsPrevios.current) : null
+  useLayoutEffect(() => {
+    virtualPrevia.current = virtual
+    if (virtual || enfocadaAlCambiar === null) return
+    const i = ids.indexOf(enfocadaAlCambiar)
+    document.querySelector<HTMLElement>(`.f-tickets-rows > li:nth-child(${i + 1}) button`)?.focus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [virtual])
+  useLayoutEffect(() => {
+    idsPrevios.current = ids
+  })
 
   const tarjeta = (t: Ticket, i?: number): React.JSX.Element => {
     const ws = wsOf(t)
@@ -661,7 +683,7 @@ export function Board(): React.JSX.Element {
 
                 {showRows &&
                   (virtual ? (
-                    <ListaVirtual ids={ids} abiertoId={curId} fila={(i) => tarjeta(visible[i], i)} />
+                    <ListaVirtual ids={ids} abiertoId={curId} fila={(i) => tarjeta(visible[i], i)} enfocarAlMontar={enfocadaAlCambiar} />
                   ) : (
                     <ul className="f-tickets-rows">{visible.map((t) => tarjeta(t))}</ul>
                   ))}
