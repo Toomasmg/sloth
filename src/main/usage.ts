@@ -161,7 +161,8 @@ export class UsageScanner {
     const midnight = new Date(new Date(now).setHours(0, 0, 0, 0)).getTime()
     const result: Record<string, AccountUsage> = {}
     for (const acc of accounts) {
-      const files = await listJsonl(join(acc.configDir, proveedorDe(acc).carpetaHistorial))
+      const carpeta = proveedorDe(acc)?.carpetaHistorial
+      const files = carpeta ? await listJsonl(join(acc.configDir, carpeta)) : []
       const seen = new Map<string, Entry>()
       for (const f of files) {
         const c = await this.readNew(f, since7d)

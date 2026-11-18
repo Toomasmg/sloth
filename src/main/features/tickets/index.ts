@@ -29,7 +29,7 @@ import { escribirJsonAtomico } from '../../json-file'
 import { podarSegunStore } from '../../poda'
 import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, ticketId } from './acciones'
 import { runClaude } from './claude-run'
-import { proveedorDe } from '../../proveedores'
+import { proveedorExigido } from '../../proveedores'
 import type { ConectorDef, ConectorGh, ConectorMcp } from './conector'
 import { crearAlmacen, type Almacen, type ConfigCruda, type FsTickets } from './almacen'
 import { CONECTORES } from './conectores'
@@ -566,8 +566,8 @@ function ajenosDe(run: Ejecucion, def: ConectorMcp): string[] {
 function ejecucion(nombre: string, accountId: string, mcp?: ConectorMcp): Ejecucion {
   const acc = ctx.store.account(accountId)
   if (!acc) throw new Error(`La cuenta para consultar ${nombre} ya no existe. Elegí otra en Configuración.`)
+  const p = proveedorExigido(acc)
   if (!accountStatus(acc).loggedIn) throw new Error(`La cuenta «${acc.label}» no tiene sesión iniciada.`)
-  const p = proveedorDe(acc)
   const exe = p.resolverExe()
   if (!exe) throw new Error('No encontré el ejecutable de Claude Code (claude.exe) en el PATH.')
   const cwd = join(carpeta(), 'tickets-run')

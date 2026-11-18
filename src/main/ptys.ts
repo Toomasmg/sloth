@@ -4,7 +4,6 @@ import type { SpawnSpec } from '../shared/daemon-protocol'
 import type { ShellChoice } from './features/settings-model'
 import { shellArgs, shellLaunch, type ShellFamily } from './shell-args'
 import { entornoLimpio } from './env-limpio'
-import { proveedorDe } from './proveedores'
 
 export { shellArgs, type ShellFamily }
 
@@ -46,7 +45,7 @@ export function resolveShell(choice: ShellChoice): { file: string; family: Shell
   return hasPwsh() ? { file: 'pwsh.exe', family: 'ps' } : { file: 'powershell.exe', family: 'ps' }
 }
 
-export function baseEnv(quitarDelAgente: (claveMayus: string) => boolean = proveedorDe({}).quitarDelEntorno): Record<string, string> {
+export function baseEnv(quitarDelAgente: (claveMayus: string) => boolean): Record<string, string> {
   return entornoLimpio(process.env, quitarDelAgente)
 }
 

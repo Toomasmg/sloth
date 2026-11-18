@@ -26,21 +26,21 @@ function baseEnvAnterior(origen: NodeJS.ProcessEnv): Record<string, string> {
 }
 
 const ORIGEN: NodeJS.ProcessEnv = {
-  PATH: 'C:\bin',
-  Path: 'C:\otro',
+  PATH: 'C:\\bin',
+  Path: 'C:\\otro',
   CLAUDECODE: '1',
   claudecode: '1',
   CLAUDE_CODE_ENTRYPOINT: 'cli',
   claude_code_x: 'x',
-  CLAUDE_CONFIG_DIR: 'C:\viejo',
-  Claude_Config_Dir: 'C:\viejo2',
+  CLAUDE_CONFIG_DIR: 'C:\\viejo',
+  Claude_Config_Dir: 'C:\\viejo2',
   ANTHROPIC_API_KEY: 'k',
   anthropic_auth_token: 't',
   ANTHROPIC_BASE_URL: 'https://x',
   CLAUDE: 'no',
   ELECTRON_RUN_AS_NODE: '1',
   ANTIREA_X: '1',
-  SLOTH_USER_DATA: 'C:\d',
+  SLOTH_USER_DATA: 'C:\\d',
   sloth_ws: 'w',
   TERM_PROGRAM: 'otra',
   VACIA: '',
@@ -56,7 +56,7 @@ test('entornoLimpio con el proveedor claude da lo mismo que baseEnv de antes, co
 
 test('entornoLimpio: deja lo que no es del agente y siempre pone TERM_PROGRAM', () => {
   const e = entornoLimpio(ORIGEN, PROVEEDORES.claude.quitarDelEntorno)
-  assert.equal(e.PATH, 'C:\bin')
+  assert.equal(e.PATH, 'C:\\bin')
   assert.equal(e.ANTHROPIC_BASE_URL, 'https://x')
   assert.equal(e.CLAUDE, 'no')
   assert.equal(e.VACIA, '')

@@ -4,8 +4,6 @@ import type { Proveedor } from './proveedores'
 
 export const claude: Proveedor = {
   id: 'claude',
-  nombre: 'Claude Code',
-  comando: 'claude',
   envConfigDir: 'CLAUDE_CONFIG_DIR',
   subcarpetaCuenta: 'claude',
   archivoMeta: '.claude.json',
@@ -20,7 +18,6 @@ export const claude: Proveedor = {
   resolverExe: (env) => resolveClaudeExe(env),
   argvInteractivo: (o) => {
     if (o.prompt) return claudeWithPrompt(o.prompt)
-    if (o.resumir) return ['claude', '--resume', o.resumir]
     if (o.continuar) return ['claude', '--continue']
     return ['claude']
   }

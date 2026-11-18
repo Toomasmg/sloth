@@ -1,11 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { PROVEEDORES, armarEnvCuenta, proveedorDe } from './proveedores'
+import { PROVEEDORES, armarEnvCuenta, proveedorDe, proveedorExigido } from './proveedores'
 import { claudeWithPrompt } from './shell-args'
 
-test('proveedorDe: sin campo o con un valor desconocido es claude', () => {
+test('proveedorDe: sin campo es claude y un valor desconocido no es ninguno', () => {
   assert.equal(proveedorDe({}), PROVEEDORES.claude)
-  assert.equal(proveedorDe({ proveedor: 'codex' }), PROVEEDORES.claude)
+  assert.equal(proveedorDe({ proveedor: 'codex' }), undefined)
+  assert.throws(() => proveedorExigido({ proveedor: 'codex' }), /actualizá Sloth/)
 })
 
 test('claude: quitarDelEntorno', () => {
@@ -17,10 +18,9 @@ test('claude: quitarDelEntorno', () => {
 test('claude: env, rutas y argv', () => {
   const p = PROVEEDORES.claude
   assert.deepEqual(p.envCuenta('C:/x'), { CLAUDE_CONFIG_DIR: 'C:/x' })
-  assert.deepEqual([p.comando, p.subcarpetaCuenta, p.archivoMeta, p.carpetaHistorial], ['claude', 'claude', '.claude.json', 'projects'])
+  assert.deepEqual([p.subcarpetaCuenta, p.archivoMeta, p.carpetaHistorial], ['claude', '.claude.json', 'projects'])
   assert.deepEqual(p.argvInteractivo({}), ['claude'])
   assert.deepEqual(p.argvInteractivo({ continuar: true }), ['claude', '--continue'])
-  assert.deepEqual(p.argvInteractivo({ resumir: 'abc' }), ['claude', '--resume', 'abc'])
   assert.deepEqual(p.argvInteractivo({ prompt: '--x\ny' }), claudeWithPrompt('--x\ny'))
   assert.deepEqual(p.argvInteractivo({ prompt: 'hola', continuar: true }), ['claude', '--', 'hola'])
 })

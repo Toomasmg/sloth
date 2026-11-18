@@ -3,18 +3,21 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { Account, AccountStatus } from '../shared/types'
 import { raizDatos } from './perfil'
-import { proveedorDe } from './proveedores'
+import { proveedorDe, proveedorExigido } from './proveedores'
 
 export function accountsRoot(): string {
   return join(raizDatos(), 'accounts')
 }
 
 /** Cada cuenta vive en su propia carpeta: es el CLAUDE_CONFIG_DIR de esa cuenta. */
-export function createAccount(label: string): Account {
+export function createAccount(label: string, proveedor?: string): Account {
+  const p = proveedorExigido({ proveedor })
   const id = randomUUID()
-  const configDir = join(accountsRoot(), id, proveedorDe({}).subcarpetaCuenta)
+  const configDir = join(accountsRoot(), id, p.subcarpetaCuenta)
   mkdirSync(configDir, { recursive: true })
-  return { id, label: label.trim() || 'Cuenta', configDir, createdAt: Date.now() }
+  const cuenta: Account = { id, label: label.trim() || 'Cuenta', configDir, createdAt: Date.now() }
+  if (proveedor !== undefined) cuenta.proveedor = p.id
+  return cuenta
 }
 
 function readJson(path: string): unknown {
@@ -31,8 +34,9 @@ function readJson(path: string): unknown {
  */
 export function accountStatus(account: Account): AccountStatus {
   const configDirExists = existsSync(account.configDir)
-  if (!configDirExists) return { loggedIn: false, configDirExists }
-  const meta = readJson(join(account.configDir, proveedorDe(account).archivoMeta)) as
+  const p = proveedorDe(account)
+  if (!configDirExists || !p) return { loggedIn: false, configDirExists }
+  const meta = readJson(join(account.configDir, p.archivoMeta)) as
     | { oauthAccount?: { emailAddress?: string; accountUuid?: string } }
     | undefined
   const email = meta?.oauthAccount?.emailAddress

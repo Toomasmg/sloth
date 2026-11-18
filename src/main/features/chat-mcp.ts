@@ -11,7 +11,7 @@ import { conGrant, debeRegistrar, hashToken, KEY_RE, MCP_LIMITS, modoRiesgoso, p
 import { crearAtencion } from './chat-mcp-atencion'
 import { argsAlta, argsBaja, leerRegistro, MCP_SCRIPT_NAME, planificar, type Registro } from './chat-mcp-registro'
 import { CHAT_MCP_SCRIPT } from './chat-mcp-script'
-import { proveedorDe } from '../proveedores'
+import { AVISO_PROVEEDOR_DESCONOCIDO, proveedorDe } from '../proveedores'
 import { hayNode, writeIfChanged } from '../hooks'
 import { escribirJsonAtomico } from '../json-file'
 import { carpetaFeatures, raizDatos } from '../perfil'
@@ -147,6 +147,8 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
     const set = (state: ChatMcpAccountReg['state'], detail?: string): void => {
       regs.set(acc.id, detail ? { accountId: acc.id, label: acc.label, state, detail } : { accountId: acc.id, label: acc.label, state })
     }
+    const p = proveedorDe(acc)
+    if (!p) return set('error', AVISO_PROVEEDOR_DESCONOCIDO)
     const quiere = !baja && debeRegistrar(cfg, acc.id, existentes())
     if (!quiere && invalidarToken(acc.id)) save()
     if (!existsSync(acc.configDir)) return set('error', 'Falta la carpeta de la cuenta.')
@@ -156,7 +158,6 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
     if (accion === 'nada') return set('ok')
     if (accion === 'conflicto') return set('conflicto', 'Ya hay un MCP «sloth» que no puso Sloth; no se tocó.')
     if (quiere && !hayNode()) return set('sin-node', 'Falta node en el PATH: Claude no puede arrancar el MCP.')
-    const p = proveedorDe(acc)
     const exe = p.resolverExe()
     if (!exe) return set('sin-cli', 'No encontré Claude Code (claude.exe) en el PATH; no se tocó nada.')
     // Al arrancar, las terminales que sobrevivieron en el daemon todavía no se conocen: se espera a que las reporte.

@@ -1,60 +1,63 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { entornoLimpio } from './env-limpio'
-import { PROVEEDORES, armarEnvCuenta, proveedorDe } from './proveedores'
-import { claudeWithPrompt, shellLaunch, type ShellFamily } from './shell-args'
-
-const EXE = 'C:\Users\yo\.local\bin\claude.exe'
-const FAMILIAS: ShellFamily[] = ['cmd', 'ps', 'posix']
+import { armarEnvCuenta, proveedorExigido } from './proveedores'
+import { shellLaunch, type ShellFamily } from './shell-args'
 
 interface Modo {
-  continuar?: boolean
-  resumir?: string
-  prompt?: string
+  nombre: string
+  argv: string[]
+  lanzamiento: Record<ShellFamily, { conExe: unknown; sinExe: unknown }>
 }
 
-// Lo que armaban claudeCommand (index.ts) y los overrides de features antes de pasar por el proveedor.
-function argvAnterior(m: Modo): string[] {
-  if (m.prompt) return claudeWithPrompt(m.prompt)
-  if (m.resumir) return 'claude --resume abc-123'.trim().split(/\s+/)
-  if (m.continuar) return ['claude', '--continue']
-  return ['claude']
+// Datos generados con el shell-args.ts de staging: la argv que armaba claudeCommand y lo que shellLaunch devolvía con ella.
+const fixtures = JSON.parse(readFileSync(new URL('./proveedores-equivalencia.fixtures.json', import.meta.url), 'utf8')) as { exe: string; modos: Modo[] }
+
+// El JSON no guarda las claves undefined.
+const plano = (x: unknown): unknown => JSON.parse(JSON.stringify(x))
+
+const ENTRADAS: Record<string, { continuar?: boolean; prompt?: string }> = {
+  nuevo: {},
+  continuar: { continuar: true },
+  'con prompt': { prompt: '/ticket PROJ-12' },
+  'con prompt que parece opción': { prompt: '--dangerously\nhola "mundo" & más' },
+  'con prompt y continuar': { prompt: 'hola', continuar: true }
 }
 
-const MODOS: Array<[string, Modo]> = [
-  ['nuevo', {}],
-  ['continuar', { continuar: true }],
-  ['resumir', { resumir: 'abc-123' }],
-  ['con prompt', { prompt: '/ticket PROJ-12' }],
-  ['con prompt que parece opción', { prompt: '--dangerously\nhola "mundo" & más' }],
-  ['con prompt y continuar', { prompt: 'hola', continuar: true }]
-]
-
-for (const [nombre, modo] of MODOS) {
-  test(`argv y lanzamiento de claude idénticos a los de antes: ${nombre}`, () => {
-    const p = proveedorDe({})
-    const ahora = p.argvInteractivo(modo)
-    assert.equal(JSON.stringify(ahora), JSON.stringify(argvAnterior(modo)))
-    for (const f of FAMILIAS) {
-      assert.equal(JSON.stringify(shellLaunch(f, ahora, EXE)), JSON.stringify(shellLaunch(f, argvAnterior(modo), EXE)), f)
-      assert.equal(JSON.stringify(shellLaunch(f, ahora, undefined)), JSON.stringify(shellLaunch(f, argvAnterior(modo), undefined)), `${f} sin exe`)
+for (const m of fixtures.modos) {
+  test(`argv y lanzamiento de claude idénticos a los de staging: ${m.nombre}`, () => {
+    const argv = proveedorExigido({}).argvInteractivo(ENTRADAS[m.nombre])
+    assert.deepEqual(argv, m.argv)
+    for (const f of Object.keys(m.lanzamiento) as ShellFamily[]) {
+      assert.deepEqual(plano(shellLaunch(f, argv, fixtures.exe)), m.lanzamiento[f].conExe, f)
+      assert.deepEqual(plano(shellLaunch(f, argv, undefined)), m.lanzamiento[f].sinExe, `${f} sin exe`)
     }
   })
 }
 
-test('el env de la terminal con CLAUDE_CONFIG_DIR es idéntico al de antes', () => {
-  const origen: NodeJS.ProcessEnv = { PATH: 'C:\bin', CLAUDECODE: '1', CLAUDE_CONFIG_DIR: 'C:\otra', ANTHROPIC_API_KEY: 'k', SLOTH_X: '1', HOME: 'C:\h' }
+test('el env de la terminal con CLAUDE_CONFIG_DIR es el de staging, con el mismo orden', () => {
+  const origen: NodeJS.ProcessEnv = { PATH: 'C:\\bin', CLAUDECODE: '1', CLAUDE_CONFIG_DIR: 'C:\\otra', ANTHROPIC_API_KEY: 'k', SLOTH_X: '1', HOME: 'C:\\h' }
   const acc = { configDir: 'C:/sloth/accounts/a/claude', label: 'Trabajo', proveedor: undefined }
-  const anterior = { ...entornoLimpio(origen, (k) => k === 'CLAUDECODE' || k.startsWith('CLAUDE_CODE_') || k === 'CLAUDE_CONFIG_DIR' || k === 'ANTHROPIC_API_KEY' || k === 'ANTHROPIC_AUTH_TOKEN'), CLAUDE_CONFIG_DIR: acc.configDir, SLOTH_ACCOUNT: acc.label }
-  const p = proveedorDe(acc)
-  const ahora = armarEnvCuenta(p, acc, entornoLimpio(origen, p.quitarDelEntorno))
-  assert.equal(JSON.stringify(ahora), JSON.stringify(anterior))
+  const p = proveedorExigido(acc)
+  const env = armarEnvCuenta(p, acc, entornoLimpio(origen, p.quitarDelEntorno))
+  assert.deepEqual(Object.entries(env), [
+    ['PATH', 'C:\\bin'],
+    ['HOME', 'C:\\h'],
+    ['TERM_PROGRAM', 'Sloth'],
+    ['CLAUDE_CONFIG_DIR', 'C:/sloth/accounts/a/claude'],
+    ['SLOTH_ACCOUNT', 'Trabajo']
+  ])
 })
 
-test('un proveedor desconocido en la cuenta se resuelve a claude y nunca a otro comando', () => {
-  for (const proveedor of ['codex', '', 'CLAUDE', 42, null, {}, ['claude']]) {
-    const p = proveedorDe({ proveedor })
-    assert.equal(p, PROVEEDORES.claude)
-    assert.equal(p.argvInteractivo({})[0], 'claude')
+test('una cuenta con un proveedor que no se conoce nunca arma un spawn', () => {
+  for (const proveedor of ['codex', '', 'CLAUDE', ' claude', 'claude ', '__proto__', 'toString', 42, null, {}, ['claude']]) {
+    assert.throws(() => proveedorExigido({ proveedor }), /no conoce; actualizá Sloth/, String(proveedor))
   }
+})
+
+test('las cuentas de antes, sin campo, siguen siendo claude', () => {
+  assert.equal(proveedorExigido({}).id, 'claude')
+  assert.equal(proveedorExigido({ proveedor: undefined }).id, 'claude')
+  assert.equal(proveedorExigido({ proveedor: 'claude' }).id, 'claude')
 })

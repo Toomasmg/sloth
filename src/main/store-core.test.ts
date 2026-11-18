@@ -54,7 +54,7 @@ test('proveedor: ausente no se agrega, de tipo raro se saca y un texto desconoci
   assert.deepEqual(validarCuenta(cuenta), cuenta)
   assert.equal('proveedor' in (validarCuenta(cuenta) ?? {}), false)
   assert.equal('proveedor' in (validarCuenta({ ...cuenta, proveedor: 5 }) ?? {}), false)
-  assert.equal(validarCuenta({ ...cuenta, proveedor: 'codex' as never })?.proveedor as string, 'codex')
+  assert.equal(validarCuenta({ ...cuenta, proveedor: 'codex' })?.proveedor, 'codex')
 })
 
 test('se conservan los campos que esta versión no conoce', () => {
