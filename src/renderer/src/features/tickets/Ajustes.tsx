@@ -3,7 +3,7 @@ import { useUi } from '../host'
 import { cleanError } from '../../format'
 import { CloseIcon } from '../../icons/SlothIcons'
 import { SIN_CONECTOR, type ConectorPropioVista, type ConectorResumen, type UsoAcum } from '../../../../shared/tickets'
-import { capacidadesDe, nombreProveedor } from '../../../../shared/proveedores'
+import { capacidadesDe, nombreProveedor, proveedorIdDe, TICKETS_EXPERIMENTAL } from '../../../../shared/proveedores'
 import { diaLocal, VUELTAS_DEFECTO, VUELTAS_MAX } from '../../../../shared/tickets-uso'
 import { fmtCosto, resumenUso, setSnapshot, type Snapshot } from './model'
 import { CuentasConectores, textoDisponibilidad } from './CuentasConectores'
@@ -140,6 +140,7 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => voi
   }
 
   const resumen = resumenDeUso(snap)
+  const costo = (usd: number): string => (snap.motorExperimental && usd === 0 ? 'sin dato' : fmtCosto(usd))
 
   return (
     <section className="f-tickets-ajustes" aria-label="Ajustes de tickets">
@@ -181,11 +182,13 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => voi
                 {ui.accounts.map((a) => {
                   const logueada = !!ui.statuses[a.id]?.loggedIn
                   const d = snap.cuentas[a.id]?.conectores[snap.config.conectorId]
-                  const sinTickets = capacidadesDe(a)?.tickets !== true
+                  const sinTickets = capacidadesDe(a)?.ticketsHeadless !== true
+                  const id = proveedorIdDe(a)
+                  const experimental = id !== undefined && TICKETS_EXPERIMENTAL.includes(id)
                   return (
                     <option key={a.id} value={a.id} disabled={sinTickets || !logueada || d?.tipo === 'falta'}>
                       {a.label}
-                      {sinTickets ? ` (${nombreProveedor(a)}: los tickets solo corren con Claude Code)` : logueada ? ` · ${textoDisponibilidad(snap.conector.nombre, d)}` : ' (sin sesión)'}
+                      {sinTickets ? ` (${nombreProveedor(a)}: todavía no puede consultar tickets)` : logueada ? ` · ${textoDisponibilidad(snap.conector.nombre, d)}${experimental ? ' · experimental' : ''}` : ' (sin sesión)'}
                     </option>
                   )
                 })}
@@ -198,7 +201,13 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => voi
                 <option value="sonnet">Sonnet</option>
                 <option value="opus">Opus</option>
               </Select>
+              {snap.motorExperimental && <small className="f-tickets-experimental">Con Codex se usa el modelo de la cuenta.</small>}
             </label>
+            {snap.motorExperimental && (
+              <p className="f-tickets-experimental" role="note">
+                <strong>Experimental.</strong> Las consultas con Codex todavía no se probaron con todas las versiones: si algo falla, el mensaje lo dice. Las acciones (escribir en el ticket) son de solo lectura, y el conector lo registrás vos en esa cuenta con «codex mcp add».
+              </p>
+            )}
           </>
         ) : (
           <div className="field f-tickets-ajustes-campo f-tickets-ajustes-repo">
@@ -254,14 +263,15 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => voi
       {resumen && (
         <div className="f-tickets-uso" aria-label="Uso estimado">
           <span title="Con suscripción de Claude no se paga por consulta: el número es nominal, para comparar.">
-            Uso (costo estimado) · Hoy: {fmtCosto(resumen.total.hoy.costUsd)} en {resumen.total.hoy.corridas} {resumen.total.hoy.corridas === 1 ? 'consulta' : 'consultas'} · Últimos 7 días:{' '}
-            {fmtCosto(resumen.total.semana.costUsd)}
+            Uso (costo estimado) · Hoy: {costo(resumen.total.hoy.costUsd)} en {resumen.total.hoy.corridas} {resumen.total.hoy.corridas === 1 ? 'consulta' : 'consultas'} · Últimos 7 días:{' '}
+            {costo(resumen.total.semana.costUsd)}
           </span>
           {resumen.porConector.map((c) => (
             <span key={c.id}>
-              {c.nombre}: hoy {fmtCosto(c.hoy.costUsd)} · 7 días {fmtCosto(c.semana.costUsd)}
+              {c.nombre}: hoy {costo(c.hoy.costUsd)} · 7 días {costo(c.semana.costUsd)}
             </span>
           ))}
+          {snap.motorExperimental && <span>Con Codex el costo aparece como «sin dato» y el tope de costo no aplica; el tope de vueltas cuenta llamadas al conector.</span>}
         </div>
       )}
 

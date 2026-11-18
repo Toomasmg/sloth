@@ -166,7 +166,7 @@ function PasoServidor({
   const [res, setRes] = useState<Descubiertas | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const prefijoMal = prefijo !== '' && !PREFIJO_RE.test(prefijo)
-  const conSesion = ui.accounts.filter((a) => ui.statuses[a.id]?.loggedIn && capacidadesDe(a)?.tickets === true)
+  const conSesion = ui.accounts.filter((a) => ui.statuses[a.id]?.loggedIn && capacidadesDe(a)?.ticketsHeadless === true)
 
   const buscar = (): void => {
     setErr(null)

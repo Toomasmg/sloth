@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { capacidadesDe, motivoSinCapacidad } from '../../../../shared/proveedores'
+import { capacidadesDe, motivoSinCapacidad, proveedorIdDe } from '../../../../shared/proveedores'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
 import type { Disponibilidad } from '../../../../shared/tickets'
@@ -40,8 +40,9 @@ export function CuentasConectores({ snap }: { snap: Snapshot }): React.JSX.Eleme
   const [manual, setManual] = useState<boolean | null>(null)
   const cid = snap.config.conectorId
   const nombre = snap.conector.nombre
-  const logueadas = ui.accounts.filter((a) => ui.statuses[a.id]?.loggedIn && capacidadesDe(a)?.tickets === true)
-  const sinTickets = ui.accounts.filter((a) => ui.statuses[a.id]?.loggedIn && capacidadesDe(a)?.tickets !== true)
+  const logueadas = ui.accounts.filter((a) => ui.statuses[a.id]?.loggedIn && capacidadesDe(a)?.ticketsHeadless === true)
+  const sinTickets = ui.accounts.filter((a) => ui.statuses[a.id]?.loggedIn && capacidadesDe(a)?.ticketsHeadless !== true)
+  const hayCodex = logueadas.some((a) => proveedorIdDe(a) === 'codex')
   const elegida = snap.config.queryAccountId
   const dElegida = elegida ? snap.cuentas[elegida]?.conectores[cid] : undefined
   const autoAbierto = (!!dElegida && dElegida.tipo !== 'tiene') || !logueadas.some((a) => snap.cuentas[a.id]?.revisadaEn)
@@ -66,7 +67,7 @@ export function CuentasConectores({ snap }: { snap: Snapshot }): React.JSX.Eleme
         {logueadas.length === 0 && <p className="f-tickets-cuentas-nota">Ninguna cuenta tiene la sesión iniciada.</p>}
         {sinTickets.map((a) => (
           <p key={a.id} className="f-tickets-cuentas-nota">
-            {a.label}: {motivoSinCapacidad(a, 'tickets')}
+            {a.label}: {motivoSinCapacidad(a, 'ticketsHeadless')}
           </p>
         ))}
         <ul className="f-tickets-cuentas-lista">
@@ -74,6 +75,7 @@ export function CuentasConectores({ snap }: { snap: Snapshot }): React.JSX.Eleme
             const v = snap.cuentas[a.id]
             const d = v?.conectores[cid]
             const otros = Object.entries(v?.conectores ?? {}).filter(([id, x]) => id !== cid && x.tipo === 'tiene')
+            const codex = proveedorIdDe(a) === 'codex'
             const accion = queHacer(d)
             return (
               <li key={a.id} className="f-tickets-cuentas-item">
@@ -90,7 +92,7 @@ export function CuentasConectores({ snap }: { snap: Snapshot }): React.JSX.Eleme
                 {accion && <p className="f-tickets-cuentas-nota">{accion}</p>}
                 {d?.tipo === 'falta' && (
                   <p className="f-tickets-cuentas-nota">
-                    {conServidor.length ? `Lo tienen: ${conServidor.join(', ')}.` : 'Ninguna cuenta lo tiene. Sumalo en Claude Code con /mcp.'}
+                    {conServidor.length ? `Lo tienen: ${conServidor.join(', ')}.` : codex ? 'Ninguna cuenta lo tiene. Sumalo con «codex mcp add» en esa cuenta.' : 'Ninguna cuenta lo tiene. Sumalo en Claude Code con /mcp.'}
                   </p>
                 )}
                 {d?.tipo === 'elegir' && (
@@ -124,6 +126,11 @@ export function CuentasConectores({ snap }: { snap: Snapshot }): React.JSX.Eleme
             )
           })}
         </ul>
+        {hayCodex && (
+          <p className="f-tickets-cuentas-nota">
+            Con Codex, Sloth solo lee los nombres de los servidores del config.toml de la cuenta: no sabe si andan. Para sumar el conector, registralo vos con «codex mcp add» en esa cuenta.
+          </p>
+        )}
         <div className="f-tickets-cuentas-pie">
           <Button size="sm" onClick={() => revisar()} disabled={ocupado}>
             Volver a revisar todas
