@@ -166,7 +166,9 @@ En **Celular → Desde cualquier red**, Sloth publica la misma vista que en el W
 
 El SQL tiene una prueba con PGlite (Postgres en WASM) con más de 140 casos de acceso permitido y prohibido. Para correrla: `npm i --no-save @electric-sql/pglite` y después `node supabase/tests/rls.test.mjs supabase/setup.sql`.
 
-`setup.sql` se genera de las migraciones de `supabase/migrations/` con `node scripts/build-supabase-setup.mjs`. No se edita a mano. Está pensado para un proyecto nuevo: las migraciones 0001 a 0008 ya estaban aplicadas en proyectos existentes y no se tocaron. Si el tuyo ya andaba, pegar `setup.sql` entero también es seguro (las pruebas lo verifican sobre una base de prueba).
+`setup.sql` se genera de las migraciones de `supabase/migrations/` con `node scripts/build-supabase-setup.mjs`. No se edita a mano. Está pensado para un proyecto nuevo: las migraciones 0001 a 0008 ya estaban aplicadas en proyectos existentes y no se tocaron. Si el tuyo ya andaba, pegar `setup.sql` entero también es seguro (las pruebas lo verifican sobre una base de prueba, también con las migraciones 0001 a 0008 y datos ya cargados).
+
+Nota: el enlace de «Privacidad» en «Acerca de» apunta a `main` y da 404 hasta que esta versión llega a esa rama.
 
 ## Costos y consumo
 

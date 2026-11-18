@@ -68,3 +68,28 @@ test('el harness PGlite la aplica limpia y dos veces', { skip: PGlite ? false : 
   await db.exec(sql)
   await db.exec(sql)
 })
+
+test('pegar setup.sql sobre una base que ya tenía 0001 a 0008 no rompe ni cambia el esquema', { skip: PGlite ? false : 'PGlite no está instalado' }, async () => {
+  const { stub } = await import(pathToFileURL(join(raiz, 'supabase', 'tests', 'stub.mjs')).href)
+  const nueva = new PGlite({ extensions: { pgcrypto } })
+  await nueva.exec(stub)
+  await nueva.exec(readFileSync(setup, 'utf8'))
+
+  const vieja = new PGlite({ extensions: { pgcrypto } })
+  await vieja.exec(stub)
+  for (const n of nombres.slice(0, 8)) await vieja.exec(readFileSync(join(migraciones, n), 'utf8'))
+  await vieja.exec(readFileSync(setup, 'utf8'))
+  await vieja.exec(readFileSync(setup, 'utf8'))
+
+  const consultas = {
+    politicas: `select tablename, policyname, cmd, roles::text, qual, with_check from pg_policies where schemaname = 'public' order by 1, 2`,
+    funciones: `select p.proname, md5(pg_get_functiondef(p.oid)), p.proacl::text from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' order by 1, 2`,
+    grants: `select table_name, grantee, privilege_type from information_schema.role_table_grants where table_schema = 'public' order by 1, 2, 3`,
+    columnas: `select table_name, column_name, grantee, privilege_type from information_schema.column_privileges where table_schema = 'public' and grantee in ('anon', 'authenticated') order by 1, 2, 3, 4`,
+    triggers: `select event_object_table, trigger_name, action_timing, event_manipulation from information_schema.triggers where trigger_schema = 'public' order by 1, 2, 3, 4`,
+    constraints: `select conrelid::regclass::text, conname, pg_get_constraintdef(oid) from pg_constraint where connamespace = 'public'::regnamespace order by 1, 2`
+  }
+  for (const [nombre, sql] of Object.entries(consultas)) {
+    assert.deepEqual((await vieja.query(sql)).rows, (await nueva.query(sql)).rows, `difiere ${nombre}`)
+  }
+})
