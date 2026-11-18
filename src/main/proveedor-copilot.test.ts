@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { entornoLimpio } from './env-limpio'
@@ -69,7 +69,7 @@ test('copilot: el entorno de la cuenta no trae tokens y sí COPILOT_HOME, COPILO
   assert.deepEqual(Object.entries(env), [['PATH', 'p'], ['HOME', 'h'], ['TERM_PROGRAM', 'Sloth'], ['COPILOT_HOME', 'C:/x'], ['COPILOT_AUTO_UPDATE', 'false'], ['SLOTH_ACCOUNT', 'Mi cuenta']])
 })
 
-test('shellLaunch con copilot sin exe o con copilot.cmd: el prompt nunca llega a la línea de la shell', () => {
+test('shellLaunch con copilot sin exe o con copilot.cmd: el prompt nunca llega a la línea de la shell y queda en paste', () => {
   const argv = copilot.argvInteractivo({ prompt: PROMPT_RARO })
   for (const f of FAMILIAS) {
     for (const exe of [undefined, 'C:\\bin\\copilot.cmd']) {
@@ -84,7 +84,7 @@ test('shellLaunch con copilot sin exe o con copilot.cmd: el prompt nunca llega a
   }
 })
 
-test('shellLaunch con copilot.exe: el prompt se pega en las tres familias, sin SLOTH_PROMPT ni --', () => {
+test('shellLaunch con copilot.exe: el prompt queda en paste en las tres familias, sin SLOTH_PROMPT ni --', () => {
   const argv = copilot.argvInteractivo({ prompt: PROMPT_RARO })
   for (const f of FAMILIAS) {
     const l = shellLaunch(f, argv, 'C:\\bin\\copilot.exe')
@@ -97,7 +97,7 @@ test('shellLaunch con copilot.exe: el prompt se pega en las tres familias, sin S
   }
 })
 
-test('shellLaunch con copilot: un prompt que parece subcomando o flag también se pega', () => {
+test('shellLaunch con copilot: un prompt que parece subcomando o flag también queda en paste, fuera de la línea', () => {
   for (const prompt of ['config', '--allow-all', 'update']) {
     for (const f of FAMILIAS) {
       const l = shellLaunch(f, copilot.argvInteractivo({ prompt }), 'C:\\bin\\copilot.exe')
@@ -142,10 +142,9 @@ test('claude y codex: shellLaunch da lo mismo que antes de sumar Copilot', () =>
   assert.equal(lineaDeShell('ps', shellLaunch('ps', ['claude'], 'C:\\bin\\claude.cmd').args), '& claude')
 })
 
-test('loginDeConfigCopilot: solo hay sesión con un usuario registrado', () => {
+test('loginDeConfigCopilot: solo hay sesión con un usuario en loggedInUsers (lastLoggedInUser puede quedar tras un logout)', () => {
   assert.deepEqual(loginDeConfigCopilot({ loggedInUsers: [{ host: 'https://github.com', login: 'x' }] }), { loggedIn: true })
-  assert.deepEqual(loginDeConfigCopilot({ lastLoggedInUser: { login: 'x' } }), { loggedIn: true })
-  for (const j of [{ loggedInUsers: [] }, { loggedInUsers: 'x' }, { lastLoggedInUser: null }, { lastLoggedInUser: 'x' }, {}, [], null, 'x', 3, undefined]) {
+  for (const j of [{ loggedInUsers: [] }, { loggedInUsers: 'x' }, { lastLoggedInUser: { login: 'x' } }, { loggedInUsers: [], lastLoggedInUser: { login: 'x' } }, {}, [], null, 'x', 3, undefined]) {
     assert.deepEqual(loginDeConfigCopilot(j), { loggedIn: false }, JSON.stringify(j))
   }
 })
@@ -160,9 +159,25 @@ test('estadoLogin lee solo config.json: sin archivo, vacío, roto o con BOM', ()
     assert.deepEqual(copilot.estadoLogin(d), { loggedIn: false })
     writeFileSync(join(d, 'config.json'), '{roto')
     assert.deepEqual(copilot.estadoLogin(d), { loggedIn: false })
-    writeFileSync(join(d, 'config.json'), '\uFEFF{"lastLoggedInUser":{"login":"x"}}')
+    writeFileSync(join(d, 'config.json'), '\uFEFF{"loggedInUsers":[{"login":"x"}]}')
     assert.deepEqual(copilot.estadoLogin(d), { loggedIn: true })
+    writeFileSync(join(d, 'config.json'), '{"lastLoggedInUser":{"login":"x"}}')
+    assert.deepEqual(copilot.estadoLogin(d), { loggedIn: false })
     assert.deepEqual(copilot.estadoLogin(join(d, 'no-existe')), { loggedIn: false })
+  } finally {
+    rmSync(d, { recursive: true, force: true })
+  }
+})
+
+test('estadoLogin no lee un config.json que no es un archivo regular ni uno enorme', () => {
+  const d = carpeta()
+  try {
+    mkdirSync(join(d, 'config.json'))
+    assert.deepEqual(copilot.estadoLogin(d), { loggedIn: false })
+    rmSync(join(d, 'config.json'), { recursive: true })
+    const usuarios = '{"loggedInUsers":[{"login":"x"}],"relleno":"' + 'a'.repeat(1024 * 1024) + '"}'
+    writeFileSync(join(d, 'config.json'), usuarios)
+    assert.deepEqual(copilot.estadoLogin(d), { loggedIn: false })
   } finally {
     rmSync(d, { recursive: true, force: true })
   }
