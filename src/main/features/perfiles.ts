@@ -5,17 +5,17 @@ import type { Feature, FeatureContext } from './context'
 import { run, type RunResult } from './git-run'
 import { leerJson } from '../json-file'
 import { logger } from '../logger-global'
-import { indicePerfiles, modoRaiz, raizDatos, recargarIndice, rutaPerfil } from '../perfil'
+import { idPerfilActivo, indicePerfiles, modoRaiz, raizDatos, recargarIndice, rutaPerfil } from '../perfil'
 import { agregarActividad, leerActividad } from '../perfiles-actividad'
 import { dentroDe, idPerfilValido, NOMBRE_INICIAL, nombreLibre } from '../perfiles-core'
 import {
   borrarPerfilFs,
-  cambiarActivoFs,
   crearPerfilFs,
   guardarFoto,
   guardarGhLogin,
   leerFotoDataUrl,
   MAX_BYTES_FOTO,
+  prepararCambioFs,
   renombrarPerfilFs,
   rutasPerfiles,
   tieneFoto
@@ -23,6 +23,7 @@ import {
 import { parsearUsuarioGh, urlAvatarConTamano, type IdentidadGh } from '../perfiles-github'
 import { validarEstado, type EstadoValidado } from '../store-core'
 import type { EntradaActividad, PerfilesPayload } from '../../shared/perfiles'
+import { loginPaneId } from '../../shared/types'
 
 const SIN_GH = 'No encontré un GitHub conectado en esta PC. Iniciá sesión con `gh auth login`.'
 const SIN_PERFILES = 'Los perfiles no están disponibles: Sloth está usando tus datos de siempre. Reiniciá para reintentar.'
@@ -111,11 +112,12 @@ const feature: Feature = {
 
     ctx.handle('estado', async (): Promise<PerfilesPayload> => {
       const indice = indicePerfiles()
+      const activo = idPerfilActivo()
       const backend = ctx.terminal()
       const vivas = backend ? await backend.list().catch(() => []) : []
       return {
-        perfiles: indice.perfiles.map((p) => ({ ...p, tieneFoto: tieneFoto(raizDatos(), p.id), activo: p.id === indice.activo })),
-        activo: indice.activo,
+        perfiles: indice.perfiles.map((p) => ({ ...p, tieneFoto: tieneFoto(raizDatos(), p.id), activo: p.id === activo })),
+        activo,
         ajenas: { cantidad: ctx.terminalesAjenas().length },
         modoRaiz: modoRaiz(),
         terminalesVivas: vivas.filter((s) => s.running && ctx.store.workspace(s.id) !== undefined).length,
@@ -142,12 +144,15 @@ const feature: Feature = {
     ctx.handle('cambiar', async (id: unknown, opts?: unknown) => {
       const destino = existente(id)
       const cerrar = opcion(opts, 'cerrarTerminales')
-      if (destino === indicePerfiles().activo) throw new Error('Ya estás en ese perfil.')
+      if (destino === idPerfilActivo()) throw new Error('Ya estás en ese perfil.')
+      // Se valida el destino antes de cerrar nada: si no se puede cambiar, las terminales siguen donde estaban.
+      const aplicar = prepararCambioFs(raizDatos(), destino)
       if (cerrar) {
         const b = await ctx.backend()
         for (const w of ctx.store.workspaces) if (b.isRunning(w.id)) await b.kill(w.id)
+        for (const a of ctx.store.accounts) if (b.isRunning(loginPaneId(a.id))) await b.kill(loginPaneId(a.id))
       }
-      cambiarActivoFs(raizDatos(), destino)
+      aplicar()
       // La respuesta tiene que llegar a la UI antes de que se cierre el proceso.
       setTimeout(() => {
         ctx.reiniciarPorPerfil().catch((e: unknown) => {
@@ -161,7 +166,7 @@ const feature: Feature = {
 
     ctx.handle('borrar', (id: unknown) => {
       const objetivo = existente(id)
-      if (objetivo === indicePerfiles().activo) throw new Error('No se puede borrar el perfil activo. Cambiá a otro primero.')
+      if (objetivo === idPerfilActivo()) throw new Error('No se puede borrar el perfil activo. Cambiá a otro primero.')
       const ajenas = new Set(ctx.terminalesAjenas())
       if (espaciosDe(objetivo).some((w) => ajenas.has(w))) throw new Error('Cerrá sus terminales antes de borrarlo.')
       const respaldo = borrarPerfilFs(raizDatos(), objetivo, Date.now())

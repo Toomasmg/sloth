@@ -50,7 +50,7 @@ import {
   type RevealTarget,
   type Workspace
 } from '../shared/types'
-import { cambiandoDePerfil, marcarCambioDePerfil, raizDatos } from './perfil'
+import { cambiandoDePerfil, iniciarPerfiles, marcarCambioDePerfil, raizDatos } from './perfil'
 import { decidirCierreTerminales, esTerminalPropia, terminalesAjenas } from './perfiles-core'
 
 let win: BrowserWindow | null = null
@@ -163,6 +163,18 @@ function serveRenderer(): void {
 }
 
 app.whenReady().then(async () => {
+  // La segunda instancia sigue unos instantes después de app.quit(): no puede llegar a la migración de perfiles ni a nada que escriba.
+  if (!instanciaUnica) return
+  // Con perfiles ya creados que no se pueden usar no hay un lugar seguro donde trabajar (la raíz quedó congelada): se avisa y no se toca nada.
+  const arranque = iniciarPerfiles()
+  if (arranque.bloqueado) {
+    cerrarSesion(logsDir, inicioSesion)
+    dialog.showErrorBox('Sloth no puede abrir tus perfiles', `${arranque.bloqueado}
+
+No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningún antivirus tenga esos archivos y volvé a abrir Sloth.`)
+    app.exit(1)
+    return
+  }
   serveRenderer()
   const devUrl = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined
   session.defaultSession.setPermissionRequestHandler((_wc, permiso, cb, d) => cb(permisoChromium(permiso, origenConfiable(d.requestingUrl, devUrl), 'mediaTypes' in d ? d.mediaTypes : undefined)))
