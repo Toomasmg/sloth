@@ -23,7 +23,7 @@ test('esProveedorId solo acepta ids del registro', () => {
 test('capacidades: claude las tiene todas y codex ninguna', () => {
   assert.deepEqual([...PROVEEDORES_IDS], ['claude', 'codex'])
   for (const k of Object.keys(CAPACIDADES.claude) as (keyof Capacidades)[]) {
-    if (k === 'limitesExperimental') continue
+    if (k === 'limitesExperimental' || k === 'avisoTurno') continue
     assert.equal(CAPACIDADES.claude[k], true, `claude ${k}`)
     assert.equal(CAPACIDADES.codex[k], false, `codex ${k}`)
   }
@@ -73,7 +73,7 @@ test('cuentaSugerida con solo cuentas de Claude: con sesión y la de menos uso, 
 test('avisoTurno y limitesExperimental por agente', () => {
   assert.equal(CAPACIDADES.claude.avisoTurno, true)
   assert.equal(CAPACIDADES.claude.limitesExperimental, false)
-  assert.equal(CAPACIDADES.codex.avisoTurno, false)
+  assert.equal(CAPACIDADES.codex.avisoTurno, true)
   assert.equal(CAPACIDADES.codex.limitesExperimental, true)
   assert.equal(motivoSinCapacidad({ proveedor: 'codex' }, 'limitesExperimental'), undefined)
   assert.equal(capacidadesDe({ proveedor: 'zzz' })?.limitesExperimental, undefined)

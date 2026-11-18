@@ -63,7 +63,7 @@ const NINGUNA: Capacidades = {
   limitesExperimental: false
 }
 
-export const CAPACIDADES: Record<ProveedorId, Capacidades> = { claude: TODAS, codex: { ...NINGUNA, limitesExperimental: true } }
+export const CAPACIDADES: Record<ProveedorId, Capacidades> = { claude: TODAS, codex: { ...NINGUNA, avisoTurno: true, limitesExperimental: true } }
 
 export const NOMBRE_PROVEEDOR: Record<ProveedorId, string> = { claude: 'Claude Code', codex: 'Codex' }
 

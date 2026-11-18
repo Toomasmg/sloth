@@ -57,6 +57,12 @@ test('limitesExperimentales: un booleano se conserva y uno de tipo raro se saca'
   assert.equal('limitesExperimentales' in (validarCuenta(cuenta) ?? {}), false)
 })
 
+test('avisoDeTurno: un booleano se conserva y uno de tipo raro se saca', () => {
+  assert.equal(validarCuenta({ ...cuenta, avisoDeTurno: true })?.avisoDeTurno, true)
+  assert.equal('avisoDeTurno' in (validarCuenta({ ...cuenta, avisoDeTurno: 1 }) ?? {}), false)
+  assert.equal('avisoDeTurno' in (validarCuenta(cuenta) ?? {}), false)
+})
+
 test('proveedor: ausente no se agrega, de tipo raro se saca y un texto desconocido se conserva', () => {
   assert.deepEqual(validarCuenta(cuenta), cuenta)
   assert.equal('proveedor' in (validarCuenta(cuenta) ?? {}), false)

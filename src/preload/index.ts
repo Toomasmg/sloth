@@ -17,6 +17,7 @@ const api: SlothApi = {
   accountUsage: () => ipcRenderer.invoke('accounts:usage'),
   setShareSetup: (id, share) => ipcRenderer.invoke('accounts:setShareSetup', id, share),
   setLimitesExperimentales: (id, activo) => ipcRenderer.invoke('accounts:setLimitesExperimentales', id, activo),
+  setAvisoDeTurno: (id, activo) => ipcRenderer.invoke('accounts:setAvisoDeTurno', id, activo),
   limitesCodex: () => ipcRenderer.invoke('accounts:limitesCodex'),
   addWorkspace: (input) => ipcRenderer.invoke('workspaces:add', input),
   removeWorkspace: (id) => ipcRenderer.invoke('workspaces:remove', id),

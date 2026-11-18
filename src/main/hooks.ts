@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import type { AgentState } from '../shared/types'
 import { HOOK_EVENTS, type HookEventPayload } from '../shared/daemon-protocol'
 import { HOOK_MARKER, HOOK_SCRIPT, LEGACY_HOOK_MARKERS } from '../daemon/hook-script'
+import { NOTIFY_SCRIPT } from '../daemon/notify-script'
 import { envolverStatusline, STATUSLINE_SCRIPT } from './statusline-core'
 import { respaldarAntesDeReemplazar, respaldarUnaVez } from './respaldo'
 import { raizDatos } from './perfil'
@@ -21,6 +22,11 @@ const PERMISSION_HOOK_TIMEOUT_S = 130
 /** Ruta del script de hook (userData/sloth-hook.cjs). */
 export function hookScriptPath(): string {
   return join(raizDatos(), 'sloth-hook.cjs')
+}
+
+/** Ruta del script de aviso de turno de Codex (userData/sloth-notify.cjs). */
+export function notifyScriptPath(): string {
+  return join(raizDatos(), 'sloth-notify.cjs')
 }
 
 let nodeEnPath: boolean | undefined
@@ -57,11 +63,12 @@ export function writeIfChanged(file: string, content: string): void {
   renameSync(tmp, file)
 }
 
-/** Escribe (o actualiza) el script de hook y el de la statusline. Llamar una vez al arrancar, antes de installInto. */
+/** Escribe (o actualiza) el script de hook, el de la statusline y el de aviso de turno de Codex. Llamar una vez al arrancar, antes de installInto. */
 export function writeHookScript(): string {
   const file = hookScriptPath()
   writeIfChanged(file, HOOK_SCRIPT)
   writeIfChanged(statuslineScriptPath(), STATUSLINE_SCRIPT)
+  writeIfChanged(notifyScriptPath(), NOTIFY_SCRIPT)
   return file
 }
 

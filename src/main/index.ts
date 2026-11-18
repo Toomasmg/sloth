@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { Store } from './store'
 import { accountStatus, createAccount } from './accounts'
-import { installInto, stateForEvent, writeHookScript, type HookEventPayload } from './hooks'
+import { hayNode, installInto, notifyScriptPath, stateForEvent, writeHookScript, type HookEventPayload } from './hooks'
 import { esFalsoFinal, pendientes, registrar as registrarFondo, venceEn, type Fondo } from './segundo-plano-core'
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
 import { pastePayload } from './shell-args'
@@ -20,6 +20,8 @@ import { textoSeguro } from './diag/texto-seguro'
 import { argvPanelCuenta, armarEnvCuenta, proveedorDe, proveedorExigido, type Proveedor } from './proveedores'
 import { NOMBRE_PROVEEDOR, capacidadesDe, esProveedorId, motivoSinCapacidad } from '../shared/proveedores'
 import { limitesDeCuenta } from './codex-limites'
+import { avisarNotify, desinstalarNotify, prepararNotify } from './codex-notify'
+import { entornoDeTerminal } from './hook-env-core'
 import { detectarAgentes } from './agentes'
 import { initialPromptProblem } from '../shared/initial-prompt'
 import { nextAgentState, type AgentInput } from './agent-machine'
@@ -356,6 +358,7 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     const p = proveedorDe(acc)
     if (!p) return
     p.prepararCarpeta(acc.configDir)
+    if (p.id === 'codex' && p.capacidades.avisoTurno) safe('notify', () => ajustarNotify(acc))
     // Los hooks y el setup compartido son de Claude Code: con otro agente ni se escriben.
     if (!p.capacidades.hooks) return
     installInto(acc.configDir, baseSettingsFor(acc))
@@ -366,6 +369,13 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
       logger.aviso('setup', `cuenta ${store.accounts.indexOf(acc) + 1}: ${report.skipped.join('; ')}`)
     }
     for (const l of prepareListeners) safe('preparar cuenta', () => l(acc))
+  }
+
+  /** Con el aviso activado deja el `notify` de Sloth en la cuenta; apagado, saca el que puso Sloth. Devuelve el motivo si no quedó como se pidió. */
+  function ajustarNotify(acc: Account): string | undefined {
+    const motivo = acc.avisoDeTurno === true ? prepararNotify(acc.configDir, hayNode() ? 'node' : undefined, notifyScriptPath()) : desinstalarNotify(acc.configDir)
+    if (motivo) avisarNotify(motivo)
+    return motivo
   }
 
   function hasPreviousConversation(acc: Account, cwd: string): boolean {
@@ -425,9 +435,7 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     const p = proveedorExigido(acc)
     if (!existsSync(ws.cwd)) throw new Error(`No existe la carpeta ${ws.cwd}`)
     prepareAccount(acc)
-    const env = p.capacidades.hooks
-      ? { ...accountEnv(acc), SLOTH_WS: ws.id, SLOTH_HOOK_URL: b.hookUrl, SLOTH_TOKEN: hookTokenDe(b.hookToken, ws.id) }
-      : { ...accountEnv(acc), SLOTH_WS: ws.id }
+    const env = entornoDeTerminal(accountEnv(acc), p.capacidades, acc.avisoDeTurno === true, ws.id, () => ({ url: b.hookUrl, token: hookTokenDe(b.hookToken, ws.id) }))
     const claude = claudeCommand(ws, acc)
     return { cwd: ws.cwd, env, claude, claudeExe: claude ? exeDe(p) : undefined }
   }
@@ -518,6 +526,23 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     if (capacidadesDe(cuenta)?.limitesExperimental !== true) throw new Error(motivoSinCapacidad(cuenta, 'limitesExperimental'))
     store.exigirEscritura()
     store.updateAccount(id, { limitesExperimentales: activo })
+  })
+
+  handle('accounts:setAvisoDeTurno', (_e, id: unknown, activo: unknown) => {
+    if (!idValido(id) || typeof activo !== 'boolean') throw new Error('Pedido inválido.')
+    const cuenta = store.account(id)
+    if (!cuenta) throw new Error('Esa cuenta ya no existe.')
+    const p = proveedorExigido(cuenta)
+    if (p.id !== 'codex' || !p.capacidades.avisoTurno) throw new Error(motivoSinCapacidad(cuenta, 'avisoTurno') ?? 'Esta cuenta no usa el aviso de «terminó» de Codex.')
+    store.exigirEscritura()
+    const acc = store.updateAccount(id, { avisoDeTurno: activo })
+    if (!acc) throw new Error('Esa cuenta ya no existe.')
+    const motivo = ajustarNotify(acc)
+    // Si no se pudo activar vuelve a apagado: no queda un switch prendido que no hace nada.
+    if (motivo && activo) {
+      store.updateAccount(id, { avisoDeTurno: false })
+      throw new Error(motivo)
+    }
   })
 
   handle('accounts:limitesCodex', async () => {

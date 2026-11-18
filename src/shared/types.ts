@@ -11,6 +11,8 @@ export interface Account {
   shareSetup?: boolean
   /** Leer los límites de uso con `codex app-server` (experimental). Ausente = apagado. */
   limitesExperimentales?: boolean
+  /** Avisar «terminó» con el `notify` de Codex en el config.toml de la cuenta (experimental). Ausente = apagado. */
+  avisoDeTurno?: boolean
   /** Agente de terminal de la cuenta. Ausente = claude. Puede ser un id que esta versión no conoce: se resuelve con proveedorDe. */
   proveedor?: ProveedorId | (string & {})
 }
@@ -174,6 +176,8 @@ export interface SlothApi {
   setShareSetup(id: string, share: boolean): Promise<SetupSyncReport | null>
   /** Activa o apaga la lectura experimental de límites de una cuenta de Codex (canal `accounts:setLimitesExperimentales`). */
   setLimitesExperimentales(id: string, activo: boolean): Promise<void>
+  /** Activa o apaga el aviso de «terminó» de una cuenta de Codex (canal `accounts:setAvisoDeTurno`). Si no se puede activar, rechaza con el motivo. */
+  setAvisoDeTurno(id: string, activo: boolean): Promise<void>
   /** Límites de las cuentas con la lectura activada; null es «sin dato» (canal `accounts:limitesCodex`). */
   limitesCodex(): Promise<Record<string, LimitesCodex | null>>
   addWorkspace(input: NewWorkspaceInput): Promise<Workspace>

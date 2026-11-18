@@ -23,7 +23,7 @@ function lineaDeShell(f: ShellFamily, args: string[]): string {
 
 test('codex: rutas, capacidades y login', () => {
   assert.deepEqual([codex.id, codex.envConfigDir, codex.subcarpetaCuenta, codex.archivoMeta, codex.carpetaHistorial], ['codex', 'CODEX_HOME', 'codex', 'config.toml', 'sessions'])
-  assert.deepEqual(Object.entries(codex.capacidades).filter(([, v]) => v).map(([k]) => k), ['limitesExperimental'])
+  assert.deepEqual(Object.entries(codex.capacidades).filter(([, v]) => v).map(([k]) => k), ['avisoTurno', 'limitesExperimental'])
   assert.deepEqual(codex.argvLogin(), ['codex', 'login'])
   assert.equal(codex.comoInstalar, 'npm install -g @openai/codex')
   assert.deepEqual(codex.envCuenta('C:/x'), { CODEX_HOME: 'C:/x' })
