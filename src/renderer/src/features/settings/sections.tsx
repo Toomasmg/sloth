@@ -885,6 +885,13 @@ export function NotificationsSection({ onClose }: { onClose(): void }): React.JS
 const CHECK_ICONO: Record<ChatCheckEstado, string> = { ok: '✔', fallo: '✖', aviso: '!', 'sin-datos': '?' }
 const CHECK_ETIQUETA: Record<ChatCheckEstado, string> = { ok: 'Bien', fallo: 'Falló', aviso: 'Atención', 'sin-datos': 'Sin datos' }
 
+function resumenChecks(checks: ChatCheck[]): string {
+  const n = (e: ChatCheckEstado): number => checks.filter((c) => c.estado === e).length
+  const fallos = checks.filter((c) => c.estado === 'fallo').map((c) => c.titulo)
+  const partes = [`${n('ok')} bien`, `${n('aviso')} con atención`, `${fallos.length} falló${fallos.length ? `: ${fallos.join(', ')}` : ''}`]
+  return `Revisión: ${partes.join(', ')}.`
+}
+
 export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element {
   const ui = useUi()
   const [snap, setSnap] = useState<ChatSnapshot | null>(null)
@@ -1048,8 +1055,11 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
           {testRes.text}
         </p>
       )}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {checksFailed ? 'No se pudo revisar el servidor.' : checks ? resumenChecks(checks) : ''}
+      </div>
       {(checks || checksFailed) && (
-        <div aria-live="polite">
+        <div>
           {checksFailed && <p className="form-error">No se pudo revisar el servidor.</p>}
           {checks && (
             <ul className="f-set-checks" aria-label="Chequeos del servidor">
@@ -1371,7 +1381,7 @@ export function AboutSection({ onClose }: { onClose(): void }): React.JSX.Elemen
             Reportar un problema
           </Button>
         </div>
-        <div className="f-set-hint">Sin telemetría: solo sale de tu PC lo que activás vos (chat, celu, ntfy, GitHub).</div>
+        <div className="f-set-hint">Sin telemetría. Sloth busca actualizaciones en GitHub por su cuenta; el resto (chat, celu, ntfy) sale solo si lo activás.</div>
       </div>
       <Group id="g-mas" title="Más">
         <ToggleLikeButton title="Novedades" hint="Qué cambió en la última versión de Sloth." onClick={go(() => openHelp('whatsnew'))} />
