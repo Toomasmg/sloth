@@ -262,7 +262,9 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
           const custom = p.settings.accountColors[a.id]
           const spaces = ui.workspaces.filter((w) => w.accountId === a.id).length
           const busy = confirm === a.id
-          const u = ui.usage[a.id]
+          const conUso = capacidadesDe(a)?.uso === true
+          // Sin la capacidad el escáner devuelve ceros: mostrarlos sería un dato falso.
+          const u = conUso ? ui.usage[a.id] : undefined
           const motivoSetup = capacidadesDe(a)?.setupCompartido === true ? undefined : motivoSinCapacidad(a, 'setupCompartido')
           return (
             <div key={a.id} className="f-set-acc" style={{ '--acc': color } as React.CSSProperties}>
@@ -301,7 +303,9 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
                     </dl>
                   )}
                 </div>
-                <PlanField key={`${a.id}-${p.settings.accountPlans[a.id] ?? ''}`} label={a.label} value={p.settings.accountPlans[a.id] ?? ''} onCommit={(plan) => save({ accountPlans: { [a.id]: plan || null } })} />
+                {conUso && (
+                  <PlanField key={`${a.id}-${p.settings.accountPlans[a.id] ?? ''}`} label={a.label} value={p.settings.accountPlans[a.id] ?? ''} onCommit={(plan) => save({ accountPlans: { [a.id]: plan || null } })} />
+                )}
                 <span className={`f-set-state ${logged ? 'ok' : 'warn'}`}>
                   <span className="f-set-dot" aria-hidden="true" />
                   {logged ? 'Sesión iniciada' : 'Hay que iniciar sesión'}
