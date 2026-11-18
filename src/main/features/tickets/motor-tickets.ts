@@ -3,7 +3,7 @@ import type { Accion } from '../../../shared/tickets'
 import type { ConectorMcp } from './conector'
 import type { Limites } from './motor'
 
-export type TareaMotor = 'lista' | 'detalle' | 'accion' | 'descubrir' | 'revisar'
+export type TareaMotor = 'lista' | 'detalle' | 'accion' | 'descubrir' | 'revisar' | 'personas'
 
 export interface PedidoMotor {
   tarea: TareaMotor

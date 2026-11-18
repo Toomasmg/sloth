@@ -49,6 +49,8 @@ export interface Detalle {
   comentarios: Comentario[]
   /** null = sin registro (no es cero). */
   minutos: number | null
+  /** Solo con un conector que la trae en el detalle: texto plano, con saltos de línea y acotado. */
+  descripcion?: string
 }
 
 export interface Ticket {
@@ -62,7 +64,61 @@ export interface Ticket {
   responsableId?: string
   descripcion?: string
   criterios?: Criterio[]
+  /** ISO: cuándo se creó, o cuándo se cerró si el estado es de categoría 'hecho'. Sin valor = el conector no la dio o no era una fecha. */
+  fecha?: string
 }
+
+/** Una persona del equipo, solo para elegir a quién filtrar: id y nombre, nunca mails ni teléfonos. */
+export interface PersonaEquipo {
+  id: string
+  nombre: string
+}
+
+/** Lo que ya se leyó: «Actualizar» y cambiar el filtro piden solo lo que falta. */
+export interface AlcanceLeido {
+  personas: string[]
+  sinAsignar: boolean
+  /** Si se pidieron también los de categoría 'hecho'. */
+  hechos: boolean
+  /** La ventana más corta con la que se leyeron los terminados. */
+  ventanaDias: number
+  /** Cuántos tickets había y no se trajeron (tope de la lista o páginas sin leer); ausente = ninguno. */
+  noLeidos?: number
+}
+
+/** Qué se ve: lo que eligió la persona, con los valores por defecto ya resueltos. */
+export interface FiltroVista {
+  personasElegidas: string[]
+  incluirSinAsignar: boolean
+  estadosElegidos: string[]
+  ventanaDias: number
+}
+
+export interface ConteosTickets {
+  /** Por id de responsable (o `sin_asignar`), entre lo que pasa estado y ventana. */
+  porPersona: Record<string, number>
+  /** Por clave de estado, entre lo que pasa alcance y ventana. */
+  porEstado: Record<string, number>
+  /** Tickets leídos que quedan fuera de lo que se ve. */
+  ocultos: number
+  /** Los que se ven pero no traen una fecha válida (la ventana no los puede descartar). */
+  sinFecha: number
+  /** Lo que la última lectura no trajo por un tope: lo que se ve no es todo lo que hay. */
+  noLeidos?: number
+}
+
+/** Qué falta leer para que la lista cubra el filtro. */
+export interface PendientesLista {
+  personas: string[]
+  sinAsignar: boolean
+  /** Hay que volver a leer todo (se sumaron los terminados o se alargó la ventana). */
+  todo: boolean
+}
+
+export const SIN_ASIGNAR = 'sin_asignar'
+export const VENTANA_DEFECTO = 4
+export const VENTANA_MAX = 14
+export const PERSONAS_ELEGIDAS_MAX = 20
 
 export interface TicketsConfig {
   conectorId: string
@@ -81,6 +137,14 @@ export interface TicketsConfig {
   maxTurns?: number
   /** Tope de costo en dólares de cada consulta (0,01 a 100); sin valor, sin tope. */
   maxCostUsd?: number
+  /** Ids de las personas cuyos tickets se ven además de los propios (solo conectores con herramienta de personas). */
+  personasElegidas?: string[]
+  /** Ver también los tickets sin responsable. */
+  incluirSinAsignar?: boolean
+  /** Claves de estado que se ven; sin valor, en curso, revisión y terminados. */
+  estadosElegidos?: string[]
+  /** Solo se ve lo creado (o cerrado) en los últimos N días, salvo lo propio que sigue abierto. 1 a 14; sin valor, 4. */
+  ventanaDias?: number
 }
 
 export type EstadoMcp = 'connected' | 'needs-auth' | 'failed' | 'pending' | 'otro'
@@ -185,6 +249,8 @@ export interface ConectorInfo {
   /** Forma del id de ticket del conector (anclada con ^…$) y si se normaliza a mayúsculas: para validar sin ir a main. */
   idRegex: string
   idMayusculas: boolean
+  /** El conector sabe listar personas: se puede filtrar por responsable. */
+  filtraPersonas: boolean
 }
 
 export interface Corrida {
@@ -242,6 +308,12 @@ export interface TicketsSnapshot {
   revisando: boolean
   /** La cuenta de consulta usa un motor con datos sin confirmar (Codex): la UI lo avisa. No se guarda. */
   motorExperimental?: boolean
+  /** Solo con conectores que filtran por personas. `tickets` ya viene filtrado (alcance, estados y ventana). */
+  filtro?: FiltroVista
+  personas?: PersonaEquipo[]
+  personasAt?: number
+  conteos?: ConteosTickets
+  pendientes?: PendientesLista
 }
 
 /** La primera lista que tenga la clave gana; si ninguna la tiene, 'pendiente'. */

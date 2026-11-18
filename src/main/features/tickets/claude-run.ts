@@ -12,6 +12,15 @@ import { depsReales } from '../../kill-tree-real'
  */
 
 export const RUN_TIMEOUT_MS = 120_000
+
+/** La consulta no terminó en su plazo: quien llama lo distingue de un error de la herramienta para no culpar a la conexión. */
+export class PlazoError extends Error {
+  segundos: number
+  constructor(quien: string, segundos: number) {
+    super(`${quien} no respondió en ${segundos} s. Probá de nuevo.`)
+    this.segundos = segundos
+  }
+}
 /** Tope de lo que se lee de stdout: una respuesta rara no llena la memoria. */
 const MAX_STDOUT = 4 * 1024 * 1024
 
@@ -110,7 +119,7 @@ export function runClaude<T>(o: RunOptions<T>): Promise<T> {
     }
     const timer = setTimeout(() => {
       cortar()
-      finish(new Error(`${o.quien} no respondió en ${Math.round(timeoutMs / 1000)} s. Probá de nuevo.`))
+      finish(new PlazoError(o.quien, Math.round(timeoutMs / 1000)))
     }, timeoutMs)
     const onAbort = (): void => {
       cortar()

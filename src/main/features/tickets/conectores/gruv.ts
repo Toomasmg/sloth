@@ -12,8 +12,9 @@ export default {
   ejemplo: { id: 'TCK-1234', estado: 'en_revision', prioridad: 'severidad', proyecto: 'espacio o proyecto' },
   herramientas: {
     prefijo: 'mcp__claude_ai_Gruv__',
-    lista: ['listar_tickets', 'ver_flujo_tickets', 'ver_mi_inicio', 'buscar_persona'],
-    detalle: ['listar_comentarios_ticket', 'listar_criterios_ticket', 'ver_reloj'],
+    lista: ['listar_tickets', 'ver_flujo_tickets', 'ver_mi_inicio', 'ver_mi_perfil', 'buscar_persona'],
+    personas: 'buscar_persona',
+    detalle: ['listar_comentarios_ticket', 'listar_criterios_ticket', 'ver_reloj', 'ver_ticket'],
     escritura: {
       estado: 'mover_ticket',
       tomar: 'asignar_ticket',
@@ -70,15 +71,27 @@ export default {
     { clave: 'cerrado', nombre: 'Cerrado', categoria: 'hecho' }
   ],
   pistas: {
-    yo: { conId: 'Tu id en Gruv es "{id}": usalo en yo.id.', sinId: 'Tu id y tu nombre en Gruv los sacás de ver_mi_inicio.' },
+    yo: {
+      conId: 'Tu id en Gruv es "{id}": usalo en yo.id.',
+      sinId: 'Tu nombre y tu correo salen de ver_mi_perfil; tu id es el de la persona que devuelve buscar_persona con ese correo. No pongas el correo en la respuesta.'
+    },
     lista:
-      'Llamá a la herramienta de Gruv listar_tickets SIN filtrar por estado ni por asignado (quiero los tickets de todo el equipo), con limite: 100. Si vuelven 100, seguí con desplazamiento: 100, 200… hasta traer todos (como máximo 250).',
+      'Llamá a la herramienta de Gruv listar_tickets SIN filtrar por estado ni por asignado (quiero los tickets de todo el equipo), con limite: 50. Si vuelven 50, seguí con desplazamiento: 50, 100… hasta traer todos (como máximo 250).',
+    listaPor:
+      'Llamá a listar_tickets una vez por cada responsable de esta lista: {asignados}. Usá asignado: <ese id> (o "sin_asignar") y limite: 50, todas en paralelo. Si una vuelve con 50, pedí la página siguiente con desplazamiento: 50 (y 100 como máximo). Son los abiertos de cada uno y se leen enteros, sin cortar por fecha. "fecha" es created_at.',
+    listaHechos:
+      'Además, por cada responsable llamá a listar_tickets con estado: "cerrado", el mismo asignado y limite: 50, y leé también la página de desplazamiento: 50 (los cerrados no vienen ordenados por cierre). En esos, "fecha" es closed_at.',
+    personas:
+      'Armá la lista de las personas del equipo: llamá a buscar_persona en paralelo con una letra por llamada (a, e, i, o, u, s, n, r, l, m) como texto; cada una devuelve hasta 25. Juntalas sin repetir por id.',
     estados: 'Llamá a ver_flujo_tickets (sin tipo) y armá "estados" con las columnas en su orden, sin repetir claves, con la clave y el nombre que se ven.',
     detalle: [
       { herramienta: 'listar_comentarios_ticket', args: { id: '{ticket}' } },
       { herramienta: 'listar_criterios_ticket', args: { id: '{ticket}' } },
-      { herramienta: 'ver_reloj', args: { entidad: 'ticket', id: '{ticket}' } }
+      { herramienta: 'ver_reloj', args: { entidad: 'ticket', id: '{ticket}' } },
+      { herramienta: 'ver_ticket', args: { id: '{ticket}' } }
     ],
+    descripcion:
+      'Gruv no tiene un campo "descripcion": el texto del ticket sale de lo que devuelve ver_ticket en "ocurrido" (qué pasó), "esperado" (qué se esperaba) y "pasos". Armalo con los que tengan texto, en ese orden, cada uno en su renglón y encabezado por "Qué pasó:", "Qué se esperaba:" y "Pasos:". Ignorá el resto de los campos de ver_ticket.',
     acciones: {
       estado: { args: { id: '{ticket}', estado: '{estado}' }, nota: 'No pongas resolucion ni resolucion_nota.' },
       tomar: { args: { id: '{ticket}', persona: '{persona}' }, nota: 'Es tomar el ticket para esa persona.' },

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { runClaude } from './claude-run'
+import { PlazoError, runClaude } from './claude-run'
 
 class Propio extends Error {}
 
@@ -91,4 +91,11 @@ test('runClaude nombra al agente en «No pude abrir»', async () => {
   const sinExe = { ...base, exe: 'no-existe-este-programa-sloth', parse: () => 0 }
   await assert.rejects(runClaude(sinExe), /^Error: No pude abrir Claude:/)
   await assert.rejects(runClaude({ ...sinExe, agente: 'Codex' }), /^Error: No pude abrir Codex:/)
+})
+
+test('runClaude que vence su plazo rechaza con PlazoError y el mismo texto de siempre', async () => {
+  await assert.rejects(
+    runClaude({ ...base, args: ['-e', 'setTimeout(()=>{},20000)'], timeoutMs: 300, parse: () => 0 }),
+    (e: unknown) => e instanceof PlazoError && e.segundos === 0 && /^.+ no respondió en 0 s\. Probá de nuevo\.$/.test(e.message)
+  )
 })

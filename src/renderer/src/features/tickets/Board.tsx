@@ -7,10 +7,11 @@ import { CloseIcon, SearchIcon, SettingsIcon, TicketIcon } from '../../icons/Slo
 import { Button, EmptyState } from '../../ui'
 import { openSettings } from '../settings/bus'
 import type { Workspace } from '../../../../shared/types'
-import { categoriaDe, SIN_CONECTOR } from '../../../../shared/tickets'
+import { categoriaDe, SIN_CONECTOR, type FiltroVista } from '../../../../shared/tickets'
 import { espacioDelTicket } from '../../../../shared/templates-shared'
 import { VUELTAS_DEFECTO, VUELTAS_MAX } from '../../../../shared/tickets-uso'
 import {
+  consumirPedidoFiltro,
   etiquetaTablero,
   isMine,
   norm,
@@ -31,7 +32,11 @@ import {
 import { TarjetaTicket, estadoKind } from './parts'
 import { ListaVirtual, UMBRAL_VENTANA } from './ListaVirtual'
 import { Detail } from './Detail'
+import { FiltroBar, type CambioFiltro } from './FiltroBar'
+import { Grupos } from './Grupos'
+import { grupoDe, gruposDe, GRUPO_TODOS, hayFaltante, ordenarPorGrupo } from './filtro-vista'
 
+type Modo = 'todo' | 'faltante' | 'personas'
 type Tab = 'mios' | 'equipo' | 'sin'
 const TABS: { id: Tab; name: string }[] = [
   { id: 'mios', name: 'Míos' },
@@ -94,6 +99,17 @@ export function Board(): React.JSX.Element {
   const [prio, setPrio] = useState('todas')
   const [selId, setSelId] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [confirmModo, setConfirmModo] = useState<Modo>('todo')
+  const [grupoSel, setGrupoSel] = useState(GRUPO_TODOS)
+  const [filtroAbierto, setFiltroAbierto] = useState(consumirPedidoFiltro)
+  /** Lo último que se pidió en el filtro, mientras main todavía responde: las casillas no esperan al viaje. */
+  const [optimista, setOptimista] = useState<FiltroVista | null>(null)
+  const [personasBusy, setPersonasBusy] = useState(false)
+  const [errPersonas, setErrPersonas] = useState<string | null>(null)
+  const [errPorPersona, setErrPorPersona] = useState<Record<string, string>>({})
+  const [modoCorriendo, setModoCorriendo] = useState<Modo | null>(null)
+  const colaFiltro = useRef<Promise<unknown>>(Promise.resolve())
+  const filtrosEnViaje = useRef(0)
   const [busy, setBusy] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
@@ -164,6 +180,15 @@ export function Board(): React.JSX.Element {
   const accLabel = (id?: string): string | undefined => ui.accounts.find((a) => a.id === id)?.label
 
   const isMineT = (t: Ticket): boolean => isMine(t, me)
+  // Con un conector que filtra por personas, main ya mandó los tickets filtrados y los grupos reemplazan a las pestañas.
+  const filtro: FiltroVista | undefined = snap?.filtro ? (optimista ?? snap.filtro) : undefined
+  const grupos = useMemo(() => (filtro && snap ? gruposDe(filtro, snap.personas, me, tickets, snap.pendientes) : []), [filtro, snap, me, tickets])
+  const grupoActivo = grupos.some((g) => g.clave === grupoSel) ? grupoSel : GRUPO_TODOS
+  const grupoSinTraer = grupos.find((g) => g.clave === grupoActivo)?.sinTraer === true
+  const errVigentes = useMemo(
+    () => Object.fromEntries(Object.entries(errPorPersona).filter(([id]) => snap?.pendientes?.personas.includes(id))),
+    [errPorPersona, snap?.pendientes]
+  )
   const counts = useMemo<Record<Tab, number>>(() => {
     const c: Record<Tab, number> = { mios: 0, equipo: 0, sin: 0 }
     for (const t of tickets) c[tabDe(t, me)]++
@@ -173,17 +198,19 @@ export function Board(): React.JSX.Element {
   const qn = norm(q.trim())
   const filtersOn = Boolean(qn) || stSel.length > 0 || prio !== 'todas'
   const visible = useMemo(
-    () =>
-      tickets
+    () => {
+      const lista = tickets
         .filter(
           (t) =>
-            tabDe(t, me) === tab &&
+            (filtro ? grupoActivo === GRUPO_TODOS || grupoDe(t, me) === grupoActivo : tabDe(t, me) === tab) &&
             (!stSel.length || stSel.includes(t.estado ?? '')) &&
             (prio === 'todas' || (t.prioridad ?? '') === prio) &&
             (!qn || norm(`${t.id} ${t.titulo}`).includes(qn))
         )
-        .sort(byIdDesc),
-    [tickets, me, tab, stSel, prio, qn]
+        .sort(byIdDesc)
+      return filtro && grupoActivo === GRUPO_TODOS ? ordenarPorGrupo(lista, grupos, me) : lista
+    },
+    [tickets, me, tab, stSel, prio, qn, filtro, grupoActivo, grupos]
   )
   const ids = useMemo(() => visible.map((t) => t.id), [visible])
   const current = visible.find((t) => t.id === selId) ?? visible[0] ?? null
@@ -229,24 +256,69 @@ export function Board(): React.JSX.Element {
   const countLabel = visible.length === 1 ? '1 ticket' : `${visible.length} tickets`
 
   // ---------- acciones ----------
-  const refresh = async (vueltas?: number): Promise<void> => {
+  const refresh = async (vueltas?: number, modo: 'todo' | 'faltante' = 'todo'): Promise<void> => {
+    const sinTraer = modo === 'faltante' ? (snap?.pendientes?.personas ?? []) : []
     setConfirming(false)
     setInfo(null)
     setErr(null)
+    setErrPorPersona({})
     setBusy('refresh')
+    setModoCorriendo(modo)
     try {
-      const r = await ui.invoke<{ count: number }>('feat:tickets:refresh', undefined, vueltas)
+      const r = await ui.invoke<{ count: number }>('feat:tickets:refresh', undefined, vueltas, modo)
       setInfo(`${n} trajo ${r.count} ${r.count === 1 ? 'ticket' : 'tickets'}.`)
     } catch (e) {
-      setErr(cleanError(e))
+      const msg = cleanError(e)
+      // Lo que ya estaba sigue a la vista: el fallo se marca en las personas que se estaban trayendo.
+      if (sinTraer.length) setErrPorPersona(Object.fromEntries(sinTraer.map((id) => [id, msg])))
+      else setErr(msg)
     } finally {
       setBusy(null)
+      setModoCorriendo(null)
     }
   }
 
-  const askRefresh = (): void => {
-    if (snap?.config.confirmRefresh && !porGh) setConfirming(true)
-    else void refresh()
+  const traerPersonas = async (): Promise<void> => {
+    setConfirming(false)
+    setErrPersonas(null)
+    setPersonasBusy(true)
+    try {
+      setSnapshot(await ui.invoke<Snapshot>('feat:tickets:personas'))
+    } catch (e) {
+      setErrPersonas(cleanError(e))
+    } finally {
+      setPersonasBusy(false)
+    }
+  }
+
+  const ejecutar = (modo: Modo): void => void (modo === 'personas' ? traerPersonas() : refresh(undefined, modo))
+
+  const pedir = (modo: Modo): void => {
+    if (snap?.config.confirmRefresh && !porGh) {
+      setConfirmModo(modo)
+      setConfirming(true)
+    } else ejecutar(modo)
+  }
+  const askRefresh = (): void => pedir('todo')
+
+  /** Los cambios al filtro van de a uno y en orden; main solo los valida y los guarda (no consulta nada). */
+  const aplicarFiltro = (c: CambioFiltro): void => {
+    const base = optimista ?? snap?.filtro
+    if (!base) return
+    setErr(null)
+    setOptimista({
+      personasElegidas: c.personasElegidas ?? base.personasElegidas,
+      incluirSinAsignar: c.incluirSinAsignar ?? base.incluirSinAsignar,
+      estadosElegidos: c.estadosElegidos ?? base.estadosElegidos,
+      ventanaDias: c.ventanaDias ?? base.ventanaDias
+    })
+    filtrosEnViaje.current++
+    colaFiltro.current = colaFiltro.current
+      .then(() => ui.invoke<Snapshot>('feat:tickets:setFiltro', c))
+      .then(setSnapshot, (e: unknown) => setErr(cleanError(e)))
+      .finally(() => {
+        if (--filtrosEnViaje.current === 0) setOptimista(null)
+      })
   }
 
   /**
@@ -395,6 +467,7 @@ export function Board(): React.JSX.Element {
 
   // Sin tickets que mostrar: la vista es solo un estado vacío con una acción (sin pestañas ni filtros en 0).
   const vacio = !bodyLoading && Boolean(snap) && tickets.length === 0
+  const conBarra = Boolean(filtro && snap && !sinConector && !unavailable)
   const vacioNode = !snap ? null : sinConector ? (
     <EmptyState
       size="lg"
@@ -432,7 +505,13 @@ export function Board(): React.JSX.Element {
       }
     />
   ) : snap.fetchedAt ? (
-    <EmptyState size="lg" icon={<TicketIcon size={28} />} title={`No hay tickets activos en ${n}`} description="Cuando haya alguno asignado o del equipo, aparece acá." action={<Button onClick={askRefresh} disabled={running}>Actualizar</Button>} />
+    <EmptyState
+      size="lg"
+      icon={<TicketIcon size={28} />}
+      title={filtro ? 'No hay tickets con este filtro' : `No hay tickets activos en ${n}`}
+      description={filtro ? 'Probá con otros estados o personas en el filtro de arriba, o actualizá.' : 'Cuando haya alguno asignado o del equipo, aparece acá.'}
+      action={<Button onClick={askRefresh} disabled={running}>Actualizar</Button>}
+    />
   ) : (
     <EmptyState
       size="lg"
@@ -485,7 +564,9 @@ export function Board(): React.JSX.Element {
           <h1 id="f-tickets-title" className="f-tickets-h1">
             {etiquetaTablero(snap)}
           </h1>
-          <p className="f-tickets-lead">Tus tickets y los del equipo. Empezá uno y Sloth arma el espacio para trabajarlo.</p>
+          <p className="f-tickets-lead">
+            {filtro ? 'Tus tickets y los de las personas que elijas. Empezá uno y Sloth arma el espacio para trabajarlo.' : 'Tus tickets y los del equipo. Empezá uno y Sloth arma el espacio para trabajarlo.'}
+          </p>
         </div>
 
         {confirming && (
@@ -493,12 +574,14 @@ export function Board(): React.JSX.Element {
             <span>
               Para leer {n} se abre Claude sin ventana con <b>{accLabel(snap?.config.queryAccountId) ?? 'una cuenta'}</b> (modelo{' '}
               {snap?.config.model}) y usa tokens de esa cuenta. Solo lee: no cambia nada en {n}.
+              {confirmModo === 'faltante' && ' Trae solo lo que falta del filtro.'}
+              {confirmModo === 'personas' && ' Pide la lista de personas del equipo.'}
             </span>
             <label className="check f-tickets-inline-check">
               <input type="checkbox" onChange={(e) => setConfirmRefresh(!e.target.checked)} />
               No volver a preguntar
             </label>
-            <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" autoFocus onClick={() => void refresh()}>
+            <button type="button" className="f-tickets-b f-tickets-b--sm f-tickets-b--pri" autoFocus onClick={() => ejecutar(confirmModo)}>
               Consultar
             </button>
             <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => setConfirming(false)}>
@@ -518,6 +601,24 @@ export function Board(): React.JSX.Element {
           </p>
         )}
 
+        {conBarra && snap && filtro && (
+          <FiltroBar
+            snap={snap}
+            filtro={filtro}
+            grupos={grupos}
+            running={running}
+            abierto={filtroAbierto}
+            onAbierto={setFiltroAbierto}
+            aplicar={aplicarFiltro}
+            onFaltante={() => pedir('faltante')}
+            onPersonas={() => pedir('personas')}
+            personasBusy={personasBusy}
+            errPersonas={errPersonas}
+            errPorPersona={errVigentes}
+            nombreConector={n}
+          />
+        )}
+
         {vacio ? (
           <div className="f-tickets-vacio">
             {snap?.aviso && (
@@ -534,32 +635,43 @@ export function Board(): React.JSX.Element {
               <h2 id="f-tickets-lista-t" className="sr-only">
                 Lista de tickets
               </h2>
-              <div role="tablist" aria-label="Qué tickets ver" className="f-tickets-tabs">
-                {TABS.map((t) => {
-                  const on = tab === t.id
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={on}
-                      tabIndex={on ? 0 : -1}
-                      className={`f-tickets-tab ${on ? 'on' : ''}`}
-                      onClick={() => setTab(t.id)}
-                      onKeyDown={(e) => {
-                        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
-                        e.preventDefault()
-                        const i = TABS.findIndex((x) => x.id === tab)
-                        const j = (i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length
-                        setTab(TABS[j].id)
-                      }}
-                    >
-                      {t.name}
-                      <span className="f-tickets-badge">{counts[t.id]}</span>
-                    </button>
-                  )
-                })}
-              </div>
+              {filtro ? (
+                <Grupos
+                  grupos={grupos}
+                  total={tickets.length}
+                  sel={grupoActivo}
+                  onSel={setGrupoSel}
+                  trayendo={running && modoCorriendo !== 'personas' && hayFaltante(snap?.pendientes)}
+                  errPorPersona={errVigentes}
+                />
+              ) : (
+                <div role="tablist" aria-label="Qué tickets ver" className="f-tickets-tabs">
+                  {TABS.map((t) => {
+                    const on = tab === t.id
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={on}
+                        tabIndex={on ? 0 : -1}
+                        className={`f-tickets-tab ${on ? 'on' : ''}`}
+                        onClick={() => setTab(t.id)}
+                        onKeyDown={(e) => {
+                          if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+                          e.preventDefault()
+                          const i = TABS.findIndex((x) => x.id === tab)
+                          const j = (i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length
+                          setTab(TABS[j].id)
+                        }}
+                      >
+                        {t.name}
+                        <span className="f-tickets-badge">{counts[t.id]}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
 
               <div className="f-tickets-filters">
                 <label className="f-tickets-search">
@@ -572,22 +684,24 @@ export function Board(): React.JSX.Element {
                     aria-label="Buscar por código o título"
                   />
                 </label>
-                <div role="group" aria-label="Filtrar por estado" className="f-tickets-chips">
-                  {estadoKeys.map((e) => {
-                    const on = stSel.includes(e.clave)
-                    return (
-                      <button
-                        key={e.clave}
-                        type="button"
-                        className={`f-tickets-chipf f-tickets-st-${kindOf(e.clave)} ${on ? 'on' : ''}`}
-                        aria-pressed={on}
-                        onClick={() => setStSel((s) => (on ? s.filter((x) => x !== e.clave) : [...s, e.clave]))}
-                      >
-                        {e.nombre}
-                      </button>
-                    )
-                  })}
-                </div>
+                {!filtro && (
+                  <div role="group" aria-label="Filtrar por estado" className="f-tickets-chips">
+                    {estadoKeys.map((e) => {
+                      const on = stSel.includes(e.clave)
+                      return (
+                        <button
+                          key={e.clave}
+                          type="button"
+                          className={`f-tickets-chipf f-tickets-st-${kindOf(e.clave)} ${on ? 'on' : ''}`}
+                          aria-pressed={on}
+                          onClick={() => setStSel((s) => (on ? s.filter((x) => x !== e.clave) : [...s, e.clave]))}
+                        >
+                          {e.nombre}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
                 <div className="f-tickets-filter-row">
                   <label className="f-tickets-prio-field">
                     Prioridad
@@ -692,8 +806,8 @@ export function Board(): React.JSX.Element {
                   <EmptyState
                     size="sm"
                     as="h3"
-                    title="Ningún ticket coincide"
-                    description="Probá con otra palabra o sacá algún filtro."
+                    title={grupoSinTraer ? 'Todavía no se trajeron sus tickets' : 'Ningún ticket coincide'}
+                    description={grupoSinTraer ? 'Tocá «Traer lo que falta» en el filtro de arriba.' : 'Probá con otra palabra o sacá algún filtro.'}
                     action={
                       <Button
                         onClick={() => {

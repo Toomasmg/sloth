@@ -114,6 +114,12 @@ const RECHAZOS: Array<[string, unknown, RegExp]> = [
   ['lista en los args', con('pistas.acciones.tomar.args', { id: '{ticket}', a: { b: ['x'] } }), /texto no vacío/],
   ['pista de acción que falta', con('pistas.acciones.comentar', BORRAR), /acciones\.comentar: falta/],
   ['pista de acción sin herramienta', con('herramientas.escritura.comentar', BORRAR), /acciones\.comentar: clave desconocida/],
+  ['personas fuera de la lista', con('herramientas.personas', 'ver_reloj'), /personas: tiene que estar también en herramientas\.lista/],
+  ['personas sin pistas', con('pistas.personas', BORRAR), /herramientas\.personas, pistas\.personas y pistas\.listaPor van juntas/],
+  ['pistas de personas sin herramienta', con('herramientas.personas', BORRAR), /van juntas/],
+  ['listaPor con otra llave', con('pistas.listaPor', 'Con {asignados} y {estado}'), /listaPor: solo admite \{asignados\}, \{desde\}/],
+  ['listaPor sin {asignados}', con('pistas.listaPor', 'Con {desde}'), /listaPor: tiene que llevar \{asignados\}/],
+  ['listaHechos con otra llave', con('pistas.listaHechos', 'Con {asignados}'), /listaHechos: solo admite \{desde\}/],
   ['conId sin {id}', con('pistas.yo.conId', 'Tu id es fijo.'), /una sola vez/],
   ['conId con dos {id}', con('pistas.yo.conId', '{id} y {id}'), /una sola vez/],
   ['regex sin ^', con('idRegex', '[A-Z]+-\\d+$'), /anclada/],
@@ -223,4 +229,17 @@ test('idNormalizado e idParaComando: la forma la fija el conector, y lo que va a
   assert.equal(idParaComando(numeral, '#12'), null)
   assert.equal(idParaComando({ idRegex: '^.+$', idMayusculas: false }, 'a b'), null)
   assert.equal(idParaComando({ idRegex: '^.+$', idMayusculas: false }, 'a..b'), null)
+})
+
+test('pistas.descripcion: es un texto acotado y necesita pasos de detalle de donde sacarla', () => {
+  assert.doesNotThrow(() => validarConector(gruv))
+  assert.ok(typeof gruv.pistas.descripcion === 'string')
+  rechaza(con('pistas.descripcion', ''), /descripcion: tiene que ser un texto no vacío/)
+  rechaza(con('pistas.descripcion', 'x'.repeat(1001)), /más de 1000 caracteres/)
+  const sinCriterio = JSON.parse(JSON.stringify(gruv)) as ConectorMcp
+  delete sinCriterio.herramientas.escritura.criterio
+  delete sinCriterio.pistas.acciones.criterio
+  sinCriterio.herramientas.detalle = []
+  sinCriterio.pistas.detalle = []
+  rechaza(sinCriterio, /necesita pasos de detalle/)
 })
