@@ -195,7 +195,9 @@ test('info de un conector que existe y de uno que no', () => {
     leeDetalle: false,
     ejemploId: '',
     estados: [],
-    comandoTicket: null
+    comandoTicket: null,
+    idRegex: '^[A-Za-z0-9_.-]{1,20}$',
+    idMayusculas: false
   })
 })
 

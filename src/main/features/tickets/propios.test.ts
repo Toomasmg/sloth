@@ -64,6 +64,17 @@ test('comandoTicket de un propio: el válido se acepta y el inválido se rechaza
   assert.throws(() => parsearImport(JSON.stringify({ ...propio('mio'), comandoTicket: '/x;y' })), /comandoTicket/)
 })
 
+test('comandoTicket de afuera: un comando de Claude que toca la sesión no entra por importar, el equipo ni el archivo de propios', () => {
+  const mal = { ...propio('mio'), comandoTicket: '/logout' }
+  rechazaEn(mal, 'conector.comandoTicket')
+  assert.throws(() => parsearImport(JSON.stringify(mal)), /comandoTicket/)
+  const r = parsearArchivoPropios(JSON.stringify({ version: 1, conectores: [mal], aceptados: {} }))
+  assert.equal(r.archivo.conectores.length, 0)
+  const e = armarRegistro({ incluidos: [], usuario: [], equipos: [{ repo: 'r', repoKey: 'r', equipo: 'E', conectores: [mal, propio('bueno')] }], hash })
+  assert.deepEqual(e.lista.map((c) => c.def.id), ['bueno'])
+  assert.match(e.avisos[0], /comandoTicket/)
+})
+
 test('los conectores propios de vía gh se rechazan', () => {
   rechazaEn({ ...github, id: 'mi-github' }, 'conector.via')
 })
@@ -239,6 +250,8 @@ test('vistaHerramientas: cada acción muestra lo mismo que va a --allowedTools, 
   assert.equal(v.pistas.apoyo, 'Leé {ticket} antes')
   assert.equal(v.pistas.yoConId, def.pistas.yo.conId)
   assert.equal(v.pistas.detalle.length, def.pistas.detalle.length)
+  assert.equal(v.comandoTicket, null)
+  assert.equal(vistaHerramientas(validarPropio({ ...def, comandoTicket: '/mi:cmd' }) as ConectorMcp).comandoTicket, '/mi:cmd')
 })
 
 test('clavesAceptadas: la copia registrada y todas las otras, para que aceptar siga valiendo si se borra una', () => {

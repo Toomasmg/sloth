@@ -3,7 +3,7 @@
  * ConectorMcp. Módulo puro: la validación es la misma que usa main (`validarPropio`).
  */
 import { ACCIONES, type Accion, type Estado } from '../../../../shared/tickets'
-import { COMANDO_TICKET_RE, ConectorInvalidoError, PLACEHOLDERS, type ArgValor, type ConectorDef, type ConectorMcp, type PasoLlamada } from '../../../../main/features/tickets/conector'
+import { ConectorInvalidoError, PLACEHOLDERS, problemaComandoTicket, type ArgValor, type ConectorDef, type ConectorMcp, type PasoLlamada } from '../../../../main/features/tickets/conector'
 import { ESTADO_EN_SNAKE, faltaConector, PISTA_ESTADOS } from '../../../../main/features/tickets/conectores/comun'
 import { jsonCanonico, validarPropio } from '../../../../main/features/tickets/propios'
 
@@ -275,8 +275,9 @@ export function validarBorrador(b: Borrador): Revision {
 /** Mensaje de por qué el comando del ticket no sirve; null si está vacío o es válido (misma regla que main). */
 export function revisarComando(b: Borrador): string | null {
   const c = b.comandoTicket?.trim()
-  if (!c || COMANDO_TICKET_RE.test(c)) return null
-  return 'Tiene que empezar con / y seguir con minúsculas, números, guiones o dos puntos, como /ticket.'
+  if (!c) return null
+  const problema = problemaComandoTicket(c)
+  return problema && `${problema[0].toUpperCase()}${problema.slice(1)}.`
 }
 
 /** Si el ejemplo de id cumple el formato elegido; con el mensaje del problema si no. */

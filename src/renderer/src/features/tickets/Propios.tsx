@@ -291,6 +291,13 @@ export function AvisoHerramientas({
       <p id={tituloId} className="f-tickets-aviso-h-titulo">
         Este conector viene de {origen}. Revisá qué puede usar Claude en cada caso:
       </p>
+      {h.comandoTicket && (
+        <p className="f-tickets-aviso-h-escribe" role="note">
+          <strong>Este conector escribe en la terminal: <code>{h.comandoTicket} &lt;ID&gt;</code></strong>
+          <br />
+          Cada vez que empieces un ticket con él, Claude arranca con ese comando. Si no lo conocés, no lo aceptes.
+        </p>
+      )}
       <div>
         <strong>Al actualizar la lista, lee con</strong>
         <Herramientas prefijo={h.prefijo} xs={h.lista} />

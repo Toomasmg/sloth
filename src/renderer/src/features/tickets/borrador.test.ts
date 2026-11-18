@@ -181,4 +181,8 @@ test('revisarComando: vacío y válido no dan problema; uno inválido sí', () =
   assert.notEqual(revisarComando(b), null)
   b.comandoTicket = '/Ticket x'
   assert.notEqual(revisarComando(b), null)
+  b.comandoTicket = '/logout'
+  assert.match(revisarComando(b) ?? '', /\/logout/)
+  b.comandoTicket = `/${'a'.repeat(40)}`
+  assert.notEqual(revisarComando(b), null)
 })
