@@ -12,6 +12,12 @@ test('win32: prefiere codex.exe, usa codex.cmd y ignora el shim sin extensión',
   assert.equal(resolverCodexExe({ Path: 'C:\\a' }, conArchivos('C:\\a\\codex.cmd'), 'win32'), 'C:\\a\\codex.cmd')
 })
 
+test('una entrada relativa del PATH (como «.») no se resuelve contra el cwd', () => {
+  assert.equal(resolverCodexExe({ PATH: '.;C:\\a' }, conArchivos('.\\codex.exe'), 'win32'), undefined)
+  assert.equal(resolverCodexExe({ PATH: '.:bin:/usr/bin' }, conArchivos('./codex', 'bin/codex'), 'linux'), undefined)
+  assert.equal(resolverCodexExe({ PATH: '.;C:\\a' }, conArchivos('C:\\a\\codex.exe'), 'win32'), 'C:\\a\\codex.exe')
+})
+
 test('posix: busca codex en cada carpeta del PATH', () => {
   assert.equal(resolverCodexExe({ PATH: '/x:/usr/bin' }, conArchivos('/usr/bin/codex'), 'linux'), '/usr/bin/codex')
   assert.equal(resolverCodexExe({ PATH: '/x' }, conArchivos('/x/codex.cmd'), 'linux'), undefined)

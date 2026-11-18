@@ -3,13 +3,13 @@ import { posix, win32 } from 'node:path'
 export const VERSION_MINIMA: readonly [number, number, number] = [0, 164, 0]
 
 /**
- * Ejecutable de Codex en el PATH. En Windows npm deja `codex.cmd` y un shim sin extensión (un script de sh
+ * Ejecutable de Codex en el PATH (las entradas relativas se ignoran: se resolverían contra el cwd de Sloth). En Windows npm deja `codex.cmd` y un shim sin extensión (un script de sh
  * que cmd no corre): solo cuentan `codex.exe` y `codex.cmd`, con el .exe primero dentro de cada carpeta.
  */
 export function resolverCodexExe(env: NodeJS.ProcessEnv, existe: (p: string) => boolean, plataforma: NodeJS.Platform): string | undefined {
   const win = plataforma === 'win32'
   const ruta = win ? win32 : posix
-  const dirs = (env.PATH ?? env.Path ?? '').split(win ? ';' : ':').filter(Boolean)
+  const dirs = (env.PATH ?? env.Path ?? '').split(win ? ';' : ':').filter((d) => d && ruta.isAbsolute(d))
   const nombres = win ? ['codex.exe', 'codex.cmd'] : ['codex']
   for (const d of dirs) {
     for (const n of nombres) {
