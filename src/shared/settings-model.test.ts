@@ -216,3 +216,23 @@ test('los colores de la paleta son hex únicos', () => {
   assert.equal(new Set(hex).size, hex.length)
   for (const h of hex) assert.match(h, /^#[0-9a-f]{6}$/)
 })
+
+test('rendimiento: valida RAM y núcleos de cada perfil, y 0 es sin límite', () => {
+  const s = applyPatch(D, { rendimiento: { enchufada: { ramMB: 8192, nucleos: 8 }, bateriaDistinta: true } })
+  assert.deepEqual(s.rendimiento.enchufada, { ramMB: 8192, nucleos: 8 })
+  assert.equal(s.rendimiento.bateriaDistinta, true)
+  assert.deepEqual(applyPatch(s, { rendimiento: { bateria: { nucleos: 2 } } }).rendimiento.bateria, { ramMB: 0, nucleos: 2 })
+  assert.equal(applyPatch(s, { rendimiento: { enchufada: { ramMB: 0 } } }).rendimiento.enchufada.ramMB, 0)
+  for (const bad of [{ enchufada: { ramMB: 1024 } }, { enchufada: { ramMB: 2048.5 } }, { bateria: { nucleos: -1 } }, { bateria: { nucleos: 65 } }, { bateria: { otro: 1 } }, { turbo: true }, { bateriaDistinta: 'sí' }])
+    assert.throws(() => applyPatch(D, { rendimiento: bad }))
+  assert.equal(D.rendimiento.enchufada.ramMB, 0)
+})
+
+test('rendimiento: normalize descarta campo por campo y reset vuelve a sin límites', () => {
+  const s = normalize({ rendimiento: { enchufada: { ramMB: 500, nucleos: 4 }, bateria: 'x', bateriaDistinta: true } })
+  assert.deepEqual(s.rendimiento, { enchufada: { ramMB: 0, nucleos: 4 }, bateria: { ramMB: 0, nucleos: 0 }, bateriaDistinta: true })
+  assert.deepEqual(resetSection(s, 'rendimiento').rendimiento, D.rendimiento)
+  const c = cloneSettings(s)
+  c.rendimiento.enchufada.nucleos = 1
+  assert.equal(s.rendimiento.enchufada.nucleos, 4)
+})

@@ -24,7 +24,8 @@ import celular from './celular'
 import avisos from './avisos'
 import diagnostico, { fijarNombresFeatures } from './diagnostico'
 import perfiles from './perfiles'
+import rendimiento from './rendimiento'
 
 /** Todas las funciones del lado main. Para sumar una: crear su archivo y agregarla acá. */
-export const FEATURES: Feature[] = [avisos, history, git, worktrees, broadcast, templates, tray, updater, exportImport, tickets, settings, onboarding, teamConfig, team, chat, help, report, moveAccount, permissions, sleep, dictado, prs, celular, diagnostico, perfiles]
+export const FEATURES: Feature[] = [avisos, history, git, worktrees, broadcast, templates, tray, updater, exportImport, tickets, settings, onboarding, teamConfig, team, chat, help, report, moveAccount, permissions, sleep, dictado, prs, celular, diagnostico, perfiles, rendimiento]
 fijarNombresFeatures(FEATURES.map((f) => f.name))

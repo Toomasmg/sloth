@@ -20,6 +20,7 @@ export const NAV: readonly NavItem[] = [
   { id: 'perfiles', name: 'Perfiles', sub: 'Separá el trabajo del resto: cada perfil tiene lo suyo.', color: '#8ab4ff', icon: 'Account' },
   { id: 'apariencia', name: 'Apariencia', sub: 'Tema, color de acento y tamaño del texto.', color: '#b59cff', icon: 'Theme' },
   { id: 'terminal', name: 'Terminal', sub: 'Fuente, cursor y shell de cada espacio.', color: '#5fd4a6', icon: 'Editor' },
+  { id: 'rendimiento', name: 'Rendimiento', sub: 'Cuánta RAM y cuántos núcleos usan las terminales, enchufada y a batería.', color: '#f0b45a', icon: 'Gauge' },
   { id: 'atajos', name: 'Atajos de teclado', sub: 'Cambiá cualquier atajo a tu gusto.', color: '#c9cdd6', icon: 'Keyboard' },
   { id: 'notif', name: 'Notificaciones y sonido', sub: 'Qué te avisa Sloth y cómo suena.', color: '#f0b45a', icon: 'Bell' },
   {
@@ -83,6 +84,9 @@ const INDEX: readonly [string, SectionId][] = [
   ['Cursor', 'terminal'],
   ['Altura de línea', 'terminal'],
   ['Shell (PowerShell)', 'terminal'],
+  ['RAM máxima de las terminales', 'rendimiento'],
+  ['Núcleos del procesador', 'rendimiento'],
+  ['Límite con batería (notebook)', 'rendimiento'],
   ...SHORTCUT_ACTIONS.map((a): [string, SectionId] => ['Atajo: ' + a.name, 'atajos']),
   ['Avisar cuando Claude termina', 'notif'],
   ['Avisar cuando pide permiso', 'notif'],
