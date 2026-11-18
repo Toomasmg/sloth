@@ -13,7 +13,7 @@ import {
   type SlothSettings,
   type TerminalSettings,
   type NotifySettings
-} from '../../../../main/features/settings-model'
+} from '../../../../shared/settings-model'
 
 /**
  * Estado de la Configuración en la interfaz (fuera de React, para que lo lean main.tsx y

@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { applyPatch } from './settings-model'
+import { applyPatch } from '../../shared/settings-model'
 import { armarArchivo, leerSettings } from './settings-archivo'
 
 test('un campo desconocido de la raíz sobrevive a cambiar el tema y guardar', () => {
