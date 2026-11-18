@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { isLoginPane } from '../../../../shared/types'
 import { useUi, type UiCtx } from '../host'
 import { resolveAccountColor } from '../settings/store'
+import { agenteComun } from '../../../../shared/proveedores'
 import { shortPath } from '../../format'
 import { DoneIcon, WaitingIcon, PermissionIcon, IdleIcon, WorkingIcon, TerminalIcon } from '../../icons/SlothIcons'
 import { cancelQueued, startBatch, useBatches, type Batch } from './store'
@@ -89,6 +90,7 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
   const batches = useBatches()
   const targets = useMemo(() => targetsOf(ctx), [ctx.workspaces, ctx.openPanes, ctx.agents, ctx.accounts, ctx.permissions]) // eslint-disable-line react-hooks/exhaustive-deps
   const receivable = targets.filter((t) => canReceive(t.status))
+  const agente = agenteComun(targets.flatMap((t) => ctx.accounts.filter((a) => a.id === t.accountId)))
   const [sel, setSel] = useState<Set<string>>(() => new Set(receivable.filter((t) => !t.hidden).map((t) => t.id)))
   const [text, setText] = useState('')
   const [interrupt, setInterrupt] = useState(false)
@@ -243,7 +245,7 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
         </span>
       }
       title="Enviar a varios espacios"
-      subtitle={batch ? 'Sloth lo manda espacio por espacio.' : 'El mismo mensaje llega a cada Claude que elijas, cada uno en su propia terminal.'}
+      subtitle={batch ? 'Sloth lo manda espacio por espacio.' : `El mismo mensaje llega a ${agente ? `cada ${agente}` : 'cada agente'} que elijas, cada uno en su propia terminal.`}
       dirty={!batch && trimmed !== ''}
       onClose={onClose}
       onSubmit={(e) => {

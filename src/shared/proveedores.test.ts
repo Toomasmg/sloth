@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { CAPACIDADES, PROVEEDORES_IDS, capacidadesDe, cuentaSugerida, esProveedorId, motivoSinCapacidad, nombreProveedor, proveedorIdDe } from './proveedores'
+import { CAPACIDADES, agenteComun, agenteDe, PROVEEDORES_IDS, capacidadesDe, cuentaSugerida, esProveedorId, motivoSinCapacidad, nombreProveedor, proveedorIdDe } from './proveedores'
 import type { Capacidades } from './proveedores'
 
 test('proveedorIdDe: ausente es claude y desconocido no es ninguno', () => {
@@ -23,6 +23,7 @@ test('esProveedorId solo acepta ids del registro', () => {
 test('capacidades: claude las tiene todas y codex ninguna', () => {
   assert.deepEqual([...PROVEEDORES_IDS], ['claude', 'codex'])
   for (const k of Object.keys(CAPACIDADES.claude) as (keyof Capacidades)[]) {
+    if (k === 'limitesExperimental') continue
     assert.equal(CAPACIDADES.claude[k], true, `claude ${k}`)
     assert.equal(CAPACIDADES.codex[k], false, `codex ${k}`)
   }
@@ -67,4 +68,32 @@ test('cuentaSugerida con solo cuentas de Claude: con sesión y la de menos uso, 
   const uso: Record<string, number> = { a: 30, b: 10, c: 5 }
   assert.equal(cuentaSugerida(cuentas, (id) => id !== 'c', (id) => uso[id]), 'b')
   assert.equal(cuentaSugerida(cuentas, () => false, (id) => uso[id]), 'c')
+})
+
+test('avisoTurno y limitesExperimental por agente', () => {
+  assert.equal(CAPACIDADES.claude.avisoTurno, true)
+  assert.equal(CAPACIDADES.claude.limitesExperimental, false)
+  assert.equal(CAPACIDADES.codex.avisoTurno, false)
+  assert.equal(CAPACIDADES.codex.limitesExperimental, false)
+})
+
+test('agenteDe: nombre corto o genérico si no se conoce', () => {
+  assert.equal(agenteDe({}), 'Claude')
+  assert.equal(agenteDe({ proveedor: 'codex' }), 'Codex')
+  assert.equal(agenteDe({ proveedor: 'zzz' }), 'el agente')
+})
+
+test('agenteComun: Claude sin cuentas o todas Claude, el mismo agente, o undefined si hay mezcla', () => {
+  assert.equal(agenteComun([]), 'Claude')
+  assert.equal(agenteComun([{}, { proveedor: 'claude' }]), 'Claude')
+  assert.equal(agenteComun([{ proveedor: 'codex' }, { proveedor: 'codex' }]), 'Codex')
+  assert.equal(agenteComun([{}, { proveedor: 'codex' }]), undefined)
+  assert.equal(agenteComun([{}, { proveedor: 'zzz' }]), undefined)
+})
+
+test('motivoSinCapacidad: motivos permanentes de Codex', () => {
+  for (const k of ['statusline', 'setupCompartido', 'uso', 'overrideClaude'] as const) {
+    assert.notEqual(motivoSinCapacidad({ proveedor: 'codex' }, k), 'Codex todavía no soporta esto en Sloth.', k)
+    assert.equal(motivoSinCapacidad({}, k), undefined, k)
+  }
 })
