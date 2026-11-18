@@ -14,7 +14,10 @@ import {
   type Disponibilidad,
   type Estado,
   type EstadoBase,
+  type FiltroVista,
   type Modelo,
+  type PendientesLista,
+  type PersonaEquipo,
   type ServidorMcp,
   type Ticket,
   type TicketsConfig,
@@ -390,6 +393,9 @@ function motorExperimental(): boolean | undefined {
   return p !== undefined && TICKETS_EXPERIMENTAL.includes(p) ? true : undefined
 }
 
+const pendientesVista = (def: ConectorDef): PendientesLista | undefined =>
+  state.fetchedAt === undefined ? undefined : pendientesDe(filtroDe(state.config, def), state.leido, def, state.me)
+
 function vistaFiltro(def: ConectorDef): Pick<TicketsSnapshot, 'filtro' | 'personas' | 'personasAt' | 'conteos' | 'pendientes'> {
   const filtro = filtroDe(state.config, def)
   return {
@@ -397,7 +403,7 @@ function vistaFiltro(def: ConectorDef): Pick<TicketsSnapshot, 'filtro' | 'person
     personas: state.personas,
     personasAt: state.personasAt,
     conteos: conteos(state.tickets, filtro, state.me, def, Date.now()),
-    pendientes: state.fetchedAt === undefined ? undefined : pendientesDe(filtro, state.leido, def, state.me)
+    pendientes: pendientesVista(def)
   }
 }
 
@@ -475,6 +481,10 @@ export interface TicketsParaEquipo {
   confirmar: boolean
   /** Con gh, la carpeta de cada ticket: el #12 de otro repo es otro ticket. */
   carpetas?: Record<string, string>
+  /** Solo con conectores que filtran por personas: `tickets` ya viene filtrado. */
+  filtro?: FiltroVista
+  personas?: PersonaEquipo[]
+  pendientes?: PendientesLista
 }
 
 /** Lo que trajo el conector activo, para la vista Equipo (incluye los estados 'hecho' para poder descartarlos). */
@@ -496,7 +506,8 @@ export function ticketsParaEquipo(): TicketsParaEquipo {
     fetchedBy: state.fetchedBy,
     lastRun: state.lastRun,
     lastError: state.lastError,
-    carpetas: def.via === 'gh' ? carpetasDe() : undefined
+    carpetas: def.via === 'gh' ? carpetasDe() : undefined,
+    ...(conFiltro(def) ? { filtro: filtroDe(state.config, def), personas: state.personas, pendientes: pendientesVista(def) } : {})
   }
 }
 

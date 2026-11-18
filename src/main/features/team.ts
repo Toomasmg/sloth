@@ -2,7 +2,7 @@ import { shell } from 'electron'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
-import { buildPeople, LOGIN_RE, NADIE, PR_URL_RE, personasDe, ticketsActivos, type TeamTicket } from './team-core'
+import { buildPeople, LOGIN_RE, NADIE, PR_URL_RE, personasDe, personasElegidasEquipo, ticketsActivos, type PersonaConector, type TeamTicket } from './team-core'
 import { adoptarLegado, avisoSoloLectura, cargarTeam, mappingDe, type MotivoSoloLectura, type TeamState } from './team-estado'
 import { fetchGithub } from './team-github'
 import { alCambiarTickets, ticketsParaEquipo, type TicketsParaEquipo } from './tickets'
@@ -77,6 +77,11 @@ function delConector(): { tp: TicketsParaEquipo; tickets: TeamTicket[] } {
   return { tp, tickets: tp.conector ? ticketsActivos(tp.tickets, tp.estados) : [] }
 }
 
+const personasEquipo = (tp: TicketsParaEquipo, tickets: TeamTicket[]): PersonaConector[] => [
+  ...personasDe(tickets),
+  ...personasElegidasEquipo(tp.filtro?.personasElegidas ?? [], tp.personas)
+]
+
 /** Mapeo del conector activo; la primera vez que hay uno se le pasa el mapeo de antes, con respaldo. */
 function mappingActivo(conectorId: string | null): Record<string, string> {
   if (!conectorId) return {}
@@ -95,7 +100,7 @@ function mappingActivo(conectorId: string | null): Record<string, string> {
 function snapshot(): unknown {
   const { tp, tickets } = delConector()
   const mapping = mappingActivo(tp.conector?.id ?? null)
-  const view = buildPeople({ prs: state.github.prs, tickets, personas: personasDe(tickets), mapping })
+  const view = buildPeople({ prs: state.github.prs, tickets, personas: personasEquipo(tp, tickets), mapping })
   // Personas del conector para el selector de «vincular».
   const personasConector = view.people.filter((p) => p.enConector).map((p) => ({ key: p.key, nombre: p.nombre }))
   const authors = new Map<string, { login: string; name?: string }>()
@@ -115,7 +120,14 @@ function snapshot(): unknown {
       running: tp.running,
       model: tp.model,
       confirmar: tp.confirmar,
-      carpetas: tp.carpetas
+      carpetas: tp.carpetas,
+      filtro: tp.filtro && {
+        personasElegidas: tp.filtro.personasElegidas.length,
+        incluirSinAsignar: tp.filtro.incluirSinAsignar,
+        ventanaDias: tp.filtro.ventanaDias,
+        sinTraer: tp.pendientes?.personas ?? [],
+        faltaTodo: tp.pendientes?.todo === true
+      }
     },
     githubRunning: Boolean(ghRun),
     aviso: soloLectura ? avisoSoloLectura(soloLectura) : undefined,
@@ -159,8 +171,8 @@ function setMapping(rawLogin: unknown, rawKey: unknown): unknown {
   else {
     if (typeof rawKey !== 'string' || rawKey.length > 200) throw new Error('Persona inválida.')
     if (rawKey !== NADIE) {
-      const { tickets } = delConector()
-      const view = buildPeople({ prs: [], tickets, personas: personasDe(tickets), mapping: {} })
+      const { tp, tickets } = delConector()
+      const view = buildPeople({ prs: [], tickets, personas: personasEquipo(tp, tickets), mapping: {} })
       if (!view.people.some((p) => p.key === rawKey)) throw new Error('Esa persona no está en lo último que trajo el conector.')
     }
     mapping[login] = rawKey
