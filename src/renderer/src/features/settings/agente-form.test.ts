@@ -6,7 +6,7 @@ import type { AgenteDisponible } from '../../../../shared/types'
 const claude: AgenteDisponible = { id: 'claude', nombre: 'Claude Code', instalado: true }
 const codex = (extra: Partial<AgenteDisponible> = {}): AgenteDisponible => ({ id: 'codex', nombre: 'Codex', instalado: true, versionOk: true, ...extra })
 
-const copilot = (extra: Partial<AgenteDisponible> = {}): AgenteDisponible => ({ id: 'copilot', nombre: 'Copilot', instalado: true, versionOk: true, ...extra })
+const copilot = (extra: Partial<AgenteDisponible> = {}): AgenteDisponible => ({ id: 'copilot', nombre: 'GitHub Copilot', instalado: true, versionOk: true, ...extra })
 
 test('sin Codex instalado no hay selector y el formulario es el de Claude', () => {
   const f = formularioCuenta('claude', [claude, codex({ instalado: false })])
@@ -73,9 +73,11 @@ test('con Codex solo: opciones Claude y Codex, y el formulario de Codex con sus 
   assert.equal(f.bloqueo, undefined)
 })
 
-test('con Copilot solo: opciones Claude y Copilot, y el formulario avisa del login compartido', () => {
+test('con Copilot solo: opciones Claude y GitHub Copilot, y el formulario avisa del login compartido', () => {
   const f = formularioCuenta('copilot', [claude, copilot()])
   assert.deepEqual(f.opciones.map((o) => o.id), ['claude', 'copilot'])
+  assert.deepEqual(f.opciones.map((o) => o.nombre), ['Claude Code', 'GitHub Copilot'])
+  assert.match(f.aviso ?? '', /la misma en todos los perfiles/)
   assert.equal(f.titulo, 'Nueva cuenta de Copilot')
   assert.equal(f.mostrarPlan, false)
   assert.equal(f.aviso, AVISO_COPILOT)

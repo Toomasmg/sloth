@@ -198,7 +198,7 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
   }, [adding])
 
   const form = formularioCuenta(proveedor, agentes, ui.accounts)
-  const agenteElegido = proveedor !== 'claude' && form.opciones.some((o) => o.id === proveedor) ? proveedor : undefined
+  const agenteElegido = form.opciones.find((o) => o.id !== 'claude' && o.id === proveedor)?.id
 
   const addAccount = (e: FormEvent): void => {
     e.preventDefault()

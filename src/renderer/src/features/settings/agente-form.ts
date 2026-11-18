@@ -1,5 +1,5 @@
 import type { LecturaLimitesCodex, LimitesCodex } from '../../../../shared/celular'
-import { motivoNoAgregar } from '../../../../shared/proveedores'
+import { motivoNoAgregar, type ProveedorId } from '../../../../shared/proveedores'
 import type { AgenteDisponible } from '../../../../shared/types'
 
 /** Lo que dice Codex es cuánto se usó (usedPercent), igual que el celu: el valor lo dice, nunca parece «lo que te queda». */
@@ -29,7 +29,7 @@ export interface FormularioCuenta {
   mostrarPlan: boolean
   aviso?: string
   avisoVersion?: string
-  opciones: { id: string; nombre: string }[]
+  opciones: { id: ProveedorId; nombre: string }[]
   bloqueo?: string
 }
 
@@ -38,16 +38,16 @@ export const AVISO_CODEX =
 export const AVISO_CODEX_VIEJO = 'Tu Codex es viejo; actualizalo con «npm install -g @openai/codex».'
 
 export const AVISO_COPILOT =
-  'Se abre una terminal con «copilot login --device-code»: seguí los pasos en el navegador. Copilot guarda el login en tu sistema y no se puede separar por cuenta, por eso Sloth admite una sola cuenta de Copilot. Todavía no hay uso, avisos de permisos desde el celu, tickets ni chat MCP.'
+  'Se abre una terminal con «copilot login --device-code»: seguí los pasos en el navegador. Copilot guarda el login en tu sistema (y puede usar el de «gh» si lo tenés iniciado) y Sloth no lo separa por cuenta, por eso admite una sola cuenta de Copilot, la misma en todos los perfiles. Todavía no hay uso, avisos de permisos desde el celu, tickets ni chat MCP.'
 export const AVISO_COPILOT_VIEJO = 'Tu Copilot es viejo; actualizalo con «npm install -g @github/copilot».'
 
 /** Sin otro agente instalado devuelve lo de siempre (Claude), así el formulario no cambia. */
 export function formularioCuenta(proveedor: string, agentes: AgenteDisponible[], cuentas: readonly { proveedor?: unknown }[] = []): FormularioCuenta {
   const codex = agentes.find((a) => a.id === 'codex' && a.instalado)
   const copilot = agentes.find((a) => a.id === 'copilot' && a.instalado)
-  const opciones = [{ id: 'claude', nombre: 'Claude Code' }]
-  if (codex) opciones.push({ id: 'codex', nombre: 'Codex' })
-  if (copilot) opciones.push({ id: 'copilot', nombre: 'Copilot' })
+  const opciones: FormularioCuenta['opciones'] = [{ id: 'claude', nombre: 'Claude Code' }]
+  if (codex) opciones.push({ id: 'codex', nombre: codex.nombre })
+  if (copilot) opciones.push({ id: 'copilot', nombre: copilot.nombre })
   const mostrarSelector = opciones.length > 1
   if (codex && proveedor === 'codex') {
     return {
