@@ -1,13 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Broom, ChatsCircle, DotsThree, MagnifyingGlass, PencilSimple, Timer, UserPlus, UsersThree } from '@phosphor-icons/react'
-import { type ChatConvRef, type ChatRetentionHours, type ChatRole } from '../../../../shared/chat'
+import { type ChatConvRef, type ChatMessage, type ChatRetentionHours, type ChatRole } from '../../../../shared/chat'
 import { canManageConv, dropExpired, noticeText, retentionLabel } from '../../../../shared/chat-retention'
 import { EmptyState, IconButton, Menu, type MenuItem } from '../../ui'
 import { Composer, type ComposerHandle } from './Composer'
 import { MessageItem } from './MessageItem'
 import { activeReduce, scrolledFar } from './active-msg'
 import { SearchBar } from './SearchBar'
-import { seenUpTo, startsGroup, typingText } from './message-ops'
+import { proximoVencimiento, seenUpTo, startsGroup, typingText } from './message-ops'
 import { Av, dayLabel, sameDay } from './view-utils'
 import {
   loadMessages,
@@ -47,7 +47,8 @@ const TOO_OLD = 'Ese mensaje es muy viejo para mostrarlo acá.'
 const FLASH_MS = 1600
 const MAX_JUMP_PAGES = Math.ceil(MAX_CACHED / PAGE)
 const NOTICE_MS = 6000
-const EXPIRY_TICK_MS = 60_000
+const EXPIRY_MIN_MS = 1000
+const MAX_TIMEOUT_MS = 2 ** 31 - 1
 let updateHintShown = false
 
 /**
@@ -57,10 +58,15 @@ let updateHintShown = false
 export function Conversation({ conv, title, photo, initial, role, me, otherReadAt, retentionHours, onBack, onModal }: Props): React.JSX.Element {
   const stored = useConvMessages(conv)
   const isTeam = conv.kind === 'team'
-  // La RLS ya no devuelve los vencidos; esto saca los que vencen con la conversación abierta (el tick
-  // vuelve a renderizar aunque no llegue nada).
-  const [, setTick] = useState(0)
-  const list = dropExpired(stored, isTeam ? retentionHours : undefined, Date.now())
+  // La RLS ya no devuelve los vencidos; esto saca los que vencen con la conversación abierta. Un solo
+  // timer al próximo vencimiento sube `venc`: la conversación solo se vuelve a renderizar cuando algo vence.
+  const [venc, setVenc] = useState(0)
+  const retention = isTeam ? retentionHours : undefined
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const list = useMemo(() => dropExpired(stored, retention, Date.now()), [stored, retention, venc])
+  const meId = me?.id
+  const meLogin = me?.login
+  const meStable = useMemo(() => (meId !== undefined && meLogin !== undefined ? { id: meId, login: meLogin } : undefined), [meId, meLogin])
   const info = useConvMeta(conv)
   const announce = useAnnouncement()
   const extras = useExtras()
@@ -96,10 +102,12 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
   }, [conv.kind, conv.id])
 
   useEffect(() => {
-    if (!isTeam || retentionHours === undefined) return
-    const t = setInterval(() => setTick((n) => n + 1), EXPIRY_TICK_MS)
-    return () => clearInterval(t)
-  }, [isTeam, retentionHours])
+    const now = Date.now()
+    const next = proximoVencimiento(stored, retention, now)
+    if (next === undefined) return
+    const t = setTimeout(() => setVenc((n) => n + 1), Math.min(Math.max(next - now, EXPIRY_MIN_MS), MAX_TIMEOUT_MS))
+    return () => clearTimeout(t)
+  }, [stored, retention, venc])
 
   // El aviso de la actualización 0004 sale una sola vez por sesión.
   useEffect(() => {
@@ -124,9 +132,9 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
     }
   }, [stored])
 
-  const later = (fn: () => void, ms: number): void => {
+  const later = useCallback((fn: () => void, ms: number): void => {
     timers.current.push(setTimeout(fn, ms))
-  }
+  }, [])
 
   const onScroll = (): void => {
     const el = scrollRef.current
@@ -135,10 +143,13 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
     if (activeId && scrolledFar(openTop.current, el.scrollTop)) setActiveId(null)
   }
 
-  const toggleBar = (id: string): void => {
+  const toggleBar = useCallback((id: string): void => {
     openTop.current = scrollRef.current?.scrollTop ?? 0
     setActiveId((cur) => activeReduce(cur, { type: 'toggle', id }))
-  }
+  }, [])
+  const closeBar = useCallback((): void => setActiveId(null), [])
+  const startReply = useCallback((m: ChatMessage): void => composerRef.current?.startReply(m), [])
+  const startEdit = useCallback((m: ChatMessage): void => composerRef.current?.startEdit(m), [])
 
   useEffect(() => {
     if (!activeId) return
@@ -169,10 +180,13 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
     if (e) setLoadErr(e)
   }
 
-  const find = (id: string): HTMLElement | null =>
-    [...(scrollRef.current?.querySelectorAll<HTMLElement>('[data-mid]') ?? [])].find((n) => n.dataset.mid === id) ?? null
+  const find = useCallback(
+    (id: string): HTMLElement | null =>
+      [...(scrollRef.current?.querySelectorAll<HTMLElement>('[data-mid]') ?? [])].find((n) => n.dataset.mid === id) ?? null,
+    []
+  )
 
-  const jump = async (id: string): Promise<void> => {
+  const jump = useCallback(async (id: string): Promise<void> => {
     pinRef.current = false
     const has = (): boolean => peekConv(conv).list.some((m) => m.id === id)
     for (let i = 0; i < MAX_JUMP_PAGES && !has(); i++) {
@@ -196,7 +210,10 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
       setFlashId(id)
       later(() => setFlashId(undefined), FLASH_MS)
     })
-  }
+    // `conv` cambia de identidad en cada render del padre; el montaje es por kind e id.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conv.kind, conv.id, later, find])
+  const onJump = useCallback((id: string): void => void jump(id), [jump])
 
   const closeSearch = (): void => {
     setSearching(false)
@@ -230,7 +247,7 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
 
   const items: React.ReactNode[] = []
   const now = Date.now()
-  const seenId = me && conv.kind === 'dm' && extras ? seenUpTo(list, me.id, otherReadAt) : undefined
+  const seenId = meStable && conv.kind === 'dm' && extras ? seenUpTo(list, meStable.id, otherReadAt) : undefined
   list.forEach((msg, i) => {
     const prev = list[i - 1]
     if (!prev || !sameDay(prev.createdAt, msg.createdAt)) {
@@ -252,18 +269,18 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
       <MessageItem
         key={msg.id}
         msg={msg}
-        mine={!!me && msg.author.id === me.id}
-        me={me}
+        mine={!!meStable && msg.author.id === meStable.id}
+        me={meStable}
         head={startsGroup(prev, msg)}
         extras={extras}
         seen={msg.id === seenId}
         flash={msg.id === flashId}
         active={msg.id === activeId}
         onToggle={toggleBar}
-        onCloseBar={() => setActiveId(null)}
-        onReply={(m) => composerRef.current?.startReply(m)}
-        onEdit={(m) => composerRef.current?.startEdit(m)}
-        onJump={(mid) => void jump(mid)}
+        onCloseBar={closeBar}
+        onReply={startReply}
+        onEdit={startEdit}
+        onJump={onJump}
       />
     )
   })
@@ -320,7 +337,7 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
         </div>
       )}
 
-      {searching && <SearchBar conv={conv} onJump={(id) => void jump(id)} onClose={closeSearch} />}
+      {searching && <SearchBar conv={conv} onJump={onJump} onClose={closeSearch} />}
 
       {loadErr && (
         <p className="f-chat-err f-chat-banner" role="alert">
