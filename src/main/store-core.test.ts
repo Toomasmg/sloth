@@ -50,6 +50,13 @@ test('campos opcionales de tipo raro se sacan y los que faltan toman su valor po
   assert.deepEqual(w, { id: 'w1', name: 'w1', repoPath: 'C:\\repo', cwd: 'C:\\repo', accountId: 'a1', autoStartClaude: true, createdAt: 0, branch: 'main' })
 })
 
+test('proveedor: ausente no se agrega, de tipo raro se saca y un texto desconocido se conserva', () => {
+  assert.deepEqual(validarCuenta(cuenta), cuenta)
+  assert.equal('proveedor' in (validarCuenta(cuenta) ?? {}), false)
+  assert.equal('proveedor' in (validarCuenta({ ...cuenta, proveedor: 5 }) ?? {}), false)
+  assert.equal(validarCuenta({ ...cuenta, proveedor: 'codex' as never })?.proveedor as string, 'codex')
+})
+
 test('se conservan los campos que esta versión no conoce', () => {
   const v = validarEstado({ version: 1, accounts: [{ ...cuenta, futuro: { x: 1 } }], workspaces: [], openPanes: [] })
   assert.deepEqual(v?.estado.accounts[0], { ...cuenta, futuro: { x: 1 } })
