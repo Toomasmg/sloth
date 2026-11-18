@@ -11,7 +11,7 @@ const WHAT_MAX = 1500
 const EXPECT_MAX = 800
 const STEP_MAX = 200
 const STEPS_MAX = 8
-const STEP_PH = ['Ej.: abrí el espacio «Back · migración de horas»', 'Ej.: apreté Ctrl K y escribí «mover»', 'Ej.: aparece el error en la barra de estado']
+const STEP_PH = ['Ej.: abrí el espacio «Mi proyecto · migración»', 'Ej.: apreté Ctrl K y escribí «mover»', 'Ej.: aparece el error en la barra de estado']
 
 type ReportType = 'error' | 'idea' | 'otra'
 const TYPES: { id: ReportType; name: string; hint: string }[] = [

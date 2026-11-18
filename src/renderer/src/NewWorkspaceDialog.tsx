@@ -158,9 +158,10 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cur?.path, cur?.isGit])
 
-  // Si el conector usa la skill /ticket, el id tiene que tener la forma ABC-123.
+  // Si el conector arma el prompt con un comando, el id tiene que tener la forma ABC-123.
+  const cmd = tk?.conector.comandoTicket
   const normId = normTicketId(ticket) ?? ''
-  const ticketId = tk?.conector.comandoTicket && !TICKET_RE.test(normId) ? '' : normId
+  const ticketId = cmd && !TICKET_RE.test(normId) ? '' : normId
   const ticketOk = ticketId !== ''
 
   // Valores de las variables (los que ya se conocen).
@@ -240,8 +241,8 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
             accountId,
             autoStartClaude: true,
             ticket: ticketId,
-            // La skill /ticket abre su propio worktree desde origin/staging.
-            initialPrompt: tk?.conector.comandoTicket ? `${tk.conector.comandoTicket} ${ticketId}` : undefined,
+            // Si el comando del conector abre su propio worktree, no se crea otro.
+            initialPrompt: cmd ? `${cmd} ${ticketId}` : undefined,
             resume: true,
             color: colorKey
           }
@@ -372,7 +373,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
         error={showErr('ticket')}
       />
       <span className="nw-hint">
-        {ticketMode ? (tk?.conector.comandoTicket ? `${agenteAcc} arranca con /ticket: tu skill se encarga del worktree, el PR y las horas.` : 'El id del ticket va en el nombre del espacio.') : 'Reemplaza {ticket} en el nombre, la rama y el primer mensaje.'}{' '}
+        {ticketMode ? (cmd ? `${agenteAcc} arranca con ${cmd}: ese comando se encarga del worktree, el PR y las horas.` : 'El id del ticket va en el nombre del espacio.') : 'Reemplaza {ticket} en el nombre, la rama y el primer mensaje.'}{' '}
         <button type="button" className="nw-link" onClick={openTickets}>
           {tk?.conector.disponible ? `Elegir de ${tk.conector.nombre}` : 'Elegir de la lista'}
         </button>

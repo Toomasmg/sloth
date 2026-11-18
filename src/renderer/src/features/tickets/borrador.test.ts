@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ConectorMcp } from '../../../../main/features/tickets/conector'
 import { jsonCanonico, validarPropio } from '../../../../main/features/tickets/propios'
-import { aDef, argsPorDefecto, borradorNuevo, conHerramientas, deDef, revisarId, seEditaSinPerder, slugId, validarBorrador, type Borrador } from './borrador'
+import { aDef, argsPorDefecto, borradorNuevo, conHerramientas, deDef, revisarComando, revisarId, seEditaSinPerder, slugId, validarBorrador, type Borrador } from './borrador'
 
 const HERRAMIENTAS = ['get_me', 'search_cards', 'get_card', 'create_card', 'update_card', 'delete_board']
 
@@ -168,4 +168,17 @@ test('comandoTicket del asistente: se guarda recortado, se conserva al editar y 
   if (!mal.ok) assert.equal(mal.ruta, 'conector.comandoTicket')
   b.comandoTicket = '   '
   assert.equal('comandoTicket' in aDef(b), false)
+})
+
+test('revisarComando: vacío y válido no dan problema; uno inválido sí', () => {
+  const b = base()
+  assert.equal(revisarComando(b), null)
+  b.comandoTicket = '  '
+  assert.equal(revisarComando(b), null)
+  b.comandoTicket = '/mi:cmd'
+  assert.equal(revisarComando(b), null)
+  b.comandoTicket = 'ticket'
+  assert.notEqual(revisarComando(b), null)
+  b.comandoTicket = '/Ticket x'
+  assert.notEqual(revisarComando(b), null)
 })

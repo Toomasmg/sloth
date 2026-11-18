@@ -233,7 +233,7 @@ export function Detail(props: DetailProps): React.JSX.Element {
         </div>
         {!(ws && st) && (
           <p className="f-tickets-help">
-            {props.tplName ? `Crea un espacio con la plantilla «${props.tplName}».` : `Crea el espacio ${t.id} y arranca Claude con /ticket ${t.id}.`}
+            {props.tplName ? `Crea un espacio con la plantilla «${props.tplName}».` : `Crea el espacio ${t.id}${conector.comandoTicket ? ` y arranca Claude con ${conector.comandoTicket} ${t.id}` : ''}.`}
           </p>
         )}
       </div>

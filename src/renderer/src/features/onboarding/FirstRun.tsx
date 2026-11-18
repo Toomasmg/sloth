@@ -168,7 +168,7 @@ function AccountsBody({ statuses }: { statuses: Record<string, AccountStatus> })
       >
         <div className="fr-add-field">
           <label htmlFor="fr-acc">Nombre para reconocerla</label>
-          <Input id="fr-acc" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} placeholder="Ej.: Tomy" />
+          <Input id="fr-acc" value={label} maxLength={40} onChange={(e) => setLabel(e.target.value)} placeholder="Ej.: Trabajo" />
         </div>
         <Button variant={ui.accounts.length ? 'secondary' : 'primary'} type="submit" loading={busy} disabled={!label.trim()} icon={<AddAccountIcon size={13} />}>
           {ui.accounts.length ? 'Agregar otra cuenta' : 'Agregar cuenta'}
@@ -285,7 +285,7 @@ function TeamLoad(): React.JSX.Element {
           Elegir carpeta
         </Button>
       </div>
-      {info && !info.isGit && <InlineAlert tone="warning">Esa carpeta no parece un repo de git (no tiene .git).</InlineAlert>}
+      {info && !info.isGit && <InlineAlert tone="warning">Esa carpeta no es un repo de git: Sloth abre terminales igual, pero sin ramas, cambios ni PRs.</InlineAlert>}
       {info && team === null && <p className="fr-step-sub">Este repo no trae configuración del equipo.</p>}
       {team?.state === 'invalid' && <InlineAlert tone="warning">El repo trae .sloth/team.json pero tiene un error: {team.error}</InlineAlert>}
       {team?.state === 'ok' && (
@@ -383,7 +383,9 @@ export function FirstRun({ embedded = false }: { embedded?: boolean }): React.JS
   const spaceOk = ui.workspaces.length > 0
   const current = !pcOk ? 0 : !accountOk ? 1 : 2
   const found = (items ?? []).filter((i) => i.state === 'ok' && SHORT[i.id]).map((i) => SHORT[i.id])
-  const pcSub = items === null ? 'Revisando lo que ya tenés instalado…' : pcOk ? `${found.length ? found.join(', ') : 'Todo'} encontrados.` : `Falta: ${blocking.map((i) => SHORT[i.id] ?? i.label).join(', ')}.`
+  const sinInstalar = (items ?? []).filter((i) => i.state !== 'ok' && i.optional && SHORT[i.id]).map((i) => SHORT[i.id])
+  const opcionalesSub = pcOk && sinInstalar.length ? ` Sin instalar (opcional): ${sinInstalar.join(', ')}.` : ''
+  const pcSub = items === null ? 'Revisando lo que ya tenés instalado…' : pcOk ? `${found.length ? found.join(', ') : 'Todo'} encontrados.${opcionalesSub}` : `Falta: ${blocking.map((i) => SHORT[i.id] ?? i.label).join(', ')}.`
   const openDetail = detail || (items !== null && !pcOk)
 
   const marker = (n: number, done: boolean): React.JSX.Element => (
