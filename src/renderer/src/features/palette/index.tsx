@@ -16,11 +16,17 @@ const DEFAULT_ICON: ReactNode = <PaletteIcon size={15} />
 const groupIcon = (group: string): ReactNode => GROUP_ICON[group] ?? DEFAULT_ICON
 import { bindingOf, isCapturingShortcut, matchShortcut } from '../../shortcuts'
 import { resolveAccountColor, useSettings } from '../settings/store'
-import { FEATURE_UIS } from '../registry'
 import { useUi, type Command, type FeatureUi, type UiCtx } from '../host'
 import { fuzzyFilter, splitHighlight, type FuzzyMatch } from './fuzzy'
 import { coreCommands, focusPaneTerminal } from './core-commands'
 import './palette.css'
+
+// La lista la fija registry.ts al armar FEATURE_UIS, para no importarlo en círculo.
+let featureUis: FeatureUi[] = []
+
+export function usarFeatureUis(l: FeatureUi[]): void {
+  featureUis = l
+}
 
 /**
  * Buscador de la barra superior. Es la paleta de comandos: Ctrl+K enfoca este mismo campo y la lista
@@ -58,7 +64,7 @@ function pushRecent(id: string): void {
  * enfocado). Así App y la paleta reutilizan los comandos reales en vez de duplicar la lógica.
  */
 export function runFeatureCommand(id: string, ctx: UiCtx): void {
-  for (const f of FEATURE_UIS) {
+  for (const f of featureUis) {
     if (!f.commands) continue
     let cmd: Command | undefined
     try {
@@ -82,7 +88,7 @@ export function runFeatureCommand(id: string, ctx: UiCtx): void {
 function allCommands(ctx: UiCtx): Command[] {
   const out: Command[] = []
   const seen = new Set<string>()
-  for (const f of FEATURE_UIS) {
+  for (const f of featureUis) {
     if (!f.commands) continue
     try {
       for (const c of f.commands(ctx)) {

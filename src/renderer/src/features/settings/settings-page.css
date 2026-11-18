@@ -518,6 +518,9 @@ button.f-set-toggle:disabled {
   box-shadow: var(--knob-shadow);
   cursor: pointer;
 }
+.f-set-slider.wide output {
+  width: 84px;
+}
 .f-set-slider output {
   width: 44px;
   flex: none;

@@ -1,6 +1,5 @@
 import type { PermissionAnswer, PermissionPrompt } from '../../../../shared/types'
-import type { DecisionEntry } from '../../../../main/features/permissions'
-import type { PermissionRule } from '../../../../main/features/permissions-core'
+import type { DecisionEntry, PermissionRule } from '../../../../shared/permissions-core'
 
 /**
  * Canal de la función «permissions» hacia main. Todas las respuestas a un pedido pasan por acá:

@@ -5,12 +5,11 @@ import { capacidadesDe, proveedorIdDe } from '../../../../shared/proveedores'
 import { PREFIJO_RE } from '../../../../main/features/tickets/conector'
 import type { Descubiertas } from '../../../../main/features/tickets/descubrir'
 import { borradorNuevo, conHerramientas, revisarComando, slugId, validarBorrador, type Borrador } from './borrador'
-import { PasoFormato, PasoHerramientas } from './AsistentePasos'
+import { PasoFormato, PasoHerramientas, type Cambiar } from './AsistentePasos'
 import { setSnapshot, type Snapshot } from './model'
 import { Button, Input, Select, Textarea } from '../../ui'
 
 export type Paso = 1 | 2 | 3 | 4
-export type Cambiar = (f: (b: Borrador) => Borrador) => void
 
 const TITULOS: Record<Paso, string> = { 1: 'Servidor', 2: 'Herramientas', 3: 'Formato de id y estados', 4: 'Pistas y guardado' }
 

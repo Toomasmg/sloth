@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { View } from '../../ui/View'
 import { Button, EmptyState, IconButton, InlineAlert, Menu, Segmented, Tag, Tooltip, toast } from '../../ui'
 import { CheckCircleIcon, ErrorIcon, MoreIcon, PullRequestIcon, RefreshIcon, SpinnerIcon } from '../../icons/SlothIcons'
+import { useAhora } from '../../lib/reloj'
 import { useVisiblePolling } from '../../visibility'
 import { useUi } from '../host'
 import { rebaseBlocker } from '../../../../shared/prs'
@@ -36,7 +37,7 @@ export function PrsPage(): React.JSX.Element {
   const [filter, setFilter] = useState<PrFilter>(readFilter)
   const [dialog, setDialog] = useState<Dialog>(null)
   const [opening, setOpening] = useState<string | null>(null)
-  const [now, setNow] = useState(() => Date.now())
+  const now = useAhora(30_000)
   const uiRef = useRef(ui)
   uiRef.current = ui
 
@@ -49,11 +50,6 @@ export function PrsPage(): React.JSX.Element {
       off()
       void invoke('feat:prs:setOpen', false)
     }
-  }, [])
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 30_000)
-    return () => clearInterval(t)
   }, [])
 
   const first = useRef(true)

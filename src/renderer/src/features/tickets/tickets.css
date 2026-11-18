@@ -1194,3 +1194,12 @@
 p.f-tickets-experimental strong {
   color: var(--text-2);
 }
+
+/* Lista con ventana: el espacio entre tarjetas va dentro de cada li para que el alto medido lo incluya. */
+.f-tickets-rows--virtual {
+  gap: 0;
+}
+.f-tickets-rows--virtual > li {
+  box-sizing: border-box;
+  padding-bottom: 2px;
+}

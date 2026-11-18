@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { useAhora } from '../../lib/reloj'
 import type { ChatMcpAsk, ChatMcpChoice } from '../../../../shared/chat-mcp'
 import { Button } from '../../ui'
 import { useUi } from '../host'
@@ -9,7 +10,6 @@ export function McpAsk(): React.JSX.Element | null {
   const titleId = useId()
   const descId = useId()
   const [asks, setAsks] = useState<ChatMcpAsk[]>([])
-  const [now, setNow] = useState(() => Date.now())
   const boxRef = useRef<HTMLDivElement>(null)
   const denyRef = useRef<HTMLButtonElement>(null)
   const prevFocus = useRef<HTMLElement | null>(null)
@@ -29,16 +29,11 @@ export function McpAsk(): React.JSX.Element | null {
     }
   }, [ui])
 
+  const now = useAhora(asks.length > 0 ? 500 : null)
   const lista = vigentes(asks, now)
   const ask = lista[0]
   const askId = ask?.id
   const abierto = ask !== undefined
-
-  useEffect(() => {
-    if (asks.length === 0) return
-    const t = setInterval(() => setNow(Date.now()), 500)
-    return () => clearInterval(t)
-  }, [asks.length])
 
   useEffect(() => {
     if (!abierto) return

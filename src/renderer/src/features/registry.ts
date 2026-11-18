@@ -3,7 +3,7 @@ import history from './history'
 import git from './git'
 import worktrees from './worktrees'
 import prs from './prs'
-import palette from './palette'
+import palette, { usarFeatureUis } from './palette'
 import broadcast from './broadcast'
 import templates from './templates'
 import updater from './updater'
@@ -29,3 +29,4 @@ import diagnostico from './diagnostico'
 
 /** Todas las funciones de la interfaz, en el orden en que aparecen en cada lugar. */
 export const FEATURE_UIS: FeatureUi[] = [history, git, worktrees, prs, palette, broadcast, templates, updater, exportImport, tickets, settings, onboarding, teamConfig, team, layout, chat, perfiles, help, report, sound, moveAccount, permissions, dictado, celular, avisos, regiones, diagnostico]
+usarFeatureUis(FEATURE_UIS)

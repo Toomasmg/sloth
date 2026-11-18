@@ -584,6 +584,17 @@ export function SoundIcon(props: SlothIconProps) {
   )
 }
 
+/** Rendimiento (velocímetro) */
+export function GaugeIcon(props: SlothIconProps) {
+  return (
+    <Base {...props}>
+      <path d="M4.5 17a8 8 0 1 1 15 0" />
+      <path d="M12 13l3.5-4" />
+      <circle cx="12" cy="13" r="1.5" fill="currentColor" stroke="none" />
+    </Base>
+  )
+}
+
 /** Cerrar */
 export function CloseIcon(props: SlothIconProps) {
   return (
@@ -884,6 +895,7 @@ export const SLOTH_ICONS = {
   Keyboard: KeyboardIcon,
   Theme: ThemeIcon,
   Sound: SoundIcon,
+  Gauge: GaugeIcon,
   Close: CloseIcon,
 } as const
 

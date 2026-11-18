@@ -5,7 +5,7 @@
  *   vigente sale de Configuración (settings.shortcuts); sin cambio, el por defecto de acá.
  *   Las funciones que atienden un atajo deben preguntar `matchShortcut(id, e)`, no mirar la tecla fija.
  */
-import { canonicalCombo, parseCombo, type ShortcutId } from '../../main/features/settings-model'
+import { canonicalCombo, parseCombo, type ShortcutId } from '../../shared/settings-model'
 import { getSettings } from './features/settings/store'
 
 export interface Shortcut {
