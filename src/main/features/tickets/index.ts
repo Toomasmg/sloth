@@ -814,6 +814,7 @@ function setConfig(raw: unknown): TicketsSnapshot {
     else {
       const def = buscar(nuevo ?? state.config.conectorId)
       const acc = ctx.store.account(id)
+      if (acc && !puedeTickets(acc)) throw new Error(`La cuenta «${acc.label}» es de ${nombreProveedor(acc)}: los tickets todavía solo corren con Claude Code.`)
       if (def?.via === 'mcp' && acc && id !== state.config.queryAccountId && dispEn(def, id).tipo === 'falta') {
         const msg = textoCuenta(def, { tipo: 'falta' }, { accountId: id, label: acc.label })
         if (msg) throw new Error(msg)

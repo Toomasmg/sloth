@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
+import { capacidadesDe } from '../../../../shared/proveedores'
 import { PREFIJO_RE } from '../../../../main/features/tickets/conector'
 import type { Descubiertas } from '../../../../main/features/tickets/descubrir'
 import { borradorNuevo, conHerramientas, slugId, validarBorrador, type Borrador } from './borrador'
@@ -165,7 +166,7 @@ function PasoServidor({
   const [res, setRes] = useState<Descubiertas | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const prefijoMal = prefijo !== '' && !PREFIJO_RE.test(prefijo)
-  const conSesion = ui.accounts.filter((a) => ui.statuses[a.id]?.loggedIn)
+  const conSesion = ui.accounts.filter((a) => ui.statuses[a.id]?.loggedIn && capacidadesDe(a)?.tickets === true)
 
   const buscar = (): void => {
     setErr(null)
