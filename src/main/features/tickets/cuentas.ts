@@ -235,7 +235,14 @@ export function servidorDeLaLista(leidoCon: string | undefined, actual: Conector
 }
 
 /** La sesión arrancó con el servidor todavía conectando (sin sus herramientas): pasa por una carrera al arrancar y un segundo intento suele andar. */
-export class ServidorPendienteError extends Error {}
+export class ServidorPendienteError extends Error {
+  /** Lo que gastó ese intento, para descontarlo del tope de costo del siguiente. */
+  costoUsd?: number
+  constructor(mensaje: string, costoUsd?: number) {
+    super(mensaje)
+    this.costoUsd = costoUsd
+  }
+}
 
 export const usable = (d: Disponibilidad): boolean => d.tipo === 'tiene' && d.estado !== 'needs-auth' && d.estado !== 'failed'
 

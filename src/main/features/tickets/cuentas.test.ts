@@ -20,6 +20,7 @@ import {
   revisarTemprano,
   sanearCache,
   servidorDeLaLista,
+  ServidorPendienteError,
   servidoresDeSalida,
   usable
 } from './cuentas'
@@ -382,4 +383,11 @@ test('mensajeCuenta: el pending de claude.ai no habla de servidores propios', ()
   assert.doesNotMatch(ai, /\/mcp|tarda en arrancar/)
   const propio = mensajeCuenta(GRUV, { ...base, nombre: 'mis-tickets', prefijo: 'mcp__mis-tickets__' }, 'Cosmos', []) ?? ''
   assert.match(propio, /tarda en arrancar/)
+})
+
+test('un servidor pendiente lleva lo que gastó el intento, para descontarlo del tope de costo', () => {
+  const e = new ServidorPendienteError('pendiente', 0.04)
+  assert.equal(e.costoUsd, 0.04)
+  assert.equal(new ServidorPendienteError('pendiente').costoUsd, undefined)
+  assert.ok(e instanceof Error)
 })
