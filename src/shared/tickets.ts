@@ -235,6 +235,8 @@ export interface TicketsSnapshot {
   cuentas: Record<string, CuentaVista>
   /** Se están revisando los conectores de las cuentas. */
   revisando: boolean
+  /** La cuenta de consulta usa un motor con datos sin confirmar (Codex): la UI lo avisa. No se guarda. */
+  motorExperimental?: boolean
 }
 
 /** La primera lista que tenga la clave gana; si ninguna la tiene, 'pendiente'. */

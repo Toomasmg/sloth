@@ -31,8 +31,10 @@ import { aplicarAccion, entradaDeAccion, esAccion, texto, textoObligatorio, tick
 import { runClaude } from './claude-run'
 import { proveedorExigido } from '../../proveedores'
 import { motorDe } from './motores'
-import type { MotorTickets, PedidoMotor } from './motor-tickets'
-import { capacidadesDe, nombreProveedor } from '../../../shared/proveedores'
+import { etiquetarAgente, type MotorTickets, type PedidoMotor } from './motor-tickets'
+import { ACCIONES_VERIFICADAS, SOLO_LECTURA } from './motor-codex'
+import { lanzableSinShell, servidorDePrefijo, servidoresDeConfigToml, servidoresIgnorados, servidoresRevisados } from './codex-config'
+import { capacidadesDe, ETIQUETA_AGENTE, motivoSinCapacidad, nombreProveedor, proveedorIdDe, TICKETS_EXPERIMENTAL } from '../../../shared/proveedores'
 import type { Account } from '../../../shared/types'
 import type { ConectorDef, ConectorGh, ConectorMcp } from './conector'
 import { crearAlmacen, type Almacen, type ConfigCruda, type FsTickets } from './almacen'
@@ -323,8 +325,14 @@ const otrasCon = (def: ConectorMcp, cuentaId: string): string[] =>
     .filter((a) => a.id !== cuentaId && usable(dispEn(def, a.id)))
     .map((a) => a.label)
 
-const textoCuenta = (def: ConectorMcp, d: Disponibilidad, run: { accountId: string; label: string }): string | undefined =>
-  mensajeCuenta(def, d, run.label, otrasCon(def, run.accountId))
+const textoCuenta = (def: ConectorMcp, d: Disponibilidad, run: { accountId: string; label: string }): string | undefined => {
+  const acc = ctx.store.account(run.accountId)
+  const motor = acc && motorDe(acc)
+  // Codex no se configura desde claude.ai ni desde /mcp: la persona lo suma con `codex mcp add`, Sloth no toca su config.
+  if (motor && !motor.leeInit && d.tipo === 'falta' && !d.parecido)
+    return `La cuenta «${run.label}» no tiene el servidor MCP de ${def.nombre}. Sumalo vos con «codex mcp add» en esa cuenta (Sloth no toca su configuración) y tocá «Volver a revisar».`
+  return mensajeCuenta(def, d, run.label, otrasCon(def, run.accountId))
+}
 
 /** Corta antes de gastar una consulta cuando ya se sabe que la cuenta no puede leer el conector. Sin revisar o pending, se prueba. */
 function chequearCuenta(def: ConectorMcp, run: { accountId: string; label: string }): void {
@@ -363,6 +371,13 @@ function vistaCuentas(): Record<string, CuentaVista> {
 /** Columnas del flujo (si la última consulta no trajo, las del conector). */
 const estados = (def: ConectorDef): EstadoBase[] => (state.estados?.length ? [...state.estados] : estadosPorDefecto(def))
 
+function motorExperimental(): boolean | undefined {
+  const id = state.config.queryAccountId
+  const acc = id ? ctx.store.account(id) : undefined
+  const p = acc ? proveedorIdDe(acc) : undefined
+  return p !== undefined && TICKETS_EXPERIMENTAL.includes(p) ? true : undefined
+}
+
 function snapshot(): TicketsSnapshot {
   const id = state.config.conectorId
   const def = buscar(id)
@@ -393,7 +408,8 @@ function snapshot(): TicketsSnapshot {
     carpetas: def?.via === 'gh' ? carpetasDe() : undefined,
     avisosPropios: avisosPropios.length ? avisosPropios : undefined,
     cuentas: vistaCuentas(),
-    revisando: descubriendo
+    revisando: descubriendo,
+    motorExperimental: motorExperimental()
   }
 }
 
@@ -499,9 +515,12 @@ async function pickAccount(def?: ConectorDef): Promise<string> {
   if (!logged.length) throw new Error('No hay ninguna cuenta con sesión iniciada.')
   const conConector = def?.via === 'mcp' ? logged.filter((a) => usable(dispEn(def, a.id))) : []
   const entre = conConector.length ? conConector : logged
+  // Una cuenta sin dato de uso (Codex) cuenta 0 y ganaría siempre: solo se elige si no hay otra.
+  const conUso = entre.filter((a) => capacidadesDe(a)?.uso === true)
+  const candidatas = conUso.length ? conUso : entre
   let usage = ctx.usage.latest
   if (!Object.keys(usage).length) usage = await ctx.usage.scan(ctx.store.accounts)
-  return [...entre].sort((a, b) => tot(usage[a.id]?.last5h) - tot(usage[b.id]?.last5h))[0].id
+  return [...candidatas].sort((a, b) => tot(usage[a.id]?.last5h) - tot(usage[b.id]?.last5h))[0].id
 }
 
 /** ¿Hay una carpeta de repo para crear el espacio de este ticket? (sin crear nada). */
@@ -525,7 +544,7 @@ async function start(rawId: unknown, rawAccount?: unknown): Promise<{ id: string
   if (typeof rawAccount === 'string' && rawAccount) {
     const acc = ctx.store.account(rawAccount)
     if (!acc || !accountStatus(acc).loggedIn) throw new Error('Esa cuenta no tiene sesión iniciada.')
-    if (!puedeTrabajar(acc)) throw new Error(`La cuenta «${acc.label}» es de ${nombreProveedor(acc)}: los tickets todavía solo corren con Claude Code.`)
+    if (!puedeTrabajar(acc)) throw new Error(`La cuenta «${acc.label}» es de ${nombreProveedor(acc)}: ${motivoSinCapacidad(acc, 'tickets') ?? 'no puede trabajar por ticket.'}`)
     accountId = acc.id
   } else accountId = await pickAccount()
   const ws = await ctx.addWorkspace({
@@ -552,6 +571,8 @@ interface Ejecucion {
   env: Record<string, string>
   envConfigDir: string
   motor: MotorTickets
+  /** Cómo se llama el agente en los textos («Claude», «Codex»). */
+  agente: string
   /** La sesión corrió sin los conectores de claude.ai: su system/init no los trae. */
   sinClaudeAi?: boolean
 }
@@ -569,6 +590,47 @@ function ajenosDe(run: Ejecucion, def: ConectorMcp): string[] {
   return mcpAjenos(leerJsonSuave(join(dir, 'settings.json')), leerJsonSuave(join(dir, '.claude.json')), def.herramientas.prefijo)
 }
 
+/** Nombres de los servidores del config.toml de la cuenta: solo ese archivo, nunca auth.json. Sin archivo, ninguno. */
+function servidoresDeCodex(run: Ejecucion): string[] {
+  const archivo = join(run.env[run.envConfigDir], 'config.toml')
+  let texto: string
+  try {
+    texto = readFileSync(archivo, 'utf8')
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return []
+    ctx.log(`tickets: no pude leer el config.toml de «${run.label}»: ${(e as Error).message}`)
+    throw new Error(`No pude leer el config.toml de la cuenta «${run.label}».`)
+  }
+  const nombres = servidoresDeConfigToml(texto)
+  if (!nombres) throw new Error(`No pude entender el config.toml de la cuenta «${run.label}»: no sé qué servidores MCP tiene.`)
+  return nombres
+}
+
+const avisoIgnorados = (nombres: readonly string[]): string | undefined => {
+  const ignorados = servidoresIgnorados(nombres)
+  return ignorados.length
+    ? `Sloth no puede apagar durante la consulta ${ignorados.length === 1 ? 'este servidor' : 'estos servidores'} por su nombre y ${ignorados.length === 1 ? 'queda habilitado' : 'quedan habilitados'}: ${ignorados.slice(0, 5).join(', ')}.`
+    : undefined
+}
+
+/** Completa el pedido con lo que el motor no puede saber solo. Con Codex: qué servidores tiene la cuenta y cuál es el del conector. */
+function pedidoPara(run: Ejecucion, pedido: PedidoMotor): PedidoMotor {
+  if (run.motor.leeInit) return pedido
+  if (!lanzableSinShell(run.exe, process.platform))
+    throw new Error(`Encontré ${run.agente} como un .cmd de npm y Sloth todavía no lo puede lanzar para consultar tickets. Instalá la versión con ejecutable (.exe) o probá con una cuenta de Claude Code.`)
+  const nombres = servidoresDeCodex(run)
+  const aviso = avisoIgnorados(nombres)
+  if (aviso) ctx.log(`tickets: ${run.label}: ${aviso}`)
+  return { ...pedido, servidoresCuenta: nombres, servidorElegido: pedido.def && servidorDePrefijo(pedido.def.herramientas.prefijo) }
+}
+
+/** Lo que `runClaude` necesita de un motor que no es Claude: cortar por línea y decir bien cómo se llama. Con Claude, nada. */
+function opcionesMotor(run: Ejecucion, pedido: PedidoMotor): { cortarSi?: (linea: string) => Error | undefined; agente?: string } {
+  const { motor } = run
+  if (motor.id === 'claude') return {}
+  return { cortarSi: motor.cortarSi && ((linea) => motor.cortarSi?.(linea, pedido)), agente: run.agente }
+}
+
 /** Con `mcp`, si la cuenta lo usa con un servidor que no es de claude.ai, la sesión no conecta los de claude.ai. */
 function ejecucion(nombre: string, accountId: string, mcp?: ConectorMcp): Ejecucion {
   const acc = ctx.store.account(accountId)
@@ -578,12 +640,12 @@ function ejecucion(nombre: string, accountId: string, mcp?: ConectorMcp): Ejecuc
   if (!p.capacidades.ticketsHeadless || !motor) throw new Error(`La cuenta «${acc.label}» es de ${nombreProveedor(acc)}: los tickets todavía solo corren con Claude Code.`)
   if (!accountStatus(acc).loggedIn) throw new Error(`La cuenta «${acc.label}» no tiene sesión iniciada.`)
   const exe = p.resolverExe()
-  if (!exe) throw new Error('No encontré el ejecutable de Claude Code (claude.exe) en el PATH.')
+  if (!exe) throw new Error(p.id === 'claude' ? 'No encontré el ejecutable de Claude Code (claude.exe) en el PATH.' : `No encontré ${nombreProveedor(acc)} en el PATH. ${p.comoInstalar}`)
   const cwd = join(carpeta(), 'tickets-run')
   mkdirSync(cwd, { recursive: true })
   // Un MCP propio lento puede tardar más que el tope por defecto de Claude Code en arrancar.
   const env = { MCP_TIMEOUT: '30000', ...baseEnv(p.quitarDelEntorno), ...p.envCuenta(acc.configDir) }
-  const run: Ejecucion = { accountId: acc.id, label: acc.label, exe, cwd, env, envConfigDir: p.envConfigDir, motor }
+  const run: Ejecucion = { accountId: acc.id, label: acc.label, exe, cwd, env, envConfigDir: p.envConfigDir, motor, agente: ETIQUETA_AGENTE[p.id] }
   if (!mcp || defPara(mcp, acc.id).herramientas.prefijo.startsWith('mcp__claude_ai_')) return run
   // Conectar todos los de claude.ai solo para no usarlos demora cada consulta. Si la variable no existe en esta
   // versión de Claude Code, no cambia nada: el init los trae igual.
@@ -694,8 +756,9 @@ function medirUso(conectorId: string, s: string, lim: LimitesEfectivos, accion?:
   if (u.tope) throw new TopeVueltasError(textoTope(u.tope, u.tope === 'vueltas' ? lim.vueltas : (lim.costo ?? 0), accion), u.tope, u)
 }
 
-/** Un error común de runClaude (los propios se devuelven tal cual) con el aviso de claude viejo, si corresponde. */
-const legible = (e: unknown): unknown => {
+/** Un error común de runClaude (los propios se devuelven tal cual) con el aviso de claude viejo, si corresponde. Con otro agente, solo cambia el nombre. */
+const legible = (e: unknown, run?: Ejecucion): unknown => {
+  if (run && run.motor.id !== 'claude') return etiquetarAgente(e, run.agente)
   if (!(e instanceof Error) || e.constructor !== Error) return e
   const t = textoFlagViejo(e.message)
   return t ? new Error(t) : e
@@ -729,9 +792,10 @@ async function refresh(rawAccount: unknown, rawVueltas?: unknown): Promise<{ cou
   state.lastRun = lastRunTrasError(state.lastRun, undefined, usadas)
   avisar()
   try {
-    const pedido: PedidoMotor = { tarea: 'lista', def: d, model: state.config.model, ajenos: ajenosDe(run, d), limites: lim }
+    const pedido = pedidoPara(run, { tarea: 'lista', def: d, model: state.config.model, ajenos: ajenosDe(run, d), limites: lim })
     const r = await runClaude({
       exe: run.exe,
+      ...opcionesMotor(run, pedido),
       args: run.motor.argv(pedido),
       prompt: buildPrompt(d, state.config.assigneeId),
       cwd: run.cwd,
@@ -753,7 +817,7 @@ async function refresh(rawAccount: unknown, rawVueltas?: unknown): Promise<{ cou
     state.config.queryAccountId = run.accountId
     return { count: r.tickets.length, tokens: r.tokens }
   } catch (e) {
-    const msg = e instanceof ConectorFaltaError ? (textoCuenta(def, { tipo: 'falta' }, run) ?? e.message) : (legible(e) as Error).message
+    const msg = e instanceof ConectorFaltaError ? (textoCuenta(def, { tipo: 'falta' }, run) ?? e.message) : (legible(e, run) as Error).message
     state.lastRun = lastRunTrasError(state.lastRun, e, usadas)
     state.lastError = msg
     throw new Error(msg)
@@ -913,9 +977,10 @@ async function detalle(rawId: unknown, rawFresco?: unknown): Promise<Detalle> {
   const lim = limites()
   const efectivos = limitesEfectivos(lim)
   try {
-    const pedido: PedidoMotor = { tarea: 'detalle', def: dc, model: state.config.model, ajenos: ajenosDe(c, dc), limites: lim }
+    const pedido = pedidoPara(c, { tarea: 'detalle', def: dc, model: state.config.model, ajenos: ajenosDe(c, dc), limites: lim })
     const d = await runClaude({
       exe: c.exe,
+      ...opcionesMotor(c, pedido),
       args: c.motor.argv(pedido),
       prompt: buildDetallePrompt(dc, id),
       cwd: c.cwd,
@@ -933,7 +998,7 @@ async function detalle(rawId: unknown, rawFresco?: unknown): Promise<Detalle> {
     return d
   } catch (e) {
     if (e instanceof ConectorFaltaError) throw new Error(`No pudimos leer el detalle: ${sinConector(def)}`)
-    throw legible(e)
+    throw legible(e, c)
   }
 }
 
@@ -960,6 +1025,7 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
 
   const c = def.via === 'mcp' ? cuenta(def) : undefined
   const dc = def.via === 'mcp' && c ? servidorDeLaLista(state.leidoCon, defPara(def, c.accountId)) : undefined
+  if (c && c.motor.id === 'codex' && !ACCIONES_VERIFICADAS) throw new Error(SOLO_LECTURA)
   const lim = limites()
   const efectivos = limitesEfectivos(lim)
   escribiendo.add(id)
@@ -967,9 +1033,10 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
     let minutosTotal: number | undefined
     if (def.via === 'gh') await ghAccion(ghRunCon(), t, a, input, state.me)
     else if (c && dc) {
-      const pedido: PedidoMotor = { tarea: 'accion', def: dc, model: state.config.model, ajenos: ajenosDe(c, dc), limites: lim, accion: a }
+      const pedido = pedidoPara(c, { tarea: 'accion', def: dc, model: state.config.model, ajenos: ajenosDe(c, dc), limites: lim, accion: a })
       const r = await runClaude({
         exe: c.exe,
+        ...opcionesMotor(c, pedido),
         args: c.motor.argv(pedido),
         prompt: buildAccionPrompt(dc, a, input),
         cwd: c.cwd,
@@ -991,7 +1058,7 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
     if (e instanceof HerramientaFaltaError) for (const k of mismaHerramienta(def, a)) noDisponible[k] = e.message
     else if (e instanceof ConectorFaltaError) for (const k of accionesSoportadas(def)) noDisponible[k] = sinConector(def)
     ctx.log(`tickets(${def.id}): accion ${a} en ${id}: error`)
-    throw legible(e)
+    throw legible(e, c)
   } finally {
     escribiendo.delete(id)
     changed()
@@ -1024,6 +1091,7 @@ async function descubrir(rawPrefijo: unknown, rawAccount: unknown): Promise<Desc
   descubriendo = true
   try {
     const run = ejecucion('las herramientas', requested ?? state.config.queryAccountId ?? (await pickAccount()))
+    if (!run.motor.leeInit) throw new Error(`Esta cuenta no puede buscar herramientas todavía: ${run.agente} no informa los servidores de la sesión. Probá con una cuenta de Claude Code.`)
     const pedido: PedidoMotor = { tarea: 'descubrir', model: state.config.model, ajenos: [] }
     const r = await runClaude({
       exe: run.exe,
@@ -1060,6 +1128,13 @@ async function revisarCuentas(raw: unknown): Promise<TicketsSnapshot> {
       const previa = cuentasCache[id]
       try {
         const run = ejecucion('los conectores', id)
+        if (!run.motor.leeInit) {
+          const nombres = servidoresDeCodex(run)
+          const servidores = servidoresRevisados(nombres)
+          cuentasCache = { ...cuentasCache, [id]: { revisadaEn: Date.now(), servidores, error: avisoIgnorados(nombres) } }
+          ctx.log(`tickets: revisar: ${nombres.length} servidores en el config de ${run.agente}`)
+          return
+        }
         const pedido: PedidoMotor = { tarea: 'revisar', model: state.config.model, ajenos: [], schema: REVISAR_SCHEMA }
         const r = await runClaude({
           exe: run.exe,

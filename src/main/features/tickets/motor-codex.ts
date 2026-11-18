@@ -12,7 +12,7 @@ import { textoTope, TopeVueltasError, VUELTAS_DEFECTO, vueltasValidas } from './
  */
 export const ACCIONES_VERIFICADAS: boolean = false
 
-const SOLO_LECTURA = 'Las acciones con Codex todavía no se probaron: por ahora es de solo lectura.'
+export const SOLO_LECTURA = 'Las acciones con Codex todavía no se probaron: por ahora es de solo lectura.'
 const SIN_DESCUBRIR = 'Esta cuenta no puede buscar herramientas todavía: Codex no informa los servidores de la sesión.'
 const HERRAMIENTA_RE = /^[A-Za-z0-9_.-]{1,128}$/
 
