@@ -172,11 +172,11 @@ const PERMISO_POR_CLASE: Record<string, string> = {
 export const resumenPermiso = (clase: string): string => PERMISO_POR_CLASE[clase] ?? 'Claude quiere usar una herramienta.'
 
 /** Título y cuerpo del aviso por ntfy. Pasa por los servidores de ntfy: solo el nombre del espacio y qué pasó. */
-export function textoAviso(tipo: TipoAviso, espacio: string, detalle?: string): { titulo: string; cuerpo: string } {
+export function textoAviso(tipo: TipoAviso, espacio: string, detalle?: string, agente = 'Claude'): { titulo: string; cuerpo: string } {
   const nombre = corto(espacio.replace(/[\r\n]+/g, ' '), 60)
-  if (tipo === 'termino') return { titulo: `${nombre} terminó`, cuerpo: 'Claude terminó. Revisá los cambios antes de seguir.' }
-  if (tipo === 'permiso') return { titulo: `${nombre} pide permiso`, cuerpo: corto((detalle ?? 'Claude necesita tu permiso.').replace(/[\r\n]+/g, ' ')) }
-  return { titulo: `${nombre} te necesita`, cuerpo: corto((detalle || 'Claude necesita tu atención.').replace(/[\r\n]+/g, ' ')) }
+  if (tipo === 'termino') return { titulo: `${nombre} terminó`, cuerpo: `${agente} terminó. Revisá los cambios antes de seguir.` }
+  if (tipo === 'permiso') return { titulo: `${nombre} pide permiso`, cuerpo: corto((detalle ?? `${agente} necesita tu permiso.`).replace(/[\r\n]+/g, ' ')) }
+  return { titulo: `${nombre} te necesita`, cuerpo: corto((detalle || `${agente} necesita tu atención.`).replace(/[\r\n]+/g, ' ')) }
 }
 
 /**

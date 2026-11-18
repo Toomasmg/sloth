@@ -1,3 +1,4 @@
+import type { LecturaLimitesCodex } from './celular'
 import type { ProveedorId } from './proveedores'
 
 /** Una cuenta de Claude: su propio CLAUDE_CONFIG_DIR, con su login y sus settings. */
@@ -8,6 +9,10 @@ export interface Account {
   createdAt: number
   /** Usar el setup de ~/.claude (skills, agents, hooks, plugins, settings, MCP). Por defecto sí. */
   shareSetup?: boolean
+  /** Leer los límites de uso con `codex app-server` (experimental). Ausente = apagado. */
+  limitesExperimentales?: boolean
+  /** Avisar «terminó» con el `notify` de Codex en el config.toml de la cuenta (experimental). Ausente = apagado. */
+  avisoDeTurno?: boolean
   /** Agente de terminal de la cuenta. Ausente = claude. Puede ser un id que esta versión no conoce: se resuelve con proveedorDe. */
   proveedor?: ProveedorId | (string & {})
 }
@@ -26,6 +31,8 @@ export interface AgenteDisponible {
   /** Falso si la versión instalada es más vieja que la mínima con la que Sloth probó el agente. */
   versionOk?: boolean
   comoInstalar?: string
+  /** Por qué está instalado pero no se puede usar (p. ej. falta PowerShell 7). */
+  aviso?: string
 }
 
 export interface UsageTotals {
@@ -169,6 +176,12 @@ export interface SlothApi {
   accountStatuses(): Promise<Record<string, AccountStatus>>
   accountUsage(): Promise<Record<string, AccountUsage>>
   setShareSetup(id: string, share: boolean): Promise<SetupSyncReport | null>
+  /** Activa o apaga la lectura experimental de límites de una cuenta de Codex (canal `accounts:setLimitesExperimentales`). */
+  setLimitesExperimentales(id: string, activo: boolean): Promise<void>
+  /** Activa o apaga el aviso de «terminó» de una cuenta de Codex (canal `accounts:setAvisoDeTurno`). Si no se puede activar, rechaza con el motivo. */
+  setAvisoDeTurno(id: string, activo: boolean): Promise<void>
+  /** Cuánto se usó de cada ventana en una cuenta con la lectura activada, o por qué no hay dato (canal `accounts:limitesCodex`). De a una cuenta: la pantalla muestra cada una apenas llega. */
+  limitesCodex(id: string): Promise<LecturaLimitesCodex>
   addWorkspace(input: NewWorkspaceInput): Promise<Workspace>
   removeWorkspace(id: string): Promise<void>
   /** Renombrar o cambiar el ícono (canal `workspaces:update`). Devuelve el espacio actualizado. */

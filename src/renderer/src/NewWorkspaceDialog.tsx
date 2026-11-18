@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Account, AccountStatus, AccountUsage, NewWorkspaceInput, Workspace } from '../../shared/types'
 import { api } from './api'
+import { agenteComun, agenteDe } from '../../shared/proveedores'
 import { Modal } from './Modal'
 import { Button, Chip, Input, Select, Tabs, Textarea, tabPanelProps } from './ui'
 import { FolderIcon, TemplatesIcon, TicketIcon } from './icons/SlothIcons'
@@ -10,7 +11,8 @@ import { useUi } from './features/host'
 import { useTemplates, openDialog, peekPreselect, takePreselect, usesTicket, type TemplateDto } from './features/templates/store'
 import { TEMPLATE_COLORS, colorHex } from './features/templates/catalog'
 import { setBoardOpen, useSnapshot } from './features/tickets/model'
-import { cuentaSugerida, proveedorIdDe } from '../../shared/proveedores'
+import { cuentaSugerida, nombreProveedor, proveedorIdDe } from '../../shared/proveedores'
+import { ayudaPrimerMensaje } from '../../shared/primer-mensaje-texto'
 import { applyVars, folderLabel, missingVars, normTicketId, TEMPLATE_COLOR_KEYS, TICKET_RE, today, validBranch, type VarValues } from '../../shared/templates-shared'
 import './NewWorkspaceDialog.css'
 
@@ -332,6 +334,8 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
     (msgEdit ?? '').trim() !== ''
 
   const acc = accounts.find((a) => a.id === accountId)
+  const agenteCuentas = agenteComun(accounts)
+  const agenteAcc = acc ? agenteDe(acc) : (agenteCuentas ?? 'Claude')
   const accNoSession = Boolean(acc && statuses[acc.id] && !statuses[acc.id].loggedIn)
 
   const changeOrigin = (o: Origin): void => {
@@ -368,7 +372,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
         error={showErr('ticket')}
       />
       <span className="nw-hint">
-        {ticketMode ? (tk?.conector.comandoTicket ? 'Claude arranca con /ticket: tu skill se encarga del worktree, el PR y las horas.' : 'El id del ticket va en el nombre del espacio.') : 'Reemplaza {ticket} en el nombre, la rama y el primer mensaje.'}{' '}
+        {ticketMode ? (tk?.conector.comandoTicket ? `${agenteAcc} arranca con /ticket: tu skill se encarga del worktree, el PR y las horas.` : 'El id del ticket va en el nombre del espacio.') : 'Reemplaza {ticket} en el nombre, la rama y el primer mensaje.'}{' '}
         <button type="button" className="nw-link" onClick={openTickets}>
           {tk?.conector.disponible ? `Elegir de ${tk.conector.nombre}` : 'Elegir de la lista'}
         </button>
@@ -401,7 +405,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
       size="lg"
       className="nw-modal"
       title={ticketMode ? 'Espacio desde ticket' : 'Nuevo espacio'}
-      subtitle="Una carpeta, una cuenta de Claude y su propia terminal."
+      subtitle={agenteCuentas ? `Una carpeta, una cuenta de ${agenteCuentas} y su propia terminal.` : 'Una carpeta, una cuenta y su propia terminal.'}
       dirty={dirty}
       locked={busy}
       onClose={onClose}
@@ -600,7 +604,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
 
           <div className="nw-field">
             <span id="nw-acc-lbl" className="nw-lbl">
-              Cuenta de Claude
+              {agenteCuentas ? `Cuenta de ${agenteCuentas}` : 'Cuenta'}
             </span>
             <div role="radiogroup" aria-labelledby="nw-acc-lbl" className="nw-accs">
               {accounts.map((a, i) => {
@@ -622,13 +626,13 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
               })}
             </div>
             {accounts.length === 0 && <span className="nw-err">Agregá una cuenta de Claude antes de crear un espacio.</span>}
-            {accNoSession && <span className="nw-hint">Al abrir el espacio, Claude te pide iniciar sesión en esa terminal.</span>}
+            {accNoSession && <span className="nw-hint">{`Al abrir el espacio, ${agenteAcc} te pide iniciar sesión en esa terminal.`}</span>}
           </div>
 
           {!ticketMode && (
             <div className="nw-field">
               <label htmlFor="nw-msg">
-                Primer mensaje para Claude <span className="nw-opt">· opcional</span>
+                {`Primer mensaje para ${agenteAcc}`} <span className="nw-opt">· opcional</span>
               </label>
               <Textarea
                 id="nw-msg"
@@ -640,9 +644,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
                 aria-describedby="nw-msg-hint"
               />
               <span id="nw-msg-hint" className="nw-hint">
-                {acc && proveedorIdDe(acc) !== 'claude'
-                  ? 'Con Codex Sloth no siempre puede mandarlo solo (depende de cómo esté instalado y de la terminal). Si no puede, te avisa y lo escribís a mano.'
-                  : 'Se manda solo la primera vez que se abre el espacio.'}
+                {ayudaPrimerMensaje(acc)}
               </span>
             </div>
           )}

@@ -39,3 +39,19 @@ test('con Claude (hooks) el pegado sigue como antes', () => {
 test('el aviso nombra el agente y el espacio y no lleva el mensaje', () => {
   assert.equal(avisoPrimerMensajeAMano('Codex', 'Mi espacio'), 'Codex no recibe el primer mensaje solo en «Mi espacio»: escribilo a mano.')
 })
+
+test('con Copilot (sin hooks) el primer mensaje nunca se pega ni se pierde en silencio: o no hay mensaje o va «a mano» con aviso', () => {
+  const copilot = PROVEEDORES.copilot
+  assert.equal(copilot.capacidades.hooks, false)
+  for (const prompt of ['Revisá el ticket PROJ-12', 'config', '--x\n"y" & z']) {
+    for (const f of FAMILIAS) {
+      for (const exe of ['C:\bin\copilot.cmd', 'C:\bin\copilot.exe', undefined]) {
+        const l = shellLaunch(f, copilot.argvInteractivo({ prompt }), exe)
+        assert.equal(l.paste === undefined, false, `${f} ${exe}: el mensaje no va por argumento ni variable`)
+        assert.equal(destinoPrimerMensaje(copilot.capacidades.hooks, l.paste), 'a-mano', `${f} ${exe}`)
+      }
+    }
+  }
+  assert.equal(destinoPrimerMensaje(copilot.capacidades.hooks, shellLaunch('ps', copilot.argvInteractivo({}), 'C:\bin\copilot.exe').paste), 'ninguno')
+  assert.equal(avisoPrimerMensajeAMano('GitHub Copilot', 'Mi espacio'), 'GitHub Copilot no recibe el primer mensaje solo en «Mi espacio»: escribilo a mano.')
+})

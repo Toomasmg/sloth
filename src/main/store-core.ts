@@ -48,7 +48,7 @@ export function validarCuenta(v: unknown): Account | undefined {
   const o: Obj = { ...v }
   if (typeof o.label !== 'string') o.label = v.id
   if (typeof o.createdAt !== 'number' || !Number.isFinite(o.createdAt)) o.createdAt = 0
-  sacarSiNoEs(o, ['shareSetup'], 'boolean')
+  sacarSiNoEs(o, ['shareSetup', 'limitesExperimentales', 'avisoDeTurno'], 'boolean')
   sacarSiNoEs(o, ['proveedor'], 'string')
   return o as unknown as Account
 }

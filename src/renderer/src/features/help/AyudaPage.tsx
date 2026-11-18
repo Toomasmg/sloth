@@ -131,6 +131,16 @@ const CODEX_PASOS: string[] = [
   'Con Codex todavía no hay: uso y límites, avisos de permisos desde el celu, tickets, chat MCP, historial, mover espacios a otra cuenta, dormir espacios ni usar tu setup de Claude. Varios de esos lugares lo dicen; en otros la función simplemente no corre con una cuenta de Codex.'
 ]
 
+/** Cuentas de Copilot: texto fijo, sin datos de afuera. */
+const COPILOT_PASOS: string[] = [
+  'Instalá Copilot en la PC: abrí una terminal y corré «npm install -g @github/copilot» (necesita Node 22) o «winget install GitHub.Copilot». En Windows también hace falta PowerShell 7 («winget install Microsoft.PowerShell»): con el PowerShell 5.1 que trae el sistema no anda. Sloth lo detecta solo; hasta entonces la opción no aparece o no deja agregar la cuenta.',
+  'Configuración › Cuentas › Agregar cuenta: elegí «GitHub Copilot» en Agente, poné un nombre y tocá Agregar.',
+  'Se abre una terminal con «copilot login --device-code»: seguí los pasos en el navegador.',
+  'Sloth admite una sola cuenta de Copilot, la misma en todos los perfiles: Copilot guarda el login en tu sistema (y puede usar el de «gh» si lo tenés iniciado) y Sloth no lo separa por cuenta ni guarda ninguna credencial.',
+  'Cada espacio de Copilot abre una conversación nueva. Sloth todavía no le manda el primer mensaje: te avisa y lo escribís a mano.',
+  'Con Copilot todavía no hay: uso y límites, avisos de permisos desde el celu, tickets, chat MCP, historial, mover espacios a otra cuenta, dormir espacios ni usar tu setup de Claude.'
+]
+
 const SECTIONS = [
   { id: 'ay-primeros', label: 'Primeros pasos' },
   { id: 'ay-atajos', label: 'Atajos de teclado' },
@@ -168,7 +178,8 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
   })).filter((g) => g.rows.length > 0)
   const nShortcuts = groups.reduce((n, g) => n + g.rows.length, 0)
   const codexVisible = matchesAll(`Cuentas de Codex ${CODEX_PASOS.join(' ')}`, words)
-  const total = cards.length + nShortcuts + faqs.length + (codexVisible ? 1 : 0)
+  const copilotVisible = matchesAll(`Cuentas de Copilot ${COPILOT_PASOS.join(' ')}`, words)
+  const total = cards.length + nShortcuts + faqs.length + (codexVisible ? 1 : 0) + (copilotVisible ? 1 : 0)
   const noResults = hasQ && total === 0
 
   const countLabel = !hasQ
@@ -440,6 +451,19 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
                 <div className="ay-card-box">
                   <ol className="ay-steps">
                     {CODEX_PASOS.map((t) => (
+                      <li key={t}>{hl(t)}</li>
+                    ))}
+                  </ol>
+                </div>
+              </section>
+            )}
+
+            {copilotVisible && (
+              <section id="ay-copilot" className="ay-sec" aria-labelledby="ay-h-copilot">
+                <h2 id="ay-h-copilot">Cuentas de Copilot</h2>
+                <div className="ay-card-box">
+                  <ol className="ay-steps">
+                    {COPILOT_PASOS.map((t) => (
                       <li key={t}>{hl(t)}</li>
                     ))}
                   </ol>

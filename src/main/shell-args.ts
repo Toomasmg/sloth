@@ -95,10 +95,12 @@ export function shellLaunch(family: ShellFamily, claude?: string[], claudeExe?: 
   if (family === 'cmd' && exe && !CMD_PLAIN.test(exe)) exe = undefined
   const agente = split.argv[0]
   // En PowerShell, `codex` a secas puede resolver a codex.ps1, que la política de ejecución suele bloquear: con codex.cmd se llama por ruta.
-  const shim = family === 'ps' && agente === 'codex' && claudeExe && CMD_SHIM_SEGURO.test(claudeExe) ? claudeExe : undefined
-  const argv = exe && (agente === 'claude' || agente === 'codex') ? [exe, ...split.argv.slice(1)] : shim ? [shim, ...split.argv.slice(1)] : split.argv
+  const shim = family === 'ps' && (agente === 'codex' || agente === 'copilot') && claudeExe && CMD_SHIM_SEGURO.test(claudeExe) ? claudeExe : undefined
+  const argv = exe && (agente === 'claude' || agente === 'codex' || agente === 'copilot') ? [exe, ...split.argv.slice(1)] : shim ? [shim, ...split.argv.slice(1)] : split.argv
   const prompt = split.prompt
-  const viaEnv = prompt !== undefined && exe !== undefined && family !== 'cmd' && !mightBeSubcommand(prompt, agente)
+  // Con Copilot el primer mensaje nunca va por SLOTH_PROMPT ni por argv: que `--` separe operandos no está confirmado. Queda en `paste` y
+  // main, como Copilot no tiene hooks que disparen el pegado, lo descarta y avisa que se escriba a mano.
+  const viaEnv = prompt !== undefined && exe !== undefined && family !== 'cmd' && agente !== 'copilot' && !mightBeSubcommand(prompt, agente)
   const paste = prompt !== undefined && !viaEnv ? prompt : undefined
   switch (family) {
     case 'ps': {

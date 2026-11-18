@@ -2,6 +2,7 @@ import type { Capacidades, ProveedorId } from '../shared/proveedores'
 import { proveedorIdDe } from '../shared/proveedores'
 import { claude } from './proveedor-claude'
 import { codex } from './proveedor-codex'
+import { copilot } from './proveedor-copilot'
 
 export interface Proveedor {
   id: ProveedorId
@@ -29,7 +30,7 @@ export interface Proveedor {
   hayConversacionPrevia(configDir: string, cwd: string): boolean
 }
 
-export const PROVEEDORES: Record<ProveedorId, Proveedor> = { claude, codex }
+export const PROVEEDORES: Record<ProveedorId, Proveedor> = { claude, codex, copilot }
 
 export const AVISO_PROVEEDOR_DESCONOCIDO = 'Esta cuenta es de un agente que esta versión de Sloth no conoce; actualizá Sloth.'
 
