@@ -35,3 +35,10 @@ export interface MotorTickets {
   /** true si el motor entiende el `system/init` con los servidores MCP de la sesión. */
   leeInit: boolean
 }
+
+/** Un error común (los propios, como el tope de vueltas, se devuelven tal cual) con el nombre del agente que corrió la consulta. */
+export function etiquetarAgente(e: unknown, nombre: string): unknown {
+  if (nombre === 'Claude' || !(e instanceof Error) || e.constructor !== Error) return e
+  const prefijo = 'Claude no pudo completar la consulta:'
+  return e.message.startsWith(prefijo) ? new Error(`${nombre} no pudo completar la consulta:${e.message.slice(prefijo.length)}`) : e
+}

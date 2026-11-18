@@ -61,5 +61,5 @@ test('motorDe: cuentas viejas y de claude usan el motor de claude', () => {
 
 test('capacidad ticketsHeadless', () => {
   assert.equal(CAPACIDADES.claude.ticketsHeadless, true)
-  assert.equal(CAPACIDADES.codex.ticketsHeadless, false)
+  assert.equal(CAPACIDADES.codex.ticketsHeadless, true)
 })
