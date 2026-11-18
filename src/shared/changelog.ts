@@ -9,6 +9,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.2',
+    date: '2026-11-18',
+    title: 'Gruv por personas, sin esperar a todo el equipo',
+    items: [
+      'Tickets y Equipo: «Actualizar» con Gruv ya no se cuelga con equipos grandes. Sloth trae siempre tus tickets y los de las personas que elijas, en vez de los de todo el equipo, y tarda unos 20 a 40 segundos en lugar de no terminar.',
+      'Nuevo filtro en Tickets: elegí a quién ver (la lista de personas la trae Gruv), qué estados mostrar (En curso, Revisión y QA, Terminado, o todos) y cuántos días hacia atrás para lo terminado (4 por defecto). Lo tuyo y lo abierto de las personas que elijas se muestran siempre, aunque sea viejo.',
+      'En Equipo, las personas que elegiste tienen su tarjeta con sus tickets, y «Traer de Gruv» trae lo tuyo más lo de ellas.',
+      'El detalle de un ticket de Gruv vuelve a mostrar la descripción (Ocurrió, Esperado y Pasos).',
+      'Si el servidor de Gruv todavía está arrancando, Sloth reintenta en vez de pedirte que lo autentiques, y los mensajes de error dicen qué pasó de verdad.'
+    ]
+  },
+  {
     version: '0.7.1',
     date: '2026-11-18',
     title: 'Links que abren, Rendimiento y deslizar entre paneles',
