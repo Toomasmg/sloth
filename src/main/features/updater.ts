@@ -6,6 +6,7 @@ import type { Feature, FeatureContext } from './context'
 import { groupNotes, type NoteGroup } from './updater-notes'
 import { currentSettings } from './settings'
 import { friendly, isPostponedOn, localDay, nextCheckDelay, notesText, parseChannel, parsePostponed, type Postponed, type UpdateChannel } from './updater-core'
+import { carpetaFeatures } from '../perfil'
 
 /**
  * Actualizaciones automáticas desde los releases de GitHub (Toomasmg/sloth).
@@ -54,7 +55,7 @@ let timer: NodeJS.Timeout | null = null
  * «Más tarde»: la versión pospuesta y el día (local, AAAA-MM-DD). Sobrevive a reiniciar Sloth: el
  * aviso no vuelve con esa misma versión hasta el día siguiente (al arrancar, o en un chequeo).
  */
-const laterFile = (): string => join(app.getPath('userData'), 'features', 'updater-later.json')
+const laterFile = (): string => join(carpetaFeatures(), 'updater-later.json')
 const dayNow = (): string => localDay(new Date())
 function readPostponed(): Postponed | null {
   try {
@@ -81,7 +82,7 @@ const isPostponed = (version: string): boolean => {
 /** Canal de actualizaciones: se lee del archivo de Configuración (default «estable»). */
 export function readChannel(): UpdateChannel {
   try {
-    return parseChannel(JSON.parse(readFileSync(join(app.getPath('userData'), 'features', 'settings.json'), 'utf8').replace(/^﻿/, '')))
+    return parseChannel(JSON.parse(readFileSync(join(carpetaFeatures(), 'settings.json'), 'utf8').replace(/^﻿/, '')))
   } catch {
     return 'estable'
   }

@@ -10,6 +10,7 @@ import { crearLimite } from '../diag/limite'
 import { leerErrorRenderer } from '../diag/error-renderer'
 import { redactar } from '../diag/redactar'
 import { logger } from '../logger-global'
+import { raizDatos } from '../perfil'
 
 function ajustesBooleanos(): Record<string, boolean> {
   const salida: Record<string, boolean> = {}
@@ -51,7 +52,7 @@ const feature: Feature = {
         crashPrevio: huboCrashPrevio(),
         fallosLog: logger.fallo()
       }
-      return redactar(textoDiagnostico(datos, Date.now()), { home: homedir(), userData: app.getPath('userData') })
+      return redactar(textoDiagnostico(datos, Date.now()), { home: homedir(), userData: raizDatos() })
     })
 
     ctx.handle('crashPrevio', () => tomarCrashPrevio())

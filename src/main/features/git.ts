@@ -1,4 +1,4 @@
-import { app, shell } from 'electron'
+import { shell } from 'electron'
 import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
 import { basename, join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
@@ -41,6 +41,7 @@ import {
   validatePr
 } from './git-ops'
 import type { FileChange } from './git-ops'
+import { carpetaFeatures } from '../perfil'
 
 /**
  * Función «git»: cambios del espacio (preparar, sacar, descartar, commit), historial, ramas
@@ -58,7 +59,7 @@ let saved: Saved = { bases: {} }
 const busy = new Set<string>()
 
 function stateFile(): string {
-  return join(app.getPath('userData'), 'features', 'git.json')
+  return join(carpetaFeatures(), 'git.json')
 }
 
 function load(): void {

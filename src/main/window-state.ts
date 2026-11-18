@@ -1,7 +1,8 @@
-import { app, screen, type BrowserWindow, type Rectangle } from 'electron'
+import { screen, type BrowserWindow, type Rectangle } from 'electron'
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { pickBounds, parseState } from './window-state-core'
+import { raizDatos } from './perfil'
 
 /**
  * Tamaño, posición y maximizado de la ventana entre sesiones (v0.5, cosita 5).
@@ -21,7 +22,7 @@ export interface WindowState {
 const DEBOUNCE_MS = 500
 
 function stateFile(): string {
-  return join(app.getPath('userData'), 'window-state.json')
+  return join(raizDatos(), 'window-state.json')
 }
 
 export function loadWindowState(): WindowState {

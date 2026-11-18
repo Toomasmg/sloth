@@ -1,4 +1,3 @@
-import { app } from 'electron'
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -7,6 +6,7 @@ import { HOOK_EVENTS, type HookEventPayload } from '../shared/daemon-protocol'
 import { HOOK_MARKER, HOOK_SCRIPT, LEGACY_HOOK_MARKERS } from '../daemon/hook-script'
 import { envolverStatusline, STATUSLINE_SCRIPT } from './statusline-core'
 import { respaldarAntesDeReemplazar, respaldarUnaVez } from './respaldo'
+import { raizDatos } from './perfil'
 
 export type { HookEventPayload }
 
@@ -20,7 +20,7 @@ const PERMISSION_HOOK_TIMEOUT_S = 130
 
 /** Ruta del script de hook (userData/sloth-hook.cjs). */
 export function hookScriptPath(): string {
-  return join(app.getPath('userData'), 'sloth-hook.cjs')
+  return join(raizDatos(), 'sloth-hook.cjs')
 }
 
 let nodeEnPath: boolean | undefined
@@ -40,7 +40,7 @@ export function hayNode(): boolean {
 
 /** Ruta del envoltorio de la statusline (userData/sloth-statusline.cjs). */
 export function statuslineScriptPath(): string {
-  return join(app.getPath('userData'), 'sloth-statusline.cjs')
+  return join(raizDatos(), 'sloth-statusline.cjs')
 }
 
 export function writeIfChanged(file: string, content: string): void {
@@ -51,7 +51,7 @@ export function writeIfChanged(file: string, content: string): void {
     /* no existe */
   }
   if (current === content) return
-  mkdirSync(app.getPath('userData'), { recursive: true })
+  mkdirSync(raizDatos(), { recursive: true })
   const tmp = `${file}.tmp`
   writeFileSync(tmp, content, 'utf8')
   renameSync(tmp, file)

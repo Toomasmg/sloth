@@ -1,4 +1,3 @@
-import { app } from 'electron'
 import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
@@ -18,6 +17,7 @@ import { sesionChat } from './chat'
 import { kindOf, labelOf } from './permissions-core'
 import { responderPermiso } from './permissions'
 import { currentSettings } from './settings'
+import { carpetaFeatures } from '../perfil'
 
 /**
  * Función «celular»: un visor en el celu con el estado de las sesiones y el uso de cada cuenta.
@@ -40,7 +40,7 @@ interface Config {
 
 const REVISAR_IP_MS = 15_000
 
-const file = (): string => join(app.getPath('userData'), 'features', 'celular.json')
+const file = (): string => join(carpetaFeatures(), 'celular.json')
 const nuevoToken = (): string => randomBytes(32).toString('base64url')
 const nuevoTema = (): string => `sloth-${randomBytes(12).toString('hex')}`
 

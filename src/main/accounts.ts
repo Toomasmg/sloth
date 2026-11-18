@@ -1,11 +1,11 @@
-import { app } from 'electron'
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { Account, AccountStatus } from '../shared/types'
+import { raizDatos } from './perfil'
 
 export function accountsRoot(): string {
-  return join(app.getPath('userData'), 'accounts')
+  return join(raizDatos(), 'accounts')
 }
 
 /** Cada cuenta vive en su propia carpeta: es el CLAUDE_CONFIG_DIR de esa cuenta. */

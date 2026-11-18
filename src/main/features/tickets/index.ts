@@ -95,6 +95,7 @@ import {
   type ResultadoLista
 } from './motor'
 import { mcpAjenos } from './mcp-ajenos'
+import { carpetaFeatures } from '../../perfil'
 
 /**
  * Tickets del conector elegido. Los de vía mcp son conectores de claude.ai, así que todo se pide a
@@ -129,7 +130,7 @@ let descubriendo = false
 /** Qué servidores MCP tiene cada cuenta (tickets-cuentas.json): de «Volver a revisar» y de cada consulta. */
 let cuentasCache: Record<string, CuentaRevisada> = {}
 
-const carpeta = (): string => join(app.getPath('userData'), 'features')
+const carpeta = (): string => carpetaFeatures()
 const propiosFile = (): string => join(carpeta(), 'tickets-conectores.json')
 const cuentasFile = (): string => join(carpeta(), 'tickets-cuentas.json')
 const hashCorto = (t: string): string => createHash('sha256').update(t).digest('hex').slice(0, 16)

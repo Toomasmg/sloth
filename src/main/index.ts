@@ -49,6 +49,7 @@ import {
   type RevealTarget,
   type Workspace
 } from '../shared/types'
+import { raizDatos } from './perfil'
 
 let win: BrowserWindow | null = null
 const windowListeners: ((w: BrowserWindow) => void)[] = []
@@ -84,7 +85,7 @@ if (!instanciaUnica) app.quit()
 
 // Antes de whenReady para que queden registrados también los errores de arranque. La segunda instancia
 // (la que cierra enseguida) no toca el log ni el marcador: son de la primera.
-const logsDir = join(app.getPath('userData'), 'logs')
+const logsDir = join(raizDatos(), 'logs')
 let inicioSesion = Date.now()
 if (instanciaUnica) {
   iniciarLogger(logsDir)
@@ -251,7 +252,7 @@ app.whenReady().then(async () => {
   function backend(): Promise<TerminalBackend> {
     if (!termPromise) {
       termPromise = createTerminalBackend({
-        userDataDir: app.getPath('userData'),
+        userDataDir: raizDatos(),
         appVersion: app.getVersion(),
         resourcesDir: app.isPackaged ? process.resourcesPath : undefined,
         projectRoot: app.isPackaged ? undefined : app.getAppPath(),

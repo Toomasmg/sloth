@@ -1,36 +1,11 @@
 import { app } from 'electron'
-import { existsSync, renameSync, mkdirSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Account, Workspace } from '../shared/types'
 import { avisar } from './avisos'
 import { escribirJsonAtomico, leerJson, respaldar } from './json-file'
+import { iniciarPerfiles, raizDatos, rutaPerfil } from './perfil'
 import { corregirRutasViejas, decidirCarga, estadoVacio, validarEstado, type PersistedState } from './store-core'
-
-
-/**
- * La app antes se llamaba AntiRea: si existe %APPDATA%\AntiRea y todavía no hay %APPDATA%\Sloth,
- * se mueve la carpeta entera (logins de las cuentas incluidos).
- */
-function migrateFromAntiRea(): void {
-  // Instancia de prueba o tests (SLOTH_USER_DATA): nunca se traen datos reales a su carpeta.
-  if (process.env.SLOTH_USER_DATA) return
-  const oldDir = join(app.getPath('appData'), 'AntiRea')
-  const newDir = app.getPath('userData')
-  if (!existsSync(oldDir) || existsSync(join(newDir, 'sloth-state.json')) || existsSync(join(newDir, 'accounts'))) return
-  try {
-    if (!existsSync(newDir)) {
-      renameSync(oldDir, newDir)
-    } else {
-      // Chromium ya creó la carpeta nueva (cachés): movemos solo lo nuestro.
-      for (const name of ['accounts', 'antirea-state.json']) {
-        const from = join(oldDir, name)
-        if (existsSync(from)) renameSync(from, join(newDir, name))
-      }
-    }
-  } catch (e) {
-    console.warn('[migración] no se pudo mover %APPDATA%\\AntiRea:', (e as Error).message)
-  }
-}
 
 export interface SoloLecturaStore {
   motivo: string
@@ -49,15 +24,9 @@ export class Store {
   private cargaConfiable = false
 
   constructor() {
-    migrateFromAntiRea()
-    mkdirSync(app.getPath('userData'), { recursive: true })
-    this.file = join(app.getPath('userData'), 'sloth-state.json')
-    const legacy = join(app.getPath('userData'), 'antirea-state.json')
-    try {
-      if (!existsSync(this.file) && existsSync(legacy)) renameSync(legacy, this.file)
-    } catch (e) {
-      console.warn('[store] no se pudo renombrar antirea-state.json:', mensaje(e))
-    }
+    iniciarPerfiles()
+    mkdirSync(rutaPerfil(), { recursive: true })
+    this.file = rutaPerfil('sloth-state.json')
     this.state = this.load()
   }
 
@@ -85,7 +54,7 @@ export class Store {
     const r = leerJson(this.file, { validar: validarEstado, porDefecto: estadoVacio, silencioso: true })
     const v = r.valor
     const rutasCorregidas =
-      !r.soloLectura && corregirRutasViejas(v.estado.accounts, join(app.getPath('appData'), 'AntiRea'), app.getPath('userData'))
+      !r.soloLectura && corregirRutasViejas(v.estado.accounts, join(app.getPath('appData'), 'AntiRea'), raizDatos())
     const d = decidirCarga({ v, apartado: r.apartado, soloLectura: r.soloLectura, motivo: r.motivo }, rutasCorregidas)
     this.cargaConfiable = d.confiable
     if (d.soloLectura) {

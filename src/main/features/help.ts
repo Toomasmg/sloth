@@ -4,13 +4,14 @@ import { dirname, join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import { isVersion, parseHelpState, whatsNewFor } from './help-core'
 import { CHANGELOG } from '../../shared/changelog'
+import { carpetaFeatures } from '../perfil'
 
 /**
  * Función «help» (lado main): «Novedades» (qué versión vio por última vez el usuario).
  * Canales: feat:help:whatsnew → { current, lastSeen, show, entries }, feat:help:seen(version) → void.
  * Estado: userData/features/help.json, { lastSeen }. Escritura atómica (tmp + rename).
  */
-const file = (): string => join(app.getPath('userData'), 'features', 'help.json')
+const file = (): string => join(carpetaFeatures(), 'help.json')
 
 function readLastSeen(): string | null {
   try {

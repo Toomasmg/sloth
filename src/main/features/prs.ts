@@ -1,4 +1,4 @@
-import { app, shell } from 'electron'
+import { shell } from 'electron'
 import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
 import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
@@ -20,6 +20,7 @@ import {
 } from './prs-core'
 import { rebaseBlocker } from '../../shared/prs'
 import type { MergeMethod, OpenBranchMode, OpenBranchResult, PrRow, PrsSnapshot, PrTarget, RepoPrs } from '../../shared/prs'
+import { carpetaFeatures, raizDatos } from '../perfil'
 
 /**
  * Función «prs»: los PR abiertos de los repos de GitHub que usan los espacios, con sus checks y
@@ -50,7 +51,7 @@ const busy = new Set<string>()
 const keyOf = (t: PrTarget): string => `${t.repo}#${t.number}`
 
 function stateFile(): string {
-  return join(app.getPath('userData'), 'features', 'prs.json')
+  return join(carpetaFeatures(), 'prs.json')
 }
 
 function load(): void {
@@ -363,7 +364,7 @@ const prs: Feature = {
       const head = seenHead(row.headSha, sha)
       await exclusive(target, async () => {
         // Fuera del repo: así gh no toca ramas locales.
-        const r = await run('gh', mergeArgs(target, m, head), { cwd: app.getPath('userData'), timeoutMs: 120000 })
+        const r = await run('gh', mergeArgs(target, m, head), { cwd: raizDatos(), timeoutMs: 120000 })
         if (r.code !== 0) throw new GitError(readable(r, 'gh pr merge'))
       })
       refreshAfterChange()
