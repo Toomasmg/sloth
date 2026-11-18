@@ -14,6 +14,13 @@ export interface VentanaLimite {
   reiniciaEn: number | null
 }
 
+/** Lo que Codex dice que queda de cada ventana, leído al momento. null: la ventana no vino o no pasó la validación. */
+export interface LimitesCodex {
+  cincoHoras: VentanaLimite | null
+  semana: VentanaLimite | null
+  at: number
+}
+
 export interface CuentaCelular {
   id: string
   nombre: string
