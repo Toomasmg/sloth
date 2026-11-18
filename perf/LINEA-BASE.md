@@ -47,3 +47,15 @@ Tablero, N=2000:
 - Primer render < 600 ms (menos de 25 % de 2378).
 - Scroll completo sin LoAF acumulado mayor a 400 ms (base 1810 ms) y frame p95 <= 20 ms.
 - Con N <= 100 el render es idéntico al actual.
+
+## Chat después de E-2 (memo de MessageItem, reloj único, expiración con un solo timeout)
+
+| N enviados | nodos `[data-mid]` | nodos totales | primer render (ms) | re-render por evento (ms, mediana) |
+|---|---|---|---|---|
+| 200 | 200 | 1872 | 516 | 15 (base 52) |
+| 2000 | 300 | 2813 | 401 | 16 (base 72) |
+| 10000 | 300 | 2843 | 373 | 13 (base 99) |
+
+Otra corrida dio 9 ms en los tres casos. Sin el memo (solo el reloj) el re-render quedó en 65/106/98 ms: lo que baja el costo es el memo, y el reloj evita que el tick de expiración renderice la conversación entera.
+
+Decisión: el chat no se virtualiza. Con el re-render por debajo de la meta de 25 ms y el DOM acotado a 300 mensajes por el tope `MAX_CACHED`, la ventana virtual agregaría riesgo (scroll anclado, mensajes en vivo mientras se mira historial, saltos a citas y búsqueda, selección, foco y lectores de pantalla) sin un beneficio medible. Las metas de `[data-mid]` < 100 y nodos < 1000 quedan sin aplicar al chat. Si se sube `MAX_CACHED` o se pagina más historial, se reevalúa con `lib/ventana-virtual.ts`, que ya existe con tests y lo usa el tablero en E-3.
