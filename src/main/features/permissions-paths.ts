@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { dentroDelRepo } from './permissions-core'
+import { dentroDelRepo } from '../../shared/permissions-core'
 
 type PathApi = Pick<typeof path, 'resolve' | 'dirname' | 'basename' | 'join'>
 

@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { PermissionAnswer, PermissionPrompt } from '../../shared/types'
-import { alwaysLabel, changesOf, filesOf, kindOf, otherName, titleOf } from '../../main/features/permissions-core'
+import { alwaysLabel, changesOf, filesOf, kindOf, otherName, titleOf } from '../../shared/permissions-core'
 import { PermissionIcon, WaitingIcon, CloseIcon } from './icons/SlothIcons'
 import { cleanError } from './format'
 import { openPermissionReview } from './features/permissions/store'

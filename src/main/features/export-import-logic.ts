@@ -17,9 +17,9 @@ import { TEMPLATE_COLOR_KEYS } from '../../shared/templates-shared'
 import { initialPromptProblem } from '../../shared/initial-prompt'
 import { PROVEEDOR_DEFECTO, PROVEEDOR_ID_RE, capacidadesDe } from '../../shared/proveedores'
 import { normalizeSupabaseUrl } from './chat-config'
-import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, THEMES, UI_FONT, SHORTCUT_IDS, canonicalCombo, type AccentChoice } from './settings-model'
+import { ACCENTS, ACCOUNT_PALETTE, DENSITIES, THEMES, UI_FONT, SHORTCUT_IDS, canonicalCombo, type AccentChoice } from '../../shared/settings-model'
 import { decryptText, type Encrypted, WRONG_PASSWORD } from './export-crypto'
-import { checkRule, FILE_EDIT_TOOLS, type PermissionKind, type RuleDraft } from './permissions-core'
+import { checkRule, FILE_EDIT_TOOLS, type PermissionKind, type RuleDraft } from '../../shared/permissions-core'
 
 export const FORMAT = 'sloth-config'
 export const FORMAT_VERSION = 2

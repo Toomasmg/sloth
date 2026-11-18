@@ -4,7 +4,7 @@ import { lstatSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, w
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { dentroDelRepoReal, realPathInside, type PathFs } from './permissions-paths'
-import { dentroDelRepo, findRule, ruleFor, type PermissionRule } from './permissions-core'
+import { dentroDelRepo, findRule, ruleFor, type PermissionRule } from '../../shared/permissions-core'
 
 const w = path.win32
 const REPO = 'C:\\Users\\ana\\repo'

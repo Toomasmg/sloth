@@ -16,7 +16,7 @@ import { armarEstado, claveValida, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerL
 import { crearFuenteWifi, type FuenteDeEstado, type ProveedorDeEstado } from './celular-servidor'
 import { crearFuenteRemota, type CambioRemoto } from './celular-remoto'
 import { sesionChat } from './chat'
-import { kindOf, labelOf } from './permissions-core'
+import { kindOf, labelOf } from '../../shared/permissions-core'
 import { responderPermiso } from './permissions'
 import { currentSettings } from './settings'
 import { carpetaFeatures } from '../perfil'
