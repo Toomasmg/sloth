@@ -1,7 +1,7 @@
 /**
  * Chat del equipo (personas, no agentes) sobre el Supabase PROPIO del equipo. v0.5.
  *
- * Arquitectura (ver docs/chat-supabase.md y el PLAN):
+ * Arquitectura (ver docs/chat-equipo.md y el PLAN):
  *  - TODO lo de Supabase (cliente, sesión, realtime) vive en el proceso MAIN
  *    (src/main/features/chat*.ts). El renderer nunca ve tokens: solo estos tipos por `feat:chat:*`.
  *  - Login con GitHub vía Supabase Auth, flujo PKCE: navegador del sistema + callback en un
@@ -42,6 +42,7 @@
  *   previewInvite(text: string)             → ChatInvitePreview   (valida y dice qué va a pasar; no cambia nada)
  *   joinInvite(text: string, confirmed?: 'confirmNew'|'confirmReplace') → ChatInviteJoin
  *   clipboardInvite()                       → string | null       (el portapapeles, solo si parece una invitación)
+ *   validate()                            → ChatCheck[]         (chequeos de solo lectura con la clave pública: servidor, GitHub, tablas, funciones, versión del esquema)
  *
  * Eventos (main → UI):
  *   feat:chat:snapshot (ChatSnapshot)       cada vez que cambia algo de la lista/estado
@@ -272,3 +273,14 @@ export interface ChatInvitePreview {
 export type ChatInviteJoin = { kind: 'joined'; team: ChatTeam } | { kind: 'signingIn' }
 
 export type ChatInviteResult = { ok: true; team: ChatTeam } | { ok: false; message: string }
+
+export type ChatCheckEstado = 'ok' | 'fallo' | 'aviso' | 'sin-datos'
+
+/** Un chequeo de «Probar conexión». Los textos son fijos del código: nunca traen datos del servidor ni la clave. */
+export interface ChatCheck {
+  id: string
+  estado: ChatCheckEstado
+  titulo: string
+  detalle: string
+  accion?: string
+}

@@ -43,9 +43,10 @@ Sloth le da a cada cuenta su propia carpeta de configuración y a cada tarea un 
 - **Mover un espacio a otra cuenta**: la conversación se copia a la cuenta destino y Claude sigue donde estaba. Es siempre manual.
 - **Dormir espacios inactivos**: cierra el Claude de un espacio sin uso para liberar memoria y lo retoma al despertarlo. Solo si es seguro: sin permisos esperando ni texto sin enviar.
 - **Historial**: las conversaciones de cada cuenta, leídas de sus transcripts.
-- **Equipo y chat**: en qué anda cada uno (GitHub con `gh`, solo lectura) y chat de equipo con tu propio proyecto de Supabase. Ver [`docs/chat-supabase.md`](docs/chat-supabase.md) y [`docs/team-config.md`](docs/team-config.md).
+- **Equipo y chat**: en qué anda cada uno (GitHub con `gh`, solo lectura) y chat de equipo con tu propio proyecto de Supabase. Ver [`docs/chat-equipo.md`](docs/chat-equipo.md) y [`docs/team-config.md`](docs/team-config.md).
 - **Llevar la configuración a otra PC**: un archivo `.sloth`, con contraseña opcional. Nunca incluye tokens, credenciales ni sesiones.
 - **Actualizaciones**: desde los releases de este repo. Nada se descarga solo y actualizar no corta las terminales.
+- **Privacidad**: qué guarda Sloth, qué sale de tu PC y cómo borrarlo, en [`PRIVACY.md`](PRIVACY.md).
 
 </details>
 
