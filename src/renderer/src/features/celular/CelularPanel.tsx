@@ -1,31 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CelularVista } from '../../../../shared/celular'
-import { qrComoCaminoSvg, qrDeTexto } from '../../../../shared/qr'
 import { cleanError } from '../../format'
 import { SidePanel } from '../../ui/SidePanel'
 import { Button, InlineAlert, Input, Switch, toast } from '../../ui'
 import { useUi } from '../host'
+import { Qr } from './Qr'
 import { RemotoSeccion } from './RemotoSeccion'
 
 const canal = (op: string): string => `feat:celular:${op}`
-
-export function Qr({ texto }: { texto: string }): React.JSX.Element {
-  const dibujo = useMemo(() => {
-    try {
-      return qrComoCaminoSvg(qrDeTexto(texto))
-    } catch {
-      return null
-    }
-  }, [texto])
-  if (!dibujo) return <InlineAlert tone="warning">No se pudo dibujar el código. Copiá el enlace.</InlineAlert>
-  const { path, lado } = dibujo
-  return (
-    <svg className="f-cel-qr" viewBox={`0 0 ${lado} ${lado}`} role="img" aria-label="Código QR para abrir Sloth en el celu" shapeRendering="crispEdges">
-      <rect width={lado} height={lado} fill="#fff" />
-      <path d={path} fill="#000" />
-    </svg>
-  )
-}
 
 /** Panel «Celular»: prender el servidor del Wi-Fi, el QR para el celu y lo que el celu puede hacer. */
 export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.Element {

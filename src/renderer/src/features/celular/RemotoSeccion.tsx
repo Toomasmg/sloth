@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { CelularVista } from '../../../../shared/celular'
 import { Button, InlineAlert, Switch, toast } from '../../ui'
-import { Qr } from './CelularPanel'
+import { Qr } from './Qr'
 
 interface Props {
   v: CelularVista
