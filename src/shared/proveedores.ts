@@ -73,7 +73,12 @@ export function capacidadesDe(cuenta: { proveedor?: unknown }): Capacidades | un
 }
 
 const MOTIVOS_ESPECIFICOS: Partial<Record<ProveedorId, Partial<Record<keyof Capacidades, string>>>> = {
-  codex: { hooks: 'Con Codex no hay avisos de permisos desde el celu: Codex todavía no se los manda a Sloth.' }
+  codex: {
+    hooks: 'Con Codex no hay avisos de permisos desde el celu: Codex todavía no se los manda a Sloth.',
+    tickets: 'Los tickets todavía solo corren con Claude Code: ni las consultas ni el trabajo por ticket usan cuentas de Codex.',
+    historial: 'El historial todavía solo lee las conversaciones de Claude Code.',
+    moverCuenta: 'Mover espacios todavía solo anda entre cuentas de Claude Code.'
+  }
 }
 
 /** Por qué la cuenta no puede usar esa función, o undefined si puede. */

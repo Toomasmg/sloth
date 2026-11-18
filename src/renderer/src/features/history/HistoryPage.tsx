@@ -348,7 +348,7 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
                 {ui.accounts.map((a) => {
                   const motivo = capacidadesDe(a)?.historial === true ? undefined : motivoSinCapacidad(a, 'historial')
                   return (
-                    <button key={a.id} type="button" aria-pressed={acc === a.id} disabled={!!motivo} title={motivo} onClick={() => setAcc(a.id)}>
+                    <button key={a.id} type="button" aria-pressed={acc === a.id} disabled={!!motivo} title={motivo} aria-label={motivo ? `${a.label}: ${motivo}` : undefined} onClick={() => setAcc(a.id)}>
                       {a.label}
                     </button>
                   )
