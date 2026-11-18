@@ -1,23 +1,20 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useUi } from '../host'
 import { TeamIcon, UpdateIcon } from '../../icons/SlothIcons'
 import { LogoMark } from '../../Logo'
 import type { ChatCheck, ChatCheckEstado, ChatConfigView, ChatSnapshot } from '../../../../shared/chat'
 import { esHostSupabase } from '../../../../shared/chat-text'
-import { SHORTCUT_ACTIONS, bindingOf, comboFromEvent, findConflict, keyTokenOf, setShortcutCapture, type ShortcutAction } from '../../shortcuts'
 import { openReport } from '../report/bus'
 import { request as requestExportImport } from '../export-import/bus'
 import { openHelp } from '../help/bus'
-import { openPermissionDecisions } from '../permissions/store'
 import { openJoinInvite } from '../chat/store'
 import { runFeatureCommand } from '../palette'
 import { setPhase } from '../updater/phase'
 import { useUpdateDot } from '../updater/useUpdateStatus'
-import { SoundTest } from '../sound/SoundTest'
-import { termFontStack, useSettings } from './store'
-import { LINE_HEIGHT, SCROLLBACK, SHELLS, TERM_FONTS, TERM_FONT, UPDATE_CHANNELS, type CursorShape, type ShellChoice, type ShortcutId, type SoundName, type TermFont, type UpdateChannel } from '../../../../shared/settings-model'
-import { errText, Group, Row, Slider, ToggleRow, useSave, SectionHint } from './ui'
-import { Button, EmptyState, InlineAlert, Input, Segmented, Select, Tag } from '../../ui'
+import { useSettings } from './store'
+import { UPDATE_CHANNELS, type UpdateChannel } from '../../../../shared/settings-model'
+import { errText, Group, useSave, SectionHint } from './ui'
+import { Button, EmptyState, InlineAlert, Input, Tag } from '../../ui'
 import { ChatClaudeGroup } from './ChatClaude'
 import { Ajustes as TicketsAjustes } from '../tickets/Ajustes'
 import { setBoardOpen, useSnapshot } from '../tickets/model'
@@ -28,259 +25,9 @@ import { goAfterClose, ToggleLikeButton } from './sections/comunes'
 export { GeneralSection } from './sections/General'
 export { AccountsSection } from './sections/Accounts'
 export { AppearanceSection } from './sections/Appearance'
-/* ---------- Terminal ---------- */
-
-const CURSOR_LABEL: Record<CursorShape, string> = { bloque: 'Bloque', barra: 'Línea', subrayado: 'Subrayado' }
-const CURSOR_ORDER: CursorShape[] = ['bloque', 'barra', 'subrayado']
-
-export function TerminalSection(): React.JSX.Element {
-  const p = useSettings()
-  const t = p.settings.terminal
-  const save = useSave()
-  const th = termTheme(p)
-  const cursor =
-    t.cursorStyle === 'bloque'
-      ? { w: '0.6em', h: '1.15em' }
-      : t.cursorStyle === 'barra'
-        ? { w: '2px', h: '1.15em' }
-        : { w: '0.6em', h: '2px' }
-  return (
-    <>
-      {p.settings.lightMode ? (
-        <p className="f-set-hint">La vista previa de la terminal está apagada en el modo liviano.</p>
-      ) : (
-      <pre
-        className="f-set-term"
-        aria-label="Vista previa de la terminal"
-        style={{ fontFamily: termFontStack(t.fontFamily), fontSize: `${t.fontSize}px`, lineHeight: t.lineHeight, background: th.background, color: th.foreground }}
-      >
-        <span style={{ color: th.brightBlack }}>~/mi-app/front</span>
-        {'\n'}
-        <span style={{ color: th.blue }}>›</span> Corré los tests de la tabla{'\n'}
-        <span style={{ color: th.green }}>●</span> PASS TicketTable.test.tsx (12){'\n'}
-        <span style={{ color: th.blue }}>›</span>{' '}
-        <span
-          className={`f-set-cursor ${t.cursorBlink ? 'blink' : ''}`}
-          style={{ display: 'inline-block', verticalAlign: 'text-bottom', width: cursor.w, height: cursor.h, background: th.cursor }}
-          aria-hidden="true"
-        />
-      </pre>
-      )}
-      <Group id="g-term" label="Texto y cursor">
-        <Row title={<label htmlFor="f-set-tfont">Fuente</label>}>
-          <Select id="f-set-tfont" value={t.fontFamily} onChange={(e) => save({ terminal: { fontFamily: e.target.value as TermFont } })}>
-            {TERM_FONTS.map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </Select>
-        </Row>
-        <Row title={<label htmlFor="f-set-tsize">Tamaño de letra</label>}>
-          <Slider id="f-set-tsize" label="Tamaño de letra de la terminal" value={t.fontSize} min={TERM_FONT.min} max={TERM_FONT.max} format={(v) => `${v} px`} onChange={(fontSize) => save({ terminal: { fontSize } })} />
-        </Row>
-        <Row title={<label htmlFor="f-set-tline">Altura de línea</label>} hint="Con más de 1, los recuadros de Claude se ven con cortes.">
-          <Slider
-            id="f-set-tline"
-            label="Altura de línea"
-            value={t.lineHeight}
-            min={LINE_HEIGHT.min}
-            max={LINE_HEIGHT.max}
-            step={LINE_HEIGHT.step}
-            format={(v) => v.toFixed(2).replace('.', ',')}
-            onChange={(v) => save({ terminal: { lineHeight: Math.round(v * 100) / 100 } })}
-          />
-        </Row>
-        <Row title="Cursor">
-          <Segmented<CursorShape> aria-label="Forma del cursor" value={t.cursorStyle} options={CURSOR_ORDER.map((c) => ({ value: c, label: CURSOR_LABEL[c] }))} onChange={(cursorStyle) => save({ terminal: { cursorStyle } })} />
-        </Row>
-        <ToggleRow title="Cursor que parpadea" checked={t.cursorBlink} onChange={(cursorBlink) => save({ terminal: { cursorBlink } })} />
-        <Row title={<label htmlFor="f-set-tscroll">Historial</label>} hint="Líneas que se guardan para subir con la rueda. Más líneas, más memoria.">
-          <Slider
-            id="f-set-tscroll"
-            label="Líneas de historial de la terminal"
-            value={t.scrollback}
-            min={SCROLLBACK.min}
-            max={SCROLLBACK.max}
-            step={SCROLLBACK.step}
-            format={(v) => `${v.toLocaleString('es-AR')} líneas`}
-            onChange={(scrollback) => save({ terminal: { scrollback } })}
-          />
-        </Row>
-        <Row title={<label htmlFor="f-set-shell">Shell</label>} hint="Se aplica a los espacios nuevos.">
-          <Select id="f-set-shell" value={t.shell} onChange={(e) => save({ terminal: { shell: e.target.value as ShellChoice } })}>
-            {SHELLS.map((x) => (
-              <option key={x} value={x}>
-                {x}
-              </option>
-            ))}
-          </Select>
-        </Row>
-      </Group>
-    </>
-  )
-}
-
-/** Colores de xterm para la vista previa: los mismos que usa la terminal real. */
-function termTheme(p: ReturnType<typeof useSettings>): { background: string; foreground: string; cursor: string; blue: string; green: string; brightBlack: string } {
-  const dark = p.dark
-  return dark
-    ? { background: '#12141a', foreground: '#c9cdd6', cursor: '#8ab4ff', blue: '#8ab4ff', green: '#5fd4a6', brightBlack: '#6f7480' }
-    : { background: '#ffffff', foreground: '#1f2430', cursor: '#2f6fe0', blue: '#2f6fe0', green: '#1a7f57', brightBlack: '#6b7280' }
-}
-
-/* ---------- Atajos ---------- */
-
-const showCombo = (c: string): string => c.split(' ').join('+')
-
-export function ShortcutsSection(): React.JSX.Element {
-  const p = useSettings()
-  const save = useSave()
-  const [cap, setCap] = useState<ShortcutId | null>(null)
-  const [msg, setMsg] = useState<string | null>(null)
-  const custom = p.settings.shortcuts
-  const customRef = useRef(custom)
-  customRef.current = custom
-
-  // Mientras se graba: captura en window (antes que nadie) para que la combinación no dispare su función.
-  useEffect(() => {
-    if (!cap) return
-    setShortcutCapture(true)
-    const onKey = (e: KeyboardEvent): void => {
-      e.preventDefault()
-      e.stopPropagation()
-      e.stopImmediatePropagation()
-      if (e.key === 'Escape') {
-        setCap(null)
-        setMsg(null)
-        return
-      }
-      const combo = comboFromEvent(e)
-      if (!combo) {
-        if (keyTokenOf(e) && !e.ctrlKey && !e.altKey) setMsg('Usá Ctrl o Alt en la combinación (o una tecla F sola).')
-        return
-      }
-      const conflict = findConflict(cap, combo, customRef.current)
-      if (conflict) {
-        setMsg(`${showCombo(combo)} ya lo usa «${conflict}». Elegí otra.`)
-        return
-      }
-      setCap(null)
-      setMsg(null)
-      save({ shortcuts: { [cap]: combo } })
-    }
-    window.addEventListener('keydown', onKey, true)
-    return () => {
-      setShortcutCapture(false)
-      window.removeEventListener('keydown', onKey, true)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cap])
-
-  return (
-    <>
-      <Group id="g-atajos">
-        {SHORTCUT_ACTIONS.map((a: ShortcutAction) => {
-          const isCap = cap === a.id
-          const changed = !a.fixed && custom[a.id] !== undefined
-          const label = isCap ? 'Apretá la combinación…' : showCombo(bindingOf(a.id, custom))
-          return (
-            <div key={a.id} className="f-set-row">
-              <span className="f-set-row-text">
-                <span className="f-set-row-title">{a.name}</span>
-                {a.fixed && <span className="f-set-hint">Fijo: 1 a 4 eligen la distribución.</span>}
-              </span>
-              <div className="f-set-row-ctl">
-                <button
-                  type="button"
-                  className={`f-set-key ${isCap ? 'capturing' : ''}`}
-                  disabled={a.fixed}
-                  aria-label={`Cambiar el atajo de ${a.name}`}
-                  onClick={() => {
-                    setMsg(null)
-                    setCap(isCap ? null : a.id)
-                  }}
-                  onBlur={() => {
-                    if (isCap) {
-                      setCap(null)
-                      setMsg(null)
-                    }
-                  }}
-                >
-                  {label}
-                </button>
-                {changed && (
-                  <Button variant="ghost" size="sm" onClick={() => save({ shortcuts: { [a.id]: null } })}>
-                    Restaurar
-                  </Button>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </Group>
-      {msg && (
-        <p role="alert" className="form-error">
-          {msg}
-        </p>
-      )}
-      <SectionHint>Tocá un atajo y apretá la combinación nueva. Esc cancela.</SectionHint>
-    </>
-  )
-}
-
-/* ---------- Notificaciones y sonido ---------- */
-
-const SOUND_OPTIONS: { value: SoundName | 'Sin sonido'; label: string }[] = [
-  { value: 'Gota', label: 'Gota' },
-  { value: 'Campana suave', label: 'Campana suave' },
-  { value: 'Clic', label: 'Clic' },
-  { value: 'Sin sonido', label: 'Sin sonido' }
-]
-
-export function NotificationsSection({ onClose }: { onClose(): void }): React.JSX.Element {
-  const p = useSettings()
-  const s = p.settings
-  const save = useSave()
-  const selected = s.sounds ? s.soundName : 'Sin sonido'
-  return (
-    <>
-      <Group id="g-av" title="Avisarme cuando…">
-        <ToggleRow title="Claude termina una tarea" hint="Aviso de Windows y el estado «Listo» en la barra." checked={s.notify.done} onChange={(done) => save({ notify: { done } })} />
-        <ToggleRow title="Claude pide permiso" hint="Te recomendamos dejarlo prendido: si no, Claude queda esperando." checked={s.notify.perm} onChange={(perm) => save({ notify: { perm } })} />
-        <ToggleRow title="Avisos del chat" hint="Un aviso cuando te escriben en el chat del equipo y no lo estás mirando." checked={s.notify.team} onChange={(team) => save({ notify: { team } })} />
-        <ToggleRow title="No molestar" hint="Silencia todo hasta que lo apagues." checked={s.noMolestar} onChange={(noMolestar) => save({ noMolestar })} />
-      </Group>
-      {s.noMolestar && <SectionHint>«No molestar» está activo: no suena nada ni avisa.</SectionHint>}
-      <p className="f-set-note">
-        <button type="button" className="f-set-link" onClick={goAfterClose(onClose, () => openPermissionDecisions())}>
-          Ver reglas de permisos y decisiones
-        </button>
-      </p>
-      <Group id="g-so" title="Sonido">
-        <Row title={<label htmlFor="f-set-sound">Sonido de aviso</label>} hint="Suena aunque la ventana esté en segundo plano.">
-          <Select id="f-set-sound" value={selected} onChange={(e) => {
-              const v = e.target.value
-              save(v === 'Sin sonido' ? { sounds: false } : { sounds: true, soundName: v as SoundName })
-            }}
-          >
-            {SOUND_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
-          <SoundTest name={s.soundName} disabled={!s.sounds} />
-        </Row>
-      </Group>
-      <Group id="g-ch" title="Sonido del chat">
-        <ToggleRow title="Sonido al recibir mensajes" hint="Suena una vez por cada mensaje de otra persona. Con «Sin sonido» no suena." checked={s.notify.soundIn} onChange={(soundIn) => save({ notify: { soundIn } })} />
-        <ToggleRow title="Sonido al enviar mensajes" hint="Un toque más corto y suave cuando mandás el tuyo." checked={s.notify.soundOut} onChange={(soundOut) => save({ notify: { soundOut } })} />
-      </Group>
-    </>
-  )
-}
-
+export { TerminalSection } from './sections/Terminal'
+export { ShortcutsSection } from './sections/Shortcuts'
+export { NotificationsSection } from './sections/Notifications'
 /* ---------- Equipo y chat ---------- */
 
 const CHECK_ICONO: Record<ChatCheckEstado, string> = { ok: '✔', fallo: '✖', aviso: '!', 'sin-datos': '?' }
