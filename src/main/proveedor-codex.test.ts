@@ -102,14 +102,41 @@ test('shellLaunch con codex: un prompt que parece subcomando se pega, nunca va p
   }
 })
 
-test('shellLaunch con codex sin prompt: mismos args con y sin .cmd, y la línea corre codex', () => {
+test('shellLaunch con codex sin prompt: sin .exe la línea corre codex y no claude', () => {
   const argv = codex.argvInteractivo({})
   for (const f of FAMILIAS) {
-    const sin = shellLaunch(f, argv, undefined)
-    assert.deepEqual(sin.args, shellLaunch(f, argv, 'C:\\bin\\codex.cmd').args, f)
-    assert.equal(lineaDeShell(f, sin.args).includes('codex'), true, f)
-    assert.equal(lineaDeShell(f, sin.args).includes('claude'), false, f)
+    const l = shellLaunch(f, argv, undefined)
+    assert.equal(lineaDeShell(f, l.args).includes('codex'), true, f)
+    assert.equal(lineaDeShell(f, l.args).includes('claude'), false, f)
   }
+})
+
+test('shellLaunch en PowerShell con codex.cmd llama al .cmd por ruta; en cmd y posix queda el nombre', () => {
+  const argv = codex.argvInteractivo({})
+  const cmd = String.raw`C:\Users\Tomás\AppData\Roaming\npm\codex.cmd`
+  assert.equal(lineaDeShell('ps', shellLaunch('ps', argv, cmd).args), `& '${cmd}' ${SEGURO.join(' ')}`)
+  for (const f of ['cmd', 'posix'] as const) {
+    assert.deepEqual(shellLaunch(f, argv, cmd).args, shellLaunch(f, argv, undefined).args, f)
+  }
+})
+
+test('shellLaunch en PowerShell con un .cmd de ruta rara no la arma a ciegas: queda el nombre', () => {
+  const argv = codex.argvInteractivo({})
+  const sinRuta = lineaDeShell('ps', shellLaunch('ps', argv, undefined).args)
+  const raras = ['C:\\a&b\\codex.cmd', 'C:\\a%PATH%\\codex.cmd', 'C:\\a"b\\codex.cmd', 'C:\\a^b\\codex.cmd', 'C:\\a!b\\codex.cmd', 'C:\\a\nb\\codex.cmd', 'C:\\a<b\\codex.cmd', 'C:\\a|b\\codex.cmd', 'C:\\a\\codex.bat']
+  for (const cmd of raras) {
+    assert.equal(lineaDeShell('ps', shellLaunch('ps', argv, cmd).args), sinRuta, JSON.stringify(cmd))
+  }
+})
+
+test('shellLaunch en PowerShell con codex.cmd y un prompt peligroso: el prompt nunca está en la línea', () => {
+  const cmd = 'C:\\bin\\codex.cmd'
+  const l = shellLaunch('ps', codex.argvInteractivo({ prompt: PROMPT_RARO }), cmd)
+  const linea = lineaDeShell('ps', l.args)
+  assert.equal(linea, `& ${cmd} ${SEGURO.join(' ')}`)
+  assert.equal(linea.includes('dangerously-bypass'), false)
+  assert.equal(l.paste?.includes('dangerously-bypass'), true)
+  assert.deepEqual(l.env, {})
 })
 
 test('prepararCarpeta crea config.toml, no pisa uno existente y no deja tmp', () => {
