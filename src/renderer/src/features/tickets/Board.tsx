@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { View } from '../../ui/View'
 import { cleanError } from '../../format'
-import { SPACE_CHIP, SPACE_LABEL, spaceStatus } from '../broadcast/state'
-import { CloseIcon, SearchIcon, SettingsIcon, SpaceIcon, TicketIcon } from '../../icons/SlothIcons'
+import { spaceStatus } from '../broadcast/state'
+import { CloseIcon, SearchIcon, SettingsIcon, TicketIcon } from '../../icons/SlothIcons'
 import { Button, EmptyState } from '../../ui'
 import { openSettings } from '../settings/bus'
 import type { Workspace } from '../../../../shared/types'
@@ -28,7 +28,8 @@ import {
   type Ticket,
   type WriteOpt
 } from './model'
-import { Av, PrioGlyph, estadoKind, prioTone } from './parts'
+import { TarjetaTicket, estadoKind } from './parts'
+import { ListaVirtual, UMBRAL_VENTANA } from './ListaVirtual'
 import { Detail } from './Detail'
 
 type Tab = 'mios' | 'equipo' | 'sin'
@@ -65,6 +66,8 @@ const byIdDesc = (a: Ticket, b: Ticket): number => {
   const nb = Number(b.id.split('-').pop())
   return nb - na
 }
+
+const tabDe = (t: Ticket, me?: Snapshot['me']): Tab => (isMine(t, me) ? 'mios' : t.responsable ? 'equipo' : 'sin')
 
 function RefreshGlyph(): React.JSX.Element {
   return (
@@ -129,9 +132,9 @@ export function Board(): React.JSX.Element {
 
   const running = Boolean(snap?.running) || busy === 'refresh'
   // Lo que se ve: la lista del conector con los cambios optimistas encima.
-  const tickets = (snap?.tickets ?? []).map((t) => (over[t.id] ? { ...t, ...over[t.id] } : t))
+  const tickets = useMemo(() => (snap?.tickets ?? []).map((t) => (over[t.id] ? { ...t, ...over[t.id] } : t)), [snap, over])
   const me = snap?.me
-  const estados = snap?.estados ?? []
+  const estados = useMemo(() => snap?.estados ?? [], [snap?.estados])
   const n = snap?.conector.nombre ?? 'el conector'
   const sinConector = snap?.conector.id === SIN_CONECTOR
   const unavailable = Boolean(snap) && !sinConector && !snap?.conector.disponible
@@ -153,24 +156,28 @@ export function Board(): React.JSX.Element {
   const accLabel = (id?: string): string | undefined => ui.accounts.find((a) => a.id === id)?.label
 
   const isMineT = (t: Ticket): boolean => isMine(t, me)
-  const inTab = (t: Ticket, tb: Tab): boolean => (tb === 'mios' ? isMineT(t) : tb === 'equipo' ? Boolean(t.responsable) && !isMineT(t) : !t.responsable)
-  const counts: Record<Tab, number> = {
-    mios: tickets.filter((t) => inTab(t, 'mios')).length,
-    equipo: tickets.filter((t) => inTab(t, 'equipo')).length,
-    sin: tickets.filter((t) => inTab(t, 'sin')).length
-  }
+  const counts = useMemo<Record<Tab, number>>(() => {
+    const c: Record<Tab, number> = { mios: 0, equipo: 0, sin: 0 }
+    for (const t of tickets) c[tabDe(t, me)]++
+    return c
+  }, [tickets, me])
 
   const qn = norm(q.trim())
   const filtersOn = Boolean(qn) || stSel.length > 0 || prio !== 'todas'
-  const visible = tickets
-    .filter(
-      (t) =>
-        inTab(t, tab) &&
-        (!stSel.length || stSel.includes(t.estado ?? '')) &&
-        (prio === 'todas' || (t.prioridad ?? '') === prio) &&
-        (!qn || norm(`${t.id} ${t.titulo}`).includes(qn))
-    )
-    .sort(byIdDesc)
+  const visible = useMemo(
+    () =>
+      tickets
+        .filter(
+          (t) =>
+            tabDe(t, me) === tab &&
+            (!stSel.length || stSel.includes(t.estado ?? '')) &&
+            (prio === 'todas' || (t.prioridad ?? '') === prio) &&
+            (!qn || norm(`${t.id} ${t.titulo}`).includes(qn))
+        )
+        .sort(byIdDesc),
+    [tickets, me, tab, stSel, prio, qn]
+  )
+  const ids = useMemo(() => visible.map((t) => t.id), [visible])
   const current = visible.find((t) => t.id === selId) ?? visible[0] ?? null
   const curId = current?.id
 
@@ -197,14 +204,18 @@ export function Board(): React.JSX.Element {
   }, [curId, detTick, snap?.conector.leeDetalle])
 
   // Chips de estado: los del flujo del conector que tienen tickets (y los que no estén en el flujo).
-  const estadoKeys = [
-    ...estados.filter((e) => tickets.some((t) => t.estado === e.clave)),
-    ...[...new Set(tickets.map((t) => t.estado).filter((k): k is string => Boolean(k)))]
-      .filter((k) => !estados.some((e) => e.clave === k))
-      .map((k): EstadoBase => ({ clave: k, nombre: k.replace(/_/g, ' ') }))
-  ]
-  const prioOpts = [...new Set(tickets.map((t) => t.prioridad).filter((p): p is string => Boolean(p)))].sort(
-    (a, b) => prioRank(a) - prioRank(b) || a.localeCompare(b)
+  const estadoKeys = useMemo(
+    () => [
+      ...estados.filter((e) => tickets.some((t) => t.estado === e.clave)),
+      ...[...new Set(tickets.map((t) => t.estado).filter((k): k is string => Boolean(k)))]
+        .filter((k) => !estados.some((e) => e.clave === k))
+        .map((k): EstadoBase => ({ clave: k, nombre: k.replace(/_/g, ' ') }))
+    ],
+    [estados, tickets]
+  )
+  const prioOpts = useMemo(
+    () => [...new Set(tickets.map((t) => t.prioridad).filter((p): p is string => Boolean(p)))].sort((a, b) => prioRank(a) - prioRank(b) || a.localeCompare(b)),
+    [tickets]
   )
 
   const countLabel = visible.length === 1 ? '1 ticket' : `${visible.length} tickets`
@@ -336,6 +347,29 @@ export function Board(): React.JSX.Element {
 
   const bodyLoading = !snap || (running && tickets.length === 0)
   const showRows = !bodyLoading && visible.length > 0
+  const virtual = visible.length > UMBRAL_VENTANA
+
+  const tarjeta = (t: Ticket, i?: number): React.JSX.Element => {
+    const ws = wsOf(t)
+    return (
+      <TarjetaTicket
+        key={t.id}
+        id={t.id}
+        titulo={t.titulo}
+        estado={estadoName(t.estado)}
+        estadoClase={kindOf(t.estado)}
+        prioridad={t.prioridad}
+        responsable={t.responsable}
+        mine={isMineT(t)}
+        sel={current?.id === t.id}
+        espacio={ws?.name}
+        espacioEstado={ws ? spaceStatus(ws.id, ui.agents, ui.permissions) : null}
+        onSelect={setSelId}
+        total={i === undefined ? undefined : visible.length}
+        pos={i === undefined ? undefined : i + 1}
+      />
+    )
+  }
 
   // Sin tickets que mostrar: la vista es solo un estado vacío con una acción (sin pestañas ni filtros en 0).
   const vacio = !bodyLoading && Boolean(snap) && tickets.length === 0
@@ -625,56 +659,12 @@ export function Board(): React.JSX.Element {
                   </div>
                 )}
 
-                {showRows && (
-                  <ul className="f-tickets-rows">
-                    {visible.map((t) => {
-                      const ws = wsOf(t)
-                      const sel = current?.id === t.id
-                      const mine = isMineT(t)
-                      const st = ws ? spaceStatus(ws.id, ui.agents, ui.permissions) : null
-                      return (
-                        <li key={t.id}>
-                          <button
-                            type="button"
-                            className={`f-tickets-row ${sel ? 'sel' : ''}`}
-                            aria-current={sel ? 'true' : undefined}
-                            onClick={() => setSelId(t.id)}
-                          >
-                            <span className="f-tickets-row-top">
-                              <span className="f-tickets-code mono">{t.id}</span>
-                              {ws && st && (
-                                <span className={`chip f-tickets-space ${SPACE_CHIP[st]}`}>
-                                  <SpaceIcon size={11} strokeWidth={2.2} />
-                                  <span className="f-tickets-ellipsis">
-                                    {ws.name} · {SPACE_LABEL[st]}
-                                  </span>
-                                </span>
-                              )}
-                            </span>
-                            <span className="f-tickets-row-title">{t.titulo}</span>
-                            <span className="f-tickets-row-meta">
-                              <span className={`f-tickets-st f-tickets-st-${kindOf(t.estado)}`}>{estadoName(t.estado)}</span>
-                              {t.prioridad && (
-                                <span className="f-tickets-prio" style={{ color: prioTone(t.prioridad) }}>
-                                  <PrioGlyph p={t.prioridad} />
-                                  {t.prioridad}
-                                </span>
-                              )}
-                              {t.responsable ? (
-                                <span className="f-tickets-who">
-                                  <Av name={t.responsable} size="sm" />
-                                  {mine ? 'Vos' : t.responsable}
-                                </span>
-                              ) : (
-                                <span className="f-tickets-muted">Sin asignar</span>
-                              )}
-                            </span>
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
+                {showRows &&
+                  (virtual ? (
+                    <ListaVirtual ids={ids} abiertoId={curId} fila={(i) => tarjeta(visible[i], i)} />
+                  ) : (
+                    <ul className="f-tickets-rows">{visible.map((t) => tarjeta(t))}</ul>
+                  ))}
 
                 {!bodyLoading && snap && tickets.length > 0 && visible.length === 0 && (
                   <EmptyState
