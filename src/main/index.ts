@@ -17,7 +17,7 @@ import { iniciarLogger, logger } from './logger-global'
 import { marcarCrashPrevio } from './diag/estado'
 import { cerrarSesion, iniciarSesion } from './sesion-marcador'
 import { textoSeguro } from './diag/texto-seguro'
-import { armarEnvCuenta, proveedorDe, proveedorExigido, type Proveedor } from './proveedores'
+import { argvPanelCuenta, armarEnvCuenta, proveedorDe, proveedorExigido, type Proveedor } from './proveedores'
 import { NOMBRE_PROVEEDOR, esProveedorId, motivoSinCapacidad } from '../shared/proveedores'
 import { detectarAgentes } from './agentes'
 import { initialPromptProblem } from '../shared/initial-prompt'
@@ -414,9 +414,9 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
       const acc = requireAccount(accountIdFromLoginPane(paneId))
       const p = proveedorExigido(acc)
       prepareAccount(acc)
-      // Primer arranque de Claude con esta carpeta: pide tema y login.
+      // Primer arranque con esta carpeta: Claude pide tema y login; Codex corre `codex login` solo si todavía no hay sesión.
       const exe = exeDe(p)
-      return { cwd: homedir(), env: accountEnv(acc), claude: p.argvLogin(), claudeExe: exe }
+      return { cwd: homedir(), env: accountEnv(acc), claude: argvPanelCuenta(p, p.estadoLogin(acc.configDir).loggedIn), claudeExe: exe }
     }
     const ws = store.workspace(paneId)
     if (!ws) throw new Error('Ese espacio ya no existe.')

@@ -50,3 +50,8 @@ export function proveedorExigido(cuenta: { proveedor?: unknown }): Proveedor {
 export function armarEnvCuenta(p: Proveedor, cuenta: { configDir: string; label: string }, base: Record<string, string>): Record<string, string> {
   return { ...base, ...p.envCuenta(cuenta.configDir), SLOTH_ACCOUNT: cuenta.label }
 }
+
+/** Lo que corre el panel «Terminal» de la cuenta: el login mientras no haya sesión, y el agente normal cuando ya la hay (así no se relanza el login de otra cuenta encima). */
+export function argvPanelCuenta(p: Proveedor, sesionIniciada: boolean): string[] {
+  return sesionIniciada ? p.argvInteractivo({}) : p.argvLogin()
+}

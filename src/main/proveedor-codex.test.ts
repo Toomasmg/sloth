@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { entornoLimpio } from './env-limpio'
-import { armarEnvCuenta, proveedorExigido, PROVEEDORES } from './proveedores'
+import { argvPanelCuenta, armarEnvCuenta, proveedorExigido, PROVEEDORES } from './proveedores'
 import { CONFIG_INICIAL } from './proveedor-codex'
 import { PROMPT_VAR, pastePayload, shellLaunch, type ShellFamily } from './shell-args'
 
@@ -156,4 +156,15 @@ test('hayConversacionPrevia busca rollout-*.jsonl por nombre bajo sessions/AAAA/
   } finally {
     rmSync(d, { recursive: true, force: true })
   }
+})
+
+test('el panel Terminal de Codex solo corre el login sin sesión; con sesión abre codex normal', () => {
+  assert.deepEqual(argvPanelCuenta(codex, false), ['codex', 'login'])
+  assert.deepEqual(argvPanelCuenta(codex, true), ['codex', ...SEGURO])
+  assert.equal(argvPanelCuenta(codex, true).includes('login'), false)
+})
+
+test('el panel Terminal de Claude es `claude` con y sin sesión, como en staging', () => {
+  assert.deepEqual(argvPanelCuenta(PROVEEDORES.claude, false), ['claude'])
+  assert.deepEqual(argvPanelCuenta(PROVEEDORES.claude, true), ['claude'])
 })
