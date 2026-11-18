@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { UsoPorDia } from '../../../shared/tickets'
-import { costoValido, diaLocal, leerUso, sanearUso, sumarUso, textoTope, TopeVueltasError, vueltasValidas } from './uso'
+import { costoValido, diaLocal, lastRunTrasError, leerUso, limitesEfectivos, sanearUso, sumarUso, textoFlagViejo, textoTope, TopeVueltasError, vueltasValidas } from './uso'
 
 test('vueltasValidas acepta enteros de 1 a 200 y nada más', () => {
   for (const v of [1, 40, 200]) assert.equal(vueltasValidas(v), v)
@@ -46,7 +46,7 @@ test('TopeVueltasError conserva el tope y el uso', () => {
 test('textoTope dice cuál fue el tope y avisa si una acción pudo quedar a medias', () => {
   assert.equal(textoTope('vueltas', 40), 'La consulta se cortó por tope de vueltas (40). Podés continuar con más vueltas o subir el tope en los ajustes.')
   assert.match(textoTope('vueltas', 40, true), /Revisá el ticket: el cambio pudo quedar a medias\.$/)
-  assert.match(textoTope('costo', 2.5), /tope de costo \(US\$ 2\.5\)/)
+  assert.match(textoTope('costo', 2.5), /tope de costo \(US\$ 2,5\)/)
   assert.ok(!textoTope('costo', 2.5).includes('a medias'))
 })
 
@@ -94,4 +94,50 @@ test('sanearUso acota días y conectores y es idempotente', () => {
 test('diaLocal arma YYYY-MM-DD con ceros', () => {
   assert.match(diaLocal(Date.now()), /^\d{4}-\d{2}-\d{2}$/)
   assert.equal(diaLocal(new Date(2026, 0, 5, 10).getTime()), '2026-01-05')
+})
+
+test('textoTope con el máximo de vueltas no invita a continuar', () => {
+  const t = textoTope('vueltas', 200)
+  assert.match(t, /tope de vueltas \(200\)/)
+  assert.ok(!t.includes('continuar'))
+  assert.match(textoTope('vueltas', 199), /continuar/)
+})
+
+test('lastRunTrasError conserva el tope solo si el error es el corte', () => {
+  const cortada = { numTurns: 40, maxTurns: 40, tope: 'vueltas' as const }
+  const corte = new TopeVueltasError('cortada', 'costo', { costUsd: 1, tope: 'costo' })
+  assert.deepEqual(lastRunTrasError(undefined, corte, 20), { costUsd: 1, tope: 'costo', maxTurns: 20 })
+  for (const e of [new Error('Consulta cancelada.'), new Error('timeout'), 'raro', undefined]) {
+    assert.deepEqual(lastRunTrasError(cortada, e, 40), { numTurns: 40, maxTurns: 40 })
+  }
+  assert.equal(lastRunTrasError(undefined, new Error('x'), 40), undefined)
+  const sana = { numTurns: 3 }
+  assert.equal(lastRunTrasError(sana, undefined, 40), sana)
+  assert.ok(!('tope' in (lastRunTrasError(cortada, undefined, 40) ?? {})))
+})
+
+test('limitesEfectivos toma los topes válidos o los de defecto', () => {
+  assert.deepEqual(limitesEfectivos({ maxTurns: 10, maxCostUsd: 2.5 }), { vueltas: 10, costo: 2.5 })
+  assert.deepEqual(limitesEfectivos({ maxTurns: 999, maxCostUsd: 0 }), { vueltas: 40 })
+  assert.deepEqual(limitesEfectivos({}), { vueltas: 40 })
+})
+
+test('textoFlagViejo reconoce el rechazo de --max-budget-usd', () => {
+  assert.match(textoFlagViejo("No se pudo leer (salió con código 1: error: unknown option '--max-budget-usd')") ?? '', /actualizala o borrá el tope/)
+  assert.equal(textoFlagViejo("unknown option '--otra'"), undefined)
+  assert.equal(textoFlagViejo('Consulta cancelada.'), undefined)
+})
+
+test('sumarUso trata negativos, NaN e infinitos como 0 y no desborda', () => {
+  const a = sumarUso(undefined, '2026-11-17', 'gruv', { costUsd: 0.5, numTurns: 2, durationMs: 10 })
+  const b = sumarUso(a, '2026-11-17', 'gruv', { costUsd: -3, numTurns: NaN, durationMs: Infinity })
+  assert.deepEqual(b['2026-11-17'].gruv, { corridas: 2, costUsd: 0.5, vueltas: 2, durationMs: 10 })
+  const grande = sumarUso(sumarUso(undefined, '2026-11-17', 'gruv', { costUsd: 1e308 }), '2026-11-17', 'gruv', { costUsd: 1e308 })
+  assert.equal(grande['2026-11-17'].gruv.costUsd, 1e308)
+  assert.deepEqual(sanearUso(grande), grande)
+})
+
+test('sanearUso descarta días imposibles', () => {
+  const bueno = { corridas: 1, costUsd: 0, vueltas: 0, durationMs: 0 }
+  assert.deepEqual(sanearUso({ '2026-13-45': { gruv: bueno }, '2026-02-30': { gruv: bueno }, '2026-02-28': { gruv: bueno } }), { '2026-02-28': { gruv: bueno } })
 })

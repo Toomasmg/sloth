@@ -1,8 +1,16 @@
 import type { Corrida, UsoAcum, UsoPorDia } from './tickets'
 
+export const VUELTAS_DEFECTO = 40
+export const VUELTAS_MAX = 200
+
 const vacio = (): UsoAcum => ({ corridas: 0, costUsd: 0, vueltas: 0, durationMs: 0 })
 
 const dos = (n: number): string => String(n).padStart(2, '0')
+
+export const diaLocal = (ms: number): string => {
+  const f = new Date(ms)
+  return `${f.getFullYear()}-${dos(f.getMonth() + 1)}-${dos(f.getDate())}`
+}
 
 function diasAtras(hoy: string, n: number): string | undefined {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(hoy)

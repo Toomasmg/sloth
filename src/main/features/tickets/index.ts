@@ -67,7 +67,7 @@ import {
   type ArchivoPropios,
   type ConectorRegistrado
 } from './propios'
-import { costoValido, diaLocal, leerUso, sumarUso, textoTope, TopeVueltasError, VUELTAS_DEFECTO, vueltasValidas, type UsoCorrida } from './uso'
+import { costoValido, diaLocal, lastRunTrasError, leerUso, limitesEfectivos, sumarUso, textoFlagViejo, textoTope, TopeVueltasError, vueltasValidas, type LimitesEfectivos, type UsoCorrida } from './uso'
 import { ASSIGNEE_MAX, assigneeValido, conConector, sinLista, type TicketsState } from './estado'
 import { ghAccion, ghDetalle, ghLista, ghYo, repoValido, type GhRun } from './gh'
 import { GitError, run as correr } from '../git-run'
@@ -421,7 +421,6 @@ export interface TicketsParaEquipo {
   fetchedAt?: number
   fetchedBy?: string
   lastRun?: Corrida
-  uso?: UsoPorDia
   lastError?: string
   running: boolean
   model: string
@@ -448,7 +447,6 @@ export function ticketsParaEquipo(): TicketsParaEquipo {
     fetchedAt: state.fetchedAt,
     fetchedBy: state.fetchedBy,
     lastRun: state.lastRun,
-    uso: state.uso,
     lastError: state.lastError,
     carpetas: def.via === 'gh' ? carpetasDe() : undefined
   }
@@ -630,6 +628,7 @@ async function refreshGh(def: ConectorGh): Promise<{ count: number }> {
     noDisponible = {}
     return { count: tickets.length }
   } catch (e) {
+    state.lastRun = lastRunTrasError(state.lastRun, e, 0)
     state.lastError = (e as Error).message
     throw e
   } finally {
@@ -642,9 +641,10 @@ async function refreshGh(def: ConectorGh): Promise<{ count: number }> {
  * runClaude convierte en Error común lo que tire parse: el texto para la persona se arma acá.
  * Una lista vacía sin el servidor (o sin sus herramientas) en la sesión no es «no hay tickets».
  */
-function leerLista(def: ConectorMcp, d: ConectorMcp, run: Ejecucion, s: string): ResultadoLista {
+function leerLista(def: ConectorMcp, d: ConectorMcp, run: Ejecucion, s: string, lim: LimitesEfectivos): ResultadoLista {
   const sesion = servidoresDeSalida(s)
   if (sesion) actualizarDesdeInit(run.accountId, sesion, run.sinClaudeAi)
+  medirUso(def.id, s, lim)
   let r: ResultadoLista
   try {
     r = parseClaudeOutput(d, s)
@@ -659,8 +659,6 @@ function leerLista(def: ConectorMcp, d: ConectorMcp, run: Ejecucion, s: string):
   return r
 }
 
-const vueltasConfig = (): number => vueltasValidas(state.config.maxTurns) ?? VUELTAS_DEFECTO
-
 /** Los topes de la config; `maxTurns` pisa el de la config solo para una consulta ya validada. */
 const limites = (maxTurns?: number): { maxTurns?: number; maxCostUsd?: number } => ({
   maxTurns: maxTurns ?? state.config.maxTurns,
@@ -674,17 +672,24 @@ function registrarUso(conectorId: string, u: UsoCorrida): void {
 }
 
 /** Antes del parser del conector: anota lo gastado y, si cortó un tope, lo dice en vez de leer una salida a medias. */
-function medirUso(conectorId: string, s: string, vueltas: number, accion?: boolean): void {
+function medirUso(conectorId: string, s: string, lim: LimitesEfectivos, accion?: boolean): void {
   const u = leerUso(s)
   if (!u) return
   registrarUso(conectorId, u)
-  if (u.tope) throw new TopeVueltasError(textoTope(u.tope, u.tope === 'vueltas' ? vueltas : (costoValido(state.config.maxCostUsd) ?? 0), accion), u.tope, u)
+  if (u.tope) throw new TopeVueltasError(textoTope(u.tope, u.tope === 'vueltas' ? lim.vueltas : (lim.costo ?? 0), accion), u.tope, u)
+}
+
+/** Un error común de runClaude (los propios se devuelven tal cual) con el aviso de claude viejo, si corresponde. */
+const legible = (e: unknown): unknown => {
+  if (!(e instanceof Error) || e.constructor !== Error) return e
+  const t = textoFlagViejo(e.message)
+  return t ? new Error(t) : e
 }
 
 async function refresh(rawAccount: unknown, rawVueltas?: unknown): Promise<{ count: number; tokens?: number }> {
   if (running) throw new Error('Ya hay una consulta en curso.')
   const def = activo()
-  let usadas = vueltasConfig()
+  let usadas = limitesEfectivos(state.config).vueltas
   if (rawVueltas !== undefined && rawVueltas !== null) {
     const v = vueltasValidas(rawVueltas)
     if (v === undefined) throw new Error('Tope de vueltas inválido.')
@@ -696,28 +701,29 @@ async function refresh(rawAccount: unknown, rawVueltas?: unknown): Promise<{ cou
   try {
     chequearCuenta(def, run)
   } catch (e) {
+    state.lastRun = lastRunTrasError(state.lastRun, e, usadas)
     state.lastError = (e as Error).message
     changed()
     throw e
   }
   const d = defPara(def, run.accountId)
+  const lim = limites(usadas)
+  const efectivos = limitesEfectivos(lim)
   const ac = new AbortController()
   running = ac
+  state.lastRun = lastRunTrasError(state.lastRun, undefined, usadas)
   avisar()
   try {
     const r = await runClaude({
       exe: run.exe,
       // --verbose trae el system/init: de ahí sale qué servidores tenía la sesión de verdad.
-      args: [...buildListaArgs(d, state.config.model, ajenosDe(run, d), limites(usadas)), '--verbose'],
+      args: [...buildListaArgs(d, state.config.model, ajenosDe(run, d), lim), '--verbose'],
       prompt: buildPrompt(d, state.config.assigneeId),
       cwd: run.cwd,
       env: run.env,
       quien: def.nombre,
       signal: ac.signal,
-      parse: (s) => {
-        medirUso(def.id, s, usadas)
-        return leerLista(def, d, run, s)
-      }
+      parse: (s) => leerLista(def, d, run, s, efectivos)
     })
     state.tickets = r.tickets
     detalles.clear()
@@ -732,8 +738,8 @@ async function refresh(rawAccount: unknown, rawVueltas?: unknown): Promise<{ cou
     state.config.queryAccountId = run.accountId
     return { count: r.tickets.length, tokens: r.tokens }
   } catch (e) {
-    const msg = e instanceof ConectorFaltaError ? (textoCuenta(def, { tipo: 'falta' }, run) ?? e.message) : (e as Error).message
-    if (e instanceof TopeVueltasError) state.lastRun = { ...e.uso, maxTurns: usadas, tope: e.tope }
+    const msg = e instanceof ConectorFaltaError ? (textoCuenta(def, { tipo: 'falta' }, run) ?? e.message) : (legible(e) as Error).message
+    state.lastRun = lastRunTrasError(state.lastRun, e, usadas)
     state.lastError = msg
     throw new Error(msg)
   } finally {
@@ -888,17 +894,19 @@ async function detalle(rawId: unknown, rawFresco?: unknown): Promise<Detalle> {
   }
   const c = cuenta(def)
   const dc = servidorDeLaLista(state.leidoCon, defPara(def, c.accountId))
+  const lim = limites()
+  const efectivos = limitesEfectivos(lim)
   try {
     const d = await runClaude({
       exe: c.exe,
-      args: buildDetalleArgs(dc, state.config.model, ajenosDe(c, dc), limites()),
+      args: buildDetalleArgs(dc, state.config.model, ajenosDe(c, dc), lim),
       prompt: buildDetallePrompt(dc, id),
       cwd: c.cwd,
       env: c.env,
       quien: def.nombre,
       timeoutMs: DETALLE_TIMEOUT_MS,
       parse: (s) => {
-        medirUso(def.id, s, vueltasConfig())
+        medirUso(def.id, s, efectivos)
         return parseDetalle(dc, s)
       }
     })
@@ -907,7 +915,7 @@ async function detalle(rawId: unknown, rawFresco?: unknown): Promise<Detalle> {
     return d
   } catch (e) {
     if (e instanceof ConectorFaltaError) throw new Error(`No pudimos leer el detalle: ${sinConector(def)}`)
-    throw e
+    throw legible(e)
   }
 }
 
@@ -934,6 +942,8 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
 
   const c = def.via === 'mcp' ? cuenta(def) : undefined
   const dc = def.via === 'mcp' && c ? servidorDeLaLista(state.leidoCon, defPara(def, c.accountId)) : undefined
+  const lim = limites()
+  const efectivos = limitesEfectivos(lim)
   escribiendo.add(id)
   try {
     let minutosTotal: number | undefined
@@ -941,16 +951,16 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
     else if (c && dc) {
       const r = await runClaude({
         exe: c.exe,
-        args: buildAccionArgs(dc, state.config.model, a, ajenosDe(c, dc), limites()),
+        args: buildAccionArgs(dc, state.config.model, a, ajenosDe(c, dc), lim),
         prompt: buildAccionPrompt(dc, a, input),
         cwd: c.cwd,
         env: c.env,
         quien: def.nombre,
         timeoutMs: DETALLE_TIMEOUT_MS,
         parse: (s) => {
-        medirUso(def.id, s, vueltasConfig(), true)
-        return parseAccion(dc, s, a)
-      }
+          medirUso(def.id, s, efectivos, true)
+          return parseAccion(dc, s, a)
+        }
       })
       minutosTotal = r.minutosTotal
     }
@@ -961,7 +971,7 @@ async function accion(rawA: unknown, rawId: unknown, rawIn: unknown): Promise<{ 
     if (e instanceof HerramientaFaltaError) for (const k of mismaHerramienta(def, a)) noDisponible[k] = e.message
     else if (e instanceof ConectorFaltaError) for (const k of accionesSoportadas(def)) noDisponible[k] = sinConector(def)
     ctx.log(`tickets(${def.id}): accion ${a} en ${id}: error`)
-    throw e
+    throw legible(e)
   } finally {
     escribiendo.delete(id)
     changed()

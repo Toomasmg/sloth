@@ -2,17 +2,24 @@
  * Límites de una corrida de `claude -p` y lo que gastó. Módulo puro (lo corre `node --test` con type
  * stripping): sin enums, namespaces ni parameter properties, y los tipos se importan con `type`.
  */
-import type { UsoAcum, UsoPorDia } from '../../../shared/tickets'
+import type { Corrida, UsoAcum, UsoPorDia } from '../../../shared/tickets'
+import { diaLocal, VUELTAS_DEFECTO, VUELTAS_MAX } from '../../../shared/tickets-uso'
 import { ID_CONECTOR_RE } from './conector'
 
-export const VUELTAS_DEFECTO = 40
+export { diaLocal, VUELTAS_DEFECTO, VUELTAS_MAX }
 export const VUELTAS_MIN = 1
-export const VUELTAS_MAX = 200
 export const COSTO_MIN = 0.01
 export const COSTO_MAX = 100
 const DIAS_MAX = 60
 const CONECTORES_MAX = 50
-const DIA_RE = /^\d{4}-\d{2}-\d{2}$/
+const DIA_RE = /^(\d{4})-(\d{2})-(\d{2})$/
+
+const diaReal = (d: string): boolean => {
+  const m = DIA_RE.exec(d)
+  if (!m) return false
+  const f = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  return f.getFullYear() === Number(m[1]) && f.getMonth() === Number(m[2]) - 1 && f.getDate() === Number(m[3])
+}
 
 export type Tope = 'vueltas' | 'costo'
 
@@ -88,23 +95,57 @@ export class TopeVueltasError extends Error {
   }
 }
 
+export interface LimitesEfectivos {
+  vueltas: number
+  costo?: number
+}
+
+/** Los topes que de verdad llevan los args de la consulta; se toman antes de correrla, porque la config puede cambiar mientras tanto. */
+export function limitesEfectivos(l: { maxTurns?: unknown; maxCostUsd?: unknown }): LimitesEfectivos {
+  const costo = costoValido(l.maxCostUsd)
+  return { vueltas: vueltasValidas(l.maxTurns) ?? VUELTAS_DEFECTO, ...(costo === undefined ? {} : { costo }) }
+}
+
 export function textoTope(tope: Tope, limite: number, accion?: boolean): string {
   const base =
     tope === 'vueltas'
-      ? `La consulta se cortó por tope de vueltas (${limite}). Podés continuar con más vueltas o subir el tope en los ajustes.`
-      : `La consulta se cortó por tope de costo (US$ ${limite}). Podés subir el tope en los ajustes.`
+      ? limite >= VUELTAS_MAX
+        ? `La consulta se cortó por tope de vueltas (${limite}), el máximo. Probá con algo más acotado.`
+        : `La consulta se cortó por tope de vueltas (${limite}). Podés continuar con más vueltas o subir el tope en los ajustes.`
+      : `La consulta se cortó por tope de costo (US$ ${String(limite).replace('.', ',')}). Podés subir el tope en los ajustes.`
   return accion ? `${base} Revisá el ticket: el cambio pudo quedar a medias.` : base
 }
 
+/** Qué queda en `lastRun` tras un intento fallido: solo el corte por tope conserva su `tope`; cualquier otro error lo limpia. */
+export function lastRunTrasError(previo: Corrida | undefined, e: unknown, maxTurns: number): Corrida | undefined {
+  if (e instanceof TopeVueltasError) return { ...e.uso, maxTurns, tope: e.tope }
+  if (!previo || previo.tope === undefined) return previo
+  const resto = { ...previo }
+  delete resto.tope
+  return resto
+}
+
+const FLAG_VIEJO_RE = /unknown option.*--max-budget-usd|--max-budget-usd.*unknown option/is
+
+/** Un claude que no conoce --max-budget-usd sale con error y stdout vacío: se explica en vez de mostrar el parse genérico. */
+export function textoFlagViejo(msg: string): string | undefined {
+  return FLAG_VIEJO_RE.test(msg) ? 'Tu versión de Claude Code no soporta el tope de costo: actualizala o borrá el tope en los ajustes de Tickets.' : undefined
+}
+
 const cero = (): UsoAcum => ({ corridas: 0, costUsd: 0, vueltas: 0, durationMs: 0 })
+
+const sumaSana = (previo: number, nuevo: number | undefined): number => {
+  const r = previo + (nuevo !== undefined && nuevo >= 0 ? nuevo : 0)
+  return Number.isFinite(r) ? r : previo
+}
 
 export function sumarUso(uso: UsoPorDia | undefined, dia: string, conectorId: string, u: UsoCorrida): UsoPorDia {
   const previo = uso?.[dia]?.[conectorId] ?? cero()
   const nuevo: UsoAcum = {
     corridas: previo.corridas + 1,
-    costUsd: previo.costUsd + (u.costUsd ?? 0),
-    vueltas: previo.vueltas + (u.numTurns ?? 0),
-    durationMs: previo.durationMs + (u.durationMs ?? 0)
+    costUsd: sumaSana(previo.costUsd, u.costUsd),
+    vueltas: sumaSana(previo.vueltas, u.numTurns),
+    durationMs: sumaSana(previo.durationMs, u.durationMs)
   }
   const todo: UsoPorDia = { ...uso, [dia]: { ...uso?.[dia], [conectorId]: nuevo } }
   const dias = Object.keys(todo).sort().slice(-DIAS_MAX)
@@ -119,7 +160,7 @@ const acumNoNegativo = (v: unknown): number | undefined => {
 export function sanearUso(raw: unknown): UsoPorDia | undefined {
   if (!esObjeto(raw)) return undefined
   const dias = Object.keys(raw)
-    .filter((d) => DIA_RE.test(d))
+    .filter(diaReal)
     .sort()
     .slice(-DIAS_MAX)
   const out: UsoPorDia = {}
@@ -140,10 +181,4 @@ export function sanearUso(raw: unknown): UsoPorDia | undefined {
     if (Object.keys(dia).length) out[d] = dia
   }
   return Object.keys(out).length ? out : undefined
-}
-
-export const diaLocal = (ms: number): string => {
-  const f = new Date(ms)
-  const dos = (n: number): string => String(n).padStart(2, '0')
-  return `${f.getFullYear()}-${dos(f.getMonth() + 1)}-${dos(f.getDate())}`
 }
