@@ -158,6 +158,20 @@ test('prepararCarpeta crea config.toml, no pisa uno existente y no deja tmp', ()
   }
 })
 
+test('prepararCarpeta no falla por un tmp que quedó de antes y puede correr dos veces', () => {
+  const d = carpeta()
+  try {
+    mkdirSync(d, { recursive: true })
+    writeFileSync(join(d, `config.toml.tmp-${process.pid}`), 'resto')
+    codex.prepararCarpeta(d)
+    codex.prepararCarpeta(d)
+    assert.equal(readFileSync(join(d, 'config.toml'), 'utf8'), CONFIG_INICIAL)
+    assert.deepEqual(readdirSync(d).sort(), ['config.toml', `config.toml.tmp-${process.pid}`])
+  } finally {
+    rmSync(d, { recursive: true, force: true })
+  }
+})
+
 test('estadoLogin solo mira si auth.json existe', () => {
   const d = carpeta()
   try {

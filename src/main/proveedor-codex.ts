@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { constants, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { CAPACIDADES } from '../shared/proveedores'
 import { promptLine } from './shell-args'
@@ -15,7 +16,7 @@ const SEGURO = ['-s', 'workspace-write', '-a', 'on-request', '--no-daemon']
 
 const AGENTES_AJENOS = /^(OPENAI_|CODEX_|ANTHROPIC_|CLAUDE)/
 
-/** Crea config.toml solo si no existe (tmp más rename); uno existente no se toca. */
+/** Crea config.toml solo si no existe; uno existente no se toca. */
 export function prepararCarpetaCodex(configDir: string): void {
   mkdirSync(configDir, { recursive: true })
   const destino = join(configDir, 'config.toml')
@@ -29,13 +30,16 @@ export function prepararCarpetaCodex(configDir: string): void {
     }
     return
   }
-  const tmp = join(configDir, `config.toml.tmp-${process.pid}`)
+  // tmp único y copia exclusiva: un resto de una corrida anterior no rompe el alta y un config.toml que aparezca en el medio nunca se pisa.
+  const tmp = join(configDir, `config.toml.tmp-${randomUUID()}`)
   writeFileSync(tmp, CONFIG_INICIAL, { encoding: 'utf8', flag: 'wx' })
-  if (existsSync(destino)) {
+  try {
+    copyFileSync(tmp, destino, constants.COPYFILE_EXCL)
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e
+  } finally {
     rmSync(tmp, { force: true })
-    return
   }
-  renameSync(tmp, destino)
 }
 
 export const codex: Proveedor = {
