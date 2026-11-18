@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { AVISO_CODEX_VIEJO, formularioCuenta } from './agente-form'
+import { AVISO_CODEX_VIEJO, filasLimites, formularioCuenta } from './agente-form'
 import type { AgenteDisponible } from '../../../../shared/types'
 
 const claude: AgenteDisponible = { id: 'claude', nombre: 'Claude Code', instalado: true }
@@ -33,4 +33,16 @@ test('con Codex elegido cambia el título, se oculta el plan y hay aviso', () =>
 
 test('con un Codex viejo se avisa cómo actualizarlo', () => {
   assert.equal(formularioCuenta('codex', [claude, codex({ versionOk: false })]).avisoVersion, AVISO_CODEX_VIEJO)
+})
+
+test('filasLimites: solo las ventanas que llegaron y sin ceros inventados', () => {
+  const v = (pct: number) => ({ pct, reiniciaEn: null })
+  assert.deepEqual(filasLimites({ cincoHoras: v(37.4), semana: v(12), at: 1 }), [
+    { nombre: '5 h', valor: '37 %' },
+    { nombre: 'Semana', valor: '12 %' }
+  ])
+  assert.deepEqual(filasLimites({ cincoHoras: null, semana: v(0), at: 1 }), [{ nombre: 'Semana', valor: '0 %' }])
+  assert.deepEqual(filasLimites({ cincoHoras: null, semana: null, at: 1 }), [])
+  assert.deepEqual(filasLimites(null), [])
+  assert.deepEqual(filasLimites(undefined), [])
 })

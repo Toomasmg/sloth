@@ -6,7 +6,8 @@ import { fmtTok, totalTok, usageTitle } from '../../format'
 import { LogoMark } from '../../Logo'
 import { loginPaneId, type Account, type AgenteDisponible } from '../../../../shared/types'
 import { capacidadesDe, motivoSinCapacidad, nombreProveedor, proveedorIdDe } from '../../../../shared/proveedores'
-import { formularioCuenta } from './agente-form'
+import { filasLimites, formularioCuenta } from './agente-form'
+import type { LimitesCodex } from '../../../../shared/celular'
 import type { ChatConfigView, ChatSnapshot } from '../../../../shared/chat'
 import { esHostSupabase } from '../../../../shared/chat-text'
 import { SHORTCUT_ACTIONS, bindingOf, comboFromEvent, findConflict, keyTokenOf, setShortcutCapture, type ShortcutAction } from '../../shortcuts'
@@ -156,6 +157,33 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
     })
   }
 
+  /** «Leer límites de uso (experimental)» de una cuenta de Codex: guarda y recarga la lista. */
+  const toggleLimites = (acc: Account): void => {
+    save(async () => {
+      await api.setLimitesExperimentales(acc.id, acc.limitesExperimentales !== true)
+      await ui.reload()
+    })
+  }
+
+  const conLectura = ui.accounts.filter((a) => capacidadesDe(a)?.limitesExperimental === true && a.limitesExperimentales === true).map((a) => a.id)
+  const claveLectura = conLectura.join(',')
+  /** Sin la clave: todavía leyendo. null: sin dato. */
+  const [limites, setLimites] = useState<Record<string, LimitesCodex | null>>({})
+  useEffect(() => {
+    if (!claveLectura) {
+      setLimites({})
+      return
+    }
+    let vivo = true
+    api.limitesCodex().then(
+      (r) => vivo && setLimites(r),
+      () => vivo && setLimites(Object.fromEntries(claveLectura.split(',').map((id) => [id, null])))
+    )
+    return () => {
+      vivo = false
+    }
+  }, [claveLectura])
+
   useEffect(() => {
     if (!adding) return
     api.agentes().then(setAgentes, () => setAgentes([]))
@@ -266,6 +294,9 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
           // Sin la capacidad el escáner devuelve ceros: mostrarlos sería un dato falso.
           const u = conUso ? ui.usage[a.id] : undefined
           const motivoSetup = capacidadesDe(a)?.setupCompartido === true ? undefined : motivoSinCapacidad(a, 'setupCompartido')
+          const conLimites = capacidadesDe(a)?.limitesExperimental === true
+          const leyendoLimites = conLimites && a.limitesExperimentales === true
+          const filasL = leyendoLimites ? filasLimites(limites[a.id]) : []
           return (
             <div key={a.id} className="f-set-acc" style={{ '--acc': color } as React.CSSProperties}>
               <div className="f-set-row">
@@ -302,6 +333,17 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
                       </div>
                     </dl>
                   )}
+                  {leyendoLimites && filasL.length > 0 && (
+                    <dl className="sl-usage" title="Lo que Codex dice que te queda, leído hace un momento.">
+                      {filasL.map((f) => (
+                        <div key={f.nombre}>
+                          <dt>{f.nombre}</dt>
+                          <dd>{f.valor}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                  {leyendoLimites && filasL.length === 0 && <span className="f-set-hint">{limites[a.id] === undefined ? 'Leyendo límites…' : 'Sin dato'}</span>}
                 </div>
                 {conUso && (
                   <PlanField key={`${a.id}-${p.settings.accountPlans[a.id] ?? ''}`} label={a.label} value={p.settings.accountPlans[a.id] ?? ''} onCommit={(plan) => save({ accountPlans: { [a.id]: plan || null } })} />
@@ -362,6 +404,18 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
                     <span className="switch-track" aria-hidden="true" />
                   </label>
                   {motivoSetup && <span className="f-set-hint">{motivoSetup}</span>}
+                  {conLimites && (
+                    <>
+                      <label className="switch" role="menuitem" title="Sloth abre Codex un momento para preguntarle cuánto te queda.">
+                        <span className="switch-text">
+                          Leer límites de uso <Tag>Experimental</Tag>
+                        </span>
+                        <input type="checkbox" role="switch" checked={a.limitesExperimentales === true} onChange={() => toggleLimites(a)} />
+                        <span className="switch-track" aria-hidden="true" />
+                      </label>
+                      <span className="f-set-hint">Sloth abre Codex un momento para preguntarle cuánto te queda. Puede fallar si Codex cambia; con una API key no aplica.</span>
+                    </>
+                  )}
                   <Button variant="danger" size="sm" role="menuitem" onClick={() => {
                       setMenu(null)
                       setConfirm(a.id)

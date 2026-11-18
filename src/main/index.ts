@@ -18,7 +18,8 @@ import { marcarCrashPrevio } from './diag/estado'
 import { cerrarSesion, iniciarSesion } from './sesion-marcador'
 import { textoSeguro } from './diag/texto-seguro'
 import { argvPanelCuenta, armarEnvCuenta, proveedorDe, proveedorExigido, type Proveedor } from './proveedores'
-import { NOMBRE_PROVEEDOR, esProveedorId, motivoSinCapacidad } from '../shared/proveedores'
+import { NOMBRE_PROVEEDOR, capacidadesDe, esProveedorId, motivoSinCapacidad } from '../shared/proveedores'
+import { limitesDeCuenta } from './codex-limites'
 import { detectarAgentes } from './agentes'
 import { initialPromptProblem } from '../shared/initial-prompt'
 import { nextAgentState, type AgentInput } from './agent-machine'
@@ -508,6 +509,20 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     }
     installInto(acc.configDir, baseSettingsFor(acc))
     return syncSharedSetup(acc, !accountBusy(acc.id))
+  })
+
+  handle('accounts:setLimitesExperimentales', (_e, id: unknown, activo: unknown) => {
+    if (!idValido(id) || typeof activo !== 'boolean') throw new Error('Pedido inválido.')
+    const cuenta = store.account(id)
+    if (!cuenta) throw new Error('Esa cuenta ya no existe.')
+    if (capacidadesDe(cuenta)?.limitesExperimental !== true) throw new Error(motivoSinCapacidad(cuenta, 'limitesExperimental'))
+    store.exigirEscritura()
+    store.updateAccount(id, { limitesExperimentales: activo })
+  })
+
+  handle('accounts:limitesCodex', async () => {
+    const pares = await Promise.all(store.accounts.map(async (a) => [a.id, await limitesDeCuenta(a, true)] as const))
+    return Object.fromEntries(pares.filter(([id]) => store.account(id)?.limitesExperimentales === true))
   })
 
   handle('accounts:remove', async (_e, id: unknown) => {

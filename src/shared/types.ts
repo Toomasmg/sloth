@@ -1,3 +1,4 @@
+import type { LimitesCodex } from './celular'
 import type { ProveedorId } from './proveedores'
 
 /** Una cuenta de Claude: su propio CLAUDE_CONFIG_DIR, con su login y sus settings. */
@@ -8,6 +9,8 @@ export interface Account {
   createdAt: number
   /** Usar el setup de ~/.claude (skills, agents, hooks, plugins, settings, MCP). Por defecto sí. */
   shareSetup?: boolean
+  /** Leer los límites de uso con `codex app-server` (experimental). Ausente = apagado. */
+  limitesExperimentales?: boolean
   /** Agente de terminal de la cuenta. Ausente = claude. Puede ser un id que esta versión no conoce: se resuelve con proveedorDe. */
   proveedor?: ProveedorId | (string & {})
 }
@@ -169,6 +172,10 @@ export interface SlothApi {
   accountStatuses(): Promise<Record<string, AccountStatus>>
   accountUsage(): Promise<Record<string, AccountUsage>>
   setShareSetup(id: string, share: boolean): Promise<SetupSyncReport | null>
+  /** Activa o apaga la lectura experimental de límites de una cuenta de Codex (canal `accounts:setLimitesExperimentales`). */
+  setLimitesExperimentales(id: string, activo: boolean): Promise<void>
+  /** Límites de las cuentas con la lectura activada; null es «sin dato» (canal `accounts:limitesCodex`). */
+  limitesCodex(): Promise<Record<string, LimitesCodex | null>>
   addWorkspace(input: NewWorkspaceInput): Promise<Workspace>
   removeWorkspace(id: string): Promise<void>
   /** Renombrar o cambiar el ícono (canal `workspaces:update`). Devuelve el espacio actualizado. */

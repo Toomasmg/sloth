@@ -74,7 +74,9 @@ test('avisoTurno y limitesExperimental por agente', () => {
   assert.equal(CAPACIDADES.claude.avisoTurno, true)
   assert.equal(CAPACIDADES.claude.limitesExperimental, false)
   assert.equal(CAPACIDADES.codex.avisoTurno, false)
-  assert.equal(CAPACIDADES.codex.limitesExperimental, false)
+  assert.equal(CAPACIDADES.codex.limitesExperimental, true)
+  assert.equal(motivoSinCapacidad({ proveedor: 'codex' }, 'limitesExperimental'), undefined)
+  assert.equal(capacidadesDe({ proveedor: 'zzz' })?.limitesExperimental, undefined)
 })
 
 test('agenteDe: nombre corto o genérico si no se conoce', () => {
