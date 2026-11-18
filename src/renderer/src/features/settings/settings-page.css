@@ -911,3 +911,32 @@ button.f-set-toggle:disabled {
 .f-set-chatclaude-notes .f-set-hint {
   margin: 0;
 }
+
+.f-set-checks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: var(--s-2) 0 0;
+  padding: 0 var(--s-1);
+  list-style: none;
+}
+.f-set-check {
+  display: flex;
+  gap: var(--s-2);
+  font-size: var(--fs-12);
+}
+.f-set-check-ico {
+  flex: none;
+  width: 1.2em;
+  text-align: center;
+  font-weight: 700;
+}
+.f-set-check.ok .f-set-check-ico {
+  color: var(--ok-fg);
+}
+.f-set-check.fallo .f-set-check-ico {
+  color: var(--danger-fg);
+}
+.f-set-check.aviso .f-set-check-ico {
+  color: var(--warn-fg);
+}
