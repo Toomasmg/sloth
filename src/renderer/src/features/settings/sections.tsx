@@ -1048,28 +1048,30 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
           {testRes.text}
         </p>
       )}
-      <div aria-live="polite">
-        {checksFailed && <p className="form-error">No se pudo revisar el servidor.</p>}
-        {checks && (
-          <ul className="f-set-checks" aria-label="Chequeos del servidor">
-            {checks.map((c) => (
-              <li key={c.id} className={`f-set-check ${c.estado}`}>
-                <span className="f-set-check-ico" aria-hidden="true">
-                  {CHECK_ICONO[c.estado]}
-                </span>
-                <div>
+      {(checks || checksFailed) && (
+        <div aria-live="polite">
+          {checksFailed && <p className="form-error">No se pudo revisar el servidor.</p>}
+          {checks && (
+            <ul className="f-set-checks" aria-label="Chequeos del servidor">
+              {checks.map((c) => (
+                <li key={c.id} className={`f-set-check ${c.estado}`}>
+                  <span className="f-set-check-ico" aria-hidden="true">
+                    {CHECK_ICONO[c.estado]}
+                  </span>
                   <div>
-                    <span className="sr-only">{CHECK_ETIQUETA[c.estado]}: </span>
-                    {c.titulo}
+                    <div>
+                      <span className="sr-only">{CHECK_ETIQUETA[c.estado]}: </span>
+                      {c.titulo}
+                    </div>
+                    <div className="f-set-hint">{c.detalle}</div>
+                    {c.accion && <div className="f-set-hint">{c.accion}</div>}
                   </div>
-                  <div className="f-set-hint">{c.detalle}</div>
-                  {c.accion && <div className="f-set-hint">{c.accion}</div>}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {offered && (
         <div className="f-set-card f-set-offer" role="group" aria-label="Configuración propuesta por el repo">
