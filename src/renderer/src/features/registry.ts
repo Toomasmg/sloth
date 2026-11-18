@@ -15,6 +15,7 @@ import teamConfig from './team-config'
 import team from './team'
 import layout from '../layout/feature'
 import chat from './chat'
+import perfiles from './perfiles'
 import help from './help'
 import report from './report'
 import sound from './sound'
@@ -27,4 +28,4 @@ import regiones from './regiones'
 import diagnostico from './diagnostico'
 
 /** Todas las funciones de la interfaz, en el orden en que aparecen en cada lugar. */
-export const FEATURE_UIS: FeatureUi[] = [history, git, worktrees, prs, palette, broadcast, templates, updater, exportImport, tickets, settings, onboarding, teamConfig, team, layout, chat, help, report, sound, moveAccount, permissions, dictado, celular, avisos, regiones, diagnostico]
+export const FEATURE_UIS: FeatureUi[] = [history, git, worktrees, prs, palette, broadcast, templates, updater, exportImport, tickets, settings, onboarding, teamConfig, team, layout, chat, perfiles, help, report, sound, moveAccount, permissions, dictado, celular, avisos, regiones, diagnostico]

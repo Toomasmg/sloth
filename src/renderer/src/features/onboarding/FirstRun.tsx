@@ -6,6 +6,7 @@ import { useVisiblePolling } from '../../visibility'
 import { setBoardOpen } from '../tickets/model'
 import { setTeamOpen } from '../team/model'
 import { openHelp } from '../help/bus'
+import { openSettings } from '../settings/bus'
 import { applyTeamSettings, cleanMsg, importTeam, repoName, scanTeams, settingsText, type ImportPlan, type TeamStatus } from '../team-config/store'
 import { closeAllViews } from '../../ui/view-stack'
 import { Button, EmptyState, IconButton, InlineAlert, Input, Switch } from '../../ui'
@@ -458,6 +459,12 @@ export function FirstRun({ embedded = false }: { embedded?: boolean }): React.JS
               <TeamIcon size={14} /> Sumar a tu equipo
             </span>
             <span className="fr-card-sub">PRs, tickets y chat compartidos</span>
+          </button>
+          <button type="button" className="fr-card" onClick={() => openSettings('perfiles')}>
+            <span className="fr-card-title">
+              <AccountIcon size={14} /> Separar en perfiles
+            </span>
+            <span className="fr-card-sub">Trabajo y personal, cada uno con lo suyo</span>
           </button>
           <button type="button" className="fr-card" onClick={() => openHelp('shortcuts')}>
             <span className="fr-card-title">
