@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { Account, AccountStatus } from '../shared/types'
 import { raizDatos } from './perfil'
+import { proveedorDe } from './proveedores'
 
 export function accountsRoot(): string {
   return join(raizDatos(), 'accounts')
@@ -11,7 +12,7 @@ export function accountsRoot(): string {
 /** Cada cuenta vive en su propia carpeta: es el CLAUDE_CONFIG_DIR de esa cuenta. */
 export function createAccount(label: string): Account {
   const id = randomUUID()
-  const configDir = join(accountsRoot(), id, 'claude')
+  const configDir = join(accountsRoot(), id, proveedorDe({}).subcarpetaCuenta)
   mkdirSync(configDir, { recursive: true })
   return { id, label: label.trim() || 'Cuenta', configDir, createdAt: Date.now() }
 }
@@ -31,7 +32,7 @@ function readJson(path: string): unknown {
 export function accountStatus(account: Account): AccountStatus {
   const configDirExists = existsSync(account.configDir)
   if (!configDirExists) return { loggedIn: false, configDirExists }
-  const meta = readJson(join(account.configDir, '.claude.json')) as
+  const meta = readJson(join(account.configDir, proveedorDe(account).archivoMeta)) as
     | { oauthAccount?: { emailAddress?: string; accountUuid?: string } }
     | undefined
   const email = meta?.oauthAccount?.emailAddress
