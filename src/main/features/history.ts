@@ -3,6 +3,7 @@ import { existsSync, lstatSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import { currentSettings } from './settings'
+import { capacidadesDe, motivoSinCapacidad } from '../../shared/proveedores'
 import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
 import {
   listRecentSessions,
@@ -89,7 +90,7 @@ function register(ctx: FeatureContext): void {
     ctx.store.workspaces.filter((w) => w.accountId === accountId && (samePath(w.cwd, cwd) || samePath(w.repoPath, cwd)))
 
   const accountsForScan = (): { id: string; label: string; configDir: string }[] =>
-    ctx.store.accounts.map((a) => ({ id: a.id, label: a.label, configDir: a.configDir }))
+    ctx.store.accounts.filter((a) => capacidadesDe(a)?.historial).map((a) => ({ id: a.id, label: a.label, configDir: a.configDir }))
 
   /** Fila de la lista: agrega el espacio de Sloth que usa esa carpeta. */
   const rowOf = (f: SessionFile, p: ParsedSession): SessionRow | null => {
@@ -119,6 +120,8 @@ function register(ctx: FeatureContext): void {
   const findFile = async (accountId: string, sessionId: string): Promise<SessionFile> => {
     const acc = ctx.store.account(accountId)
     if (!acc) throw new Error('Esa cuenta ya no existe en Sloth.')
+    const motivo = motivoSinCapacidad(acc, 'historial')
+    if (motivo) throw new Error(motivo)
     const files = await listSessions([{ id: acc.id, label: acc.label, configDir: acc.configDir }])
     const f = files.find((x) => x.sessionId === sessionId)
     if (!f) throw new Error('No encontré esa conversación en la carpeta de la cuenta.')
@@ -284,6 +287,8 @@ function register(ctx: FeatureContext): void {
     if (!a.cwd || a.cwd.length > 1000) throw new Error('Carpeta inválida.')
     const acc = ctx.store.account(a.accountId)
     if (!acc) throw new Error('Esa cuenta ya no existe en Sloth.')
+    const motivo = motivoSinCapacidad(acc, 'historial')
+    if (motivo) throw new Error(motivo)
     const cwd = a.cwd
     if (!existsSync(cwd) || !statSync(cwd).isDirectory()) throw new Error(`La carpeta ${cwd} ya no existe: no se puede retomar ahí.`)
     // Claude busca la conversación en projects/<slug del cwd>: tiene que estar ahí.

@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import type { Feature, FeatureContext } from './context'
 import { accountStatus } from '../accounts'
+import { motivoSinCapacidad } from '../../shared/proveedores'
 import { changeCount } from './git-ops'
 import { buildSummary, copyConversation, latestSession, projectDirOf, sanitizeSummary, UUID_RE } from './move-account-core'
 
@@ -70,6 +71,7 @@ function register(ctx: FeatureContext): void {
     if (!isId(wsId)) throw new Error('Espacio inválido.')
     const ws = ctx.store.workspace(wsId)
     if (!ws) throw new Error('Ese espacio ya no existe.')
+    sinMover(ctx, ws.accountId)
     const changes = (await changeCount(ws.cwd)) ?? -1
     return { text: buildSummary({ name: ws.name, cwd: ws.cwd, branch: ws.branch ?? null, changes }) }
   })
@@ -79,6 +81,7 @@ function register(ctx: FeatureContext): void {
     if (!isId(wsId)) throw new Error('Espacio inválido.')
     const ws = ctx.store.workspace(wsId)
     if (!ws) throw new Error('Ese espacio ya no existe.')
+    sinMover(ctx, ws.accountId)
     const acc = ctx.store.account(ws.accountId)
     const session = acc ? await latestSession(projectDirOf(acc.configDir, ws.cwd)) : undefined
     return { hasConversation: session !== undefined }
@@ -96,6 +99,8 @@ function register(ctx: FeatureContext): void {
     const to = ctx.store.account(targetAccountId)
     if (!to) throw new Error('Esa cuenta ya no existe.')
     if (to.id === ws.accountId) throw new Error('El espacio ya usa esa cuenta.')
+    sinMover(ctx, ws.accountId)
+    sinMover(ctx, to.id)
     if (!existsSync(to.configDir)) throw new Error(`Falta la carpeta de la cuenta «${to.label}».`)
     if (!accountStatus(to).loggedIn) throw new Error(`La cuenta «${to.label}» no tiene sesión iniciada.`)
     if (moving.has(ws.id)) throw new Error('Ese espacio ya se está moviendo.')
@@ -109,6 +114,13 @@ function register(ctx: FeatureContext): void {
       moving.delete(ws.id)
     }
   })
+}
+
+/** Mover copia y retoma conversaciones de Claude: si la cuenta es de otro agente, se rechaza. */
+function sinMover(ctx: FeatureContext, accountId: string): void {
+  const acc = ctx.store.account(accountId)
+  const motivo = acc ? motivoSinCapacidad(acc, 'moverCuenta') : undefined
+  if (motivo) throw new Error(motivo)
 }
 
 async function move(ctx: FeatureContext, wsId: string, toId: string, text: string | null, keepConversation: boolean): Promise<MoveResult> {

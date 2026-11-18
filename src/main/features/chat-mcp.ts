@@ -12,6 +12,7 @@ import { crearAtencion } from './chat-mcp-atencion'
 import { argsAlta, argsBaja, leerRegistro, MCP_SCRIPT_NAME, planificar, type Registro } from './chat-mcp-registro'
 import { CHAT_MCP_SCRIPT } from './chat-mcp-script'
 import { AVISO_PROVEEDOR_DESCONOCIDO, proveedorDe } from '../proveedores'
+import { nombreProveedor } from '../../shared/proveedores'
 import { hayNode, writeIfChanged } from '../hooks'
 import { escribirJsonAtomico } from '../json-file'
 import { carpetaFeatures, raizDatos } from '../perfil'
@@ -149,6 +150,8 @@ export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispo
     }
     const p = proveedorDe(acc)
     if (!p) return set('error', AVISO_PROVEEDOR_DESCONOCIDO)
+    // Registrar el MCP es escribir el .claude.json de la cuenta: con otro agente no se toca nada.
+    if (!p.capacidades.chatMcp) return set('error', `Esta cuenta es de ${nombreProveedor(acc)}: el chat con MCP todavía no está disponible.`)
     const quiere = !baja && debeRegistrar(cfg, acc.id, existentes())
     if (!quiere && invalidarToken(acc.id)) save()
     if (!existsSync(acc.configDir)) return set('error', 'Falta la carpeta de la cuenta.')

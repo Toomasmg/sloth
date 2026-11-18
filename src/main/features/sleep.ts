@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import type { HookEventPayload } from '../hooks'
 import { currentSettings } from './settings'
+import { capacidadesDe } from '../../shared/proveedores'
 import { featuresDir } from './tray-settings'
 import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
 import { podarSegunStore } from '../poda'
@@ -106,6 +107,9 @@ const feature: Feature = {
       if (!b) return
       const now = Date.now()
       for (const ws of ctx.store.workspaces) {
+        // Dormir se apoya en los hooks y en `claude --continue`: otro agente nunca se duerme.
+        const acc = ctx.store.account(ws.accountId)
+        if (acc && !capacidadesDe(acc)?.dormir) continue
         if (!canSleep(ws.id, now, afterMs)) continue
         asleep.add(ws.id)
         save()
