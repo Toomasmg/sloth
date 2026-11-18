@@ -77,14 +77,11 @@ test('la duración admite la tolerancia y no más', () => {
   assert.equal(fuera.cincoHoras, null)
 })
 
-test('el porcentaje se acota a 0-100 y uno no finito descarta la ventana', () => {
-  const r = limitesDeResultado(
-    { rateLimits: { primary: { ...cinco, usedPercent: 150 }, secondary: { ...semana, usedPercent: -3 } } },
-    AHORA
-  )
+test('un porcentaje fuera de 0-100 o no finito descarta la ventana, y los bordes valen', () => {
+  const r = limitesDeResultado({ rateLimits: { primary: { ...cinco, usedPercent: 100 }, secondary: { ...semana, usedPercent: 0 } } }, AHORA)
   assert.equal(r.cincoHoras?.pct, 100)
   assert.equal(r.semana?.pct, 0)
-  for (const malo of [Number.NaN, Infinity, '40', null, undefined]) {
+  for (const malo of [150, 100.5, -3, Number.NaN, Infinity, '40', null, undefined]) {
     const x = limitesDeResultado({ rateLimits: { primary: { ...cinco, usedPercent: malo }, secondary: null } }, AHORA)
     assert.equal(x.cincoHoras, null)
   }
@@ -95,6 +92,16 @@ test('una ventana con el reinicio vencido es null', () => {
   const r = limitesDeResultado({ rateLimits: { primary: { ...cinco, resetsAt: vencido }, secondary: semana } }, AHORA)
   assert.equal(r.cincoHoras, null)
   assert.equal(r.semana?.pct, 12)
+})
+
+test('un reinicio con otra unidad se descarta: segundos relativos, microsegundos o demasiado lejos', () => {
+  const con = (resetsAt: number) => limitesDeResultado({ rateLimits: { primary: { ...cinco, resetsAt }, secondary: null } }, AHORA).cincoHoras
+  assert.equal(con(3600), null)
+  assert.equal(con(1.7e15), null)
+  assert.equal(con(AHORA + 6 * 3_600_000), null)
+  assert.equal(con(Math.floor((AHORA + 6 * 3_600_000) / 1000)), null)
+  assert.equal(con(Math.floor((AHORA + 5.4 * 3_600_000) / 1000))?.pct, 37)
+  assert.equal(con(AHORA + 1)?.pct, 37)
 })
 
 test('si rateLimits no sirve, prueba el bucket codex de rateLimitsByLimitId', () => {

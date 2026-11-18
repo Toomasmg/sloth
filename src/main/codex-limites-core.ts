@@ -13,6 +13,7 @@ const CINCO_HORAS_MIN = 300
 const SEMANA_MIN = 10080
 const TOLERANCIA_CINCO_HORAS = 5
 const TOLERANCIA_SEMANA = 60
+const MARGEN_REINICIO = 1.1
 
 export function lineaInicializar(): string {
   return JSON.stringify({ id: ID_INICIALIZAR, method: 'initialize', params: { clientInfo: { name: 'sloth', version: '1' } } })
@@ -69,10 +70,15 @@ function leerVentana(raw: unknown, ahora: number): Ventana | null {
   const minutos = primero(raw, 'windowDurationMins', 'window_duration_mins')
   if (typeof usado !== 'number' || !Number.isFinite(usado)) return null
   if (typeof minutos !== 'number' || !Number.isFinite(minutos)) return null
+  // Sin dato antes que dato falso: un porcentaje fuera de 0-100 no es de fiar.
+  if (usado < 0 || usado > 100) return null
   const reiniciaEn = aMs(primero(raw, 'resetsAt', 'resets_at'))
-  // Con el reinicio vencido el porcentaje es de la ventana anterior: mejor «sin dato» que un número viejo.
-  if (reiniciaEn !== null && reiniciaEn <= ahora) return null
-  return { minutos, ventana: { pct: Math.max(0, Math.min(100, usado)), reiniciaEn } }
+  if (reiniciaEn !== null) {
+    // Con el reinicio vencido el porcentaje es de la ventana anterior. Uno más lejano que la propia ventana
+    // (con un margen) es una unidad mal interpretada: segundos relativos o microsegundos darían fechas absurdas.
+    if (reiniciaEn <= ahora || reiniciaEn > ahora + minutos * 60_000 * MARGEN_REINICIO) return null
+  }
+  return { minutos, ventana: { pct: usado, reiniciaEn } }
 }
 
 function ventanasDe(snapshot: unknown, ahora: number): { cincoHoras: VentanaLimite | null; semana: VentanaLimite | null } {
