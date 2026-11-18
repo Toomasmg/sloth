@@ -75,6 +75,8 @@ export interface ExportDoc {
   formatoVersion: number
   versión: string
   exportado: string
+  /** Solo el nombre del perfil de origen, para que quien recibe el archivo sepa de dónde viene. */
+  perfil?: string
   cuentas?: ExportedAccount[]
   espacios?: ExportedSpace[]
   plantillas?: ExportedTemplate[]

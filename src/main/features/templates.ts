@@ -1,4 +1,3 @@
-import { app } from 'electron'
 import { readFileSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
@@ -6,6 +5,7 @@ import { accountStatus } from '../accounts'
 import { buildInput, pickSuggested, SUGGESTED, TemplateFile, type Template } from './templates-core'
 import { gitRaw, isDir, normPath } from './git-run'
 import type { UsageTotals } from '../../shared/types'
+import { carpetaFeatures } from '../perfil'
 
 /**
  * Función «templates»: plantillas de espacio en userData/features/templates.json.
@@ -24,7 +24,7 @@ const tot = (t?: UsageTotals): number => (t ? t.input + t.output + t.cacheWrite 
 function teamIds(): Set<string> {
   const ids = new Set<string>()
   try {
-    const raw = JSON.parse(readFileSync(join(app.getPath('userData'), 'features', 'team-config.json'), 'utf8').replace(/^﻿/, '')) as {
+    const raw = JSON.parse(readFileSync(join(carpetaFeatures(), 'team-config.json'), 'utf8').replace(/^﻿/, '')) as {
       teams?: Record<string, { mapping?: Record<string, unknown> }>
     }
     for (const e of Object.values(raw.teams ?? {})) for (const v of Object.values(e?.mapping ?? {})) if (typeof v === 'string') ids.add(v)
@@ -129,7 +129,7 @@ async function resolveAccount(ctx: FeatureContext, t: Template): Promise<string>
 const feature: Feature = {
   name: 'templates',
   register(ctx) {
-    file = new TemplateFile(join(app.getPath('userData'), 'features', 'templates.json'))
+    file = new TemplateFile(join(carpetaFeatures(), 'templates.json'))
     const f = file
     const accountIds = (): Set<string> => new Set(ctx.store.accounts.map((a) => a.id))
     const view = (): { list: (Template & { team: boolean })[]; defaultId: string | null } => {

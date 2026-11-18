@@ -15,13 +15,14 @@ import {
   type ThemeChoice
 } from './settings-model'
 import { SURFACE } from '../../shared/surfaces'
+import { carpetaFeatures } from '../perfil'
 
 /**
  * Función «settings» (lado main): guarda la Configuración en userData/features/settings.json,
  * la valida y avisa a la interfaz con `feat:settings:changed`. También aplica lo que es de main:
  * tema nativo (barra de título, diálogos) y «abrir al iniciar Windows».
  */
-const file = (): string => join(app.getPath('userData'), 'features', 'settings.json')
+const file = (): string => join(carpetaFeatures(), 'settings.json')
 
 const VERSION_SETTINGS = 1
 

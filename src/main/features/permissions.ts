@@ -1,4 +1,4 @@
-import { app, Notification, type BrowserWindow } from 'electron'
+import { Notification, type BrowserWindow } from 'electron'
 import { lstatSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -23,6 +23,7 @@ import {
   type PermissionRule
 } from './permissions-core'
 import { dentroDelRepoReal, type PathFs } from './permissions-paths'
+import { carpetaFeatures } from '../perfil'
 
 /**
  * Función «permissions» (lado main): pedidos de permiso de Claude, reglas «Permitir siempre» por
@@ -56,7 +57,7 @@ const MAX_MESSAGE = 1000
 /** Tope de reglas que acepta una importación de una vez (el archivo ya viene acotado). */
 const MAX_IMPORT = 500
 
-const file = (): string => join(app.getPath('userData'), 'features', 'permissions.json')
+const file = (): string => join(carpetaFeatures(), 'permissions.json')
 
 /** Lectura tolerante: las entradas que no se entienden se descartan; un archivo ilegible se aparta. */
 function load(): State {

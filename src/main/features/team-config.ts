@@ -1,4 +1,4 @@
-import { app, shell } from 'electron'
+import { shell } from 'electron'
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
@@ -15,6 +15,7 @@ import {
   type TeamLink,
   type TeamSettings
 } from './team-config-core'
+import { carpetaFeatures } from '../perfil'
 
 /**
  * Función «team-config»: configuración compartida en `<repo>/.sloth/team.json` (solo lectura,
@@ -66,7 +67,7 @@ export interface TeamStatus {
   avisos?: string[]
 }
 
-const featuresDir = (): string => join(app.getPath('userData'), 'features')
+const featuresDir = (): string => carpetaFeatures()
 const stateFile = (): string => join(featuresDir(), 'team-config.json')
 const templatesFile = (): string => join(featuresDir(), 'templates.json')
 

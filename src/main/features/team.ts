@@ -1,4 +1,4 @@
-import { app, shell } from 'electron'
+import { shell } from 'electron'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
@@ -6,6 +6,7 @@ import { buildPeople, LOGIN_RE, NADIE, PR_URL_RE, personasDe, ticketsActivos, ty
 import { adoptarLegado, avisoSoloLectura, cargarTeam, mappingDe, type MotivoSoloLectura, type TeamState } from './team-estado'
 import { fetchGithub } from './team-github'
 import { alCambiarTickets, ticketsParaEquipo, type TicketsParaEquipo } from './tickets'
+import { carpetaFeatures } from '../perfil'
 
 /**
  * Vista «Equipo»: en qué anda cada uno, sin servidor propio. GitHub (gh, solo lectura) se pide al
@@ -67,7 +68,7 @@ function load(): TeamState {
 
 function save(): void {
   if (soloLectura) return
-  mkdirSync(join(app.getPath('userData'), 'features'), { recursive: true })
+  mkdirSync(carpetaFeatures(), { recursive: true })
   escribir(file, JSON.stringify(state, null, 2))
 }
 
@@ -179,7 +180,7 @@ const feature: Feature = {
   name: 'team',
   register(c) {
     ctx = c
-    file = join(app.getPath('userData'), 'features', 'team.json')
+    file = join(carpetaFeatures(), 'team.json')
     state = load()
     offTickets = alCambiarTickets(() => ctx.emit('changed', snapshot()))
     c.handle('state', () => snapshot())

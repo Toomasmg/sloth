@@ -7,6 +7,7 @@ import { NAV, navOf, normalizeTab, searchSettings } from './search'
 import { updateSettings, type SettingsPatch } from './store'
 import { SaveContext, errText, type SaveFn } from './ui'
 import { AboutSection, AccountsSection, AppearanceSection, BackupSection, GeneralSection, NotificationsSection, ShortcutsSection, TeamSection, TemplatesSection, TerminalSection, TicketsSection, UpdatesSection } from './sections'
+import { PerfilesSection } from '../perfiles/PerfilesSection'
 
 interface Toast {
   text: string
@@ -119,6 +120,7 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
               <div className="f-set-body" role="region" aria-label={meta.name}>
                 {sec === 'general' && <GeneralSection />}
                 {sec === 'cuentas' && <AccountsSection onClose={onClose} adding={adding} setAdding={setAdding} />}
+                {sec === 'perfiles' && <PerfilesSection />}
                 {sec === 'apariencia' && <AppearanceSection />}
                 {sec === 'terminal' && <TerminalSection />}
                 {sec === 'atajos' && <ShortcutsSection />}

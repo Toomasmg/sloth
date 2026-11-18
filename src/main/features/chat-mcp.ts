@@ -1,4 +1,3 @@
-import { app } from 'electron'
 import { execFile } from 'node:child_process'
 import { createServer, type Server, type Socket } from 'node:net'
 import { chmodSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
@@ -15,6 +14,7 @@ import { CHAT_MCP_SCRIPT } from './chat-mcp-script'
 import { resolveClaudeExe } from './tickets/claude-run'
 import { hayNode, writeIfChanged } from '../hooks'
 import { escribirJsonAtomico } from '../json-file'
+import { carpetaFeatures, raizDatos } from '../perfil'
 
 export interface ChatMcpDeps {
   data: ChatData
@@ -63,10 +63,10 @@ function correrClaude(exe: string, args: string[], configDir: string): Promise<v
  * registro con el CLI de Claude Code. Los canales quedan en la función «chat» (feat:chat:mcp*).
  */
 export function registerChatMcp(ctx: FeatureContext, deps: ChatMcpDeps): { dispose(): Promise<void> } {
-  const userData = app.getPath('userData')
+  const userData = raizDatos()
   const scriptPath = join(userData, MCP_SCRIPT_NAME)
   const infoPath = join(userData, 'chat-mcp.json')
-  const cfgPath = join(userData, 'features', 'chat-mcp.json')
+  const cfgPath = join(carpetaFeatures(), 'chat-mcp.json')
   const pipe = pipePath(userData)
 
   try {

@@ -25,6 +25,7 @@ import {
   type SessionInfo,
   type SessionRow
 } from './history-core'
+import { carpetaFeatures } from '../perfil'
 
 /**
  * Función «history» (lado main): historial de conversaciones de Claude de cada cuenta, leído de sus
@@ -41,7 +42,7 @@ const projectSlug = (cwd: string): string => cwd.replace(/[^A-Za-z0-9]/g, '-')
 const samePath = (a: string, b: string): boolean =>
   resolve(a).replace(/[\\/]+$/, '').toLowerCase() === resolve(b).replace(/[\\/]+$/, '').toLowerCase()
 
-const prefsFile = (): string => join(app.getPath('userData'), 'features', 'history.json')
+const prefsFile = (): string => join(carpetaFeatures(), 'history.json')
 
 function readPrefs(): HistoryPrefs {
   return leerJson(prefsFile(), {
