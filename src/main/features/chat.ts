@@ -2,12 +2,13 @@ import { app, clipboard, Notification, safeStorage, shell, type BrowserWindow } 
 import { join } from 'node:path'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Feature, FeatureContext } from './context'
-import type { ChatAuth, ChatConfigView, ChatInviteJoin, ChatInvitePreview, ChatInviteResult, ChatProfile, ChatSnapshot, ChatTeam } from '../../shared/chat'
+import type { ChatAuth, ChatCheck, ChatConfigView, ChatInviteJoin, ChatInvitePreview, ChatInviteResult, ChatProfile, ChatSnapshot, ChatTeam } from '../../shared/chat'
 import { CHAT_CALLBACK_PATH, CHAT_CALLBACK_PORTS } from '../../shared/chat'
 import { hostNoSupabase, inviteConfirmation } from '../../shared/chat-text'
 import { keyHash, keyPreview, parseChatServerConfig, type ChatServerConfig } from './chat-config'
 import { createSessionStore, type SessionStore } from './chat-session'
 import { githubEnSettings, startGithubLogin, type GithubLogin } from './chat-auth'
+import { validarChat } from './chat-validar'
 import { readTeamConfig, repoKey } from './team-config-core'
 import { registerChatData, type ChatData, type ChatCoreHandle } from './chat-data'
 import { buildInvitation, decideInvite, looksLikeInvitation, parseInvitation, type ChatInvitation } from './chat-invite'
@@ -561,6 +562,23 @@ const feature: Feature = {
     }
 
     ctx.handle('test', (): Promise<ChatTestResult> => testConnection())
+
+    // Con la clave pública y solo lectura: no toca la config guardada ni emite snapshot. Una corrida a la vez.
+    let validando: { id: string; p: Promise<ChatCheck[]> } | undefined
+    ctx.handle('validate', (): Promise<ChatCheck[]> => {
+      refresh()
+      if (!active) {
+        return Promise.resolve([{ id: 'config', estado: 'fallo', titulo: 'Sin configuración', detalle: 'Primero guardá la URL y la clave publicable del proyecto.' }])
+      }
+      const id = `${active.id}|${active.cfg.supabaseUrl}|${active.cfg.anonKey}`
+      if (validando?.id !== id) {
+        const p: Promise<ChatCheck[]> = validarChat({ supabaseUrl: active.cfg.supabaseUrl, anonKey: active.cfg.anonKey, fetch }).finally(() => {
+          if (validando?.p === p) validando = undefined
+        })
+        validando = { id, p }
+      }
+      return validando.p
+    })
     ctx.handle('previewInvite', (text: unknown): ChatInvitePreview => inviteState(parseInvitation(text)))
     ctx.handle('joinInvite', (text: unknown, confirmed: unknown): Promise<ChatInviteJoin> => joinInvite(text, confirmed))
     ctx.handle('clipboardInvite', (): string | null => {

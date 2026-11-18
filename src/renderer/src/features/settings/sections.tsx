@@ -8,7 +8,7 @@ import { loginPaneId, type Account, type AgenteDisponible } from '../../../../sh
 import { capacidadesDe, motivoSinCapacidad, nombreProveedor, proveedorIdDe } from '../../../../shared/proveedores'
 import { TITULO_LIMITES, filasLimites, formularioCuenta, textoSinLimites } from './agente-form'
 import type { LecturaLimitesCodex } from '../../../../shared/celular'
-import type { ChatConfigView, ChatSnapshot } from '../../../../shared/chat'
+import type { ChatCheck, ChatCheckEstado, ChatConfigView, ChatSnapshot } from '../../../../shared/chat'
 import { esHostSupabase } from '../../../../shared/chat-text'
 import { SHORTCUT_ACTIONS, bindingOf, comboFromEvent, findConflict, keyTokenOf, setShortcutCapture, type ShortcutAction } from '../../shortcuts'
 import { openReport } from '../report/bus'
@@ -882,6 +882,16 @@ export function NotificationsSection({ onClose }: { onClose(): void }): React.JS
 
 /* ---------- Equipo y chat ---------- */
 
+const CHECK_ICONO: Record<ChatCheckEstado, string> = { ok: '✔', fallo: '✖', aviso: '!', 'sin-datos': '?' }
+const CHECK_ETIQUETA: Record<ChatCheckEstado, string> = { ok: 'Bien', fallo: 'Falló', aviso: 'Atención', 'sin-datos': 'Sin datos' }
+
+function resumenChecks(checks: ChatCheck[]): string {
+  const n = (e: ChatCheckEstado): number => checks.filter((c) => c.estado === e).length
+  const fallos = checks.filter((c) => c.estado === 'fallo').map((c) => c.titulo)
+  const partes = [`${n('ok')} bien`, `${n('aviso')} con atención`, `${fallos.length} falló${fallos.length ? `: ${fallos.join(', ')}` : ''}`]
+  return `Revisión: ${partes.join(', ')}.`
+}
+
 export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element {
   const ui = useUi()
   const [snap, setSnap] = useState<ChatSnapshot | null>(null)
@@ -895,20 +905,24 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
   const [confirmDel, setConfirmDel] = useState(false)
   const [tried, setTried] = useState(false)
   const [testRes, setTestRes] = useState<{ ok: boolean; text: string } | null>(null)
+  const [checks, setChecks] = useState<ChatCheck[] | null>(null)
+  const [checksFailed, setChecksFailed] = useState(false)
 
-  /** Consulta real a Supabase con la configuración guardada (feat:chat:test, con 8 s de tope). */
+  /** Consulta real a Supabase con la configuración guardada (feat:chat:test) más la revisión de solo lectura (feat:chat:validate). */
   const runTest = (): void => {
     setTesting(true)
     setTestRes(null)
-    ui.invoke<{ ok: boolean; message: string }>('feat:chat:test')
-      .then(
-        (r) => setTestRes({ ok: r.ok, text: r.message }),
-        (e) => setTestRes({ ok: false, text: errText(e) })
-      )
-      .finally(() => {
-        setTesting(false)
-        void reloadState()
-      })
+    setChecks(null)
+    setChecksFailed(false)
+    const revision = ui.invoke<ChatCheck[]>('feat:chat:validate').then(setChecks, () => setChecksFailed(true))
+    const prueba = ui.invoke<{ ok: boolean; message: string }>('feat:chat:test').then(
+      (r) => setTestRes({ ok: r.ok, text: r.message }),
+      (e) => setTestRes({ ok: false, text: errText(e) })
+    )
+    void Promise.all([prueba, revision]).finally(() => {
+      setTesting(false)
+      void reloadState()
+    })
   }
 
   const loadCfg = useCallback(
@@ -1040,6 +1054,33 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
         <p className={testRes.ok ? 'f-set-ok' : 'form-error'} role={testRes.ok ? 'status' : 'alert'}>
           {testRes.text}
         </p>
+      )}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {checksFailed ? 'No se pudo revisar el servidor.' : checks ? resumenChecks(checks) : ''}
+      </div>
+      {(checks || checksFailed) && (
+        <div>
+          {checksFailed && <p className="form-error">No se pudo revisar el servidor.</p>}
+          {checks && (
+            <ul className="f-set-checks" aria-label="Chequeos del servidor">
+              {checks.map((c) => (
+                <li key={c.id} className={`f-set-check ${c.estado}`}>
+                  <span className="f-set-check-ico" aria-hidden="true">
+                    {CHECK_ICONO[c.estado]}
+                  </span>
+                  <div>
+                    <div>
+                      <span className="sr-only">{CHECK_ETIQUETA[c.estado]}: </span>
+                      {c.titulo}
+                    </div>
+                    <div className="f-set-hint">{c.detalle}</div>
+                    {c.accion && <div className="f-set-hint">{c.accion}</div>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       {offered && (
@@ -1333,10 +1374,14 @@ export function AboutSection({ onClose }: { onClose(): void }): React.JSX.Elemen
           <a className="btn sm" href="https://github.com/Toomasmg/sloth" target="_blank" rel="noreferrer">
             Repositorio
           </a>
+          <a className="btn sm" href="https://github.com/Toomasmg/sloth/blob/main/PRIVACY.md" target="_blank" rel="noreferrer">
+            Privacidad
+          </a>
           <Button size="sm" onClick={go(() => openReport())}>
             Reportar un problema
           </Button>
         </div>
+        <div className="f-set-hint">Sin telemetría. Sloth busca actualizaciones en GitHub por su cuenta; el resto (chat, celu, ntfy) sale solo si lo activás.</div>
       </div>
       <Group id="g-mas" title="Más">
         <ToggleLikeButton title="Novedades" hint="Qué cambió en la última versión de Sloth." onClick={go(() => openHelp('whatsnew'))} />

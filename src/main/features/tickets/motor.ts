@@ -18,7 +18,7 @@ import {
   type Ticket,
   type Yo
 } from '../../../shared/tickets'
-import { ACCIONES_GH, ID_MAX, ID_SEGURO_RE, nombreCompleto, PERSONA_POR_DEFECTO, regexDeId, regexDePersona, type ArgValor, type ConectorDef, type ConectorMcp } from './conector'
+import { ACCIONES_GH, ID_MAX, ID_SEGURO_RE, idNormalizado, nombreCompleto, PERSONA_POR_DEFECTO, regexDeId, regexDePersona, type ArgValor, type ConectorDef, type ConectorMcp } from './conector'
 import { costoValido, VUELTAS_DEFECTO, vueltasValidas } from './uso'
 
 const MAX_TICKETS = 250
@@ -219,22 +219,21 @@ export const estadosPorDefecto = (def: ConectorDef): Estado[] => def.estados.fil
 export const conCategoria = (def: ConectorDef, estados: EstadoBase[]): Estado[] =>
   estados.map((e) => ({ clave: e.clave, nombre: e.nombre, categoria: categoriaDe(e.clave, def.estados) }))
 
-/** El id normalizado si es válido para el conector; si no, null. */
-export function idValido(def: ConectorDef, v: unknown): string | null {
-  if (typeof v !== 'string') return null
-  const s = def.idMayusculas ? v.trim().toUpperCase() : v.trim()
-  return s.length <= ID_MAX && ID_SEGURO_RE.test(s) && regexDeId(def).test(s) ? s : null
-}
+/** Sin conector no hay forma de id que pedir: letras, números y _ . -. */
+const ID_LIBRE = '^[A-Za-z0-9_.-]{1,20}$'
 
-/** La skill `/ticket` es propia de un solo conector (gruv): solo ese arranca el espacio con ella. */
-export const usaComandoTicket = (def: ConectorDef): boolean => def.id === 'gruv'
+/** El id normalizado si es válido para el conector; si no, null. */
+export const idValido = (def: ConectorDef, v: unknown): string | null => idNormalizado(def, v)
+
+/** El comando con el que arranca el espacio de un ticket; solo lo tienen los conectores que lo declaran (gruv, con `/ticket`). */
+export const comandoDeTicket = (def: ConectorDef): string | null => def.comandoTicket ?? null
 
 export const leeDetalle = (def: ConectorDef): boolean => def.via === 'gh' || def.herramientas.detalle.length > 0
 
 /** `soloLectura`: un incluido sin probar se puede leer pero no ofrece acciones. */
 export function info(def: ConectorDef | undefined, idPedido: string, soloLectura = false): ConectorInfo {
   if (!def)
-    return { id: idPedido, nombre: idPedido === SIN_CONECTOR ? 'Sin conector' : idPedido, verificado: false, via: 'mcp', disponible: false, acciones: [], leeDetalle: false, ejemploId: '', estados: [], comandoTicket: false }
+    return { id: idPedido, nombre: idPedido === SIN_CONECTOR ? 'Sin conector' : idPedido, verificado: false, via: 'mcp', disponible: false, acciones: [], leeDetalle: false, ejemploId: '', estados: [], comandoTicket: null, idRegex: ID_LIBRE, idMayusculas: false }
   return {
     id: def.id,
     nombre: def.nombre,
@@ -245,7 +244,9 @@ export function info(def: ConectorDef | undefined, idPedido: string, soloLectura
     leeDetalle: leeDetalle(def),
     ejemploId: def.ejemplo.id,
     estados: def.estados.map((e) => ({ ...e })),
-    comandoTicket: usaComandoTicket(def)
+    comandoTicket: comandoDeTicket(def),
+    idRegex: def.idRegex,
+    idMayusculas: def.idMayusculas
   }
 }
 

@@ -142,6 +142,8 @@ export interface HerramientasVista {
   acciones: Partial<Record<Accion, string[]>>
   escritura: Partial<Record<Accion, string>>
   negar: number
+  /** Lo que se escribe en la terminal al empezar un ticket (`<comando> <id>`); null si el conector no declara uno. */
+  comandoTicket: string | null
   pistas: PistasVista
 }
 
@@ -178,8 +180,11 @@ export interface ConectorInfo {
   ejemploId: string
   /** Los del conector, incluidos los de categoría 'hecho'. */
   estados: Estado[]
-  /** Si los espacios de sus tickets arrancan con `/ticket <id>` (la skill `/ticket` es propia de un solo conector: gruv). */
-  comandoTicket: boolean
+  /** El comando con el que arrancan los espacios de sus tickets (`<comando> <id>`); null si el conector no declara uno. */
+  comandoTicket: string | null
+  /** Forma del id de ticket del conector (anclada con ^…$) y si se normaliza a mayúsculas: para validar sin ir a main. */
+  idRegex: string
+  idMayusculas: boolean
 }
 
 export interface Corrida {

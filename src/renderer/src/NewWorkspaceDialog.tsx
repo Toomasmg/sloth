@@ -12,8 +12,9 @@ import { useTemplates, openDialog, peekPreselect, takePreselect, usesTicket, typ
 import { TEMPLATE_COLORS, colorHex } from './features/templates/catalog'
 import { setBoardOpen, useSnapshot } from './features/tickets/model'
 import { cuentaSugerida, nombreProveedor, proveedorIdDe } from '../../shared/proveedores'
+import { idParaComando } from '../../main/features/tickets/conector'
 import { ayudaPrimerMensaje } from '../../shared/primer-mensaje-texto'
-import { applyVars, folderLabel, missingVars, normTicketId, TEMPLATE_COLOR_KEYS, TICKET_RE, today, validBranch, type VarValues } from '../../shared/templates-shared'
+import { applyVars, folderLabel, missingVars, normTicketId, TEMPLATE_COLOR_KEYS, today, validBranch, type VarValues } from '../../shared/templates-shared'
 import './NewWorkspaceDialog.css'
 
 interface Props {
@@ -158,9 +159,10 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cur?.path, cur?.isGit])
 
-  // Si el conector usa la skill /ticket, el id tiene que tener la forma ABC-123.
-  const normId = normTicketId(ticket) ?? ''
-  const ticketId = tk?.conector.comandoTicket && !TICKET_RE.test(normId) ? '' : normId
+  // Si el conector arma el prompt con un comando, el id tiene que cumplir la forma del conector (la misma que valida el tablero)
+  // y además pasar normTicketId, que es lo que main exige antes de que llegue a la terminal.
+  const cmd = tk?.conector.comandoTicket
+  const ticketId = (cmd && tk ? idParaComando(tk.conector, ticket) : normTicketId(ticket)) ?? ''
   const ticketOk = ticketId !== ''
 
   // Valores de las variables (los que ya se conocen).
@@ -240,8 +242,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
             accountId,
             autoStartClaude: true,
             ticket: ticketId,
-            // La skill /ticket abre su propio worktree desde origin/staging.
-            initialPrompt: tk?.conector.comandoTicket ? `/ticket ${ticketId}` : undefined,
+            initialPrompt: cmd ? `${cmd} ${ticketId}` : undefined,
             resume: true,
             color: colorKey
           }
@@ -372,7 +373,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
         error={showErr('ticket')}
       />
       <span className="nw-hint">
-        {ticketMode ? (tk?.conector.comandoTicket ? `${agenteAcc} arranca con /ticket: tu skill se encarga del worktree, el PR y las horas.` : 'El id del ticket va en el nombre del espacio.') : 'Reemplaza {ticket} en el nombre, la rama y el primer mensaje.'}{' '}
+        {ticketMode ? (cmd ? `${agenteAcc} arranca con ${cmd} ${ticketId || (tk?.conector.ejemploId || 'ID')}.` : 'El id del ticket va en el nombre del espacio.') : 'Reemplaza {ticket} en el nombre, la rama y el primer mensaje.'}{' '}
         <button type="button" className="nw-link" onClick={openTickets}>
           {tk?.conector.disponible ? `Elegir de ${tk.conector.nombre}` : 'Elegir de la lista'}
         </button>

@@ -1,7 +1,7 @@
 import { ACCIONES, CATEGORIAS, type Accion, type Categoria } from '../../../../shared/tickets'
 import { PLACEHOLDERS } from '../../../../main/features/tickets/conector'
 import { pareceDeLectura } from '../../../../main/features/tickets/propios'
-import { ACCION_ETIQUETA, argsPorDefecto, FORMATOS, revisarId, type Borrador, type FormatoId, type Rol } from './borrador'
+import { ACCION_ETIQUETA, argsPorDefecto, FORMATOS, revisarComando, revisarId, type Borrador, type FormatoId, type Rol } from './borrador'
 import type { Cambiar } from './Asistente'
 import { Button, Input, Select } from '../../ui'
 
@@ -117,6 +117,7 @@ function AccionCampos({ a, b, cambiar }: { a: Accion; b: Borrador; cambiar: Camb
 
 export function PasoFormato({ b, cambiar }: { b: Borrador; cambiar: Cambiar }): React.JSX.Element {
   const problema = revisarId(b)
+  const problemaComando = revisarComando(b)
   const elegir = (f: FormatoId): void => cambiar((x) => ({ ...x, formato: f, ejemploId: f === 'propio' ? x.ejemploId : FORMATOS[f].ejemplo }))
   const setEstado = (i: number, cambio: Partial<Borrador['estados'][number]>): void =>
     cambiar((x) => ({ ...x, estados: x.estados.map((e, j) => (j === i ? { ...e, ...cambio } : e)) }))
@@ -148,6 +149,22 @@ export function PasoFormato({ b, cambiar }: { b: Borrador; cambiar: Cambiar }): 
         />
         <span id="f-tickets-asis-ejemplo" className={problema ? 'field-error' : 'field-help'}>
           {problema ?? 'Cumple el formato.'}
+        </span>
+      </label>
+
+      <label className="field">
+        <span>Comando para armar el prompt del ticket (opcional)</span>
+        <Input
+          value={b.comandoTicket ?? ''}
+          maxLength={40}
+          spellCheck={false}
+          placeholder="/ticket"
+          aria-invalid={Boolean(problemaComando)}
+          aria-describedby="f-tickets-asis-comando"
+          onChange={(e) => cambiar((x) => ({ ...x, comandoTicket: e.target.value }))}
+        />
+        <span id="f-tickets-asis-comando" className={problemaComando ? 'field-error' : 'field-help'}>
+          {problemaComando ?? 'Si tenés una skill o comando propio (p. ej. /ticket), Sloth lo manda con el id al abrir el espacio. Dejalo vacío para no usar ninguno.'}
         </span>
       </label>
 

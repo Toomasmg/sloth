@@ -4,7 +4,7 @@ import { cleanError } from '../../format'
 import { capacidadesDe, proveedorIdDe } from '../../../../shared/proveedores'
 import { PREFIJO_RE } from '../../../../main/features/tickets/conector'
 import type { Descubiertas } from '../../../../main/features/tickets/descubrir'
-import { borradorNuevo, conHerramientas, slugId, validarBorrador, type Borrador } from './borrador'
+import { borradorNuevo, conHerramientas, revisarComando, slugId, validarBorrador, type Borrador } from './borrador'
 import { PasoFormato, PasoHerramientas } from './AsistentePasos'
 import { setSnapshot, type Snapshot } from './model'
 import { Button, Input, Select, Textarea } from '../../ui'
@@ -132,7 +132,7 @@ export function Asistente({
           </Button>
         )}
         {paso < 4 ? (
-          <Button variant="primary" size="sm" onClick={siguiente} disabled={!b || (paso === 1 && (!nombre.trim() || !PREFIJO_RE.test(prefijo) || otroPrefijo))}>
+          <Button variant="primary" size="sm" onClick={siguiente} disabled={!b || (paso === 1 && (!nombre.trim() || !PREFIJO_RE.test(prefijo) || otroPrefijo)) || (paso === 3 && revisarComando(b) !== null)}>
             Siguiente
           </Button>
         ) : (

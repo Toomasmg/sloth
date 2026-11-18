@@ -139,9 +139,12 @@ export function Board(): React.JSX.Element {
   const porGh = snap?.conector.via === 'gh'
   const kindOf = (k?: string): ReturnType<typeof estadoKind> => estadoKind(categoriaDe(k, estados, snap?.conector.estados ?? []))
   const ticketTpls = tpls.filter(usesTicket)
-  // `/ticket` es una skill propia del conector (hoy solo gruv): si el conector no la usa,
-  // una plantilla que la usa solo vale si se llama como el conector, no como la primera que haya.
-  const sirveDeComodin = (x: TemplateLite): boolean => Boolean(snap?.conector.comandoTicket) || !/(^|\s)\/ticket\b/.test(x.initialPrompt ?? '')
+  // Una plantilla cuyo prompt arranca con un comando solo vale de comodín si es el del conector,
+  // no la primera que haya.
+  const sirveDeComodin = (x: TemplateLite): boolean => {
+    const p = (x.initialPrompt ?? '').trim()
+    return !p.startsWith('/') || p.split(/\s/)[0] === snap?.conector.comandoTicket
+  }
   const ticketTpl = ticketTpls.find((x) => x.name.toLowerCase().includes(n.toLowerCase())) ?? ticketTpls.find(sirveDeComodin)
   const estadoName = (k?: string): string => estados.find((e) => e.clave === k)?.nombre ?? (k ? k.replace(/_/g, ' ') : 'Sin estado')
   const wsOf = (t: Ticket): Workspace | undefined => {
@@ -263,7 +266,7 @@ export function Board(): React.JSX.Element {
     }
   }
 
-  /** «Empezar en Sloth»: con la plantilla de ticket si existe; si no, el flujo de siempre (`/ticket`). */
+  /** «Empezar en Sloth»: con la plantilla de ticket si existe; si no, el flujo del conector. */
   const start = async (t: Ticket): Promise<void> => {
     setErr(null)
     const ws = wsOf(t)

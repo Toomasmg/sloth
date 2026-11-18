@@ -5,7 +5,7 @@ import { validarConector, type ConectorMcp } from './conector'
 import { CONECTORES, conectorPorId } from './conectores'
 import { accionesSoportadas, buildAccionArgs, buildAccionPrompt, buildDetalleArgs, buildDetallePrompt, buildListaArgs, buildPrompt, type AccionInput } from './motor'
 
-const IDS = ['gruv', 'github', 'jira', 'linear', 'asana', 'notion', 'clickup', 'monday', 'azure-devops', 'gitlab', 'shortcut', 'youtrack']
+const IDS = ['github', 'jira', 'linear', 'gruv', 'asana', 'notion', 'clickup', 'monday', 'azure-devops', 'gitlab', 'shortcut', 'youtrack']
 
 function flag(args: string[], nombre: string): string[] {
   const v = args[args.indexOf(nombre) + 1]
@@ -34,10 +34,17 @@ test('el registro trae todos los presets, en orden y sin repetir', () => {
   for (const d of CONECTORES) assert.deepEqual(validarConector(d), d, d.id)
 })
 
+test('solo Gruv trae comandoTicket, y es /ticket', () => {
+  assert.deepEqual(
+    CONECTORES.filter((c) => c.comandoTicket !== undefined).map((c) => [c.id, c.comandoTicket]),
+    [['gruv', '/ticket']]
+  )
+})
+
 test('solo Gruv, GitHub y Jira están verificados', () => {
   assert.deepEqual(
     CONECTORES.filter((c) => c.verificado).map((c) => c.id),
-    ['gruv', 'github', 'jira']
+    ['github', 'jira', 'gruv']
   )
 })
 

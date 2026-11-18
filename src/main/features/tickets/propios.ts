@@ -278,6 +278,7 @@ export function vistaHerramientas(def: ConectorMcp): HerramientasVista {
     acciones: permisos.acciones,
     escritura: { ...h.escritura },
     negar: h.negar.length,
+    comandoTicket: def.comandoTicket ?? null,
     pistas: {
       yoConId: p.yo.conId,
       yoSinId: p.yo.sinId,
