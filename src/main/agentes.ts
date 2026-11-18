@@ -1,10 +1,14 @@
 import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import type { AgenteDisponible } from '../shared/types'
 import { NOMBRE_PROVEEDOR, PROVEEDORES_IDS } from '../shared/proveedores'
 import { versionCodexOk } from './codex-exe'
+import { hayPowerShell7, versionCopilotOk } from './copilot-exe'
 import { PROVEEDORES } from './proveedores'
 
 const TIMEOUT_MS = 5000
+
+const AVISO_POWERSHELL_7 = 'Copilot necesita PowerShell 7 en Windows: instalalo con «winget install Microsoft.PowerShell».'
 
 // cmd lee estos caracteres como sintaxis aun entre comillas: una ruta así no se ejecuta.
 const RUTA_CMD_RARA = /[%"&^!<>|\r\n]/
@@ -31,11 +35,21 @@ export async function detectarAgentes(): Promise<AgenteDisponible[]> {
       const p = PROVEEDORES[id]
       const exe = p.resolverExe()
       const base = { id, nombre: NOMBRE_PROVEEDOR[id], instalado: exe !== undefined, comoInstalar: p.comoInstalar }
-      if (id !== 'codex' || exe === undefined) return base
-      const salida = await salidaDeVersion(exe)
-      if (salida === undefined) return base
-      const { version, ok } = versionCodexOk(salida)
-      return { ...base, version, versionOk: ok }
+      if (exe === undefined) return base
+      if (id === 'codex') {
+        const salida = await salidaDeVersion(exe)
+        if (salida === undefined) return base
+        const { version, ok } = versionCodexOk(salida)
+        return { ...base, version, versionOk: ok }
+      }
+      if (id === 'copilot') {
+        const conAviso = hayPowerShell7(process.env, existsSync, process.platform) ? base : { ...base, aviso: AVISO_POWERSHELL_7 }
+        const salida = await salidaDeVersion(exe)
+        if (salida === undefined) return conAviso
+        const { version, ok } = versionCopilotOk(salida)
+        return { ...conAviso, version, versionOk: ok }
+      }
+      return base
     })
   )
 }
