@@ -2,7 +2,7 @@
 
 Banco: `npm run perf` (compila y corre `perf/listas.spec.ts` sobre `out/`, con datos sintéticos y carpetas `SLOTH_USER_DATA` temporales). Deja `perf/reporte.md` y `perf/reporte.json` (ignorados por git). `PERF_CV=1 npx playwright test -c perf/playwright.config.ts` repite todo con `content-visibility:auto` inyectado y escribe `perf/reporte-cv.*`. No corre en `npm test` ni en la CI.
 
-Máquina: AMD Ryzen 5 4600H, 12 hilos, 15 GB, Windows 11 (10.0.26300), 2026-11-18. Una corrida; el primer render y el re-render tienen ruido de decenas a cientos de ms entre corridas, así que las metas se apoyan en los nodos del DOM y en órdenes de magnitud.
+Máquina: AMD Ryzen 5 4600H, 12 hilos, 15 GB, Windows 11 (10.0.26300), 2026-11-18. Las tablas de la base («código actual») son de una sola corrida. Los tiempos varían mucho entre corridas y entre sesiones (el primer render del tablero de 2000 tarjetas dio de 343 a 1376 ms con el mismo código), así que desde E-4 los resultados se informan con mediana y rango de al menos 5 corridas, y las comparaciones entre sesiones distintas no son confiables. Los nodos del DOM, en cambio, son exactos.
 
 ## Chat (código actual, commit 2b2f229)
 
@@ -60,12 +60,56 @@ Otra corrida dio 9 ms en los tres casos. Sin el memo (solo el reloj) el re-rende
 
 Decisión: el chat no se virtualiza. Con el re-render por debajo de la meta de 25 ms y el DOM acotado a 300 mensajes por el tope `MAX_CACHED`, la ventana virtual agregaría riesgo (scroll anclado, mensajes en vivo mientras se mira historial, saltos a citas y búsqueda, selección, foco y lectores de pantalla) sin un beneficio medible. Las metas de `[data-mid]` < 100 y nodos < 1000 quedan sin aplicar al chat. Si se sube `MAX_CACHED` o se pagina más historial, se reevalúa con `lib/ventana-virtual.ts`, que ya existe con tests y lo usa el tablero en E-3.
 
-## Tablero después de E-3 (tarjeta en memo, ventana virtual con más de 100 tarjetas)
+## Resultados con la rama terminada (5 corridas de `npm run perf`, mediana y [mínimo-máximo])
 
-| N tarjetas | `.f-tickets-row` | nodos totales | primer render (ms) | desde el aviso (ms) | LoAF en el scroll | frame p95 (ms) |
+Corridas de la sesión de E-4 con el código final (misma máquina). Los tiempos de esta sesión salieron mucho más bajos que los de E-2 y E-3 (primer render del chat 135 ms contra 373 a 516 ms): la PC estaba menos cargada o con otro estado térmico, no se pudo determinar por qué. Lo que sigue vale para esa sesión; no prueba que las metas de tiempo se cumplan siempre.
+
+### Chat (sin ventana virtual: el DOM queda en 300 mensajes por `MAX_CACHED`)
+
+| N enviados | `[data-mid]` | nodos totales | primer render (ms) | re-render por evento (ms) | frame p95 (ms) | mutaciones/s en reposo |
 |---|---|---|---|---|---|---|
-| 50 | 50 (base 50) | 672 (base 672) | 399 (base 387 a 404) | 363 (base 361) | 2 (368 ms) | 215 (arranque en frío, como en la base) |
-| 500 | 12 (base 500) | 217 (base 6072) | 362 (base 559 a 768) | 221 (base 377) | 2 (268 ms) | 18.6 |
-| 2000 | 12 (base 2000) | 217 (base 24072) | 740 (corridas: 739, 783, 899, 1004, 1376; base 1874 a 2378) | 108 (base 1163) | 2 (311 ms; otras corridas 300, 429, 591; base 1328 a 1810) | 17.4 |
+| 200 | 200 | 1872 | 185 [137-247] | 15.8 [13.5-16.9] | 17.2 [17.0-18.4] | 0.8 |
+| 2000 | 300 | 2813 | 136 [129-204] | 15.1 [14.5-16.9] | 17.2 [17.0-17.3] | 0.8 |
+| 10000 | 300 | 2843 | 137 [123-194] | 15.1 [13.9-16.2] | 17.1 [17.0-17.2] | 0.4 a 0.8 |
 
-La columna «desde el aviso» es lo que tarda la UI desde que le llega `feat:tickets:changed` hasta pintar la primera tarjeta; el «primer render» del banco suma además lo que tarda el propio banco en mandar las 2000 tarjetas por CDP (unos 600 a 700 ms que el código no controla), por eso la meta de 600 ms se juzga con la primera. Con N <= 100 el DOM es idéntico al de antes (50: 672 nodos antes y después) y las capturas de `e2e/` no cambian. El scroll del banco baja de a 800 px por cuadro hasta el final, así que su duración depende de la altura total y no mejora.
+### Tablero
+
+| N tarjetas | `.f-tickets-row` | nodos totales | primer render del banco (ms) | desde el aviso (ms, complementaria) | LoAF acumulado en el scroll (ms) | frame p95 (ms) |
+|---|---|---|---|---|---|---|
+| 50 | 50 (idéntico a la base) | 672 (idéntico) | 333 [324-342] | 321 [311-328] | 84 [72-109] | 86 [77-101] |
+| 500 | 12 | 217 | 326 [308-342] | 245 [206-260] | 86 [77-178] | 18.0 [17.5-18.2] |
+| 2000 | 12 | 217 | 358 [344-449] | 61 [56-73] | 103 [81-156] | 17.8 [17.5-17.9] |
+
+El scroll completo del banco con 2000 tarjetas tarda 4024 ms [4004-4047], igual que la base (4111): baja de a 800 px por cuadro hasta el final, así que depende de la altura total y no mide nada de lo que mejoró.
+
+### Corridas anteriores del tablero de 2000 (E-3, mismo código salvo los arreglos de E-4)
+
+- Primer render del banco: 739, 783, 899, 1004 y 1376 ms (mediana 899, rango 739-1376). En E-3 se había puesto 740 en la tabla, que era la mejor.
+- LoAF acumulado: 311, 300, 429 y 591 ms (de las otras cuatro corridas no quedó registro).
+- «Desde el aviso»: 108 ms en la corrida que se publicó.
+
+## Qué metas se cumplen
+
+La meta de tiempo se fijó sobre el primer render del banco y sobre el LoAF, y no se cambió. Estado:
+
+| Meta (tablero N=2000 salvo que diga chat) | Resultado | ¿Cumplida? |
+|---|---|---|
+| Tarjetas en el DOM < 150 | 12 | Sí |
+| Nodos totales < 2500 | 217 | Sí |
+| Primer render del banco < 600 ms | E-4: 344-449 ms (5 de 5 cumplen). E-3: 739-1376 ms (0 de 5 cumplen). | **No de forma estable**: falla en algunas corridas y sesiones |
+| LoAF acumulado en el scroll <= 400 ms | E-4: 81-156 ms (5 de 5). E-3: 300, 311, 429, 591 ms (2 de 4 fallan). | **No de forma estable**: falla en algunas corridas |
+| Frame p95 <= 20 ms | 17.5-17.9 ms | Sí |
+| Mutaciones en reposo <= 1/s | 0.4 a 0.8 | Sí |
+| Con N <= 100 el DOM es idéntico | 672 nodos antes y después con 50; capturas de `e2e/` sin cambios | Sí |
+| Chat: re-render por evento < 25 ms | 13.5-16.9 ms en las 15 corridas | Sí |
+| Chat: `[data-mid]` < 100 y nodos < 1000 | 300 y 2843 | **No aplicada**: el chat no se virtualiza (ver arriba) |
+| Chat: primer render no peor que la base | 123-247 ms (base 379 a 845, medida en otra sesión) | Sí en esta sesión; la comparación entre sesiones no es confiable |
+| Chat: el tick de expiración no re-renderiza la lista | Por diseño (un `setTimeout` por vigilia); el banco no lo mide | Sin medir |
+
+## La métrica «desde el aviso» (complementaria)
+
+«Desde el aviso» va del listener de `feat:tickets:changed` en el renderer hasta la primera tarjeta pintada. Se agregó en E-3 para separar lo que tarda el banco en mandar las 2000 tarjetas, pero no reemplaza a la métrica de la meta y no la hace cumplirse: **no incluye el IPC de main al renderer ni el structured clone de las tarjetas**, que sí están en el camino real del usuario. Lo único que queda afuera del código es el tramo de Playwright a main. Medirlo entero pide mandar `Date.now()` desde main en el payload, justo antes de `webContents.send`, y compararlo con el del primer pintado; no está hecho. Desde E-4 el banco toma como aviso solo el primero que trae las N tarjetas.
+
+## Con más de 100 tarjetas
+
+Ctrl+F del navegador, la selección y copia entre tarjetas y la impresión solo ven las unas 12 tarjetas dibujadas. El tablero tiene su propio buscador (id y título) para encontrar el resto.
