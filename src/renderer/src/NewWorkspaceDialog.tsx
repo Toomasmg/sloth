@@ -10,6 +10,7 @@ import { useUi } from './features/host'
 import { useTemplates, openDialog, peekPreselect, takePreselect, usesTicket, type TemplateDto } from './features/templates/store'
 import { TEMPLATE_COLORS, colorHex } from './features/templates/catalog'
 import { setBoardOpen, useSnapshot } from './features/tickets/model'
+import { proveedorIdDe } from '../../shared/proveedores'
 import { applyVars, folderLabel, missingVars, normTicketId, TEMPLATE_COLOR_KEYS, TICKET_RE, today, validBranch, type VarValues } from '../../shared/templates-shared'
 import './NewWorkspaceDialog.css'
 
@@ -642,7 +643,9 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
                 aria-describedby="nw-msg-hint"
               />
               <span id="nw-msg-hint" className="nw-hint">
-                Se manda solo la primera vez que se abre el espacio.
+                {acc && proveedorIdDe(acc) !== 'claude'
+                  ? 'Con Codex Sloth no siempre puede mandarlo solo (depende de cómo esté instalado y de la terminal). Si no puede, te avisa y lo escribís a mano.'
+                  : 'Se manda solo la primera vez que se abre el espacio.'}
               </span>
             </div>
           )}

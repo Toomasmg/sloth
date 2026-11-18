@@ -12,6 +12,7 @@ import { esFalsoFinal, pendientes, registrar as registrarFondo, venceEn, type Fo
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
 import { pastePayload } from './shell-args'
 import { avisar } from './avisos'
+import { avisoPrimerMensajeAMano, destinoPrimerMensaje } from './primer-mensaje'
 import { iniciarLogger, logger } from './logger-global'
 import { marcarCrashPrevio } from './diag/estado'
 import { cerrarSesion, iniciarSesion } from './sesion-marcador'
@@ -638,8 +639,14 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     const ws = running ? undefined : store.workspace(id)
     if (ws) registrarActividad({ t: Date.now(), tipo: 'espacio', espacio: ws.name })
     if (ws?.initialPrompt && !ws.initialPromptUsed && spec.claude?.includes('--')) {
-      if (paste) pendingPaste.set(id, { text: paste, until: Date.now() + 2 * 60 * 1000 })
-      else store.updateWorkspace(id, { initialPromptUsed: true })
+      const acc = store.account(ws.accountId)
+      const p = acc && proveedorDe(acc)
+      const destino = destinoPrimerMensaje(p ? p.capacidades.hooks : true, paste)
+      if (destino === 'pegar' && paste) pendingPaste.set(id, { text: paste, until: Date.now() + 2 * 60 * 1000 })
+      else {
+        store.updateWorkspace(id, { initialPromptUsed: true })
+        if (destino === 'a-mano' && p) avisar(avisoPrimerMensajeAMano(NOMBRE_PROVEEDOR[p.id], ws.name))
+      }
     }
     if (store.workspace(id)) moveAgent(id, 'start')
     return result
