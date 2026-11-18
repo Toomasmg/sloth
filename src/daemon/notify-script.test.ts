@@ -22,7 +22,7 @@ interface Pedido {
   body: string
 }
 
-async function correr(argumento: string, env: Record<string, string | undefined>, ruta = '/hook'): Promise<{ pedidos: Pedido[]; codigo: number | null }> {
+async function correr(argumento: string, envDe: (url: string) => Record<string, string | undefined>): Promise<{ pedidos: Pedido[]; codigo: number | null }> {
   const pedidos: Pedido[] = []
   const servidor = createServer((req, res) => {
     let body = ''
@@ -38,10 +38,9 @@ async function correr(argumento: string, env: Record<string, string | undefined>
     const script = join(carpeta, 'sloth notify.cjs')
     writeFileSync(script, NOTIFY_SCRIPT)
     const puerto = (servidor.address() as AddressInfo).port
-    const entorno = { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '', ...env }
-    for (const k of Object.keys(entorno)) if (entorno[k as keyof typeof entorno] === undefined) delete entorno[k as keyof typeof entorno]
-    const url = entorno.SLOTH_HOOK_URL === '<url>' ? `http://127.0.0.1:${puerto}${ruta}` : entorno.SLOTH_HOOK_URL
-    const hijo = spawn(process.execPath, [script, argumento], { env: { ...entorno, ...(url !== undefined && { SLOTH_HOOK_URL: url }) }, stdio: 'ignore', windowsHide: true })
+    const env: Record<string, string> = { PATH: process.env.PATH ?? '', SystemRoot: process.env.SystemRoot ?? '' }
+    for (const [k, v] of Object.entries(envDe(`http://127.0.0.1:${puerto}/hook`))) if (v !== undefined) env[k] = v
+    const hijo = spawn(process.execPath, [script, argumento], { env, stdio: 'ignore', windowsHide: true })
     const codigo = await new Promise<number | null>((r) => hijo.on('exit', r))
     return { pedidos, codigo }
   } finally {
@@ -50,7 +49,7 @@ async function correr(argumento: string, env: Record<string, string | undefined>
   }
 }
 
-const ENV = { SLOTH_HOOK_URL: '<url>', SLOTH_TOKEN: 'tok', SLOTH_WS: 'ws-1' }
+const ENV = (url: string): Record<string, string | undefined> => ({ SLOTH_HOOK_URL: url, SLOTH_TOKEN: 'tok', SLOTH_WS: 'ws-1' })
 const TURNO = JSON.stringify({ type: 'agent-turn-complete', cwd: 'C:/secreto', 'last-assistant-message': 'texto privado', 'input-messages': ['hola'] })
 
 test('un turno terminado manda un Stop con solo el espacio', async () => {
@@ -73,7 +72,7 @@ test('otro tipo de evento, JSON roto o un argumento que no es un objeto no manda
 
 test('fuera de Sloth (sin las variables) no hace nada', async () => {
   for (const falta of ['SLOTH_HOOK_URL', 'SLOTH_TOKEN', 'SLOTH_WS']) {
-    const r = await correr(TURNO, { ...ENV, [falta]: undefined })
+    const r = await correr(TURNO, (u) => ({ ...ENV(u), [falta]: undefined }))
     assert.equal(r.codigo, 0, falta)
     assert.equal(r.pedidos.length, 0, falta)
   }
@@ -81,7 +80,7 @@ test('fuera de Sloth (sin las variables) no hace nada', async () => {
 
 test('un destino que no es la propia máquina no recibe el token', async () => {
   for (const url of ['http://example.com/hook', 'https://127.0.0.1/hook', 'no es una url']) {
-    const r = await correr(TURNO, { ...ENV, SLOTH_HOOK_URL: url })
+    const r = await correr(TURNO, (u) => ({ ...ENV(u), SLOTH_HOOK_URL: url }))
     assert.equal(r.codigo, 0, url)
     assert.equal(r.pedidos.length, 0, url)
   }
