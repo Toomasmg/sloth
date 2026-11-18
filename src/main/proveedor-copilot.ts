@@ -4,7 +4,7 @@ import { CAPACIDADES } from '../shared/proveedores'
 import { resolverCopilotExe } from './copilot-exe'
 import { logger } from './logger-global'
 import { promptLine } from './shell-args'
-import type { Proveedor } from './proveedores'
+import type { Proveedor } from './proveedor-tipos'
 
 // Copilot guarda su login en el almacén del sistema, no en el entorno: ningún token se hereda ni se pasa. Las
 // variables de GitHub se sacan para que la terminal no use otra identidad que la del login del sistema.

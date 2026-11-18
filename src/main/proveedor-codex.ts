@@ -5,7 +5,7 @@ import { CAPACIDADES } from '../shared/proveedores'
 import { promptLine } from './shell-args'
 import { resolverCodexExe } from './codex-exe'
 import { logger } from './logger-global'
-import type { Proveedor } from './proveedores'
+import type { Proveedor } from './proveedor-tipos'
 
 // Sin esto Codex puede guardar el login en el almacén del sistema y dos cuentas se pisarían entre sí.
 export const CLAVE_ALMACEN = 'cli_auth_credentials_store'
