@@ -4,9 +4,11 @@ import { join } from 'node:path'
 import { avisar } from './avisos'
 import { logger } from './logger-global'
 import { NOMBRE_INICIAL, PERFIL_INICIAL_ID, type IndicePerfiles, type Perfil } from './perfiles-core'
-import { iniciarPerfilesFs, rutasPerfiles, type ResultadoArranque } from './perfiles-fs'
+import { iniciarPerfilesFs, leerIndiceVigente, rutasPerfiles, type ResultadoArranque } from './perfiles-fs'
 
 let resultado: ResultadoArranque | undefined
+// El perfil con el que arrancó esta sesión: el Store y todas las rutas lo usan, aunque el índice cambie en disco antes del reinicio.
+let activoSesion: string | undefined
 let cambiando = false
 
 const mensaje = (e: unknown): string => (e instanceof Error ? e.message : String(e))
@@ -57,23 +59,36 @@ export function iniciarPerfiles(): ResultadoArranque {
   traerDeAntiRea()
   renombrarEstadoViejo()
   resultado = iniciarPerfilesFs(raizDatos(), Date.now)
-  if (resultado.error) {
+  activoSesion = resultado.indice.activo
+  if (resultado.bloqueado) {
+    logger.error('perfiles', `no se pueden usar los perfiles: ${resultado.bloqueado}`)
+  } else if (resultado.error) {
     logger.aviso('perfiles', `sigo con la raíz de siempre: ${resultado.error}`)
     avisar(`No pude preparar los perfiles (${resultado.error}). Sloth sigue con tus datos de siempre; reiniciá para reintentar.`)
   } else {
     if (resultado.migrado) logger.info('perfiles', 'datos copiados al perfil principal')
     if (resultado.reconstruido) logger.aviso('perfiles', 'perfiles.json rearmado a partir de las carpetas')
     if (resultado.aviso) logger.aviso('perfiles', resultado.aviso)
+    if (resultado.avisoUsuario) {
+      logger.aviso('perfiles', resultado.avisoUsuario)
+      avisar(resultado.avisoUsuario)
+    }
   }
   return resultado
 }
 
+/** Si la relectura falla se conserva el índice anterior: perder de vista los perfiles a mitad de sesión es peor que mostrar uno viejo. */
 export function recargarIndice(): void {
-  resultado = undefined
-  iniciarPerfiles()
+  const actual = iniciarPerfiles()
+  const indice = leerIndiceVigente(raizDatos())
+  if (!indice) {
+    logger.aviso('perfiles', 'no pude releer perfiles.json; sigo con el índice de antes')
+    return
+  }
+  resultado = { ...actual, indice }
 }
 
-/** La migración falló: se trabaja sobre la raíz vieja, como antes de los perfiles. */
+/** Todavía no había perfiles y no se pudieron preparar: se trabaja sobre la raíz, como antes de los perfiles. */
 export function modoRaiz(): boolean {
   return iniciarPerfiles().error !== undefined
 }
@@ -82,14 +97,23 @@ export function indicePerfiles(): IndicePerfiles {
   return iniciarPerfiles().indice
 }
 
+/** El id del perfil con el que corre esta sesión. */
+export function idPerfilActivo(): string {
+  iniciarPerfiles()
+  return activoSesion ?? PERFIL_INICIAL_ID
+}
+
 export function perfilActivo(): Perfil {
-  const i = indicePerfiles()
-  return i.perfiles.find((p) => p.id === i.activo) ?? { id: PERFIL_INICIAL_ID, nombre: NOMBRE_INICIAL, creado: 0 }
+  const id = idPerfilActivo()
+  return indicePerfiles().perfiles.find((p) => p.id === id) ?? { id: PERFIL_INICIAL_ID, nombre: NOMBRE_INICIAL, creado: 0 }
 }
 
 export function rutaPerfil(...partes: string[]): string {
+  const r = iniciarPerfiles()
+  // Con los perfiles bloqueados no hay un lugar seguro donde escribir: ni la raíz congelada ni un perfil que no se pudo leer.
+  if (r.bloqueado) throw new Error(`Los perfiles no están disponibles: ${r.bloqueado}`)
   if (modoRaiz()) return join(raizDatos(), ...partes)
-  return join(rutasPerfiles(raizDatos()).carpeta, indicePerfiles().activo, ...partes)
+  return join(rutasPerfiles(raizDatos()).carpeta, idPerfilActivo(), ...partes)
 }
 
 export const carpetaFeatures = (): string => rutaPerfil('features')

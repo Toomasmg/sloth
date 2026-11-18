@@ -1,6 +1,6 @@
 import { mock, test } from 'node:test'
 import assert from 'node:assert/strict'
-import fs, { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import fs, { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { syncBuiltinESMExports } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join, relative, resolve } from 'node:path'
@@ -12,8 +12,10 @@ import {
   guardarGhLogin,
   iniciarPerfilesFs,
   leerFotoDataUrl,
+  leerIndiceVigente,
   leerMeta,
   MAX_BYTES_FOTO,
+  prepararCambioFs,
   renombrarPerfilFs,
   rutasPerfiles,
   tieneFoto,
@@ -545,5 +547,309 @@ test('guardarGhLogin valida el login y lo deja en perfil.json y en el índice', 
   guardarGhLogin(d, 'principal', 'octo-cat')
   assert.equal(leerMeta(join(d, 'perfiles', 'principal'))?.ghLogin, 'octo-cat')
   assert.equal(indiceDe(d).perfiles[0]?.ghLogin, 'octo-cat')
+  rmSync(d, { recursive: true })
+})
+
+/** Un archivo que el antivirus o el indexador de Windows tiene tomado: existe pero no se puede leer. */
+function conArchivoTomado<T>(ruta: (r: string) => boolean, fn: () => T): T {
+  const original = fs.readFileSync as (...a: unknown[]) => unknown
+  const m = mock.method(fs, 'readFileSync', (...a: unknown[]) => {
+    if (ruta(String(a[0]).replaceAll('\\', '/'))) throw Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' })
+    return original.apply(fs, a)
+  })
+  syncBuiltinESMExports()
+  try {
+    return fn()
+  } finally {
+    m.mock.restore()
+    syncBuiltinESMExports()
+  }
+}
+
+function sinListarPerfiles<T>(fn: () => T): T {
+  const original = fs.readdirSync as (...a: unknown[]) => unknown
+  const m = mock.method(fs, 'readdirSync', (...a: unknown[]) => {
+    if (String(a[0]).replaceAll('\\', '/').endsWith('/perfiles')) throw Object.assign(new Error('EPERM: operation not permitted, scandir'), { code: 'EPERM' })
+    return original.apply(fs, a)
+  })
+  syncBuiltinESMExports()
+  try {
+    return fn()
+  } finally {
+    m.mock.restore()
+    syncBuiltinESMExports()
+  }
+}
+
+const sinTmpNiCorrupt = (d: string): void => {
+  assert.deepEqual(readdirSync(d).filter((n) => n.includes('.corrupt-')), [])
+  assert.deepEqual(readdirSync(join(d, 'perfiles')).filter((n) => n.startsWith('.') || n.includes('.corrupt-')), [])
+}
+
+test('perfil.json de principal ilegible con el índice sano: no migra de nuevo, no cae a la raíz y no toca nada', () => {
+  const d = raiz()
+  sembrar(d)
+  assert.equal(iniciarPerfilesFs(d, ahora).error, undefined)
+  escribir(d, 'sloth-state.json', '{"cambio":"en la raíz congelada"}')
+  escribir(d, 'perfiles/principal/features/nuevo.json', 'lo que se hizo con perfiles')
+  const antes = foto(d)
+  const r = conArchivoTomado((f) => f.endsWith('perfiles/principal/perfil.json'), () => iniciarPerfilesFs(d, () => AHORA + 99))
+  assert.match(r.bloqueado ?? '', /perfiles\/principal.*EBUSY/)
+  assert.equal(r.error, undefined)
+  assert.equal(r.migrado, false)
+  assert.deepEqual(foto(d), antes)
+  assert.deepEqual(respaldosPrevios(d), [`pre-perfiles-${AHORA}`])
+  sinTmpNiCorrupt(d)
+  const despues = iniciarPerfilesFs(d, () => AHORA + 100)
+  assert.equal(despues.bloqueado, undefined)
+  assert.equal(despues.indice.activo, 'principal')
+  assert.equal(readFileSync(join(d, 'perfiles', 'principal', 'features', 'nuevo.json'), 'utf8'), 'lo que se hizo con perfiles')
+  rmSync(d, { recursive: true })
+})
+
+test('perfil.json ilegible sin perfiles.json: tampoco migra de nuevo sobre el perfil que ya está', () => {
+  const d = raiz()
+  sembrar(d)
+  iniciarPerfilesFs(d, ahora)
+  rmSync(rutasPerfiles(d).indice)
+  const antes = foto(d)
+  const r = conArchivoTomado((f) => f.endsWith('perfiles/principal/perfil.json'), () => iniciarPerfilesFs(d, () => AHORA + 99))
+  assert.match(r.bloqueado ?? '', /perfiles\/principal/)
+  assert.deepEqual(foto(d), antes)
+  assert.equal(existsSync(rutasPerfiles(d).indice), false)
+  rmSync(d, { recursive: true })
+})
+
+test('perfil.json roto en el único perfil: se avisa y queda donde estaba, sin apartarlo como .corrupt ni migrar', () => {
+  const d = raiz()
+  sembrar(d)
+  iniciarPerfilesFs(d, ahora)
+  writeFileSync(join(d, 'perfiles', 'principal', 'perfil.json'), '{ roto')
+  const antes = foto(d)
+  const r = iniciarPerfilesFs(d, () => AHORA + 99)
+  assert.match(r.bloqueado ?? '', /perfiles\/principal/)
+  assert.equal(r.migrado, false)
+  assert.deepEqual(foto(d), antes)
+  sinTmpNiCorrupt(d)
+  rmSync(d, { recursive: true })
+})
+
+test('el perfil activo ilegible con otro sano: no se cambia de perfil a escondidas ni se reescribe el índice', () => {
+  const d = conPrincipal()
+  const p = crearPerfilFs(d, 'Trabajo', AHORA + 1, azarFijo('t1'))
+  cambiarActivoFs(d, p.id)
+  const antes = foto(d)
+  const r = conArchivoTomado((f) => f.endsWith(`perfiles/${p.id}/perfil.json`), () => iniciarPerfilesFs(d, () => AHORA + 99))
+  assert.match(r.bloqueado ?? '', new RegExp(p.id))
+  assert.deepEqual(foto(d), antes)
+  rmSync(d, { recursive: true })
+})
+
+test('un perfil que hoy no se puede leer no se saca del índice: se usa el rearmado en memoria sin guardarlo', () => {
+  const d = conPrincipal()
+  const p = crearPerfilFs(d, 'Trabajo', AHORA + 1, azarFijo('t1'))
+  rmSync(rutasPerfiles(d).indice)
+  const r = conArchivoTomado((f) => f.endsWith(`perfiles/${p.id}/perfil.json`), () => iniciarPerfilesFs(d, () => AHORA + 99))
+  assert.equal(r.bloqueado, undefined)
+  assert.equal(r.reconstruido, true)
+  assert.deepEqual(r.indice.perfiles.map((x) => x.id), ['principal'])
+  assert.match(r.avisoUsuario ?? '', new RegExp(p.id))
+  assert.equal(existsSync(rutasPerfiles(d).indice), false)
+  const sano = iniciarPerfilesFs(d, () => AHORA + 100)
+  assert.deepEqual(sano.indice.perfiles.map((x) => x.id), ['principal', p.id])
+  rmSync(d, { recursive: true })
+})
+
+test('si listar perfiles/ falla con perfiles creados no se cae a la raíz ni se migra', () => {
+  const d = conPrincipal()
+  rmSync(rutasPerfiles(d).indice)
+  const antes = foto(d)
+  const r = sinListarPerfiles(() => iniciarPerfilesFs(d, () => AHORA + 99))
+  assert.match(r.bloqueado ?? '', /EPERM/)
+  assert.equal(r.error, undefined)
+  assert.deepEqual(foto(d), antes)
+  rmSync(d, { recursive: true })
+})
+
+test('con el índice sano y principal sano un fallo al listar perfiles/ ni se nota', () => {
+  const d = conPrincipal()
+  const r = sinListarPerfiles(() => iniciarPerfilesFs(d, () => AHORA + 99))
+  assert.equal(r.bloqueado, undefined)
+  assert.equal(r.error, undefined)
+  assert.equal(r.indice.activo, 'principal')
+  rmSync(d, { recursive: true })
+})
+
+test('el índice apunta a perfiles pero perfiles/ no tiene ninguno: se avisa, no se vuelve a migrar la raíz congelada', () => {
+  const d = conPrincipal()
+  rmSync(join(d, 'perfiles'), { recursive: true })
+  const antes = foto(d)
+  const r = iniciarPerfilesFs(d, () => AHORA + 99)
+  assert.match(r.bloqueado ?? '', /sus carpetas/)
+  assert.deepEqual(foto(d), antes)
+  assert.equal(existsSync(join(d, 'perfiles')), false)
+  rmSync(d, { recursive: true })
+})
+
+test('si falla guardar el índice justo después de migrar se sigue con el perfil principal, no con la raíz', () => {
+  const d = raiz()
+  sembrar(d)
+  const r = conFsRoto(['openSync'], (destino) => destino.includes('perfiles.json'), () => iniciarPerfilesFs(d, ahora))
+  assert.equal(r.error, undefined)
+  assert.equal(r.bloqueado, undefined)
+  assert.equal(r.migrado, true)
+  assert.equal(r.indice.activo, 'principal')
+  assert.match(r.avisoUsuario ?? '', /perfiles\.json/)
+  assert.equal(existsSync(join(d, 'perfiles', 'principal', 'perfil.json')), true)
+  const otra = iniciarPerfilesFs(d, () => AHORA + 5)
+  assert.equal(otra.reconstruido, true)
+  assert.equal(otra.migrado, false)
+  assert.deepEqual(respaldosPrevios(d), [`pre-perfiles-${AHORA}`])
+  rmSync(d, { recursive: true })
+})
+
+test('perfiles.json de una versión futura: no se aparta ni se reescribe y se sigue con los perfiles en memoria', () => {
+  const d = conPrincipal()
+  const futuro = JSON.stringify({ version: 2, activo: 'principal', perfiles: [{ id: 'principal', nombre: { es: 'Mi perfil' }, creado: 1 }], extra: true })
+  writeFileSync(rutasPerfiles(d).indice, futuro)
+  const r = iniciarPerfilesFs(d, () => AHORA + 99)
+  assert.equal(r.bloqueado, undefined)
+  assert.equal(r.reconstruido, true)
+  assert.equal(r.indice.activo, 'principal')
+  assert.match(r.avisoUsuario ?? '', /más nueva/)
+  assert.equal(readFileSync(rutasPerfiles(d).indice, 'utf8'), futuro)
+  assert.deepEqual(readdirSync(d).filter((n) => n.startsWith('perfiles.json.')), [])
+  assert.throws(() => crearPerfilFs(d, 'Trabajo', AHORA, azarFijo('t1')), /más nueva/)
+  assert.throws(() => cambiarActivoFs(d, 'principal'), /más nueva/)
+  rmSync(d, { recursive: true })
+})
+
+test('perfil.json de una versión futura: no se aparta como .corrupt; si es el único perfil se avisa', () => {
+  const d = conPrincipal()
+  const futuro = JSON.stringify({ version: 2, id: 'principal', nombre: 'Mi perfil', creado: 1, campoNuevo: [1, 2] })
+  writeFileSync(join(d, 'perfiles', 'principal', 'perfil.json'), futuro)
+  const r = iniciarPerfilesFs(d, () => AHORA + 99)
+  assert.match(r.bloqueado ?? '', /más nueva/)
+  assert.equal(readFileSync(join(d, 'perfiles', 'principal', 'perfil.json'), 'utf8'), futuro)
+  sinTmpNiCorrupt(d)
+  rmSync(d, { recursive: true })
+})
+
+test('perfil.json futuro de un perfil que no es el activo: queda como está y el índice guardado no lo deja afuera', () => {
+  const d = conPrincipal()
+  const p = crearPerfilFs(d, 'Trabajo', AHORA + 1, azarFijo('t1'))
+  const futuro = JSON.stringify({ version: 2, id: p.id, nombre: 'Trabajo', creado: AHORA + 1 })
+  writeFileSync(join(d, 'perfiles', p.id, 'perfil.json'), futuro)
+  const indiceAntes = readFileSync(rutasPerfiles(d).indice, 'utf8')
+  const r = iniciarPerfilesFs(d, () => AHORA + 99)
+  assert.equal(r.bloqueado, undefined)
+  assert.equal(r.indice.activo, 'principal')
+  assert.equal(readFileSync(join(d, 'perfiles', p.id, 'perfil.json'), 'utf8'), futuro)
+  assert.equal(readFileSync(rutasPerfiles(d).indice, 'utf8'), indiceAntes)
+  sinTmpNiCorrupt(d)
+  rmSync(d, { recursive: true })
+})
+
+test('candado: con otra copia migrando no se migra ni se toca nada', () => {
+  const d = raiz()
+  sembrar(d)
+  writeFileSync(rutasPerfiles(d).candado, JSON.stringify({ pid: process.pid, desde: Date.now() }))
+  const antes = foto(d)
+  const r = iniciarPerfilesFs(d, ahora)
+  assert.match(r.bloqueado ?? '', /Otra copia de Sloth/)
+  assert.equal(r.error, undefined)
+  assert.deepEqual(foto(d), antes)
+  assert.equal(existsSync(join(d, 'perfiles')), false)
+  assert.equal(existsSync(join(d, 'respaldos')), false)
+  rmSync(d, { recursive: true })
+})
+
+test('candado: uno abandonado (vencido) no frena la migración y no queda ninguno al terminar', () => {
+  const d = raiz()
+  sembrar(d)
+  writeFileSync(rutasPerfiles(d).candado, JSON.stringify({ pid: process.pid, desde: 1000 }))
+  const r = iniciarPerfilesFs(d, ahora)
+  assert.equal(r.migrado, true)
+  assert.equal(r.bloqueado, undefined)
+  assert.equal(existsSync(rutasPerfiles(d).candado), false)
+  iniciarPerfilesFs(d, () => AHORA + 1)
+  assert.equal(existsSync(rutasPerfiles(d).candado), false)
+  rmSync(d, { recursive: true })
+})
+
+test('candado: con el arranque normal otra copia migrando no impide arrancar, pero no se barren sus tmp', () => {
+  const d = conPrincipal()
+  escribir(d, 'perfiles/.tmp-p-otra/x', 'crear de otra copia en curso')
+  writeFileSync(rutasPerfiles(d).candado, JSON.stringify({ pid: process.pid, desde: Date.now() }))
+  const r = iniciarPerfilesFs(d, () => AHORA + 99)
+  assert.equal(r.bloqueado, undefined)
+  assert.equal(existsSync(join(d, 'perfiles', '.tmp-p-otra', 'x')), true)
+  rmSync(d, { recursive: true })
+})
+
+test('enlaces (junction o symlink) dentro de features no se siguen: ni la copia ni el respaldo apuntan a la raíz', () => {
+  const d = raiz()
+  const afuera = raiz()
+  escribir(d, 'sloth-state.json', '{"version":1,"accounts":[],"workspaces":[],"openPanes":[]}')
+  escribir(d, 'features/settings.json', '{"version":1}')
+  escribir(afuera, 'secreto.txt', 'no es de features')
+  symlinkSync(afuera, join(d, 'features', 'enlace'), 'junction')
+  const r = iniciarPerfilesFs(d, ahora)
+  assert.equal(r.error, undefined)
+  assert.equal(r.migrado, true)
+  assert.match(r.avisoUsuario ?? '', /enlace/)
+  for (const base of [join(d, 'perfiles', 'principal'), join(d, 'respaldos', `pre-perfiles-${AHORA}`)]) {
+    assert.equal(readFileSync(join(base, 'features', 'settings.json'), 'utf8'), '{"version":1}')
+    assert.equal(existsSync(join(base, 'features', 'enlace')), false)
+  }
+  assert.equal(readFileSync(join(afuera, 'secreto.txt'), 'utf8'), 'no es de features')
+  assert.equal(lstatSync(join(d, 'features', 'enlace')).isSymbolicLink(), true)
+  rmSync(d, { recursive: true })
+  rmSync(afuera, { recursive: true })
+})
+
+test('features entera como enlace a otra carpeta: no se copia ni se respalda como enlace', () => {
+  const d = raiz()
+  const otra = raiz()
+  escribir(d, 'sloth-state.json', '{"version":1,"accounts":[],"workspaces":[],"openPanes":[]}')
+  escribir(otra, 'settings.json', '{"version":1,"de":"otra carpeta"}')
+  symlinkSync(otra, join(d, 'features'), 'junction')
+  const r = iniciarPerfilesFs(d, ahora)
+  assert.equal(r.error, undefined)
+  assert.match(r.avisoUsuario ?? '', /enlace/)
+  for (const base of [join(d, 'perfiles', 'principal'), join(d, 'respaldos', `pre-perfiles-${AHORA}`)]) {
+    assert.equal(existsSync(join(base, 'sloth-state.json')), true)
+    assert.equal(existsSync(join(base, 'features')) && lstatSync(join(base, 'features')).isSymbolicLink(), false)
+  }
+  assert.equal(readFileSync(join(otra, 'settings.json'), 'utf8'), '{"version":1,"de":"otra carpeta"}')
+  rmSync(d, { recursive: true })
+  rmSync(otra, { recursive: true })
+})
+
+test('cambiar: un destino dañado o inexistente se rechaza antes de escribir nada; el cambio solo se aplica al confirmar', () => {
+  const d = conPrincipal()
+  const p = crearPerfilFs(d, 'Trabajo', AHORA + 1, azarFijo('t1'))
+  const antes = readFileSync(rutasPerfiles(d).indice, 'utf8')
+  const meta = join(d, 'perfiles', p.id, 'perfil.json')
+  const guardado = readFileSync(meta, 'utf8')
+  rmSync(meta)
+  assert.throws(() => prepararCambioFs(d, p.id), /no está o está dañada/)
+  assert.throws(() => prepararCambioFs(d, 'p-fantasma'), /no existe/)
+  assert.equal(readFileSync(rutasPerfiles(d).indice, 'utf8'), antes)
+  writeFileSync(meta, guardado)
+  const aplicar = prepararCambioFs(d, p.id)
+  assert.equal(indiceDe(d).activo, 'principal')
+  aplicar()
+  assert.equal(indiceDe(d).activo, p.id)
+  rmSync(d, { recursive: true })
+})
+
+test('leerIndiceVigente: null si el índice no se puede leer, para que recargar conserve el anterior', () => {
+  const d = conPrincipal()
+  assert.equal(leerIndiceVigente(d)?.activo, 'principal')
+  writeFileSync(rutasPerfiles(d).indice, '{ roto')
+  assert.equal(leerIndiceVigente(d), null)
+  assert.equal(readFileSync(rutasPerfiles(d).indice, 'utf8'), '{ roto')
+  assert.deepEqual(readdirSync(d).filter((n) => n.includes('.corrupt-')), [])
   rmSync(d, { recursive: true })
 })
