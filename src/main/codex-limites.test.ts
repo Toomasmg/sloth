@@ -3,8 +3,9 @@ import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import type { spawn } from 'node:child_process'
-import { LectorLimitesCodex } from './codex-limites'
-import type { DepsLimites } from './codex-limites'
+import { EN_USO, LectorLimitesCodex } from './codex-limites'
+import type { DepsLimites, Permiso } from './codex-limites'
+import type { LimitesCodex } from '../shared/celular'
 
 const CUENTA = { id: 'c1', configDir: 'C:\\cuentas\\c1', proveedor: 'codex' }
 const AHORA = 1_700_000_000_000
@@ -95,7 +96,7 @@ test('cache de 5 minutos por cuenta', async () => {
   t.ahora += 4 * 60_000
   const otra = await lector.leer(CUENTA, 'codex')
   assert.equal(t.spawns, 1)
-  assert.equal(otra?.cincoHoras?.pct, 37)
+  assert.equal((otra as LimitesCodex | undefined)?.cincoHoras?.pct, 37)
   assert.equal(lector.cacheado(CUENTA.id)?.cincoHoras?.pct, 37)
   t.ahora += 2 * 60_000
   assert.equal(lector.cacheado(CUENTA.id), undefined)
@@ -110,7 +111,7 @@ test('dos llamadas simultáneas son un solo spawn', async () => {
   assert.deepEqual(a, b)
 })
 
-test('cuentas distintas se leen una a la vez', async () => {
+test('cuentas distintas se leen de a dos como máximo', async () => {
   let abiertos = 0
   let maximo = 0
   const guion = (h: HijoFalso, l: string): void => {
@@ -124,10 +125,10 @@ test('cuentas distintas se leen una a la vez', async () => {
     if (m.method === 'account/rateLimits/read') h.responder({ id: m.id, result: RESULTADO })
   }
   const { lector, t } = armar(guion)
-  await Promise.all([lector.leer(CUENTA, 'codex'), lector.leer({ ...CUENTA, id: 'c2' }, 'codex')])
-  assert.equal(t.spawns, 2)
-  assert.equal(maximo, 1)
-  assert.equal(t.matados.length, 2)
+  await Promise.all(['c1', 'c2', 'c3', 'c4'].map((id) => lector.leer({ ...CUENTA, id }, 'codex')))
+  assert.equal(t.spawns, 4)
+  assert.equal(maximo, 2)
+  assert.equal(t.matados.length, 4)
 })
 
 test('un error JSON-RPC es sin dato, mata el árbol y no se reintenta por 30 minutos', async () => {
@@ -204,7 +205,7 @@ test('texto suelto y notificaciones del servidor se ignoran', async () => {
     }
     if (m.method === 'account/rateLimits/read') h.responder({ id: m.id, result: RESULTADO })
   })
-  assert.equal((await lector.leer(CUENTA, 'codex'))?.cincoHoras?.pct, 37)
+  assert.equal(((await lector.leer(CUENTA, 'codex')) as LimitesCodex | undefined)?.cincoHoras?.pct, 37)
 })
 
 test('un agente que Sloth no conoce no lanza nada', async () => {
@@ -230,4 +231,75 @@ test('en Windows un .cmd corre por cmd.exe verbatim con argv fijo y una ruta rar
   const rara = armar(conExito(), { matar: { platform: 'win32', taskkill: async () => true, killGroup: () => undefined, killOne: () => undefined } })
   assert.equal(await rara.lector.leer(CUENTA, 'C:\\a&b\\codex.cmd'), undefined)
   assert.equal(rara.t.spawns, 0)
+})
+
+function conPermiso(permisos: Record<string, Permiso>, guion = conExito()) {
+  return armar(guion, { permiso: (id) => permisos[id] ?? 'ok' })
+}
+
+test('con una terminal abierta de la cuenta no se lanza nada y no queda espera de 30 minutos', async () => {
+  const permisos: Record<string, Permiso> = { c1: 'en-uso' }
+  const { lector, t } = conPermiso(permisos)
+  assert.equal(await lector.leer(CUENTA, 'codex'), EN_USO)
+  assert.equal(lector.enUso('c1'), true)
+  assert.equal(t.spawns, 0)
+  assert.equal(lector.reintentoEnMin('c1'), undefined)
+  permisos.c1 = 'ok'
+  assert.equal(((await lector.leer(CUENTA, 'codex')) as LimitesCodex).cincoHoras?.pct, 37)
+  assert.equal(t.spawns, 1)
+})
+
+test('lo ya leído se sigue mostrando aunque la cuenta abra una terminal después', async () => {
+  const permisos: Record<string, Permiso> = {}
+  const { lector, t } = conPermiso(permisos)
+  await lector.leer(CUENTA, 'codex')
+  permisos.c1 = 'en-uso'
+  assert.equal(((await lector.leer(CUENTA, 'codex')) as LimitesCodex).cincoHoras?.pct, 37)
+  assert.equal(t.spawns, 1)
+})
+
+test('si la cuenta abre una terminal mientras la lectura espera su turno, no se lanza', async () => {
+  const permisos: Record<string, Permiso> = {}
+  const { lector, t } = conPermiso(permisos, () => undefined)
+  // c1 y c2 ocupan los dos cupos sin responder; c3 queda en la cola.
+  const a = lector.leer({ ...CUENTA, id: 'c1' }, 'codex')
+  const b = lector.leer({ ...CUENTA, id: 'c2' }, 'codex')
+  const c = lector.leer({ ...CUENTA, id: 'c3' }, 'codex')
+  await new Promise((r) => setImmediate(r))
+  assert.equal(t.spawns, 2)
+  permisos.c3 = 'en-uso'
+  for (const h of t.hijos) {
+    h.exitCode = 0
+    h.emit('close')
+  }
+  await Promise.all([a, b])
+  assert.equal(await c, EN_USO)
+  assert.equal(t.spawns, 2)
+})
+
+test('con el switch apagado mientras esperaba en la cola no se lee ni se castiga la cuenta', async () => {
+  const { lector, t } = conPermiso({ c1: 'apagada' })
+  assert.equal(await lector.leer(CUENTA, 'codex'), undefined)
+  assert.equal(t.spawns, 0)
+  assert.equal(lector.reintentoEnMin('c1'), undefined)
+})
+
+test('olvidar saca la espera de un fallo y la caché: apagar y prender vuelve a probar', async () => {
+  let falla = true
+  const { lector, t } = armar((h, l) => {
+    const m = JSON.parse(l) as { id?: number; method?: string }
+    if (m.method === 'initialize') h.responder(falla ? { id: m.id, error: { code: -1, message: 'x' } } : { id: m.id, result: {} })
+    if (m.method === 'account/rateLimits/read') h.responder({ id: m.id, result: RESULTADO })
+  })
+  assert.equal(await lector.leer(CUENTA, 'codex'), undefined)
+  assert.equal(lector.reintentoEnMin('c1'), 30)
+  t.ahora += 60_000
+  assert.equal(lector.reintentoEnMin('c1'), 29)
+  assert.equal(await lector.leer(CUENTA, 'codex'), undefined)
+  assert.equal(t.spawns, 1)
+  falla = false
+  lector.olvidar('c1')
+  assert.equal(lector.reintentoEnMin('c1'), undefined)
+  assert.equal(((await lector.leer(CUENTA, 'codex')) as LimitesCodex).cincoHoras?.pct, 37)
+  assert.equal(t.spawns, 2)
 })

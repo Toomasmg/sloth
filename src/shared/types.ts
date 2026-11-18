@@ -1,4 +1,4 @@
-import type { LimitesCodex } from './celular'
+import type { LecturaLimitesCodex } from './celular'
 import type { ProveedorId } from './proveedores'
 
 /** Una cuenta de Claude: su propio CLAUDE_CONFIG_DIR, con su login y sus settings. */
@@ -178,8 +178,8 @@ export interface SlothApi {
   setLimitesExperimentales(id: string, activo: boolean): Promise<void>
   /** Activa o apaga el aviso de «terminó» de una cuenta de Codex (canal `accounts:setAvisoDeTurno`). Si no se puede activar, rechaza con el motivo. */
   setAvisoDeTurno(id: string, activo: boolean): Promise<void>
-  /** Límites de las cuentas con la lectura activada; null es «sin dato» (canal `accounts:limitesCodex`). */
-  limitesCodex(): Promise<Record<string, LimitesCodex | null>>
+  /** Cuánto se usó de cada ventana en una cuenta con la lectura activada, o por qué no hay dato (canal `accounts:limitesCodex`). De a una cuenta: la pantalla muestra cada una apenas llega. */
+  limitesCodex(id: string): Promise<LecturaLimitesCodex>
   addWorkspace(input: NewWorkspaceInput): Promise<Workspace>
   removeWorkspace(id: string): Promise<void>
   /** Renombrar o cambiar el ícono (canal `workspaces:update`). Devuelve el espacio actualizado. */

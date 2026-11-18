@@ -21,6 +21,9 @@ export interface LimitesCodex {
   at: number
 }
 
+/** Lo que Ajustes muestra de una cuenta de Codex: datos, sin dato (con cuánto falta para reintentar) o sin leer porque hay una terminal abierta de esa cuenta. */
+export type LecturaLimitesCodex = { tipo: 'datos'; limites: LimitesCodex } | { tipo: 'sin-dato'; reintentaEnMin?: number } | { tipo: 'en-uso' }
+
 export interface CuentaCelular {
   id: string
   nombre: string

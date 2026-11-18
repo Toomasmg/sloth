@@ -19,7 +19,8 @@ import { cerrarSesion, iniciarSesion } from './sesion-marcador'
 import { textoSeguro } from './diag/texto-seguro'
 import { argvPanelCuenta, armarEnvCuenta, proveedorDe, proveedorExigido, type Proveedor } from './proveedores'
 import { NOMBRE_PROVEEDOR, capacidadesDe, esProveedorId, motivoSinCapacidad } from '../shared/proveedores'
-import { limitesDeCuenta } from './codex-limites'
+import { lectorLimites, limitesDeCuenta } from './codex-limites'
+import type { LecturaLimitesCodex } from '../shared/celular'
 import { avisarNotify, desinstalarNotify, prepararNotify } from './codex-notify'
 import { entornoDeTerminal } from './hook-env-core'
 import { detectarAgentes } from './agentes'
@@ -352,6 +353,14 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     return store.workspaces.some((w) => w.accountId === accountId && b.isRunning(w.id))
   }
 
+  // Leer los límites de Codex lanza su app-server, que puede renovar el token de la cuenta: con una terminal abierta de la
+  // misma cuenta (o sin saber todavía cuáles hay, porque el backend no arrancó) no se lanza.
+  lectorLimites.conectarPermiso((id) => {
+    const a = store.account(id)
+    if (!a || a.limitesExperimentales !== true) return 'apagada'
+    return term && !accountBusy(id) ? 'ok' : 'en-uso'
+  })
+
   /** Deja la cuenta lista antes de abrir Claude: settings + hooks y tu setup compartido. */
   function prepareAccount(acc: Account): void {
     // Una cuenta de un agente que esta versión no conoce no se toca: ni hooks ni setup de Claude en su carpeta.
@@ -537,6 +546,8 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     if (capacidadesDe(cuenta)?.limitesExperimental !== true) throw new Error(motivoSinCapacidad(cuenta, 'limitesExperimental'))
     store.exigirEscritura()
     store.updateAccount(id, { limitesExperimentales: activo })
+    // Al apagar y prender se prueba de nuevo: ni la caché ni la espera tras un fallo sobreviven al switch.
+    lectorLimites.olvidar(id)
   })
 
   handle('accounts:setAvisoDeTurno', (_e, id: unknown, activo: unknown) => {
@@ -556,9 +567,14 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     }
   })
 
-  handle('accounts:limitesCodex', async () => {
-    const pares = await Promise.all(store.accounts.map(async (a) => [a.id, await limitesDeCuenta(a, true)] as const))
-    return Object.fromEntries(pares.filter(([id]) => store.account(id)?.limitesExperimentales === true))
+  // De a una cuenta: Ajustes muestra cada una apenas llega, sin esperar a las demás.
+  handle('accounts:limitesCodex', async (_e, id: unknown): Promise<LecturaLimitesCodex> => {
+    if (!idValido(id)) throw new Error('Pedido inválido.')
+    // Hasta que el backend no arranca no se sabe qué terminales hay abiertas.
+    await backend().catch(() => undefined)
+    const cuenta = store.account(id)
+    if (!cuenta || cuenta.limitesExperimentales !== true) return { tipo: 'sin-dato' }
+    return limitesDeCuenta(cuenta, true)
   })
 
   handle('accounts:remove', async (_e, id: unknown) => {

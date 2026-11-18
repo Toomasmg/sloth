@@ -172,7 +172,7 @@ const feature: Feature = {
           if (!capacidadesDe(a)?.statusline) {
             // Sin esperar: el celu consulta seguido y la lectura de Codex puede tardar hasta 10 s; muestra lo último leído.
             const l = await limitesDeCuenta(a, false)
-            return [a.id, l ? { cincoHoras: l.cincoHoras, semana: l.semana, at: l.at } : leerLimites(null, ahora)] as const
+            return [a.id, l.tipo === 'datos' ? { cincoHoras: l.limites.cincoHoras, semana: l.limites.semana, at: l.limites.at } : leerLimites(null, ahora)] as const
           }
           try {
             texto = await readFile(join(a.configDir, LIMITES_ARCHIVO), 'utf8')

@@ -1,12 +1,25 @@
-import type { LimitesCodex } from '../../../../shared/celular'
+import type { LecturaLimitesCodex, LimitesCodex } from '../../../../shared/celular'
 import type { AgenteDisponible } from '../../../../shared/types'
+
+/** Lo que dice Codex es cuánto se usó (usedPercent), igual que el celu: el valor lo dice, nunca parece «lo que te queda». */
+export const TITULO_LIMITES = 'Cuánto de cada ventana ya usaste, según Codex, leído hace un momento.'
 
 /** Una fila por ventana que haya llegado; sin ventanas queda vacío y la pantalla dice «Sin dato». Nunca se rellena con ceros. */
 export function filasLimites(l: LimitesCodex | null | undefined): { nombre: string; valor: string }[] {
   const filas: { nombre: string; valor: string }[] = []
-  if (l?.cincoHoras) filas.push({ nombre: '5 h', valor: `${Math.round(l.cincoHoras.pct)} %` })
-  if (l?.semana) filas.push({ nombre: 'Semana', valor: `${Math.round(l.semana.pct)} %` })
+  if (l?.cincoHoras) filas.push({ nombre: '5 h', valor: `${Math.round(l.cincoHoras.pct)} % usado` })
+  if (l?.semana) filas.push({ nombre: 'Semana', valor: `${Math.round(l.semana.pct)} % usado` })
   return filas
+}
+
+export const SIN_DATO_EN_USO = 'Sin dato (cerrá la terminal de esta cuenta para medir)'
+
+/** Qué decir cuando no hay filas: todavía leyendo (sin respuesta), terminal abierta de la cuenta, o sin dato (con cuánto falta para reintentar). */
+export function textoSinLimites(r: LecturaLimitesCodex | undefined): string {
+  if (!r) return 'Leyendo límites…'
+  if (r.tipo === 'en-uso') return SIN_DATO_EN_USO
+  if (r.tipo === 'sin-dato' && r.reintentaEnMin) return `Sin dato (reintenta en ${r.reintentaEnMin} min)`
+  return 'Sin dato'
 }
 
 export interface FormularioCuenta {
