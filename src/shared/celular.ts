@@ -60,6 +60,8 @@ export interface EstadoCelular {
   ahora: number
   /** Si se puede aprobar o rechazar desde el celu. */
   aprobar: boolean
+  /** Si se pueden abrir las terminales desde el celu (solo en el Wi-Fi). */
+  terminal: boolean
   cuentas: CuentaCelular[]
   sesiones: SesionCelular[]
   pedidos: PedidoCelular[]
@@ -75,6 +77,7 @@ export interface CelularVista {
   /** http://<ip>:<puerto>/#k=<clave>, o null si no hay IP o está apagado. */
   enlace: string | null
   aprobar: boolean
+  terminal: boolean
   ntfy: { encendido: boolean; tema: string; servidor: string; conToken: boolean; temaRenovado?: boolean }
   error: string | null
   /** La IP cambió desde que se abrió el servidor: el QR viejo ya no sirve. */

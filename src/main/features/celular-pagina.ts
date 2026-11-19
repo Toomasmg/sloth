@@ -53,6 +53,29 @@ export const PAGINA_HTML = `<!doctype html>
     <p class="hoy" id="hoy">Hoy: sin datos</p>
   </section>
 </main>
+<section class="term" id="term" role="dialog" aria-modal="true" aria-labelledby="term-nombre" hidden>
+  <header class="term-top">
+    <button type="button" class="term-volver" id="term-volver" aria-label="Volver a las sesiones"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+    <span class="term-nombre" id="term-nombre"></span>
+    <button type="button" class="term-ajustar" id="term-ajustar" aria-pressed="false">Ajustar al celu</button>
+  </header>
+  <div class="term-aviso" id="term-aviso" role="status" hidden></div>
+  <div class="term-pantalla" id="term-pantalla"></div>
+  <div class="term-teclas" role="group" aria-label="Teclas">
+    <button type="button" data-tecla="esc">Esc</button>
+    <button type="button" data-tecla="tab">Tab</button>
+    <button type="button" data-tecla="arriba" aria-label="Flecha arriba">↑</button>
+    <button type="button" data-tecla="abajo" aria-label="Flecha abajo">↓</button>
+    <button type="button" data-tecla="izq" aria-label="Flecha izquierda">←</button>
+    <button type="button" data-tecla="der" aria-label="Flecha derecha">→</button>
+    <button type="button" data-tecla="ctrlc" aria-label="Control C">Ctrl C</button>
+    <button type="button" data-tecla="enter" aria-label="Enter">⏎</button>
+  </div>
+  <form class="term-escribir" id="term-form" autocomplete="off">
+    <textarea id="term-texto" rows="1" placeholder="Escribile a la terminal…" aria-label="Texto para la terminal" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+    <button type="submit" id="term-enviar">Enviar</button>
+  </form>
+</section>
 <section class="aviso-pantalla" id="sin-token" hidden>
   <h1>Este celu no está conectado</h1>
   <p id="sin-token-texto">Abrí Sloth en la PC, entrá a «Celular» y escaneá el QR.</p>
@@ -186,6 +209,24 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .aviso-pantalla { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 24px max(24px, env(safe-area-inset-right)) 24px max(24px, env(safe-area-inset-left)); background: var(--fondo); text-align: center; }
 .aviso-pantalla h1 { margin: 0; font-size: 20px; }
 .aviso-pantalla p { margin: 0 auto; max-width: 36ch; color: var(--suave); }
+.lista .s-term { flex: none; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid var(--borde); background: #1B1F25; color: var(--texto); font: 600 13px var(--mono); }
+.term { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; background: var(--fondo); padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.term-top { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--borde); }
+.term-volver { flex: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 12px; background: transparent; color: var(--texto); }
+.term-nombre { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; color: var(--fuerte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.term-ajustar { flex: none; min-height: 44px; padding: 0 12px; border: 1px solid var(--borde); border-radius: 12px; background: var(--panel); color: var(--texto); font-size: 13px; font-weight: 600; }
+.term-ajustar[aria-pressed="true"] { background: #2A2F37; color: var(--fuerte); }
+.term-aviso { flex: none; padding: 8px 14px; font-size: 13px; color: var(--espera); background: rgba(255,159,67,0.10); border-bottom: 1px solid rgba(255,176,103,0.3); }
+.term-pantalla { flex: 1; min-height: 0; overflow: auto; padding: 6px 4px; background: #0B0D10; -webkit-overflow-scrolling: touch; }
+.term-pantalla .xterm { padding: 0; }
+.term-teclas { flex: none; display: flex; gap: 4px; padding: 6px 8px; overflow-x: auto; border-top: 1px solid var(--borde); scrollbar-width: none; }
+.term-teclas::-webkit-scrollbar { display: none; }
+.term-teclas button { flex: 1 0 auto; min-width: 38px; min-height: 44px; padding: 0 6px; border: 1px solid var(--borde); border-radius: 10px; background: var(--panel); color: var(--texto); font: 600 13px var(--mono); }
+.term-escribir { flex: none; display: flex; gap: 8px; padding: 6px 8px 8px; }
+.term-escribir textarea { flex: 1; min-width: 0; min-height: 44px; max-height: 120px; resize: none; padding: 11px 12px; border: 1px solid var(--borde); border-radius: 12px; background: var(--panel); color: var(--texto); font: 16px/1.3 var(--mono); }
+.term-escribir textarea:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 1px; }
+.term-escribir button { flex: none; min-height: 44px; padding: 0 16px; border: 0; border-radius: 12px; background: var(--trabaja); color: #08111C; font-weight: 700; }
+.term button:disabled, .term textarea:disabled { opacity: 0.5; cursor: default; }
 @media (prefers-reduced-motion: reduce) {
   .aguja, .valor { transition: none; }
   .c-espera.hay .num { animation: none; }
@@ -218,7 +259,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       var s = window.slothSello.sellarPedido(claves, ruta, objeto);
       fetch(ruta, { method: 'POST', cache: 'no-store', headers: { 'content-type': 'text/plain' }, body: s.sobre })
         .then(function (r) {
-          if (r.status !== 200 && r.status !== 400 && r.status !== 403 && r.status !== 409) return { ok: false, status: r.status };
+          if (r.status !== 200 && r.status !== 400 && r.status !== 403 && r.status !== 404 && r.status !== 409) return { ok: false, status: r.status };
           return r.text().then(function (texto) {
             var plano = window.slothSello.abrirRespuesta(claves, s.iv, texto);
             if (plano === null) throw new Error('respuesta sin sellar');
@@ -437,6 +478,13 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       li.appendChild(punto);
       li.appendChild(texto);
       li.appendChild(lado);
+      if (e.terminal && !window.slothFetch && s.estado !== 'exited') {
+        var bt = el('button', 's-term', '>_');
+        bt.type = 'button';
+        bt.setAttribute('aria-label', 'Abrir la terminal de ' + s.nombre);
+        bt.addEventListener('click', function () { abrirTerminal(s.id, s.nombre); });
+        li.appendChild(bt);
+      }
       lista.appendChild(li);
     });
     var n = function (k) { return e.sesiones.filter(function (s) { return s.estado === k; }).length; };
@@ -528,9 +576,195 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     $('pista-ok').addEventListener('click', function () { $('pista-ios').hidden = true; guardar('sloth-pista-ios', '1'); });
   }
 
+
+  // Terminal: el celu pide «lo nuevo desde el chunk N» cada poco y manda lo que se tipea, todo sellado
+  // por el mismo canal que el estado. xterm se carga recién al abrirla (pesa ~500 kB).
+  var TECLAS = { esc: '\\x1b', tab: '\\t', arriba: '\\x1b[A', abajo: '\\x1b[B', der: '\\x1b[C', izq: '\\x1b[D', ctrlc: '\\x03', enter: '\\r' };
+  var TERM_MS = 350, TERM_MAX = 1500;
+  var term = null, termId = null, termDesde = -1, termTimer = null, termEnVuelo = false, termCola = [], termTam = null;
+  var termAjustado = false, termPedirTam = null, termCerrada = false, termFallas = 0, xtermCargando = null, conHistoria = false;
+
+  function cargarXterm() {
+    if (window.Terminal) return Promise.resolve();
+    if (xtermCargando) return xtermCargando;
+    xtermCargando = new Promise(function (resolve, reject) {
+      var css = document.createElement('link');
+      css.rel = 'stylesheet';
+      css.href = '/xterm.css';
+      document.head.appendChild(css);
+      var js = document.createElement('script');
+      js.src = '/xterm.js';
+      js.onload = function () { resolve(); };
+      js.onerror = function () { xtermCargando = null; reject(new Error('xterm')); };
+      document.head.appendChild(js);
+    });
+    return xtermCargando;
+  }
+
+  function avisoTerm(texto) {
+    $('term-aviso').hidden = !texto;
+    $('term-aviso').textContent = texto || '';
+  }
+
+  // La celda se mide en lo que dibujó xterm (redondea a píxeles de la pantalla); a ojo, el texto se corta.
+  function celda() {
+    var pantalla = $('term-pantalla').querySelector('.xterm-screen');
+    if (!pantalla || !term.cols) return null;
+    return { w: pantalla.offsetWidth / term.cols, h: pantalla.offsetHeight / term.rows };
+  }
+  // Lo que queda para las columnas: el padding y la barra de scroll de xterm.
+  var anchoUtil = function () { return $('term-pantalla').clientWidth - 8 - 14; };
+
+  // Con el tamaño de la PC la letra se achica hasta que entren las columnas; si ni así, se desliza de costado.
+  function encajar() {
+    if (!term || !termTam) return;
+    if (term.cols !== termTam.cols || term.rows !== termTam.rows) term.resize(termTam.cols, termTam.rows);
+    var px = term.options.fontSize;
+    for (var i = 0; i < 3; i++) {
+      var c = celda();
+      if (!c || !c.w) return;
+      var nuevo = Math.max(7, Math.min(15, Math.floor(px * anchoUtil() / (c.w * termTam.cols) * 10) / 10));
+      if (Math.abs(nuevo - px) < 0.1) return;
+      term.options.fontSize = px = nuevo;
+    }
+  }
+
+  function tamDelCelu() {
+    var c = celda();
+    var px = term.options.fontSize;
+    var w = c && c.w ? c.w * 13 / px : 7.8, h = c && c.h ? c.h * 13 / px : 16;
+    return { cols: Math.max(20, Math.min(500, Math.floor(anchoUtil() / w))), rows: Math.max(5, Math.min(200, Math.floor(($('term-pantalla').clientHeight - 12) / h))) };
+  }
+
+  function encolar(texto, aparte) {
+    if (termCerrada || !texto) return;
+    var ult = termCola[termCola.length - 1];
+    for (var i = 0; i < texto.length; i += TERM_MAX) {
+      var parte = texto.slice(i, i + TERM_MAX);
+      if (!aparte && ult && !ult.aparte && ult.t.length + parte.length <= TERM_MAX) ult.t += parte;
+      else termCola.push(ult = { t: parte, aparte: !!aparte });
+    }
+    tickTerm();
+  }
+
+  function tickTerm() {
+    clearTimeout(termTimer);
+    if (!termId || !term || termEnVuelo || document.hidden) return;
+    var pedido = { id: termId, desde: termDesde };
+    var item = termCola.shift();
+    if (item) pedido.escribir = item.t;
+    if (termPedirTam) { pedido.tam = termPedirTam; termPedirTam = null; }
+    var id = termId;
+    termEnVuelo = true;
+    pedirApi('/api/terminal', pedido)
+      .then(function (r) {
+        if (r.status === 401) { cerrarTerminal(false); consultar(); return null; }
+        if (!r.json) throw new Error('http ' + r.status);
+        return r.json().then(function (j) { return { r: r, j: j }; });
+      })
+      .then(function (x) {
+        if (!x || id !== termId) return;
+        termFallas = 0;
+        if (!x.r.ok) {
+          termCerrada = true;
+          termCola = [];
+          avisoTerm(x.j && x.j.error === 'reloj' ? HORA_CORRIDA : (x.j && x.j.error) || 'La PC no dejó abrir la terminal.');
+          return;
+        }
+        var j = x.j;
+        // Primero el tamaño: lo que llega se dibujó para ese ancho.
+        var cambio = !termTam || termTam.cols !== j.cols || termTam.rows !== j.rows;
+        if (cambio) { termTam = { cols: j.cols, rows: j.rows }; encajar(); }
+        if (j.reinicio) term.reset();
+        if (j.datos) term.write(j.datos, cambio || j.reinicio ? function () { term.scrollToBottom(); } : undefined);
+        termDesde = j.hasta;
+        termAjustado = j.ajustado;
+        $('term-ajustar').setAttribute('aria-pressed', termAjustado ? 'true' : 'false');
+        $('term-ajustar').textContent = termAjustado ? 'Tamaño de la PC' : 'Ajustar al celu';
+        termCerrada = !j.viva;
+        avisoTerm(termCerrada ? 'La terminal está cerrada en la PC. Abrila ahí para seguir desde acá.' : '');
+      }, function () {
+        if (id !== termId) return;
+        if (item) termCola.unshift(item);
+        termFallas++;
+        avisoTerm('Sin conexión con la PC. Reintentando…');
+      })
+      .then(function () {
+        termEnVuelo = false;
+        if (id !== termId) return;
+        $('term-enviar').disabled = $('term-ajustar').disabled = termCerrada;
+        termTimer = setTimeout(tickTerm, termCola.length ? 0 : termFallas ? Math.min(5000, 700 * termFallas) : TERM_MS);
+      });
+  }
+
+  function abrirTerminal(id, nombre) {
+    termId = id;
+    termDesde = -1;
+    termCola = [];
+    termTam = null;
+    termCerrada = false;
+    termFallas = 0;
+    termPedirTam = null;
+    $('term-nombre').textContent = nombre;
+    $('term').hidden = false;
+    $('term-enviar').disabled = $('term-ajustar').disabled = false;
+    avisoTerm('Abriendo la terminal…');
+    if (!conHistoria) {
+      conHistoria = true;
+      window.addEventListener('popstate', function () { if (termId) cerrarTerminal(true); });
+    }
+    try { history.pushState({ terminal: id }, ''); } catch (e) { /* sin historial */ }
+    cargarXterm().then(function () {
+      if (termId !== id) return;
+      if (!term) {
+        term = new window.Terminal({
+          fontFamily: '"JetBrains Mono", ui-monospace, "Cascadia Mono", Menlo, monospace',
+          fontSize: 12, scrollback: 5000, cursorBlink: true,
+          theme: { background: '#0B0D10', foreground: '#E8EAED', cursor: '#8CC2FF', selectionBackground: '#2A3A4F' }
+        });
+        term.open($('term-pantalla'));
+        term.onData(function (d) { encolar(d, false); });
+        window.addEventListener('resize', encajar);
+      } else term.reset();
+      tickTerm();
+    }, function () { avisoTerm('No se pudo cargar la terminal. Revisá la conexión con la PC.'); });
+  }
+
+  function cerrarTerminal(desdeHistoria) {
+    if (!termId) return;
+    var id = termId;
+    if (termAjustado) pedirApi('/api/terminal', { id: id, desde: termDesde, tam: 'pc' }).then(null, function () { /* la PC lo devuelve sola al rato */ });
+    termId = null;
+    termAjustado = false;
+    termCola = [];
+    clearTimeout(termTimer);
+    $('term').hidden = true;
+    if (!desdeHistoria) { try { history.back(); } catch (e) { /* sin historial */ } }
+  }
+
+  $('term-volver').addEventListener('click', function () { cerrarTerminal(false); });
+  $('term-ajustar').addEventListener('click', function () {
+    termPedirTam = termAjustado ? 'pc' : tamDelCelu();
+    tickTerm();
+  });
+  if (document.querySelectorAll) {
+    [].forEach.call(document.querySelectorAll('[data-tecla]'), function (b) {
+      b.addEventListener('click', function () { encolar(TECLAS[b.getAttribute('data-tecla')], true); });
+    });
+  }
+  $('term-form').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var t = $('term-texto');
+    if (!t.value) { encolar('\\r', true); return; }
+    // El Enter va en otro pedido: pegado al texto, Claude lo toma como parte de lo pegado y no lo manda.
+    encolar(t.value.replace(/\\r?\\n/g, '\\r'), true);
+    encolar('\\r', true);
+    t.value = '';
+  });
+
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) clearTimeout(timer);
-    else consultar();
+    if (document.hidden) { clearTimeout(timer); clearTimeout(termTimer); }
+    else { consultar(); tickTerm(); }
   });
   consultar();
 })();

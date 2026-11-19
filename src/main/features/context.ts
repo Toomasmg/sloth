@@ -32,6 +32,12 @@ export interface FeatureContext {
   onPtyExit(cb: (id: string, code: number) => void): void
   /** Lo que la persona escribe en una terminal desde la UI. */
   onPtyWrite(cb: (id: string, data: string) => void): void
+  /** Escribe en una terminal como si fuera la persona en la PC (avisa a `onPtyWrite`). */
+  writePty(id: string, data: string): void
+  /** El último tamaño que le dio la PC a esa terminal, o null si la PC todavía no la abrió. */
+  ptySize(id: string): { cols: number; rows: number } | null
+  /** Cambia el tamaño de la terminal sin tocar el que recuerda la PC (`ptySize`). */
+  resizePty(id: string, cols: number, rows: number): void
   agents(): ReadonlyMap<string, AgentStatus>
   setAgent(wsId: string, status: AgentStatus): void
   /** Mismas validaciones que «Nuevo espacio» (incluye crear worktree si viene branch). */

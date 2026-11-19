@@ -169,7 +169,7 @@ export function crearFuenteRemota(o: OpcionesRemota): FuenteDeEstado {
     const h = huella(e)
     if (!debePublicar({ ...ritmo, cambio: h !== ultimaHuella })) return
     holaNuevo = false
-    const dato: DatoEstado = { estado: { ...e, aprobar: e.aprobar && o.puedeAprobar() }, n: ++n }
+    const dato: DatoEstado = { estado: { ...e, aprobar: e.aprobar && o.puedeAprobar(), terminal: false }, n: ++n }
     if (await mandar(c, EVENTOS.estado, dato)) {
       ultimoEnvio = ahora
       ultimaHuella = h

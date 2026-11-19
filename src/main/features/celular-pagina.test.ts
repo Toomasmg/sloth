@@ -6,7 +6,7 @@ import type { EstadoCelular } from '../../shared/celular'
 import { PAGINA_JS } from './celular-pagina'
 import { abrirPedido, derivarClaves, sellarRespuesta, type Claves } from './celular-sello'
 
-const ESTADO: EstadoCelular = { ahora: 1, aprobar: false, cuentas: [], sesiones: [], pedidos: [] }
+const ESTADO: EstadoCelular = { ahora: 1, aprobar: false, terminal: false, cuentas: [], sesiones: [], pedidos: [] }
 const CLAVE = Buffer.alloc(32, 9).toString('base64url')
 const claves = derivarClaves(CLAVE) as Claves
 
