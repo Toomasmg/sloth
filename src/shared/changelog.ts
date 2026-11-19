@@ -9,6 +9,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.4',
+    date: '2026-11-19',
+    title: 'La terminal del celu, ahora sí',
+    items: ['En la 0.7.3, la terminal no cargaba en el celu con Sloth instalado. Ya anda.']
+  },
+  {
+    version: '0.7.3',
+    date: '2026-11-19',
+    title: 'La terminal en el celu',
+    items: [
+      'Desde el celu ya podés abrir la terminal de cada espacio: ves lo que pasa en vivo y le escribís como si estuvieras en la PC. Prendelo en Celular › «Abrir las terminales desde el celu» (viene apagado) y tocá el botón >_ de la sesión.',
+      'Tiene teclas rápidas (Esc, Tab, flechas, Ctrl C y Enter) y un campo para escribir cómodo con el teclado del celu.',
+      'Se ve con el tamaño de la PC; con «Ajustar al celu» la terminal se acomoda a la pantalla del teléfono y, al volver, recupera el tamaño de la PC.',
+      'Anda solo en el Wi-Fi de casa y va cifrado con la clave del QR. Quien tenga el QR puede correr comandos en tu PC: prendelo solo en una red de confianza.'
+    ]
+  },
+  {
     version: '0.7.2',
     date: '2026-11-18',
     title: 'Gruv por personas, sin esperar a todo el equipo',
