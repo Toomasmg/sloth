@@ -9,6 +9,12 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.4',
+    date: '2026-11-19',
+    title: 'La terminal del celu, ahora sí',
+    items: ['En la 0.7.3, la terminal no cargaba en el celu con Sloth instalado. Ya anda.']
+  },
+  {
     version: '0.7.3',
     date: '2026-11-19',
     title: 'La terminal en el celu',
