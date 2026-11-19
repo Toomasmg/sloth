@@ -18,9 +18,25 @@ export interface EstadoSwipe {
   /** Ya cambió de panel en este gesto: lo que sigue se ignora hasta que termine. */
   usado: boolean
   ultimo: number
+  /** Desde el cambio: sentido del gesto, el |deltaX| más alto y el más bajo después. Así se ve la inercia. */
+  signo: number
+  pico: number
+  piso: number
 }
 
-export const swipeInicial = (): EstadoSwipe => ({ acumulado: 0, usado: false, ultimo: -Infinity })
+export const swipeInicial = (): EstadoSwipe => ({ acumulado: 0, usado: false, ultimo: -Infinity, signo: 0, pico: 0, piso: 0 })
+
+/**
+ * La inercia de Windows sigue mandando eventos un buen rato después de soltar, cada vez más chicos y
+ * siempre para el mismo lado: sin esto, un segundo deslizamiento que arranca encima de ella se tomaba
+ * como el mismo gesto (y había que tocar el pad para cortarla). Si los eventos ya se frenaron y vuelven
+ * a acelerar, o cambian de sentido, son dedos nuevos.
+ */
+function dedosNuevos(s: EstadoSwipe, dx: number): boolean {
+  const m = Math.abs(dx)
+  if (m >= 4 && Math.sign(dx) !== s.signo) return true
+  return s.piso < s.pico * 0.4 && m > s.piso * 2 + 4
+}
 
 export interface PasoSwipe {
   estado: EstadoSwipe
@@ -31,12 +47,17 @@ export interface PasoSwipe {
 }
 
 export function pasoSwipe(s: EstadoSwipe, dx: number, dy: number, ahora: number): PasoSwipe {
-  const nuevo = ahora - s.ultimo > FIN_GESTO_MS
-  const base: EstadoSwipe = nuevo ? { acumulado: 0, usado: false, ultimo: ahora } : { ...s, ultimo: ahora }
+  const horizontal = Math.abs(dx) > Math.abs(dy)
+  const nuevo = ahora - s.ultimo > FIN_GESTO_MS || (s.usado && horizontal && dedosNuevos(s, dx))
+  let base: EstadoSwipe = nuevo ? { ...swipeInicial(), ultimo: ahora } : { ...s, ultimo: ahora }
+  if (base.usado && horizontal) base = { ...base, pico: Math.max(base.pico, Math.abs(dx)), piso: Math.min(base.piso, Math.abs(dx)) }
   // Un gesto vertical (subir el historial) nunca cambia de panel, aunque se desvíe un poco.
-  if (base.usado || Math.abs(dx) <= Math.abs(dy)) return { estado: base, cambio: null, arrastre: base.usado ? 0 : arrastreDe(base.acumulado) }
+  if (base.usado || !horizontal) return { estado: base, cambio: null, arrastre: base.usado ? 0 : arrastreDe(base.acumulado) }
   const acumulado = base.acumulado + dx
-  if (Math.abs(acumulado) >= UMBRAL_SWIPE) return { estado: { ...base, acumulado: 0, usado: true }, cambio: acumulado > 0 ? 1 : -1, arrastre: 0 }
+  if (Math.abs(acumulado) >= UMBRAL_SWIPE) {
+    const m = Math.abs(dx)
+    return { estado: { ...base, acumulado: 0, usado: true, signo: Math.sign(dx), pico: m, piso: m }, cambio: acumulado > 0 ? 1 : -1, arrastre: 0 }
+  }
   return { estado: { ...base, acumulado }, cambio: null, arrastre: arrastreDe(acumulado) }
 }
 

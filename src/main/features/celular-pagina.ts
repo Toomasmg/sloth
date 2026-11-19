@@ -49,6 +49,7 @@ export const PAGINA_HTML = `<!doctype html>
     <div class="pedido" id="pedido" hidden></div>
     <div class="calma" id="calma"><span class="calma-t">Nada te espera</span><span class="calma-s" id="calma-s">Ningún permiso pendiente.</span></div>
     <h2 class="titulo-lista">Sesiones <span id="resumen"></span></h2>
+    <p class="term-nota" id="term-nota" hidden>La terminal de cada sesión se abre con el QR del Wi-Fi de casa, no con el de «Desde cualquier red».</p>
     <ul class="lista" id="lista"></ul>
     <p class="hoy" id="hoy">Hoy: sin datos</p>
   </section>
@@ -209,7 +210,9 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .aviso-pantalla { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 24px max(24px, env(safe-area-inset-right)) 24px max(24px, env(safe-area-inset-left)); background: var(--fondo); text-align: center; }
 .aviso-pantalla h1 { margin: 0; font-size: 20px; }
 .aviso-pantalla p { margin: 0 auto; max-width: 36ch; color: var(--suave); }
-.lista .s-term { flex: none; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid var(--borde); background: #1B1F25; color: var(--texto); font: 600 13px var(--mono); }
+.lista .s-term { flex: none; min-height: 44px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border-radius: 12px; border: 1px solid rgba(140,194,255,0.35); background: rgba(90,169,255,0.12); color: var(--trabaja); font-size: 13px; font-weight: 600; }
+.lista .s-term .s-term-ico { font: 700 13px var(--mono); }
+.term-nota { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--panel); border: 1px solid var(--borde); font-size: 12px; color: var(--suave); }
 .term { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; background: var(--fondo); padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 .term-top { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--borde); }
 .term-volver { flex: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 12px; background: transparent; color: var(--texto); }
@@ -479,7 +482,9 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       li.appendChild(texto);
       li.appendChild(lado);
       if (e.terminal && !window.slothFetch && s.estado !== 'exited') {
-        var bt = el('button', 's-term', '>_');
+        var bt = el('button', 's-term');
+        bt.appendChild(el('span', 's-term-ico', '>_'));
+        bt.appendChild(el('span', '', 'Terminal'));
         bt.type = 'button';
         bt.setAttribute('aria-label', 'Abrir la terminal de ' + s.nombre);
         bt.addEventListener('click', function () { abrirTerminal(s.id, s.nombre); });
@@ -492,6 +497,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     $('n-espera').parentNode.classList.toggle('hay', n('waiting') > 0);
     $('n-listo').textContent = n('done');
     $('n-trabaja').textContent = n('working');
+    $('term-nota').hidden = !(window.slothFetch && e.terminalEnWifi);
     $('resumen').textContent = e.sesiones.length ? e.sesiones.length + (e.sesiones.length === 1 ? ' abierta' : ' abiertas') : '';
   }
 

@@ -33,7 +33,7 @@ interface Pedido {
 }
 
 /** Corre app.js en un contexto aparte con un DOM mínimo, como un Android (con requestFullscreen). */
-async function correrPagina(slothFetch?: (url: string, init?: unknown) => Promise<unknown>, hash = `#k=${CLAVE}`, responder?: (ab: { iv: Buffer }) => { status: number; cuerpo: string }): Promise<{ fetchs: Pedido[]; pantallaCompleta: number; hoy: string | undefined; conexion: string | undefined; sinClave: boolean; sinClaveTexto: string | undefined; almacen: Map<string, string>; url: string }> {
+async function correrPagina(slothFetch?: (url: string, init?: unknown) => Promise<unknown>, hash = `#k=${CLAVE}`, responder?: (ab: { iv: Buffer }) => { status: number; cuerpo: string }): Promise<{ fetchs: Pedido[]; pantallaCompleta: number; hoy: string | undefined; conexion: string | undefined; sinClave: boolean; sinClaveTexto: string | undefined; almacen: Map<string, string>; url: string; notaTerminal: boolean }> {
   const fetchs: Pedido[] = []
   const nodos = new Map<string, Nodo>()
   let pantallaCompleta = 0
@@ -86,7 +86,7 @@ async function correrPagina(slothFetch?: (url: string, init?: unknown) => Promis
   if (slothFetch) ventana.slothFetch = slothFetch
   runInNewContext(PAGINA_JS, ventana)
   await new Promise((r) => setImmediate(r))
-  return { fetchs, pantallaCompleta, hoy: nodos.get('hoy')?.textContent, conexion: nodos.get('conexion-texto')?.textContent, sinClave: nodos.get('sin-token')?.hidden === false, sinClaveTexto: nodos.get('sin-token-texto')?.textContent, almacen, url }
+  return { fetchs, pantallaCompleta, hoy: nodos.get('hoy')?.textContent, conexion: nodos.get('conexion-texto')?.textContent, sinClave: nodos.get('sin-token')?.hidden === false, sinClaveTexto: nodos.get('sin-token-texto')?.textContent, almacen, url, notaTerminal: nodos.get('term-nota')?.hidden === false }
 }
 
 test('en el Wi-Fi la página pide /api/estado sellado con la clave del hash, sin pedir pantalla completa', async () => {
@@ -146,4 +146,11 @@ test('un #k= truncado no se guarda y dice que el QR no se leyó bien', async () 
   assert.equal(r.almacen.get('sloth-clave'), undefined)
   assert.equal(r.sinClave, true)
   assert.match(r.sinClaveTexto ?? '', /no se leyó bien/)
+})
+
+test('la versión remota avisa que la terminal se abre con el QR del Wi-Fi, solo si está prendida en la PC', async () => {
+  const remota = (e: EstadoCelular) => async () => ({ status: 200, ok: true, json: async () => e })
+  assert.equal((await correrPagina(remota({ ...ESTADO, terminalEnWifi: true }))).notaTerminal, true)
+  assert.equal((await correrPagina(remota({ ...ESTADO, terminalEnWifi: false }))).notaTerminal, false)
+  assert.equal((await correrPagina()).notaTerminal, false, 'en el Wi-Fi no hace falta el aviso')
 })
