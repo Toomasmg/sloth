@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
 import { networkInterfaces } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
 import type { PendingPermission } from '../daemon-client'
 import type { HookEventPayload } from '../hooks'
@@ -14,6 +14,7 @@ import { agenteDe, capacidadesDe } from '../../shared/proveedores'
 import { limitesDeCuenta } from '../codex-limites'
 import { armarEstado, claveValida, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type TipoAviso } from './celular-core'
 import { crearFuenteWifi, type FuenteDeEstado, type ProveedorDeEstado } from './celular-servidor'
+import { XTERM } from './celular-xterm'
 import { nuevoVisor, ponerFoto, salidaDesde, sumarSalida, tamanoActual, vencidos, type Visor } from './celular-terminal-core'
 import { crearFuenteRemota, type CambioRemoto } from './celular-remoto'
 import { sesionChat } from './chat'
@@ -117,19 +118,7 @@ const feature: Feature = {
     let celuActivo = false
     const visores = new Map<string, Visor>()
     let vencedor: NodeJS.Timeout | null = null
-    let xterm: { js: string; css: string } | null | undefined
 
-    const leerXterm = (): { js: string; css: string } | null => {
-      if (xterm !== undefined) return xterm
-      try {
-        const js = require.resolve('@xterm/xterm/lib/xterm.js')
-        xterm = { js: readFileSync(js, 'utf8'), css: readFileSync(join(dirname(js), '../css/xterm.css'), 'utf8') }
-      } catch (e) {
-        ctx.log('no encontré xterm para el celu:', (e as Error).message)
-        xterm = null
-      }
-      return xterm
-    }
 
     const guardar = (): void => {
       try {
@@ -269,7 +258,7 @@ const feature: Feature = {
         const salida = v ? salidaDesde(v, p.desde) : { reinicio: p.desde !== -1, datos: '', hasta: 0 }
         return { ...salida, viva: viva && !!v, cols: tam.cols, rows: tam.rows, ajustado: !!v?.ajustado }
       },
-      xterm: leerXterm
+      xterm: () => XTERM
     }
 
     function devolverTamano(id: string, v: Visor): void {
