@@ -56,3 +56,28 @@ test('direccionDe usa la pedida o, si no, el orden de las pestañas', () => {
   assert.equal(direccionDe(l, 'c', 'a', 1), 1)
   assert.equal(direccionDe(l, null, 'b'), 1)
 })
+
+/** La inercia de Windows: después de soltar, eventos que se van achicando, todos para el mismo lado. */
+const inercia = (desde: number, signo = 1): [number, number][] => {
+  const r: [number, number][] = []
+  for (let d = desde; d >= 1; d = Math.floor(d * 0.85)) r.push([signo * d, 0])
+  return r
+}
+
+test('un segundo deslizamiento encima de la inercia del primero también cambia (sin tocar el pad)', () => {
+  const r = gesto([...Array(8).fill([20, 0]), ...inercia(20), ...Array(8).fill([6, 0]), ...Array(8).fill([20, 0])])
+  assert.deepEqual(r.cambios, [1, 1])
+})
+
+test('al revés encima de la inercia también vale', () => {
+  assert.deepEqual(gesto([...Array(8).fill([20, 0]), ...inercia(20), ...Array(8).fill([-20, 0])]).cambios, [1, -1])
+})
+
+test('la inercia sola, con algún salto chico, no cambia de nuevo', () => {
+  const ruido = inercia(30).map(([dx], i): [number, number] => [dx + (i % 3 === 0 ? 2 : 0), 0])
+  assert.deepEqual(gesto([...Array(6).fill([20, 0]), ...ruido]).cambios, [1])
+})
+
+test('un deslizamiento largo que acelera sin frenarse cambia una sola vez', () => {
+  assert.deepEqual(gesto([[10, 0], [20, 0], [30, 0], [40, 0], [50, 0], [60, 0], [70, 0], [80, 0], [90, 0]]).cambios, [1])
+})

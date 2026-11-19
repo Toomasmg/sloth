@@ -191,7 +191,7 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
               Abrir las terminales desde el celu
             </Switch>
             <p className={v.terminal ? 'f-cel-aviso' : 'f-cel-nota'}>
-              Desde el celu vas a poder ver la terminal de cada espacio y escribir en ella como si estuvieras en la PC. Quien tenga el QR (o la clave) puede correr cualquier comando en esta PC. Solo anda en el Wi-Fi de casa, no en «Desde cualquier red».
+              Desde el celu vas a poder ver la terminal de cada espacio y escribir en ella como si estuvieras en la PC. Quien tenga el QR (o la clave) puede correr cualquier comando en esta PC. Solo anda en el Wi-Fi de casa: abrí la página con el QR de arriba, no con el de «Desde cualquier red». En cada sesión vas a ver el botón «Terminal».
             </p>
             <p className="f-cel-aviso" role="note">
               Lo que va entre el celu y la PC viaja cifrado en tu Wi-Fi, con una clave que está solo en el QR. Aun así la página no puede verificarse: alguien que manipule tu red a propósito podría robarte la clave. Usalo en una red propia; en una pública, de hotel o compartida, usá «Desde cualquier red», que va cifrado de punta a punta.
