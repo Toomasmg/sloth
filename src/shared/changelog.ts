@@ -9,6 +9,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.5',
+    date: '2026-11-19',
+    title: 'Deslizar con dos dedos y la terminal a mano',
+    items: [
+      'Deslizar con dos dedos en el touchpad ya pasa de un panel al siguiente seguido, sin tener que tocar el pad entre gesto y gesto.',
+      'En el celu, cada sesión tiene un botón «>_ Terminal» bien visible. Si abrís el QR de «Desde cualquier red», te avisa que la terminal se abre con el QR del Wi-Fi.'
+    ]
+  },
+  {
     version: '0.7.4',
     date: '2026-11-19',
     title: 'La terminal del celu, ahora sí',
