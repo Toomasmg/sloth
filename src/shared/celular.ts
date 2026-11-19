@@ -62,6 +62,8 @@ export interface EstadoCelular {
   aprobar: boolean
   /** Si se pueden abrir las terminales desde el celu (solo en el Wi-Fi). */
   terminal: boolean
+  /** Solo en «desde cualquier red»: la terminal está prendida, pero se abre con el QR del Wi-Fi. */
+  terminalEnWifi?: boolean
   cuentas: CuentaCelular[]
   sesiones: SesionCelular[]
   pedidos: PedidoCelular[]
