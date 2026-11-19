@@ -114,6 +114,7 @@ const corto = (s: string, n = MAX_TEXTO): string => (s.length > n ? `${s.slice(0
 export interface Entrada {
   ahora: number
   aprobar: boolean
+  terminal: boolean
   cuentas: { id: string; label: string }[]
   espacios: { id: string; name: string; accountId: string }[]
   agentes: ReadonlyMap<string, AgentStatus> | Record<string, AgentStatus>
@@ -157,7 +158,7 @@ export function armarEstado(e: Entrada): EstadoCelular {
     .filter((p) => nombres.has(p.ws))
     .sort((a, b) => a.at - b.at)
     .map((p) => ({ id: p.id, sesionId: p.ws, sesion: corto(nombres.get(p.ws) as string, 60), texto: corto(p.texto), desde: p.at, vence: p.expiresAt }))
-  return { ahora: e.ahora, aprobar: e.aprobar, cuentas, sesiones, pedidos }
+  return { ahora: e.ahora, aprobar: e.aprobar, terminal: e.terminal, cuentas, sesiones, pedidos }
 }
 
 export type TipoAviso = 'termino' | 'teNecesita' | 'permiso'

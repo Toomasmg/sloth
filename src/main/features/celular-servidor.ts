@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { EstadoCelular } from '../../shared/celular'
 import { abrirPedido, crearRepetidos, derivarClaves, fechaValida, sellarRespuesta } from './celular-sello'
 import { manifiesto, PAGINA_CSS, PAGINA_HTML, PAGINA_JS } from './celular-pagina'
+import { leerPedidoTerminal, type PedidoTerminal, type RespuestaTerminal } from './celular-terminal-core'
 
 /** Lo que la PC le da a cualquier fuente: el estado y cómo responder un permiso. */
 export interface ProveedorDeEstado {
@@ -11,6 +12,10 @@ export interface ProveedorDeEstado {
   puedeAprobar(): boolean
   clave(): string
   icono(): Buffer | null
+  /** La terminal de un espacio, vista desde el celu. Con `error`, no se pudo (apagado, cerrada, no existe). */
+  terminal(p: PedidoTerminal): Promise<RespuestaTerminal | { status: 403 | 404; error: string }>
+  /** xterm.js y su css, para que la página del celu dibuje la terminal. */
+  xterm(): { js: string; css: string } | null
 }
 
 /**
@@ -35,7 +40,7 @@ const SEGURIDAD = {
 const CSP = [
   "default-src 'none'",
   "script-src 'self'",
-  "style-src 'self' https://fonts.googleapis.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   'font-src https://fonts.gstatic.com',
   "img-src 'self'",
   "connect-src 'self'",
@@ -84,7 +89,7 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
     const metodo = req.method ?? 'GET'
     const esGet = metodo === 'GET' || metodo === 'HEAD'
 
-    if (ruta === '/api/estado' || ruta === '/api/permiso') {
+    if (ruta === '/api/estado' || ruta === '/api/permiso' || ruta === '/api/terminal') {
       // 401 a los GET para que una página vieja ya abierta (con x-sloth-token) pida volver a escanear en vez de quedar en «sin conexión».
       if (esGet) return enviar(res, 401, null)
       if (metodo !== 'POST') return enviar(res, 405, null, undefined, { allow: 'POST' })
@@ -107,6 +112,12 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
       if (repetidos.vistoAntes(ab.iv, Date.now())) return sellado(409, { error: 'repetido' })
 
       if (ruta === '/api/estado') return sellado(200, await o.proveedor.estado())
+      if (ruta === '/api/terminal') {
+        const p = leerPedidoTerminal(sobre.b)
+        if (!p) return sellado(400, { error: 'Pedido inválido.' })
+        const r = await o.proveedor.terminal(p)
+        return 'error' in r ? sellado(r.status, { error: r.error }) : sellado(200, r)
+      }
       if (!o.proveedor.puedeAprobar()) return sellado(403, { error: 'Aprobar desde el celu está apagado en Sloth.' })
       const p = sobre.b as { id?: unknown; decision?: unknown } | null
       if (!p || typeof p !== 'object' || typeof p.id !== 'string' || p.id.length > 100 || (p.decision !== 'allow' && p.decision !== 'deny')) return sellado(400, { error: 'Pedido inválido.' })
@@ -122,6 +133,11 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
     if (ruta === '/') return enviar(res, 200, 'text/html; charset=utf-8', PAGINA_HTML, { 'content-security-policy': CSP })
     if (ruta === '/app.css') return enviar(res, 200, 'text/css; charset=utf-8', PAGINA_CSS)
     if (ruta === '/app.js') return enviar(res, 200, 'text/javascript; charset=utf-8', PAGINA_JS)
+    if (ruta === '/xterm.js' || ruta === '/xterm.css') {
+      const x = o.proveedor.xterm()
+      if (!x) return enviar(res, 404, null)
+      return ruta === '/xterm.js' ? enviar(res, 200, 'text/javascript; charset=utf-8', x.js) : enviar(res, 200, 'text/css; charset=utf-8', x.css)
+    }
     if (ruta === '/manifest.webmanifest') return enviar(res, 200, 'application/manifest+json; charset=utf-8', manifiesto())
     if (ruta === '/icono.png') {
       const png = o.proveedor.icono()

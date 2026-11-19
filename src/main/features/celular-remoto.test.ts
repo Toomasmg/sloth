@@ -10,7 +10,7 @@ const USER = '00000000-0000-4000-8000-000000000001'
 const TOPIC = topicCelu(USER)
 const VIEJO = 'a'.repeat(43)
 const NUEVO = 'b'.repeat(43)
-const ESTADO: EstadoCelular = { ahora: 1, aprobar: true, cuentas: [], sesiones: [], pedidos: [] }
+const ESTADO: EstadoCelular = { ahora: 1, aprobar: true, terminal: false, cuentas: [], sesiones: [], pedidos: [] }
 
 interface Enviado {
   event: EventoCelu
@@ -54,7 +54,7 @@ test('al regenerar, la PC deja de publicar con la clave vieja y rechaza las deci
   let secreto = VIEJO
   const decididas: string[] = []
   const fuente = crearFuenteRemota({
-    proveedor: { estado: async () => ESTADO, decidir: (id, d) => void decididas.push(`${id}:${d}`), puedeAprobar: () => true, clave: () => 'x', icono: () => null },
+    proveedor: { estado: async () => ESTADO, decidir: (id, d) => void decididas.push(`${id}:${d}`), puedeAprobar: () => true, clave: () => 'x', icono: () => null, terminal: async () => ({ status: 403, error: 'x' }), xterm: () => null },
     sesion: () => sesion,
     secreto: () => secreto,
     puedeAprobar: () => true,

@@ -6,7 +6,7 @@ import { crearFuenteWifi, type ProveedorDeEstado } from './celular-servidor'
 import { abrirRespuesta, derivarClaves, sellarPedido, type Claves } from './celular-sello'
 
 const CLAVE = Buffer.alloc(32, 7).toString('base64url')
-const ESTADO: EstadoCelular = { ahora: 1, aprobar: false, cuentas: [], sesiones: [], pedidos: [] }
+const ESTADO: EstadoCelular = { ahora: 1, aprobar: false, terminal: false, cuentas: [], sesiones: [], pedidos: [] }
 
 const claves = derivarClaves(CLAVE) as Claves
 
@@ -20,6 +20,8 @@ async function conServidor(over: Partial<ProveedorDeEstado>, fn: (base: string, 
     puedeAprobar: () => false,
     clave: () => CLAVE,
     icono: () => null,
+    terminal: async () => ({ status: 403, error: 'La terminal desde el celu está apagada en Sloth.' }),
+    xterm: () => null,
     ...over
   }
   const f = crearFuenteWifi({ host: '127.0.0.1', puerto: 0, proveedor })
@@ -157,5 +159,46 @@ test('la página se sirve sin clave, con CSP y sin referer; lo desconocido es 40
     assert.ok((await js.text()).includes('slothSello'))
     assert.equal((await fetch(`${base}/icono.png`)).status, 404)
     assert.equal((await fetch(`${base}/.env`)).status, 404)
+  })
+})
+
+test('terminal: sin sello no hay nada; con el pedido mal armado, 400; apagada, 403 sellado', async () => {
+  const pedidos: unknown[] = []
+  const terminal: ProveedorDeEstado['terminal'] = async (p) => {
+    pedidos.push(p)
+    return { status: 403, error: 'La terminal desde el celu está apagada en Sloth.' }
+  }
+  await conServidor({ terminal }, async (base) => {
+    const sin = await enviarSobre(base, '/api/terminal', '')
+    assert.equal(sin.status, 401)
+    assert.equal(await sin.text(), '')
+    assert.equal((await postSellado(base, '/api/terminal', { id: 'ws', desde: 0, escribir: 'x'.repeat(5000) })).status, 400)
+    assert.equal((await postSellado(base, '/api/terminal', { id: 'login:a', desde: 0 })).status, 400)
+    const r = await postSellado(base, '/api/terminal', { id: 'ws-1', desde: -1, escribir: 'ls\r' })
+    assert.equal(r.status, 403)
+    assert.deepEqual(r.cuerpo, { error: 'La terminal desde el celu está apagada en Sloth.' })
+    assert.deepEqual(pedidos, [{ id: 'ws-1', desde: -1, escribir: 'ls\r' }])
+  })
+})
+
+test('terminal prendida: la salida vuelve sellada (nada en claro en la red)', async () => {
+  const terminal: ProveedorDeEstado['terminal'] = async () => ({ reinicio: true, datos: 'secreto-de-la-terminal', hasta: 3, viva: true, cols: 80, rows: 24, ajustado: false })
+  await conServidor({ terminal }, async (base) => {
+    const r = await postSellado(base, '/api/terminal', { id: 'ws-1', desde: -1 })
+    assert.equal(r.status, 200)
+    assert.ok(!r.texto.includes('secreto'))
+    assert.equal((r.cuerpo as { datos: string }).datos, 'secreto-de-la-terminal')
+  })
+})
+
+test('xterm se sirve solo si está; sin él, 404', async () => {
+  await conServidor({}, async (base) => {
+    assert.equal((await fetch(`${base}/xterm.js`)).status, 404)
+  })
+  await conServidor({ xterm: () => ({ js: 'var x', css: '.x{}' }) }, async (base) => {
+    const js = await fetch(`${base}/xterm.js`)
+    assert.equal(js.status, 200)
+    assert.match(js.headers.get('content-type') ?? '', /javascript/)
+    assert.equal(await (await fetch(`${base}/xterm.css`)).text(), '.x{}')
   })
 })

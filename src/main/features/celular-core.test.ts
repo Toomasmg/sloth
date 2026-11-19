@@ -109,6 +109,7 @@ function entrada(): Entrada {
   return {
     ahora: 1000,
     aprobar: false,
+    terminal: false,
     cuentas: [
       { id: 'a', label: 'Fusion' },
       { id: 'b', label: 'Personal' }
