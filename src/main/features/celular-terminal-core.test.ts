@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { leerPedidoTerminal, tamanoActual, MAX_DATOS_PESO, MAX_ESCRIBIR, MAX_VISOR_CHARS, nuevoVisor, pesoJson, ponerFoto, salidaDesde, sumarSalida, vencidos, type Visor } from './celular-terminal-core'
+import { leerPedidoTerminal, tamanoActual, ESPERA_MAX_MS, MAX_DATOS_PESO, MAX_ESCRIBIR, MAX_VISOR_CHARS, nuevoVisor, pesoJson, ponerFoto, salidaDesde, sumarSalida, vencidos, type Visor } from './celular-terminal-core'
 import { derivarClaves, sellarRespuesta, type Claves } from './celular-sello'
 
 const c = (seq: number, data = `[${seq}]`) => ({ seq, data })
@@ -52,6 +52,53 @@ test('valida el pedido del celu', () => {
   assert.equal(leerPedidoTerminal({ id: 'ws', desde: 0, escribir: 'x'.repeat(MAX_ESCRIBIR + 1) }), null)
   assert.equal(leerPedidoTerminal({ id: 'ws', desde: 0, tam: { cols: 5, rows: 30 } }), null)
   assert.equal(leerPedidoTerminal({ id: 'ws', desde: 0, tam: 'grande' }), null)
+})
+
+test('espera: entero de 0 al tope; cualquier otra cosa invalida el pedido', () => {
+  assert.deepEqual(leerPedidoTerminal({ id: 'ws', desde: 4, espera: 0 }), { id: 'ws', desde: 4, espera: 0 })
+  assert.deepEqual(leerPedidoTerminal({ id: 'ws', desde: 4, espera: 20000 }), { id: 'ws', desde: 4, espera: 20000 })
+  assert.deepEqual(leerPedidoTerminal({ id: 'ws', desde: 4, espera: ESPERA_MAX_MS }), { id: 'ws', desde: 4, espera: ESPERA_MAX_MS })
+  for (const mala of [-1, 1.5, NaN, Infinity, '5', true, null, [], {}, ESPERA_MAX_MS + 1, 1e9]) {
+    assert.equal(leerPedidoTerminal({ id: 'ws', desde: 4, espera: mala }), null, String(mala))
+  }
+})
+
+test('espera mayor que cero no se mezcla con escribir, tam ni soloEscribir', () => {
+  assert.equal(leerPedidoTerminal({ id: 'ws', desde: 0, espera: 20000, escribir: 'ls' }), null)
+  assert.equal(leerPedidoTerminal({ id: 'ws', desde: 0, espera: 1, tam: 'pc' }), null)
+  assert.equal(leerPedidoTerminal({ id: 'ws', desde: 0, espera: 20000, tam: { cols: 60, rows: 30 }, soloEscribir: true }), null)
+  assert.deepEqual(leerPedidoTerminal({ id: 'ws', desde: 0, espera: 0, escribir: 'ls' }), { id: 'ws', desde: 0, espera: 0, escribir: 'ls' })
+})
+
+test('soloEscribir: solo true, y solo con algo que escribir o un tamaño', () => {
+  assert.deepEqual(leerPedidoTerminal({ id: 'ws', desde: 0, soloEscribir: true, escribir: 'a' }), { id: 'ws', desde: 0, escribir: 'a', soloEscribir: true })
+  assert.deepEqual(leerPedidoTerminal({ id: 'ws', desde: 0, soloEscribir: true, tam: 'pc' }), { id: 'ws', desde: 0, tam: 'pc', soloEscribir: true })
+  for (const mala of [false, 1, 'true', null, {}]) {
+    assert.equal(leerPedidoTerminal({ id: 'ws', desde: 0, soloEscribir: mala, escribir: 'a' }), null, String(mala))
+  }
+  assert.equal(leerPedidoTerminal({ id: 'ws', desde: 0, soloEscribir: true }), null)
+  assert.equal(leerPedidoTerminal({ id: 'ws', desde: 0, soloEscribir: true, espera: 0 }), null)
+})
+
+test('sesion y n van juntos, validados, y solo con una escritura', () => {
+  const ok = { id: 'ws', desde: 0, escribir: 'a', sesion: 'abcDEF12', n: 7 }
+  assert.deepEqual(leerPedidoTerminal(ok), ok)
+  assert.deepEqual(leerPedidoTerminal({ id: 'ws', desde: 0, tam: 'pc', sesion: 'a_b-c_d-e', n: 1 }), { id: 'ws', desde: 0, tam: 'pc', sesion: 'a_b-c_d-e', n: 1 })
+  assert.equal(leerPedidoTerminal({ ...ok, sesion: undefined }), null, 'n sin sesion')
+  assert.equal(leerPedidoTerminal({ id: 'ws', desde: 0, escribir: 'a', sesion: 'abcDEF12' }), null, 'sesion sin n')
+  for (const mala of ['corta', 'x'.repeat(41), 'con espacio1', 'ñandúñandú', 7, null, '../../etc']) {
+    assert.equal(leerPedidoTerminal({ ...ok, sesion: mala }), null, String(mala))
+  }
+  for (const mala of [0, -1, 1.5, NaN, '7', 1_000_000_001, true, null]) {
+    assert.equal(leerPedidoTerminal({ ...ok, n: mala }), null, String(mala))
+  }
+  assert.equal(leerPedidoTerminal({ id: 'ws', desde: 0, sesion: 'abcDEF12', n: 1 }), null, 'sin nada que escribir')
+})
+
+test('el pedido de antes, sin los campos nuevos, sigue valiendo y no los inventa', () => {
+  const p = leerPedidoTerminal({ id: 'ws', desde: 2, escribir: 'x' })
+  assert.deepEqual(p, { id: 'ws', desde: 2, escribir: 'x' })
+  assert.ok(p && !('espera' in p) && !('soloEscribir' in p) && !('n' in p))
 })
 
 test('vencen los visores que nadie consulta', () => {
