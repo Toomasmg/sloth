@@ -75,6 +75,7 @@
   gap: var(--s-2);
   min-width: 0;
   padding-right: 148px;
+  container: sl-right / inline-size;
 }
 .sl-top-search {
   min-width: 0;
@@ -134,23 +135,18 @@
 }
 .sl-upd:not(:empty) {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--s-1) var(--s-2);
-  min-height: var(--h-sm);
-  padding: 2px var(--s-1) 2px var(--s-3); /* 2px: ajuste óptico para el botón de adentro */
-  border-radius: var(--r-full);
-  background: var(--done-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--done) 28%, transparent);
-  color: var(--text-2);
-  font-size: var(--fs-12);
-  max-width: 100%;
+  min-width: 0;
+  flex: 0 1 auto;
 }
-.sl-upd .btn {
-  height: var(--h-xs);
-  padding: 0 var(--s-2);
-  border-radius: var(--r-full);
-  font-size: var(--fs-12);
+/* Con el aviso a la vista, el buscador cede ancho (hasta su mínimo) antes de que el aviso pise el chat. */
+.sl-top:has(.sl-upd:not(:empty)) {
+  grid-template-columns: minmax(0, 1fr) clamp(240px, calc(100vw - 700px), 520px) minmax(0, 1fr);
+}
+/* Con el aviso a la vista y poco ancho, los resúmenes de estado le dejan el lugar: nunca se pisan. */
+@container sl-right (max-width: 680px) {
+  .sl-top-right:has(.sl-upd:not(:empty)) .sl-top-status {
+    display: none;
+  }
 }
 .sl-chat {
   position: relative;

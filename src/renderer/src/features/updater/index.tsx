@@ -2,7 +2,8 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { ModalLoading } from '../../Modal'
 import type { FeatureUi } from '../host'
 import { useUi } from '../host'
-import { CheckIcon, UpdateIcon } from '../../icons/SlothIcons'
+import { CheckIcon, CloseIcon, UpdateIcon } from '../../icons/SlothIcons'
+import { IconButton } from '../../ui/IconButton'
 import { onOpenAbout, onUpdateToast, openAbout, showUpdateToast } from './bus'
 import { setPhase, usePhase } from './phase'
 import { useUpdateDot, useUpdateStatus } from './useUpdateStatus'
@@ -39,7 +40,7 @@ function useUpdateNote(): string {
 }
 
 /**
- * Aviso discreto en la barra superior: «Hay una versión nueva» con «Ver novedades» y «Más tarde».
+ * Aviso discreto en la barra superior, en una sola línea: versión, «Ver novedades» (o «Reiniciar») y una × de «Más tarde».
  * «Más tarde» lo oculta y deja un punto en el acceso a Configuración (ver useUpdateDot).
  */
 function UpdateBanner(): React.JSX.Element | null {
@@ -60,28 +61,39 @@ function UpdateBanner(): React.JSX.Element | null {
   const queued = !!st.queued
 
   let text: string | null = null
+  let full = ''
   let actions: React.ReactNode = null
   if (st.state === 'available') {
-    if (queued) text = `La ${v} se instala al cerrar Sloth`
-    else {
-      text = `Hay una versión nueva (${v})`
+    if (queued) {
+      text = `${v} al cerrar`
+      full = `La ${v} se instala al cerrar Sloth`
+    } else {
+      text = `Actualización ${v}`
+      full = `Hay una versión nueva (${v})`
       actions = (
         <>
           <button type="button" className="btn primary sm" onClick={() => setPhase('notes')}>
             Ver novedades
           </button>
-          <button type="button" className="btn ghost sm" onClick={() => void ui.invoke('feat:updater:later').catch(() => showUpdateToast('No se pudo dejar el aviso para más tarde'))}>
-            Más tarde
-          </button>
+          <IconButton
+            label="Más tarde"
+            icon={<CloseIcon size={12} />}
+            size="sm"
+            onClick={() => void ui.invoke('feat:updater:later').catch(() => showUpdateToast('No se pudo dejar el aviso para más tarde'))}
+          />
         </>
       )
     }
   } else if (st.state === 'downloading') {
-    text = queued ? `La ${v} se instala al cerrar Sloth` : `Descargando ${v}: ${st.percent ?? 0} %`
+    text = queued ? `${v} al cerrar` : `Descargando ${st.percent ?? 0} %`
+    full = queued ? `La ${v} se instala al cerrar Sloth` : `Descargando la ${v}: ${st.percent ?? 0} %`
   } else if (st.state === 'ready') {
-    if (queued) text = `La ${v} se instala al cerrar Sloth`
-    else {
-      text = `Sloth ${v} ya está descargada`
+    if (queued) {
+      text = `${v} al cerrar`
+      full = `La ${v} se instala al cerrar Sloth`
+    } else {
+      text = `${v} lista`
+      full = `Sloth ${v} ya está descargada`
       actions = (
         <button type="button" className="btn primary sm" onClick={() => setPhase('dl')}>
           Reiniciar
@@ -92,7 +104,7 @@ function UpdateBanner(): React.JSX.Element | null {
   if (!text || (phase === 'dl' && st.state === 'downloading')) return null
 
   return (
-    <div role="status" className="f-updater-banner">
+    <div role="status" className={`f-updater-banner${actions ? ' has-act' : ''}`} aria-label={full} title={full}>
       <UpdateIcon size={14} />
       <span className="f-updater-banner-text">{text}</span>
       {actions}
