@@ -1,8 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
+import { connect, type Socket } from 'node:net'
 import type { EstadoCelular } from '../../shared/celular'
-import { crearFuenteWifi, type ProveedorDeEstado } from './celular-servidor'
+import { crearFuenteWifi, type OpcionesWifi, type ProveedorDeEstado } from './celular-servidor'
 import { abrirRespuesta, derivarClaves, sellarPedido, type Claves } from './celular-sello'
 
 const CLAVE = Buffer.alloc(32, 7).toString('base64url')
@@ -10,7 +11,7 @@ const ESTADO: EstadoCelular = { ahora: 1, aprobar: false, terminal: false, cuent
 
 const claves = derivarClaves(CLAVE) as Claves
 
-async function conServidor(over: Partial<ProveedorDeEstado>, fn: (base: string, decisiones: string[]) => Promise<void>): Promise<void> {
+async function conServidor(over: Partial<ProveedorDeEstado>, fn: (base: string, decisiones: string[]) => Promise<void>, opciones: Partial<OpcionesWifi> = {}): Promise<void> {
   const decisiones: string[] = []
   const proveedor: ProveedorDeEstado = {
     estado: async () => ESTADO,
@@ -24,7 +25,7 @@ async function conServidor(over: Partial<ProveedorDeEstado>, fn: (base: string, 
     xterm: () => null,
     ...over
   }
-  const f = crearFuenteWifi({ host: '127.0.0.1', puerto: 0, proveedor })
+  const f = crearFuenteWifi({ host: '127.0.0.1', puerto: 0, proveedor, ...opciones })
   await f.iniciar()
   try {
     await fn(`http://127.0.0.1:${f.puerto()}`, decisiones)
@@ -201,4 +202,156 @@ test('xterm se sirve solo si está; sin él, 404', async () => {
     assert.match(js.headers.get('content-type') ?? '', /javascript/)
     assert.equal(await (await fetch(`${base}/xterm.css`)).text(), '.x{}')
   })
+})
+
+const SIN_SALIDA = { reinicio: false, datos: '', hasta: 0, mas: false, viva: true, cols: 80, rows: 24, ajustado: false }
+
+test('terminal: lleva los campos nuevos al proveedor y rechaza las mezclas que no valen sin llegar a él', async () => {
+  const pedidos: unknown[] = []
+  const terminal: ProveedorDeEstado['terminal'] = async (p) => {
+    pedidos.push(p)
+    return SIN_SALIDA
+  }
+  await conServidor({ terminal }, async (base) => {
+    assert.equal((await postSellado(base, '/api/terminal', { id: 'ws', desde: 4, espera: 20000, sesion: 'sesion-abc' })).status, 200)
+    assert.equal((await postSellado(base, '/api/terminal', { id: 'ws', desde: 4, soloEscribir: true, escribir: 'a', sesion: 'sesion-abc', n: 3 })).status, 200)
+    assert.equal((await postSellado(base, '/api/terminal', { id: 'ws', desde: 4, espera: 20000, escribir: 'a' })).status, 400)
+    assert.equal((await postSellado(base, '/api/terminal', { id: 'ws', desde: 4, espera: 99999 })).status, 400)
+    assert.equal((await postSellado(base, '/api/terminal', { id: 'ws', desde: 4, soloEscribir: true })).status, 400)
+    assert.deepEqual(pedidos, [
+      { id: 'ws', desde: 4, espera: 20000, sesion: 'sesion-abc' },
+      { id: 'ws', desde: 4, escribir: 'a', soloEscribir: true, sesion: 'sesion-abc', n: 3 }
+    ])
+  })
+})
+
+test('terminal: pasados 200 pedidos en 5 s, 429 sin cuerpo; los que no pasan el MAC no gastan el cupo', async () => {
+  let llegaron = 0
+  const terminal: ProveedorDeEstado['terminal'] = async () => {
+    llegaron++
+    return SIN_SALIDA
+  }
+  await conServidor({ terminal }, async (base) => {
+    for (let i = 0; i < 300; i++) assert.equal((await enviarSobre(base, '/api/terminal', 'basura' + i)).status, 401)
+    for (let i = 0; i < 200; i++) assert.equal((await postSellado(base, '/api/terminal', { id: 'ws', desde: 0 })).status, 200, `pedido ${i}`)
+    const iv = randomBytes(16)
+    const sobre = sellarPedido(claves, '/api/terminal', JSON.stringify({ t: Date.now(), b: { id: 'ws', desde: 0 } }), iv)
+    const r = await enviarSobre(base, '/api/terminal', sobre)
+    assert.equal(r.status, 429)
+    assert.equal(await r.text(), '')
+    assert.equal(llegaron, 200)
+    const otraRuta = await postSellado(base, '/api/estado', {})
+    assert.equal(otraRuta.status, 200, 'el límite es solo de la terminal')
+  })
+})
+
+test('terminal: un 429 del proveedor (demasiadas esperas) vuelve sellado', async () => {
+  const terminal: ProveedorDeEstado['terminal'] = async () => ({ status: 429, error: 'La PC tiene demasiadas terminales abiertas desde el celu.' })
+  await conServidor({ terminal }, async (base) => {
+    const r = await postSellado(base, '/api/terminal', { id: 'ws', desde: 1, espera: 1000 })
+    assert.equal(r.status, 429)
+    assert.deepEqual(r.cuerpo, { error: 'La PC tiene demasiadas terminales abiertas desde el celu.' })
+  })
+})
+
+function proveedorColgado(): { terminal: ProveedorDeEstado['terminal']; llego: Promise<void>; señal: () => AbortSignal | null; terminaron: () => number } {
+  let señal: AbortSignal | null = null
+  let terminaron = 0
+  let avisarLlegada: () => void = () => undefined
+  const llego = new Promise<void>((r) => {
+    avisarLlegada = r
+  })
+  const terminal: ProveedorDeEstado['terminal'] = (_p, cancelar) =>
+    new Promise((resolve) => {
+      señal = cancelar ?? null
+      avisarLlegada()
+      cancelar?.addEventListener('abort', () => {
+        terminaron++
+        resolve(SIN_SALIDA)
+      })
+    })
+  return { terminal, llego, señal: () => señal, terminaron: () => terminaron }
+}
+
+test('terminal: si el celu corta la conexión con el pedido abierto, el proveedor recibe la señal y no queda nada colgado', async () => {
+  const c = proveedorColgado()
+  await conServidor({ terminal: c.terminal }, async (base) => {
+    const ctl = new AbortController()
+    const iv = randomBytes(16)
+    const sobre = sellarPedido(claves, '/api/terminal', JSON.stringify({ t: Date.now(), b: { id: 'ws', desde: 3, espera: 20000 } }), iv)
+    const abierto = fetch(`${base}/api/terminal`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: sobre, signal: ctl.signal })
+    await c.llego
+    assert.equal(c.señal()?.aborted, false)
+    ctl.abort()
+    await assert.rejects(abierto)
+    for (let i = 0; i < 100 && !c.señal()?.aborted; i++) await new Promise((r) => setTimeout(r, 10))
+    assert.equal(c.señal()?.aborted, true)
+    for (let i = 0; i < 100 && c.terminaron() === 0; i++) await new Promise((r) => setTimeout(r, 10))
+    assert.equal(c.terminaron(), 1)
+    assert.equal((await postSellado(base, '/api/estado', {})).status, 200, 'el servidor sigue atendiendo')
+  })
+})
+
+test('terminal: detener() con un pedido abierto corta la conexión, suelta la espera y no se cuelga', async () => {
+  const c = proveedorColgado()
+  const f = crearFuenteWifi({
+    host: '127.0.0.1',
+    puerto: 0,
+    proveedor: { estado: async () => ESTADO, decidir: () => undefined, puedeAprobar: () => false, clave: () => CLAVE, icono: () => null, terminal: c.terminal, xterm: () => null }
+  })
+  await f.iniciar()
+  const sobre = sellarPedido(claves, '/api/terminal', JSON.stringify({ t: Date.now(), b: { id: 'ws', desde: 3, espera: 20000 } }))
+  const abierto = fetch(`http://127.0.0.1:${f.puerto()}/api/terminal`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: sobre })
+  const rechazo = assert.rejects(abierto)
+  await c.llego
+  const limite = new Promise<string>((r) => setTimeout(() => r('colgado'), 3000))
+  assert.equal(await Promise.race([f.detener().then(() => 'detenido'), limite]), 'detenido')
+  await rechazo
+  for (let i = 0; i < 100 && c.terminaron() === 0; i++) await new Promise((r) => setTimeout(r, 10))
+  assert.equal(c.señal()?.aborted, true)
+  assert.equal(c.terminaron(), 1)
+})
+
+const puertoDe = (base: string): number => Number(new URL(base).port)
+
+function socketDesde(origen: string, puerto: number): Promise<{ socket: Socket; cerrado: Promise<void> }> {
+  return new Promise((resolve, reject) => {
+    const socket = connect({ host: '127.0.0.1', port: puerto, localAddress: origen })
+    const cerrado = new Promise<void>((r) => socket.once('close', () => r()))
+    socket.once('error', reject)
+    socket.once('connect', () => resolve({ socket: socket.on('error', () => undefined), cerrado }))
+  })
+}
+
+test('conexiones: un equipo que llena su cupo con sockets ociosos no deja sin servicio a otro', async () => {
+  await conServidor(
+    {},
+    async (base) => {
+      const malos = await Promise.all([1, 2, 3].map(() => socketDesde('127.0.0.2', puertoDe(base))))
+      const de_mas = await socketDesde('127.0.0.2', puertoDe(base))
+      await de_mas.cerrado
+      assert.equal(de_mas.socket.destroyed, true, 'el cuarto del mismo equipo se corta')
+      assert.equal(malos.every((m) => !m.socket.destroyed), true, 'los tres primeros siguen')
+      assert.equal((await postSellado(base, '/api/estado', {})).status, 200, 'el celu, desde otra dirección, sigue andando')
+      malos[0].socket.destroy()
+      await malos[0].cerrado
+      const vuelve = await socketDesde('127.0.0.2', puertoDe(base))
+      assert.equal(vuelve.socket.destroyed, false, 'al cerrarse una vuelve el lugar')
+      for (const m of [...malos, vuelve]) m.socket.destroy()
+    },
+    { maxConexionesPorIp: 3 }
+  )
+})
+
+test('conexiones: una que no manda nada se corta sola', async () => {
+  await conServidor(
+    {},
+    async (base) => {
+      const callado = await socketDesde('127.0.0.1', puertoDe(base))
+      await callado.cerrado
+      assert.equal(callado.socket.destroyed, true)
+      assert.equal((await postSellado(base, '/api/estado', {})).status, 200)
+    },
+    { ociosoMs: 150 }
+  )
 })

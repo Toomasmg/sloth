@@ -22,18 +22,28 @@ const CELUS = [
 interface Registro {
   consola: string[]
   fallos: string[]
+  /** Pedidos de /api/terminal que la propia página cortó justo al cerrar la terminal: el «mirar» que tenía abierto. */
+  cortados: string[]
+  /** Cuándo se tocó «Volver a las sesiones» por última vez (Date.now()). */
+  cierre: number
   estados: Record<string, number[]>
   mayor: number
 }
 
 function vigilar(p: Page): Registro {
-  const r: Registro = { consola: [], fallos: [], estados: {}, mayor: 0 }
+  const r: Registro = { consola: [], fallos: [], cortados: [], cierre: 0, estados: {}, mayor: 0 }
   p.on('console', (m) => {
     if (m.type() === 'error' || m.type() === 'warning') r.consola.push(`${m.type()}: ${m.text()}`)
   })
   p.on('pageerror', (e) => r.consola.push(`pageerror: ${e.message}`))
   p.on('requestfailed', (q) => {
-    if (!q.url().includes('fonts.g')) r.fallos.push(`${q.url()} ${q.failure()?.errorText}`)
+    if (q.url().includes('fonts.g')) return
+    const motivo = `${q.url()} ${q.failure()?.errorText}`
+    // Al cerrar la terminal la página corta el «mirar» que la PC tiene abierto: no es un fallo. Un corte en otro momento
+    // (el watchdog de un pedido colgado, por ejemplo) sí lo es.
+    const alCerrar = Date.now() - r.cierre < 3000
+    if (alCerrar && new URL(q.url()).pathname === '/api/terminal' && /ERR_ABORTED|cancel/i.test(q.failure()?.errorText ?? '')) r.cortados.push(motivo)
+    else r.fallos.push(motivo)
   })
   p.on('response', (s) => {
     const ruta = new URL(s.url()).pathname
@@ -117,6 +127,7 @@ test('Celular movil: la terminal anda en un Galaxy y un iPhone simulados, con sa
       await expect(pantalla).toContainText('fin-grande', { timeout: 30_000 })
 
       // Reabrir con ese historial: la foto inicial pesa lo que pesa el visor.
+      reg.cierre = Date.now()
       await term.getByRole('button', { name: 'Volver a las sesiones' }).click()
       await expect(term).toBeHidden()
       await cel.getByRole('button', { name: 'Abrir la terminal de web' }).click()
@@ -135,11 +146,13 @@ test('Celular movil: la terminal anda en un Galaxy y un iPhone simulados, con sa
       // «Ajustar al celu» y volver.
       await cel.getByRole('button', { name: 'Ajustar al celu' }).click()
       await expect(cel.getByRole('button', { name: 'Tamaño de la PC' })).toBeVisible()
+      reg.cierre = Date.now()
       await cel.getByRole('button', { name: 'Volver a las sesiones' }).click()
       await expect(cel.getByRole('dialog', { name: 'web' })).toBeHidden()
 
       expect(reg.consola, `consola de ${celu.nombre}`).toEqual([])
       expect(reg.fallos, `pedidos fallidos de ${celu.nombre}`).toEqual([])
+      expect(reg.cortados.length, `«mirar» cortados de ${celu.nombre}: uno por cada vez que se cerró la terminal`).toBeLessThanOrEqual(2)
       expect(reg.estados['/xterm.js']).toEqual([200])
       expect(reg.estados['/xterm.css']).toEqual([200])
       await ctx.close()

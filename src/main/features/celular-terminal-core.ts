@@ -20,6 +20,13 @@ export interface PedidoTerminal {
   escribir?: string
   /** Un tamaño para achicar la terminal al celu, o 'pc' para devolverle el de la PC. */
   tam?: { cols: number; rows: number } | 'pc'
+  /** Cuánto puede esperar la PC (ms) a que haya salida nueva antes de contestar vacío. Solo en un pedido de mirar. */
+  espera?: number
+  /** Pedido que solo escribe o cambia el tamaño: la PC contesta ya y sin salida. */
+  soloEscribir?: true
+  /** Identifica a la página (se renueva al recargarla); con `n`, el número de la escritura: la PC no repite una que ya hizo. */
+  sesion?: string
+  n?: number
 }
 
 export interface RespuestaTerminal {
@@ -38,7 +45,10 @@ export interface RespuestaTerminal {
 export const MAX_VISOR_CHARS = 150_000
 export const MAX_ESCRIBIR = 4000
 export const VISOR_VENCE_MS = 30_000
+export const ESPERA_MAX_MS = 25_000
 const ID_RE = /^[A-Za-z0-9_-]{1,80}$/
+const SESION_RE = /^[A-Za-z0-9_-]{8,40}$/
+const N_MAX = 1_000_000_000
 
 export function nuevoVisor(ahora: number): Visor {
   return { chunks: [], tam: 0, foto: null, usadoEn: ahora, ajustado: null, pcAlAjustar: null }
@@ -165,6 +175,24 @@ export function leerPedidoTerminal(b: unknown): PedidoTerminal | null {
       p.tam = { cols: t.cols, rows: t.rows }
     }
   }
+  const escribe = p.escribir !== undefined || p.tam !== undefined
+  if (o.espera !== undefined) {
+    if (!dim(o.espera, 0, ESPERA_MAX_MS)) return null
+    p.espera = o.espera
+  }
+  if (o.soloEscribir !== undefined) {
+    if (o.soloEscribir !== true || !escribe) return null
+    p.soloEscribir = true
+  }
+  if (p.espera && (escribe || p.soloEscribir)) return null
+  if (o.sesion !== undefined) {
+    if (typeof o.sesion !== 'string' || !SESION_RE.test(o.sesion)) return null
+    p.sesion = o.sesion
+  }
+  if (o.n !== undefined) {
+    if (!p.sesion || !escribe || !dim(o.n, 1, N_MAX)) return null
+    p.n = o.n
+  }
   return p
 }
 
@@ -184,4 +212,14 @@ export function tamanoActual(v: Visor | undefined, pc: Tam): { cols: number; row
     v.pcAlAjustar = null
   }
   return pc ?? { cols: 80, rows: 24 }
+}
+
+/** Si el pedido de mirar tiene que quedar abierto: no hay nada nuevo que mandar, la terminal está viva y no es la primera vez. */
+export function debeEsperar(p: PedidoTerminal, salida: { reinicio: boolean; datos: string }, viva: boolean): boolean {
+  return !!p.espera && !p.soloEscribir && viva && p.desde >= 0 && !salida.reinicio && !salida.datos
+}
+
+/** La respuesta de un pedido que no trae salida: el celu sigue desde donde estaba. */
+export function sinSalida(p: PedidoTerminal): { reinicio: false; datos: ''; hasta: number; mas: false } {
+  return { reinicio: false, datos: '', hasta: p.desde, mas: false }
 }
