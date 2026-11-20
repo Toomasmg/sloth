@@ -58,7 +58,7 @@ export const PAGINA_HTML = `<!doctype html>
   <header class="term-top">
     <button type="button" class="term-volver" id="term-volver" aria-label="Volver a las sesiones"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
     <span class="term-nombre" id="term-nombre"></span>
-    <button type="button" class="term-ajustar" id="term-ajustar" aria-pressed="false">Ajustar al celu</button>
+    <button type="button" class="term-vista" id="term-vista">Vista PC</button>
   </header>
   <div class="term-aviso" id="term-aviso" role="status" hidden></div>
   <div class="term-pantalla" id="term-pantalla"></div>
@@ -72,10 +72,6 @@ export const PAGINA_HTML = `<!doctype html>
     <button type="button" data-tecla="ctrlc" aria-label="Control C">Ctrl C</button>
     <button type="button" data-tecla="enter" aria-label="Enter">⏎</button>
   </div>
-  <form class="term-escribir" id="term-form" autocomplete="off">
-    <textarea id="term-texto" rows="1" placeholder="Escribile a la terminal…" aria-label="Texto para la terminal" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
-    <button type="submit" id="term-enviar">Enviar</button>
-  </form>
 </section>
 <section class="aviso-pantalla" id="sin-token" hidden>
   <h1>Este celu no está conectado</h1>
@@ -218,19 +214,16 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .term-top { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--borde); }
 .term-volver { flex: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 12px; background: transparent; color: var(--texto); }
 .term-nombre { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; color: var(--fuerte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.term-ajustar { flex: none; min-height: 44px; padding: 0 12px; border: 1px solid var(--borde); border-radius: 12px; background: var(--panel); color: var(--texto); font-size: 13px; font-weight: 600; }
-.term-ajustar[aria-pressed="true"] { background: #2A2F37; color: var(--fuerte); }
+.term-vista { flex: none; min-height: 44px; padding: 0 12px; border: 1px solid var(--borde); border-radius: 12px; background: var(--panel); color: var(--texto); font-size: 13px; font-weight: 600; }
+.term-vista[data-vista="celu"] { background: #2A2F37; color: var(--fuerte); }
 .term-aviso { flex: none; padding: 8px 14px; font-size: 13px; color: var(--espera); background: rgba(255,159,67,0.10); border-bottom: 1px solid rgba(255,176,103,0.3); }
-.term-pantalla { flex: 1; min-height: 0; overflow: auto; padding: 6px 4px; background: #0B0D10; -webkit-overflow-scrolling: touch; }
+.term-pantalla { flex: 1; min-height: 0; overflow: auto; padding: 6px 4px; background: #0B0D10; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .term-pantalla .xterm { padding: 0; }
 .term-teclas { flex: none; display: flex; gap: 4px; padding: 6px 8px; overflow-x: auto; border-top: 1px solid var(--borde); scrollbar-width: none; }
 .term-teclas::-webkit-scrollbar { display: none; }
-.term-teclas button { flex: 1 0 auto; min-width: 38px; min-height: 44px; padding: 0 6px; border: 1px solid var(--borde); border-radius: 10px; background: var(--panel); color: var(--texto); font: 600 13px var(--mono); }
-.term-escribir { flex: none; display: flex; gap: 8px; padding: 6px 8px 8px; }
-.term-escribir textarea { flex: 1; min-width: 0; min-height: 44px; max-height: 120px; resize: none; padding: 11px 12px; border: 1px solid var(--borde); border-radius: 12px; background: var(--panel); color: var(--texto); font: 16px/1.3 var(--mono); }
-.term-escribir textarea:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 1px; }
-.term-escribir button { flex: none; min-height: 44px; padding: 0 16px; border: 0; border-radius: 12px; background: var(--trabaja); color: #08111C; font-weight: 700; }
-.term button:disabled, .term textarea:disabled { opacity: 0.5; cursor: default; }
+.term-teclas button { flex: 1 0 auto; min-width: 38px; min-height: 40px; padding: 0 6px; border: 1px solid var(--borde); border-radius: 10px; background: var(--panel); color: var(--texto); font: 600 13px var(--mono); touch-action: manipulation; }
+.term button:disabled { opacity: 0.5; cursor: default; }
+html.con-term, html.con-term body { overflow: hidden; overscroll-behavior: none; }
 @media (prefers-reduced-motion: reduce) {
   .aguja, .valor { transition: none; }
   .c-espera.hay .num { animation: none; }
@@ -607,8 +600,11 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   // Todo sellado por el mismo canal que el estado. xterm se carga recién al abrirla (pesa ~500 kB).
   var TECLAS = { esc: '\\x1b', tab: '\\t', arriba: '\\x1b[A', abajo: '\\x1b[B', der: '\\x1b[C', izq: '\\x1b[D', ctrlc: '\\x03', enter: '\\r' };
   var TERM_MAX = 1500, TERM_ESPERA = 20000, TERM_MARGEN = 8000, TERM_ESCRIBIR_MAX = 10000;
-  var term = null, termId = null, termDesde = -1, termCola = [], termTam = null, termTamPend = null;
-  var termAjustado = false, termCerrada = false, xtermCargando = null, conHistoria = false;
+  var term = null, termId = null, termDesde = -1, termCola = [], termTam = null;
+  var termCerrada = false, xtermCargando = null, conHistoria = false;
+  var termVista = 'pc', termHoriz = false, termAlto = 0, botonesTecla = [];
+  var TERM_SEGUIR_INMEDIATO = 8000;
+  var TERM_FUENTE_MIN = 8, TERM_FUENTE_MAX = 15, TERM_FUENTE_CELU = 13.5;
   var termMas = false, termParada = false, termTipo = '', termIguales = 0;
   var termGen = 0, termCtl = null, termMirando = false, termFallas = 0, termPausa = 0, termMirarTimer = null, termWatchdog = null;
   var termEscribiendo = false, termEscFallas = 0, termEscTok = 0, termEscTimer = null, termEscCtl = null, termEscWatchdog = null, termN = 0;
@@ -655,25 +651,89 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   // Lo que queda para las columnas: el padding y la barra de scroll de xterm.
   var anchoUtil = function () { return $('term-pantalla').clientWidth - 8 - 14; };
 
-  // Con el tamaño de la PC la letra se achica hasta que entren las columnas; si ni así, se desliza de costado.
+  // La terminal de la PC nunca cambia de tamaño: el celu solo elige cómo mirarla. «PC» muestra todas las columnas con la
+  // letra que entre (con un piso legible; si ni así entran, se desliza de costado). «Celu» usa una letra cómoda y la
+  // ventana recorre la pantalla de la PC. El texto no se reacomoda al ancho del celu: eso exigiría achicar la terminal de la PC.
   function encajar() {
     if (!term || !termTam) return;
     if (term.cols !== termTam.cols || term.rows !== termTam.rows) term.resize(termTam.cols, termTam.rows);
     var px = term.options.fontSize;
     for (var i = 0; i < 3; i++) {
       var c = celda();
-      if (!c || !c.w) return;
-      var nuevo = Math.max(7, Math.min(15, Math.floor(px * anchoUtil() / (c.w * termTam.cols) * 10) / 10));
-      if (Math.abs(nuevo - px) < 0.1) return;
+      if (!c || !c.w) break;
+      var nuevo = termVista === 'celu' ? TERM_FUENTE_CELU : Math.max(TERM_FUENTE_MIN, Math.min(TERM_FUENTE_MAX, Math.floor(px * anchoUtil() / (c.w * termTam.cols) * 10) / 10));
+      if (Math.abs(nuevo - px) < 0.1) break;
       term.options.fontSize = px = nuevo;
     }
+    seguirCursor();
   }
 
-  function tamDelCelu() {
-    var c = celda();
-    var px = term.options.fontSize;
-    var w = c && c.w ? c.w * 13 / px : 7.8, h = c && c.h ? c.h * 13 / px : 16;
-    return { cols: Math.max(20, Math.min(500, Math.floor(anchoUtil() / w))), rows: Math.max(5, Math.min(200, Math.floor(($('term-pantalla').clientHeight - 12) / h))) };
+  // El cursor tiene que verse sin que la pantalla salte: solo se mueve lo que falta para que entre en la ventana.
+  function seguirCursor() {
+    if (!term || !termTam || !term.buffer) return;
+    var c = celda(), p = $('term-pantalla'), s = p.querySelector('.xterm-screen');
+    if (!c || !c.w || !s || !p.getBoundingClientRect) return;
+    var b = term.buffer.active, pr = p.getBoundingClientRect(), sr = s.getBoundingClientRect();
+    var x = sr.left - pr.left + p.scrollLeft + b.cursorX * c.w, y = sr.top - pr.top + p.scrollTop + b.cursorY * c.h;
+    var mx = c.w * 2, my = c.h;
+    if (x - mx < p.scrollLeft) p.scrollLeft = Math.max(0, x - mx);
+    else if (x + c.w + mx > p.scrollLeft + p.clientWidth) p.scrollLeft = x + c.w + mx - p.clientWidth;
+    if (y - my < p.scrollTop) p.scrollTop = Math.max(0, y - my);
+    else if (y + c.h + my > p.scrollTop + p.clientHeight) p.scrollTop = y + c.h + my - p.clientHeight;
+  }
+
+  function alFondo() {
+    if (!term) return;
+    term.scrollToBottom();
+    seguirCursor();
+  }
+
+  var esHorizontal = function () { return !!(window.matchMedia && window.matchMedia('(orientation: landscape)').matches); };
+  var claveVista = function () { return 'sloth-term-vista-' + (termHoriz ? 'h' : 'v'); };
+  function pintarVista() {
+    var b = $('term-vista');
+    b.textContent = termVista === 'celu' ? 'Vista celu' : 'Vista PC';
+    b.setAttribute('data-vista', termVista);
+    b.setAttribute('aria-label', termVista === 'celu' ? 'Vista celu. Tocá para ver la pantalla entera de la PC' : 'Vista PC. Tocá para ver con letra grande');
+  }
+  // La elección se recuerda por orientación: acostado conviene otra que parado.
+  function elegirVista() {
+    termVista = leer(claveVista()) === 'celu' ? 'celu' : 'pc';
+    pintarVista();
+  }
+
+  // La terminal ocupa solo lo que se ve: con el teclado virtual abierto, la ventana visible es más baja que la página.
+  function cajaVisible() {
+    var el = $('term'), vv = window.visualViewport;
+    el.style.top = (vv ? vv.offsetTop : 0) + 'px';
+    el.style.height = (vv ? vv.height : window.innerHeight) + 'px';
+    el.style.bottom = 'auto';
+    return vv ? vv.height : window.innerHeight;
+  }
+
+  function alCambiarVentana() {
+    if (!termId || !term) return;
+    var alto = cajaVisible();
+    var h = esHorizontal();
+    if (h !== termHoriz) { termHoriz = h; elegirVista(); }
+    encajar();
+    if (alto < termAlto) alFondo();
+    termAlto = alto;
+  }
+
+  // Lo que sale de teclear en xterm no es todo del usuario: contesta solo a las consultas del programa (posición del
+  // cursor, atributos, colores) y avisa foco y toques de mouse. A la terminal de la PC solo va lo que se tipeó.
+  // Se deja pasar ESC[1;2R a ESC[1;8R (F3 con modificador: no se distingue de una posición en la fila 1) y la rueda del mouse
+  // (ESC[<64;x;yM y ESC[<65;x;yM), que es el usuario deslizando en un programa que pidió mouse.
+  var AUTOMATICAS = /(\\x1b\\[200~[\\s\\S]*?(?:\\x1b\\[201~|$))|\\x1b\\[[?>=]?[\\d;:]*\\$y|\\x1b\\[(?!1;[2-8]R)\\??\\d+;\\d+R|\\x1b\\[[?>=][\\d;]*c|\\x1b\\[\\??\\d+(?:;\\d+)*n|\\x1b\\[\\d+(?:;\\d+)*t|\\x1b\\[[IO]|\\x1b\\[<(?!6[45];)\\d+;\\d+;\\d+[Mm]|\\x1b\\[M[\\x20-\\uffff]{3}|\\x1b\\][^\\x07\\x1b]*(?:\\x07|\\x1b\\\\)|\\x1bP[^\\x1b]*\\x1b\\\\/g;
+  // Dos veces o más: al sacar una secuencia pueden juntarse los restos y formar otra.
+  function sinAutomaticas(t) {
+    for (var i = 0; i < 16; i++) {
+      var r = t.replace(AUTOMATICAS, function (m, pegado) { return pegado ? m : ''; });
+      if (r === t) break;
+      t = r;
+    }
+    return t;
   }
 
   // Cuánto ocupa lo que se escribe dentro del JSON del pedido (bytes UTF-8 ya escapados): la PC no acepta
@@ -714,7 +774,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   }
 
   var retardoTerm = function (fallas) { return fallas ? Math.min(4000, 250 * Math.pow(2, fallas - 1)) : 0; };
-  var botonesTerm = function () { $('term-enviar').disabled = $('term-ajustar').disabled = termCerrada || termParada; };
+  var botonesTerm = function () { for (var i = 0; i < botonesTecla.length; i++) botonesTecla[i].disabled = termCerrada || termParada; };
 
   // Lo que llegue de un pedido de mirar anterior a esto ya no vale: se compara termGen.
   function soltarMirar() {
@@ -741,9 +801,6 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   }
 
   function aplicarEstado(j) {
-    termAjustado = j.ajustado;
-    $('term-ajustar').setAttribute('aria-pressed', termAjustado ? 'true' : 'false');
-    $('term-ajustar').textContent = termAjustado ? 'Tamaño de la PC' : 'Ajustar al celu';
     termCerrada = !j.viva;
     avisoTerm(termCerrada ? 'La terminal está cerrada en la PC. Abrila ahí para seguir desde acá.' : termNota);
     botonesTerm();
@@ -757,7 +814,6 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   function rechazoDeLaPc(j) {
     termCerrada = true;
     termCola = [];
-    termTamPend = null;
     avisoTerm(j && j.error === 'reloj' ? HORA_CORRIDA : (j && j.error) || 'La PC no dejó abrir la terminal.');
     botonesTerm();
   }
@@ -779,7 +835,6 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     if (termIguales >= TERM_IGUALES) {
       termParada = true;
       termCola = [];
-      termTamPend = null;
       avisoTerm(motivo + ' Volvé a las sesiones y abrí la terminal de nuevo.');
     } else avisoTerm(motivo + ' Reintentando…');
   }
@@ -827,7 +882,15 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
         // Primero el tamaño: lo que llega se dibujó para ese ancho.
         var cambio = aplicarTam(j);
         if (j.reinicio) term.reset();
-        if (j.datos) term.write(j.datos, cambio || j.reinicio ? function () { term.scrollToBottom(); } : undefined);
+        // Con la PC más ancha que el celu, lo que llega puede dejar el cursor fuera de la ventana: se lo sigue siempre. Con una pantalla
+        // entera (la foto al abrir) medir el cursor en el callback fuerza un layout de más sobre miles de líneas: se hace un rato después.
+        if (j.datos) {
+          var grande = j.datos.length > TERM_SEGUIR_INMEDIATO;
+          term.write(j.datos, function () {
+            if (cambio || j.reinicio) term.scrollToBottom();
+            if (grande) setTimeout(seguirCursor, 150); else seguirCursor();
+          });
+        }
         termDesde = j.hasta;
         termMas = !!j.mas;
         aplicarEstado(j);
@@ -849,8 +912,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   }
 
   function quitarEscrito(item) {
-    if (termTamPend === item) termTamPend = null;
-    else if (termCola[0] === item) termCola.shift();
+    if (termCola[0] === item) termCola.shift();
   }
 
   function programarEscritura() {
@@ -868,10 +930,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   function enviarEscritura() {
     // Con un reintento esperando su backoff, teclear más no lo adelanta.
     if (termEscTimer || !termId || !term || termEscribiendo || termParada || termCerrada || document.hidden) return;
-    // Lo que ya salió con número y no se confirmó va primero: la PC descarta un número menor que el último que hizo,
-    // así que si un «Ajustar» se numerara antes, las teclas pendientes se perderían sin aviso.
-    var sinConfirmar = termCola[0] && termCola[0].n ? termCola[0] : termTamPend && termTamPend.n ? termTamPend : null;
-    var item = sinConfirmar || termTamPend || termCola[0];
+    var item = termCola[0];
     if (!item) return;
     if (!item.n) {
       item.n = ++termN;
@@ -885,8 +944,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       return;
     }
     var pedido = { id: termId, desde: termDesde, soloEscribir: true, sesion: TERM_SESION, n: item.n };
-    if (item.tam) pedido.tam = item.tam;
-    else pedido.escribir = item.t;
+    pedido.escribir = item.t;
     var tok = ++termEscTok;
     var ctl = window.AbortController ? new AbortController() : null;
     termEscCtl = ctl;
@@ -944,7 +1002,6 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     termId = id;
     termDesde = -1;
     termCola = [];
-    termTamPend = null;
     termTam = null;
     termCerrada = false;
     termFallas = 0;
@@ -957,7 +1014,11 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     termNota = '';
     $('term-nombre').textContent = nombre;
     $('term').hidden = false;
-    $('term-enviar').disabled = $('term-ajustar').disabled = false;
+    botonesTerm();
+    if (raiz.classList) raiz.classList.add('con-term');
+    termHoriz = esHorizontal();
+    elegirVista();
+    termAlto = cajaVisible();
     avisoTerm('Abriendo la terminal…');
     if (!conHistoria) {
       conHistoria = true;
@@ -973,9 +1034,20 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
           theme: { background: '#0B0D10', foreground: '#E8EAED', cursor: '#8CC2FF', selectionBackground: '#2A3A4F' }
         });
         term.open($('term-pantalla'));
-        term.onData(function (d) { encolar(d, false); });
-        window.addEventListener('resize', encajar);
+        term.onData(function (d) {
+          var t = sinAutomaticas(d);
+          // El Enter va en otro pedido: pegado al texto, Claude lo toma como parte de lo pegado y no lo manda. Lo que empieza con ESC
+          // (flechas, Esc) tampoco se junta con lo que sigue: ESC y después «[I» tecleados aparte no tienen que parecer un reporte de foco.
+          if (t) encolar(t, t === '\\r' || t.charAt(0) === '\\x1b');
+        });
+        window.addEventListener('resize', alCambiarVentana);
+        window.addEventListener('orientationchange', alCambiarVentana);
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener('resize', alCambiarVentana);
+          window.visualViewport.addEventListener('scroll', alCambiarVentana);
+        }
       } else term.reset();
+      alCambiarVentana();
       mirar();
       enviarEscritura();
     }, function () { avisoTerm('No se pudo cargar la terminal. Revisá la conexión con la PC.'); });
@@ -984,37 +1056,35 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   function cerrarTerminal(desdeHistoria) {
     if (!termId) return;
     var id = termId;
-    if (termAjustado) pedirApi('/api/terminal', { id: id, desde: termDesde, tam: 'pc', soloEscribir: true, sesion: TERM_SESION, n: ++termN }).then(null, function () { /* la PC lo devuelve sola al rato */ });
     termId = null;
-    termAjustado = false;
     termCola = [];
-    termTamPend = null;
     soltarMirar();
     soltarEscribir();
-    $('term').hidden = true;
+    var el = $('term');
+    el.hidden = true;
+    el.style.top = el.style.height = el.style.bottom = '';
+    if (raiz.classList) raiz.classList.remove('con-term');
     if (!desdeHistoria) { try { history.back(); } catch (e) { /* sin historial */ } }
   }
 
   $('term-volver').addEventListener('click', function () { cerrarTerminal(false); });
-  $('term-ajustar').addEventListener('click', function () {
-    if (!termId || !term) return;
-    termTamPend = { tam: termAjustado ? 'pc' : tamDelCelu(), n: 0 };
-    enviarEscritura();
+  $('term-vista').addEventListener('click', function () {
+    termVista = termVista === 'celu' ? 'pc' : 'celu';
+    guardar(claveVista(), termVista);
+    pintarVista();
+    encajar();
   });
+  // El foco tiene que salir de un toque del usuario (iOS no abre el teclado si no): xterm enfoca su textarea oculto y de ahí sale lo tipeado.
+  $('term-pantalla').addEventListener('click', function () { if (term && !termCerrada) term.focus(); });
+  $('term-pantalla').addEventListener('focusin', function () { setTimeout(alFondo, 350); });
   if (document.querySelectorAll) {
     [].forEach.call(document.querySelectorAll('[data-tecla]'), function (b) {
+      botonesTecla.push(b);
+      // Con el dedo sobre una tecla el foco no se mueve: si se movía, el teclado se cerraba en cada toque.
+      b.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
       b.addEventListener('click', function () { encolar(TECLAS[b.getAttribute('data-tecla')], true); });
     });
   }
-  $('term-form').addEventListener('submit', function (ev) {
-    ev.preventDefault();
-    var t = $('term-texto');
-    if (!t.value) { encolar('\\r', true); return; }
-    // El Enter va en otro pedido: pegado al texto, Claude lo toma como parte de lo pegado y no lo manda.
-    encolar(t.value.replace(/\\r?\\n/g, '\\r'), true);
-    encolar('\\r', true);
-    t.value = '';
-  });
 
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { clearTimeout(timer); soltarMirar(); clearTimeout(termEscTimer); termEscTimer = null; }
