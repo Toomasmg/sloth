@@ -1,8 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
+import { connect, type Socket } from 'node:net'
 import type { EstadoCelular } from '../../shared/celular'
-import { crearFuenteWifi, type ProveedorDeEstado } from './celular-servidor'
+import { crearFuenteWifi, type OpcionesWifi, type ProveedorDeEstado } from './celular-servidor'
 import { abrirRespuesta, derivarClaves, sellarPedido, type Claves } from './celular-sello'
 
 const CLAVE = Buffer.alloc(32, 7).toString('base64url')
@@ -10,7 +11,7 @@ const ESTADO: EstadoCelular = { ahora: 1, aprobar: false, terminal: false, cuent
 
 const claves = derivarClaves(CLAVE) as Claves
 
-async function conServidor(over: Partial<ProveedorDeEstado>, fn: (base: string, decisiones: string[]) => Promise<void>): Promise<void> {
+async function conServidor(over: Partial<ProveedorDeEstado>, fn: (base: string, decisiones: string[]) => Promise<void>, opciones: Partial<OpcionesWifi> = {}): Promise<void> {
   const decisiones: string[] = []
   const proveedor: ProveedorDeEstado = {
     estado: async () => ESTADO,
@@ -24,7 +25,7 @@ async function conServidor(over: Partial<ProveedorDeEstado>, fn: (base: string, 
     xterm: () => null,
     ...over
   }
-  const f = crearFuenteWifi({ host: '127.0.0.1', puerto: 0, proveedor })
+  const f = crearFuenteWifi({ host: '127.0.0.1', puerto: 0, proveedor, ...opciones })
   await f.iniciar()
   try {
     await fn(`http://127.0.0.1:${f.puerto()}`, decisiones)
@@ -309,4 +310,48 @@ test('terminal: detener() con un pedido abierto corta la conexión, suelta la es
   for (let i = 0; i < 100 && c.terminaron() === 0; i++) await new Promise((r) => setTimeout(r, 10))
   assert.equal(c.señal()?.aborted, true)
   assert.equal(c.terminaron(), 1)
+})
+
+const puertoDe = (base: string): number => Number(new URL(base).port)
+
+function socketDesde(origen: string, puerto: number): Promise<{ socket: Socket; cerrado: Promise<void> }> {
+  return new Promise((resolve, reject) => {
+    const socket = connect({ host: '127.0.0.1', port: puerto, localAddress: origen })
+    const cerrado = new Promise<void>((r) => socket.once('close', () => r()))
+    socket.once('error', reject)
+    socket.once('connect', () => resolve({ socket: socket.on('error', () => undefined), cerrado }))
+  })
+}
+
+test('conexiones: un equipo que llena su cupo con sockets ociosos no deja sin servicio a otro', async () => {
+  await conServidor(
+    {},
+    async (base) => {
+      const malos = await Promise.all([1, 2, 3].map(() => socketDesde('127.0.0.2', puertoDe(base))))
+      const de_mas = await socketDesde('127.0.0.2', puertoDe(base))
+      await de_mas.cerrado
+      assert.equal(de_mas.socket.destroyed, true, 'el cuarto del mismo equipo se corta')
+      assert.equal(malos.every((m) => !m.socket.destroyed), true, 'los tres primeros siguen')
+      assert.equal((await postSellado(base, '/api/estado', {})).status, 200, 'el celu, desde otra dirección, sigue andando')
+      malos[0].socket.destroy()
+      await malos[0].cerrado
+      const vuelve = await socketDesde('127.0.0.2', puertoDe(base))
+      assert.equal(vuelve.socket.destroyed, false, 'al cerrarse una vuelve el lugar')
+      for (const m of [...malos, vuelve]) m.socket.destroy()
+    },
+    { maxConexionesPorIp: 3 }
+  )
+})
+
+test('conexiones: una que no manda nada se corta sola', async () => {
+  await conServidor(
+    {},
+    async (base) => {
+      const callado = await socketDesde('127.0.0.1', puertoDe(base))
+      await callado.cerrado
+      assert.equal(callado.socket.destroyed, true)
+      assert.equal((await postSellado(base, '/api/estado', {})).status, 200)
+    },
+    { ociosoMs: 150 }
+  )
 })
