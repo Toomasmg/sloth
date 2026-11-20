@@ -97,6 +97,7 @@ interface Pagina {
   mostrar: () => void
   evento: (tipo: string) => void
   timersAbiertos: () => number
+  slothSello: { abrirClave: (c: string) => unknown }
 }
 
 interface Opciones {
@@ -258,7 +259,8 @@ async function abrir(responder: Responder, opciones: Opciones = {}): Promise<Pag
       esDocumento.get('visibilitychange')?.()
     },
     evento: (tipo) => esVentana.get(tipo)?.(),
-    timersAbiertos: () => timers.size
+    timersAbiertos: () => timers.size,
+    slothSello: ventana.slothSello as Pagina['slothSello']
   }
 }
 
@@ -376,13 +378,14 @@ test('lo que se pega se parte en pedidos que la PC acepta, aunque sean puros ESC
   assert.deepEqual(p.escritos.map((x) => x.b.n), p.escritos.map((_, i) => i + 1), 'numerados sin huecos')
 })
 
-test('si la PC contestó pero la página no pudo leerlo, lo que se había escrito no se manda dos veces', async () => {
+test('si la PC contestó pero la página no pudo leerlo, lo que se había escrito no se manda dos veces y avisa que puede no haber llegado', async () => {
   const enorme = ok({ ...SALIDA, datos: 'x'.repeat(300_000) })
   const p = await abrir((b) => (b.soloEscribir ? (b.escribir === 'ls' ? enorme : ok(SALIDA)) : 'colgar'))
   p.teclear('ls')
   await p.esperar(() => p.escritos.length >= 1)
   await p.avanzar(10_000)
   assert.equal(p.escritos.filter((x) => x.b.escribir === 'ls').length, 1)
+  assert.match(p.aviso(), /puede que lo último que escribiste no haya llegado/)
 })
 
 test('red que cae con una escritura: se reenvía con el MISMO número, y lo que se teclee después va aparte y después', async () => {
@@ -559,4 +562,72 @@ test('en «Desde cualquier red» la sesión muestra «Terminal» apagado, y con 
   assert.match(remoto.botones[0].atributos.get('aria-label') ?? '', /QR del Wi-Fi de casa/)
   const sin = await abrir(() => ok(SALIDA), { remoto: true, estado: { ...ESTADO, terminal: false, terminalEnWifi: false } })
   assert.equal(sin.botones.length, 0)
+})
+
+test('un «Ajustar» pedido con teclas sin confirmar no las pasa de largo: lo ya numerado se reenvía primero', async () => {
+  let intentos = 0
+  const p = await abrir((b) => {
+    if (!b.soloEscribir) return 'colgar'
+    return b.escribir === 'git push' && ++intentos === 1 ? 'red' : ok(SALIDA)
+  })
+  p.teclear('git push')
+  await p.esperar(() => p.escritos.length >= 1)
+  p.nodo('term-ajustar').escuchas.get('click')?.({ preventDefault: () => undefined })
+  await p.esperar()
+  assert.equal(p.escritos.length, 1, 'el backoff manda')
+  await p.avanzar(250)
+  await p.esperar(() => p.escritos.length >= 3)
+  assert.deepEqual(p.escritos.map((x) => [x.b.escribir ?? 'tam', x.b.n]), [['git push', 1], ['git push', 1], ['tam', 2]], 'números crecientes en el orden en que llegan a la PC')
+})
+
+test('lo que no se confirmó en 2 minutos no se reenvía (la PC olvida a los 10): se descarta y avisa', async () => {
+  let intentos = 0
+  const p = await abrir((b) => (b.soloEscribir && b.escribir === 'rm -rf dist' && ++intentos === 1 ? 'red' : b.soloEscribir ? ok(SALIDA) : 'colgar'))
+  p.teclear('rm -rf dist')
+  await p.esperar(() => p.escritos.length >= 1)
+  p.ocultar()
+  await p.avanzar(3 * 60_000)
+  p.mostrar()
+  await p.esperar()
+  assert.equal(p.escritos.filter((x) => x.b.escribir === 'rm -rf dist').length, 1, 'ni un reintento')
+  assert.match(p.aviso(), /No sé si llegó lo último que escribiste/)
+  p.teclear('ls')
+  await p.esperar(() => p.escritos.some((x) => x.b.escribir === 'ls'))
+  assert.equal(p.escritos[p.escritos.length - 1].b.n, 2, 'lo siguiente sigue con el número que viene')
+  assert.match(p.aviso(), /^$/, 'confirmada la nueva, el aviso se va')
+})
+
+test('pasado un rato corto el reintento sí sale, con el mismo número', async () => {
+  let intentos = 0
+  const p = await abrir((b) => (b.soloEscribir && b.escribir === 'ls' && ++intentos === 1 ? 'red' : b.soloEscribir ? ok(SALIDA) : 'colgar'))
+  p.teclear('ls')
+  await p.esperar(() => p.escritos.length >= 1)
+  p.ocultar()
+  await p.avanzar(110_000)
+  p.mostrar()
+  await p.esperar(() => p.escritos.length >= 2)
+  assert.deepEqual(p.escritos.map((x) => x.b.n), [1, 1])
+})
+
+test('un 429 dice que la PC está ocupada, no que no hay conexión', async () => {
+  const p = await abrir(() => ({ status: 429, cuerpo: () => '' }))
+  await p.avanzar(2000)
+  assert.match(p.aviso(), /La PC está ocupada/)
+  assert.doesNotMatch(p.aviso(), /Sin conexión/)
+})
+
+test('la clave del sello se deriva una vez, no en cada pedido', async () => {
+  const p = await abrir(reposo)
+  const real = p.slothSello.abrirClave
+  let llamadas = 0
+  p.slothSello.abrirClave = (c: string) => {
+    llamadas++
+    return real(c)
+  }
+  p.teclear('a')
+  await p.esperar(() => p.escritos.length >= 1)
+  p.teclear('b')
+  await p.esperar(() => p.escritos.length >= 2)
+  await p.avanzar(5000)
+  assert.equal(llamadas, 0)
 })

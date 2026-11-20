@@ -257,9 +257,15 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   var leer = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
   // La versión remota define window.slothFetch: se busca en cada pedido, no al cargar. En el Wi-Fi
   // los pedidos van sellados con la clave del QR (window.slothSello).
+  // Derivar la clave y precalcular el MAC cuesta: se hace una vez por clave, no en cada pedido.
+  var cacheClaves = { t: null, c: null };
+  var clavesDe = function (t) {
+    if (cacheClaves.t !== t || !cacheClaves.c) cacheClaves = { t: t, c: window.slothSello.abrirClave(t) };
+    return cacheClaves.c;
+  };
   var sellado = function (ruta, objeto, senal) {
     return new Promise(function (resolve, reject) {
-      var claves = window.slothSello.abrirClave(token);
+      var claves = clavesDe(token);
       if (!claves) { resolve({ ok: false, status: 401 }); return; }
       var s = window.slothSello.sellarPedido(claves, ruta, objeto);
       var opciones = { method: 'POST', cache: 'no-store', headers: { 'content-type': 'text/plain' }, body: s.sobre };
@@ -607,6 +613,9 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   var termGen = 0, termCtl = null, termMirando = false, termFallas = 0, termPausa = 0, termMirarTimer = null, termWatchdog = null;
   var termEscribiendo = false, termEscFallas = 0, termEscTok = 0, termEscTimer = null, termEscCtl = null, termEscWatchdog = null, termN = 0;
   var TERM_PESO = 3000, TERM_IGUALES = 3;
+  // La PC recuerda 10 min los números de escritura que hizo: pasado bastante menos que eso lo que no se confirmó se descarta, nunca se reenvía.
+  var TERM_ESCRITURA_MAX_MS = 120000;
+  var termNota = '';
   // Identifica a esta página ante la PC: con el número de cada escritura, un reintento no se escribe dos veces.
   var TERM_SESION = (function () {
     var abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', r = '', b = null;
@@ -736,9 +745,14 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     $('term-ajustar').setAttribute('aria-pressed', termAjustado ? 'true' : 'false');
     $('term-ajustar').textContent = termAjustado ? 'Tamaño de la PC' : 'Ajustar al celu';
     termCerrada = !j.viva;
-    avisoTerm(termCerrada ? 'La terminal está cerrada en la PC. Abrila ahí para seguir desde acá.' : '');
+    avisoTerm(termCerrada ? 'La terminal está cerrada en la PC. Abrila ahí para seguir desde acá.' : termNota);
     botonesTerm();
   }
+
+  var tipoDeError = function (err) {
+    var m = err && err.message;
+    return m === 'grande' || m === 'sello' ? m : m === 'http 429' ? 'ocupada' : 'red';
+  };
 
   function rechazoDeLaPc(j) {
     termCerrada = true;
@@ -752,10 +766,10 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     termMas = false;
     termFallas++;
     termPausa = retardoTerm(termFallas);
-    if (tipo === 'red') {
+    if (tipo === 'red' || tipo === 'ocupada') {
       termTipo = '';
       termIguales = 0;
-      if (termFallas >= 2) avisoTerm('Sin conexión con la PC. Reintentando…');
+      if (termFallas >= 2) avisoTerm(tipo === 'ocupada' ? 'La PC está ocupada. Reintentando…' : 'Sin conexión con la PC. Reintentando…');
       return;
     }
     // La PC sí contestó: lo que se mira no cambia nada allá, se pide de nuevo desde el mismo punto.
@@ -822,7 +836,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
         else if (espera > 0 && !j.datos && !j.reinicio && !j.mas && !cambio && Date.now() - t0 < 400) termPausa = 500;
       }, function (err) {
         if (gen !== termGen) return;
-        falloMirar(err && (err.message === 'grande' || err.message === 'sello') ? err.message : 'red');
+        falloMirar(tipoDeError(err));
       })
       .then(function () {
         if (gen !== termGen) return;
@@ -844,9 +858,9 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     else termEscTimer = setTimeout(function () { termEscTimer = null; enviarEscritura(); }, retardoTerm(termEscFallas));
   }
 
-  function falloEscribir() {
+  function falloEscribir(tipo) {
     termEscFallas++;
-    if (termEscFallas >= 2) avisoTerm('Sin conexión con la PC. Reintentando…');
+    if (termEscFallas >= 2) avisoTerm(tipo === 'ocupada' ? 'La PC está ocupada. Reintentando…' : 'Sin conexión con la PC. Reintentando…');
   }
 
   // Un pedido por vez y en orden. Mientras no haya respuesta el item sigue en la cola con su número: si la
@@ -854,9 +868,22 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   function enviarEscritura() {
     // Con un reintento esperando su backoff, teclear más no lo adelanta.
     if (termEscTimer || !termId || !term || termEscribiendo || termParada || termCerrada || document.hidden) return;
-    var item = termTamPend || termCola[0];
+    // Lo que ya salió con número y no se confirmó va primero: la PC descarta un número menor que el último que hizo,
+    // así que si un «Ajustar» se numerara antes, las teclas pendientes se perderían sin aviso.
+    var sinConfirmar = termCola[0] && termCola[0].n ? termCola[0] : termTamPend && termTamPend.n ? termTamPend : null;
+    var item = sinConfirmar || termTamPend || termCola[0];
     if (!item) return;
-    if (!item.n) item.n = ++termN;
+    if (!item.n) {
+      item.n = ++termN;
+      item.env = Date.now();
+    } else if (Date.now() - item.env > TERM_ESCRITURA_MAX_MS) {
+      quitarEscrito(item);
+      termEscFallas = 0;
+      if (item.t) termNota = 'No sé si llegó lo último que escribiste desde el celu. Revisá la terminal.';
+      avisoTerm(termNota);
+      enviarEscritura();
+      return;
+    }
     var pedido = { id: termId, desde: termDesde, soloEscribir: true, sesion: TERM_SESION, n: item.n };
     if (item.tam) pedido.tam = item.tam;
     else pedido.escribir = item.t;
@@ -867,7 +894,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     termEscWatchdog = setTimeout(function () {
       if (tok !== termEscTok) return;
       soltarEscribir();
-      falloEscribir();
+      falloEscribir('red');
       programarEscritura();
     }, TERM_ESCRIBIR_MAX);
     pedirApi('/api/terminal', pedido, ctl ? ctl.signal : null)
@@ -881,6 +908,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
         if (!x || tok !== termEscTok) return;
         termEscFallas = 0;
         if (!x.r.ok) { rechazoDeLaPc(x.j); return; }
+        termNota = '';
         quitarEscrito(item);
         aplicarTam(x.j);
         aplicarEstado(x.j);
@@ -889,8 +917,8 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
         if (err && (err.message === 'grande' || err.message === 'sello')) {
           // La PC sí contestó (y ya escribió lo que iba): no se reenvía, o se escribiría dos veces.
           quitarEscrito(item);
-          avisoTerm('No pude leer la respuesta de la PC.');
-        } else falloEscribir();
+          avisoTerm('No pude leer la respuesta de la PC: puede que lo último que escribiste no haya llegado.');
+        } else falloEscribir(tipoDeError(err));
       })
       .then(function () {
         if (tok !== termEscTok) return;
@@ -926,6 +954,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     termParada = false;
     termTipo = '';
     termIguales = 0;
+    termNota = '';
     $('term-nombre').textContent = nombre;
     $('term').hidden = false;
     $('term-enviar').disabled = $('term-ajustar').disabled = false;
