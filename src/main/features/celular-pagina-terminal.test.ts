@@ -141,7 +141,16 @@ async function abrir(responder: Responder, opciones: { estado?: EstadoCelular; r
   ventana.window = ventana
   if (opciones.remoto) ventana.slothFetch = async () => ({ status: 200, ok: true, json: async () => estado })
   runInNewContext(PAGINA_JS, ventana)
-  const esperar = (): Promise<void> => new Promise((r) => setTimeout(r, 60))
+  // Sellar y abrir con AES en JS puro tarda más con la PC ocupada: se espera a que dejen de llegar pedidos, no un tiempo fijo.
+  const esperar = async (): Promise<void> => {
+    let visto = -1
+    let quietos = 0
+    for (let i = 0; i < 250 && quietos < 3; i++) {
+      await new Promise((r) => setTimeout(r, 20))
+      quietos = pedidosTerminal.length === visto ? quietos + 1 : 0
+      visto = pedidosTerminal.length
+    }
+  }
   await esperar()
   const boton = botones.find((b) => b.className === 's-term')
   if (!opciones.remoto) {
