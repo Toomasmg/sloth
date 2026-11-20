@@ -123,6 +123,7 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
                   <p className="f-cel-ok">
                     Abierto en <span className="f-cel-mono">{`${v.ip}:${v.puerto}`}</span>
                   </p>
+                  {v.terminal && <p className="f-cel-ok">Las terminales se abren con este QR.</p>}
                   <p className="f-cel-nota">Escaneá el QR con la cámara del celu. Tiene que estar en el mismo Wi-Fi que la PC. El QR contiene la clave: no lo compartas.</p>
                   <p className="f-cel-nota">Para tenerlo como app: en el navegador del celu, «Agregar a pantalla de inicio».</p>
                   <Button size="sm" variant="secondary" onClick={() => void copiar(v.enlace as string, 'Enlace')}>
@@ -190,6 +191,11 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
             <Switch checked={v.terminal} onChange={(on) => void hacer('terminal', on)}>
               Abrir las terminales desde el celu
             </Switch>
+            {v.terminal && (
+              <p className="f-cel-ok" role="status">
+                {v.enlace ? 'Prendido: el botón «Terminal» aparece en cada sesión al abrir la página con el QR de «En tu Wi-Fi». Con el de «Desde cualquier red» sale apagado.' : 'Prendido, pero «Ver Sloth en el celu» está apagado: no hay QR para abrirlas.'}
+              </p>
+            )}
             <p className={v.terminal ? 'f-cel-aviso' : 'f-cel-nota'}>
               Desde el celu vas a poder ver la terminal de cada espacio y escribir en ella como si estuvieras en la PC. Quien tenga el QR (o la clave) puede correr cualquier comando en esta PC. Solo anda en el Wi-Fi de casa: abrí la página con el QR de arriba, no con el de «Desde cualquier red». En cada sesión vas a ver el botón «Terminal».
             </p>

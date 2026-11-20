@@ -27,6 +27,8 @@ export interface RespuestaTerminal {
   reinicio: boolean
   datos: string
   hasta: number
+  /** Hay más salida ya guardada que no entró en esta respuesta: el celu vuelve a pedir enseguida. */
+  mas: boolean
   viva: boolean
   cols: number
   rows: number
@@ -66,13 +68,80 @@ export function ponerFoto(v: Visor, foto: PtyChunk[], upTo: number): void {
   recortar(v)
 }
 
-/** Lo que le falta al celu. Si pide algo que el visor ya recortó (o de otro visor), va todo de nuevo. */
-export function salidaDesde(v: Visor, desde: number): { reinicio: boolean; datos: string; hasta: number } {
-  const hasta = v.chunks.length ? v.chunks[v.chunks.length - 1].seq : (v.foto ?? 0)
-  const primero = v.chunks.length ? v.chunks[0].seq : hasta + 1
-  const reinicio = desde < 0 || desde > hasta || desde < primero - 1
-  const datos = (reinicio ? v.chunks : v.chunks.filter((c) => c.seq > desde)).map((c) => c.data).join('')
-  return { reinicio, datos, hasta }
+/**
+ * Lo que `texto` ocupa dentro del JSON de la respuesta, en bytes UTF-8 ya escapados (como lo deja JSON.stringify):
+ * un ESC pesa 6, una comilla o una barra 2, un salto de línea 2, una letra con tilde 2 y un emoji 4.
+ */
+export function pesoJson(texto: string): number {
+  let n = 0
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto.charCodeAt(i)
+    if (c === 0x22 || c === 0x5c || c === 0x08 || c === 0x09 || c === 0x0a || c === 0x0c || c === 0x0d) n += 2
+    else if (c < 0x20) n += 6
+    else if (c < 0x80) n += 1
+    else if (c < 0x800) n += 2
+    else if (c >= 0xd800 && c < 0xdc00 && i + 1 < texto.length && (texto.charCodeAt(i + 1) & 0xfc00) === 0xdc00) {
+      n += 4
+      i++
+    } else if (c >= 0xd800 && c < 0xe000) n += 6
+    else n += 3
+  }
+  return n
+}
+
+/** El final de `texto` que entra en `max`, sin partir un par de sustitutos (un emoji). */
+function colaQueEntra(texto: string, max: number): string {
+  let peso = 0
+  let i = texto.length
+  while (i > 0) {
+    const par = i > 1 && (texto.charCodeAt(i - 1) & 0xfc00) === 0xdc00 && (texto.charCodeAt(i - 2) & 0xfc00) === 0xd800
+    const unidad = par ? texto.slice(i - 2, i) : texto[i - 1]
+    peso += pesoJson(unidad)
+    if (peso > max) break
+    i -= unidad.length
+  }
+  return texto.slice(i)
+}
+
+/** Lo que va en cada respuesta: la página rechaza sobres de más de 262144 caracteres, y con AES en JS puro un celu lento no debería procesar mucho más de lo que se ve. */
+export const MAX_DATOS_PESO = 120_000
+
+/**
+ * Lo que le falta al celu, sin pasar de `max` (peso en el JSON). Si pide algo que el visor ya recortó (o de otro
+ * visor), va la cola más reciente que entre, cortada entre trozos. En una respuesta común van los trozos que
+ * entran desde `desde` y `hasta` es el seq del último incluido: el próximo pedido sigue de ahí, sin huecos
+ * ni repetidos, y `mas` avisa que quedó salida por mandar. Un trozo solo que no entra en `max` se manda
+ * truncado a su final (lo más reciente) y lo que quedó antes se pierde.
+ */
+export function salidaDesde(v: Visor, desde: number, max = MAX_DATOS_PESO): { reinicio: boolean; datos: string; hasta: number; mas: boolean } {
+  const ultimo = v.chunks.length ? v.chunks[v.chunks.length - 1].seq : (v.foto ?? 0)
+  const primero = v.chunks.length ? v.chunks[0].seq : ultimo + 1
+  const reinicio = desde < 0 || desde > ultimo || desde < primero - 1
+  const lista = reinicio ? v.chunks : v.chunks.filter((c) => c.seq > desde)
+  if (!lista.length) return { reinicio, datos: '', hasta: ultimo, mas: false }
+  if (reinicio) {
+    let peso = 0
+    let i = lista.length
+    while (i > 0) {
+      const p = pesoJson(lista[i - 1].data)
+      if (peso + p > max) break
+      peso += p
+      i--
+    }
+    const datos = i < lista.length ? lista.slice(i).map((c) => c.data).join('') : colaQueEntra(lista[lista.length - 1].data, max)
+    return { reinicio, datos, hasta: ultimo, mas: false }
+  }
+  let peso = 0
+  let n = 0
+  let datos = ''
+  while (n < lista.length) {
+    const p = pesoJson(lista[n].data)
+    if (n > 0 && peso + p > max) break
+    datos += p > max ? colaQueEntra(lista[n].data, max) : lista[n].data
+    peso += p
+    n++
+  }
+  return { reinicio, datos, hasta: lista[n - 1].seq, mas: n < lista.length }
 }
 
 const dim = (n: unknown, min: number, max: number): n is number => Number.isInteger(n) && (n as number) >= min && (n as number) <= max
