@@ -9,6 +9,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.6',
+    date: '2026-11-20',
+    title: 'La terminal del celu, rápida y que anda',
+    items: [
+      'La terminal del celu por Wi-Fi ya no se queda en «Sin conexión»: una terminal con mucho color mandaba una primera respuesta más grande de lo que acepta la página.',
+      'Lo que tipeás aparece casi al instante: el eco pasó de unos 180 ms a unos 60 ms, y con la terminal quieta el celu hace 3 pedidos por minuto en vez de 166.',
+      'Si se corta la red, un comando no se ejecuta dos veces. Si pasan más de 2 minutos sin confirmar lo último que escribiste, te avisa en vez de reenviarlo.',
+      'En «Desde cualquier red», el botón «Terminal» aparece apagado con el motivo, y el panel dice si la terminal está prendida y con qué QR se usa.',
+      'Otro aparato de tu Wi-Fi, sin la clave, ya no puede dejar al celu sin conexión.'
+    ]
+  },
+  {
     version: '0.7.5',
     date: '2026-11-19',
     title: 'Deslizar con dos dedos y la terminal a mano',
