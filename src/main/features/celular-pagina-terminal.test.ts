@@ -32,6 +32,15 @@ class Nodo {
   type = ''
   clientWidth = 400
   clientHeight = 300
+  scrollLeft = 0
+  scrollTop = 0
+  offsetWidth = 0
+  offsetHeight = 0
+  rect = { left: 0, top: 0 }
+  hijo: Nodo | null = null
+  getBoundingClientRect(): { left: number; top: number } {
+    return this.rect
+  }
   parentNode: Nodo | null = null
   style: Record<string, string> = {}
   atributos = new Map<string, string>()
@@ -40,6 +49,9 @@ class Nodo {
   setAttribute(k: string, v: string): void {
     this.atributos.set(k, v)
   }
+  getAttribute(k: string): string | null {
+    return this.atributos.get(k) ?? null
+  }
   addEventListener(tipo: string, f: Escucha): void {
     this.escuchas.set(tipo, f)
   }
@@ -47,8 +59,8 @@ class Nodo {
     n.parentNode = this
     return n
   }
-  querySelector(): null {
-    return null
+  querySelector(): Nodo | null {
+    return this.hijo
   }
 }
 
@@ -87,6 +99,9 @@ interface Pagina {
   salida: string[]
   aviso: () => string
   enviar: () => boolean
+  teclas: Nodo[]
+  guardado: Map<string, string>
+  terminal: { buffer: { active: { cursorX: number; cursorY: number } } }
   botones: Nodo[]
   nodo: (id: string) => Nodo
   teclear: (texto: string) => void
@@ -104,6 +119,9 @@ interface Opciones {
   estado?: EstadoCelular
   remoto?: boolean
   sinAbortController?: boolean
+  guardado?: Record<string, string>
+  /** La pantalla de xterm mide 800x240 (80 columnas de 10 px) dentro de una ventana de 400x300. */
+  pantalla?: boolean
 }
 
 /** Corre app.js con un DOM mínimo, un xterm de mentira y un reloj que se mueve solo cuando el test lo pide, y abre la terminal. */
@@ -117,16 +135,27 @@ async function abrir(responder: Responder, opciones: Opciones = {}): Promise<Pag
   let reloj = Date.now()
   let semilla = 0
   const timers = new Map<number, { f: () => void; en: number }>()
+  const guardado = new Map<string, string>(Object.entries(opciones.guardado ?? {}))
+  const teclas = ['esc', 'arriba', 'enter'].map((t) => {
+    const n = new Nodo()
+    n.atributos.set('data-tecla', t)
+    return n
+  })
   const nodo = (id: string): Nodo => {
     let n = nodos.get(id)
     if (!n) nodos.set(id, (n = Object.assign(new Nodo(), { id, parentNode: new Nodo() })))
     return n
   }
   let alTeclear: (d: string) => void = () => undefined
+  let terminal: { buffer: { active: { cursorX: number; cursorY: number } } } | null = null
   class TerminalFalsa {
     options = { fontSize: 12 }
     cols = 80
     rows = 24
+    buffer = { active: { cursorX: 0, cursorY: 0 } }
+    constructor() {
+      terminal = this
+    }
     open(): void {}
     onData(f: (d: string) => void): void {
       alTeclear = f
@@ -145,6 +174,7 @@ async function abrir(responder: Responder, opciones: Opciones = {}): Promise<Pag
     documentElement: {},
     head: { appendChild: (): void => undefined },
     getElementById: nodo,
+    querySelectorAll: (): Nodo[] => teclas,
     createElement: (): Nodo => {
       const n = new Nodo()
       botones.push(n)
@@ -160,7 +190,7 @@ async function abrir(responder: Responder, opciones: Opciones = {}): Promise<Pag
   const ventana: Record<string, unknown> = {
     document: documento,
     Date: FechaFalsa,
-    localStorage: { getItem: (): null => null, setItem: (): void => undefined, removeItem: (): void => undefined },
+    localStorage: { getItem: (k: string): string | null => guardado.get(k) ?? null, setItem: (k: string, v: string): void => void guardado.set(k, v), removeItem: (k: string): void => void guardado.delete(k) },
     location: { hash: `#k=${CLAVE}`, pathname: '/' },
     history: { replaceState: (): void => undefined, pushState: (): void => undefined, back: (): void => undefined },
     crypto: webcrypto,
@@ -201,6 +231,7 @@ async function abrir(responder: Responder, opciones: Opciones = {}): Promise<Pag
     ...(opciones.sinAbortController ? {} : { AbortController })
   }
   ventana.window = ventana
+  if (opciones.pantalla) nodo('term-pantalla').hijo = Object.assign(new Nodo(), { offsetWidth: 800, offsetHeight: 240 })
   if (opciones.remoto) ventana.slothFetch = async () => ({ status: 200, ok: true, json: async () => estado })
   runInNewContext(PAGINA_JS, ventana)
   // Sellar y abrir con AES en JS puro tarda más con la PC ocupada: se espera a que se aquiete la cadena de promesas, no un tiempo fijo.
@@ -243,7 +274,12 @@ async function abrir(responder: Responder, opciones: Opciones = {}): Promise<Pag
     },
     salida,
     aviso: () => nodo('term-aviso').textContent,
-    enviar: () => nodo('term-enviar').disabled,
+    enviar: () => teclas[0].disabled,
+    teclas,
+    guardado,
+    get terminal() {
+      return terminal as NonNullable<typeof terminal>
+    },
     botones: botones.filter((b) => b.className === 's-term'),
     nodo,
     teclear: (texto) => alTeclear(texto),
@@ -356,12 +392,92 @@ test('lo que se teclea mientras viaja otra tecla se junta en el pedido siguiente
   assert.deepEqual(p.escritos.map((x) => [x.b.escribir, x.b.n]), [['a', 1], ['bc', 2]])
 })
 
-test('el formulario manda el texto y el Enter en pedidos aparte y en orden', async () => {
+test('lo que se tipea en la terminal va a la PC: el texto y el Enter en pedidos aparte y en orden', async () => {
   const p = await abrir(reposo)
-  p.nodo('term-texto').value = 'ls -la'
-  p.nodo('term-form').escuchas.get('submit')?.({ preventDefault: () => undefined })
+  p.teclear('ls -la')
+  p.teclear('\r')
   await p.esperar(() => p.escritos.length >= 2)
   assert.deepEqual(p.escritos.map((x) => x.b.escribir), ['ls -la', '\r'])
+})
+
+test('lo que el xterm del celu contesta solo (posición, foco, mouse, atributos, colores) no llega a la PC; lo tipeado sí', async () => {
+  const p = await abrir(reposo)
+  const E = '\x1b'
+  for (const solo of [`${E}[24;80R`, `${E}[?1;2c`, `${E}[>0;276;0c`, `${E}[?2004;2$y`, `${E}[I`, `${E}[O`, `${E}[<0;39;19M`, `${E}[<0;39;19m`, `${E}]11;rgb:0b0b/0d0d/1010${E}\\`]) p.teclear(solo)
+  p.teclear(`a${E}[Ib${E}[24;80Rc`)
+  p.teclear(`${E}[A`)
+  p.teclear(`${E}[1;2R`)
+  p.teclear(`${E}[<64;3;4M`)
+  p.teclear(`${E}[200~pega ${E}[I tal cual${E}[201~`)
+  await p.esperar(() => p.escritos.length >= 5)
+  await p.avanzar(1000)
+  assert.deepEqual(p.escritos.map((x) => x.b.escribir), ['abc', `${E}[A`, `${E}[1;2R`, `${E}[<64;3;4M`, `${E}[200~pega ${E}[I tal cual${E}[201~`], 'F3 con modificador y la rueda pasan; cada tecla con ESC va en su pedido')
+})
+
+test('Esc y «[I» tecleados aparte no viajan juntos, o la PC los tomaría por un reporte de foco', async () => {
+  const p = await abrir(reposo)
+  p.teclear('')
+  p.teclear('[I')
+  await p.esperar(() => p.escritos.length >= 2)
+  assert.deepEqual(p.escritos.map((x) => x.b.escribir), ['', '[I'])
+})
+
+test('con la PC más ancha que el celu, cada vez que llega salida la ventana sigue al cursor', async () => {
+  let soltar: () => void = () => undefined
+  const llega = new Promise<void>((r) => (soltar = r))
+  const p = await abrir((b, n) => (b.soloEscribir ? ok(SALIDA) : n === 1 ? ok(SALIDA) : n === 2 ? llega.then(() => ok({ ...SALIDA, datos: 'x'.repeat(70), hasta: 5 })) : 'colgar'), { pantalla: true })
+  await p.esperar(() => p.mirar.length >= 2)
+  const ventana = p.nodo('term-pantalla')
+  assert.equal(ventana.scrollLeft, 0)
+  p.terminal.buffer.active.cursorX = 70
+  soltar()
+  await p.esperar(() => p.salida.length > 0)
+  assert.equal(ventana.scrollLeft, 70 * 10 + 10 + 20 - 400, 'el cursor (columna 70 de 10 px) queda dentro del ancho de 400 con 2 columnas de margen')
+})
+
+test('las teclas de la botonera siguen yendo aparte y no mueven el foco de la terminal', async () => {
+  const p = await abrir(reposo)
+  const esc = p.teclas[0]
+  let evitado = false
+  esc.escuchas.get('mousedown')?.({ preventDefault: () => (evitado = true) })
+  assert.equal(evitado, true, 'si el botón tomara el foco, el teclado del celu se cerraría')
+  esc.escuchas.get('click')?.({ preventDefault: () => undefined })
+  p.teclas[1].escuchas.get('click')?.({ preventDefault: () => undefined })
+  await p.esperar(() => p.escritos.length >= 2)
+  assert.deepEqual(p.escritos.map((x) => x.b.escribir), ['\x1b', '\x1b[A'])
+})
+
+test('el celu no pide cambiar el tamaño de la terminal de la PC: ningún pedido lleva tam', async () => {
+  const p = await abrir((b) => (b.soloEscribir ? ok({ ...SALIDA, cols: 200, rows: 50 }) : 'colgar'))
+  p.nodo('term-vista').escuchas.get('click')?.({ preventDefault: () => undefined })
+  p.teclear('x')
+  await p.esperar(() => p.escritos.length >= 1)
+  p.nodo('term-volver').escuchas.get('click')?.({ preventDefault: () => undefined })
+  await p.avanzar(5000)
+  assert.ok(p.pedidos.length > 1)
+  assert.ok(p.pedidos.every((x) => !('tam' in x.b)), 'ni tam ni «pc»')
+  assert.ok(!PAGINA_JS.includes('term-ajustar') && !PAGINA_JS.includes('tamDelCelu'), 'el botón de ajustar ya no existe')
+})
+
+test('la vista PC o celu se alterna, se pinta y se recuerda por orientación', async () => {
+  const p = await abrir(reposo)
+  const vista = p.nodo('term-vista')
+  assert.equal(vista.textContent, 'Vista PC')
+  vista.escuchas.get('click')?.({ preventDefault: () => undefined })
+  assert.equal(vista.textContent, 'Vista celu')
+  assert.match(vista.atributos.get('aria-label') ?? '', /Vista celu/)
+  assert.equal(vista.atributos.get('data-vista'), 'celu')
+  assert.equal(vista.atributos.has('aria-pressed'), false, 'la etiqueta ya dice el estado: un botón que cambia de nombre no es un interruptor')
+  assert.ok(!PAGINA_JS.includes('id="term-vista" aria-pressed'))
+  assert.equal(p.guardado.get('sloth-term-vista-v'), 'celu')
+  vista.escuchas.get('click')?.({ preventDefault: () => undefined })
+  assert.equal(vista.textContent, 'Vista PC')
+  assert.equal(p.guardado.get('sloth-term-vista-v'), 'pc')
+})
+
+test('al abrir, la vista que se había elegido se recupera', async () => {
+  const p = await abrir(reposo, { guardado: { 'sloth-term-vista-v': 'celu' } })
+  assert.equal(p.nodo('term-vista').textContent, 'Vista celu')
 })
 
 test('lo que se pega se parte en pedidos que la PC acepta, aunque sean puros ESC', async () => {
@@ -416,20 +532,6 @@ test('una escritura que cuelga se corta a los 10 s y se reintenta con el mismo n
   await p.avanzar(250)
   await p.esperar(() => p.escritos.length >= 2)
   assert.deepEqual(p.escritos.map((x) => [x.b.escribir, x.b.n]), [['z', 1], ['z', 1]])
-})
-
-test('«Ajustar al celu» y volver al tamaño de la PC viajan como escrituras numeradas, sin salida', async () => {
-  const p = await abrir((b) => (b.soloEscribir ? ok({ ...SALIDA, cols: 48, rows: 18, ajustado: !!b.tam && b.tam !== 'pc' }) : 'colgar'))
-  p.nodo('term-ajustar').escuchas.get('click')?.({ preventDefault: () => undefined })
-  await p.esperar(() => p.escritos.length >= 1)
-  const t = p.escritos[0].b.tam as { cols: number; rows: number }
-  assert.ok(Number.isInteger(t.cols) && Number.isInteger(t.rows))
-  assert.equal(p.escritos[0].b.soloEscribir, true)
-  assert.equal(p.nodo('term-ajustar').textContent, 'Tamaño de la PC')
-  p.nodo('term-ajustar').escuchas.get('click')?.({ preventDefault: () => undefined })
-  await p.esperar(() => p.escritos.length >= 2)
-  assert.equal(p.escritos[1].b.tam, 'pc')
-  assert.deepEqual(p.escritos.map((x) => x.b.n), [1, 2])
 })
 
 test('una respuesta de una escritura aplica tamaño y estado, nunca salida', async () => {
@@ -562,22 +664,6 @@ test('en «Desde cualquier red» la sesión muestra «Terminal» apagado, y con 
   assert.match(remoto.botones[0].atributos.get('aria-label') ?? '', /QR del Wi-Fi de casa/)
   const sin = await abrir(() => ok(SALIDA), { remoto: true, estado: { ...ESTADO, terminal: false, terminalEnWifi: false } })
   assert.equal(sin.botones.length, 0)
-})
-
-test('un «Ajustar» pedido con teclas sin confirmar no las pasa de largo: lo ya numerado se reenvía primero', async () => {
-  let intentos = 0
-  const p = await abrir((b) => {
-    if (!b.soloEscribir) return 'colgar'
-    return b.escribir === 'git push' && ++intentos === 1 ? 'red' : ok(SALIDA)
-  })
-  p.teclear('git push')
-  await p.esperar(() => p.escritos.length >= 1)
-  p.nodo('term-ajustar').escuchas.get('click')?.({ preventDefault: () => undefined })
-  await p.esperar()
-  assert.equal(p.escritos.length, 1, 'el backoff manda')
-  await p.avanzar(250)
-  await p.esperar(() => p.escritos.length >= 3)
-  assert.deepEqual(p.escritos.map((x) => [x.b.escribir ?? 'tam', x.b.n]), [['git push', 1], ['git push', 1], ['tam', 2]], 'números crecientes en el orden en que llegan a la PC')
 })
 
 test('lo que no se confirmó en 2 minutos no se reenvía (la PC olvida a los 10): se descarta y avisa', async () => {

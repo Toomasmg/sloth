@@ -291,8 +291,9 @@ for (const celu of CELUS) {
     const abierto = await abrirCelu(url, celu, true)
     try {
       const { cel, term, pantalla } = abierto
-      await term.getByLabel('Texto para la terminal').fill("$e=[char]27; 1..2000 | % { -join (1..20 | % { \"$e[3$($_ % 7 + 1)mx\" }) }; Write-Output ('fin-' + 'grande')")
-      await term.getByRole('button', { name: 'Enviar' }).click()
+      await term.locator('.xterm-screen').click()
+      await cel.keyboard.insertText("$e=[char]27; 1..2000 | % { -join (1..20 | % { \"$e[3$($_ % 7 + 1)mx\" }) }; Write-Output ('fin-' + 'grande')")
+      await cel.keyboard.press('Enter')
       await expect(pantalla).toContainText('fin-grande', { timeout: 60_000 })
       await term.getByRole('button', { name: 'Volver a las sesiones' }).click()
       await expect(term).toBeHidden()

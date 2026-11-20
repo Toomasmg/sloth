@@ -3,15 +3,19 @@
 .f-updater-banner {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 30px;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-height: 28px;
   max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
-  padding: 3px 4px 3px 10px;
-  border-radius: var(--r-lg);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-full);
   background: var(--done-soft);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--done) 28%, transparent);
   color: var(--text-2);
+  font: inherit;
   font-size: var(--fs-12);
 }
 .f-updater-banner > svg {
@@ -21,25 +25,25 @@
 .f-updater-banner-text {
   min-width: 0;
   color: var(--text);
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.f-updater-banner .btn.sm {
-  height: 24px;
-  padding: 0 9px;
-  border-radius: var(--r-lg);
-  font-size: var(--fs-12);
-  font-weight: 600;
+.f-updater-banner.is-act {
+  cursor: pointer;
 }
-.f-updater-banner .btn.ghost {
-  font-weight: 400;
-  color: var(--text-2);
+.f-updater-banner.is-act:hover {
+  filter: brightness(1.15);
+}
+.f-updater-banner:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .f-updater-banner.is-flash {
-  padding-right: 10px;
+  flex: 0 1 auto;
+  max-width: 320px;
 }
 
 .f-updater-backdrop {
@@ -321,4 +325,16 @@
   background: var(--accent);
   box-shadow: 0 0 0 2px var(--bg);
   pointer-events: none;
+}
+
+/* Poco lugar: queda solo el ícono (el detalle está en el tooltip y en el aria-label) para no tapar los resúmenes de estado. */
+@container sl-right (max-width: 460px) {
+  .f-updater-banner:not(.is-flash) {
+    padding: 0;
+    width: 28px;
+    justify-content: center;
+  }
+  .f-updater-banner:not(.is-flash) .f-updater-banner-text {
+    display: none;
+  }
 }

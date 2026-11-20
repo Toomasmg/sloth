@@ -15,7 +15,7 @@ import { limitesDeCuenta } from '../codex-limites'
 import { armarEstado, claveValida, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type TipoAviso } from './celular-core'
 import { crearFuenteWifi, type FuenteDeEstado, type ProveedorDeEstado } from './celular-servidor'
 import { XTERM } from './celular-xterm'
-import { debeEsperar, nuevoVisor, ponerFoto, salidaDesde, sinSalida, sumarSalida, tamanoActual, vencidos, type RespuestaTerminal, type Visor } from './celular-terminal-core'
+import { debeEsperar, nuevoVisor, ponerFoto, salidaDesde, sinSalida, sinAutomaticas, sumarSalida, tamanoActual, vencidos, type RespuestaTerminal, type Visor } from './celular-terminal-core'
 import { crearEsperas } from './celular-espera'
 import { crearEscrituras } from './celular-escrituras'
 import { crearFuenteRemota, type CambioRemoto } from './celular-remoto'
@@ -252,20 +252,13 @@ const feature: Feature = {
         // Un reintento (la respuesta se perdió) trae el mismo número: lo que ya se escribió no se escribe dos veces.
         const repetida = p.sesion !== undefined && p.n !== undefined && (p.escribir !== undefined || p.tam !== undefined) && !escrituras.nueva(p.id, p.sesion, p.n, Date.now())
         if (v && viva && !repetida) {
-          if (p.escribir) ctx.writePty(p.id, p.escribir)
-          if (p.tam) {
-            if (p.tam === 'pc') devolverTamano(p.id, v)
-            else {
-              v.ajustado = p.tam
-              v.pcAlAjustar = ctx.ptySize(p.id)
-              ctx.resizePty(p.id, p.tam.cols, p.tam.rows)
-              esperas.avisar(p.id)
-            }
-          }
+          // Lo que el xterm del celu contesta solo (posición, foco, mouse) no es entrada del usuario; `tam` de una página vieja se ignora.
+          const texto = p.escribir ? sinAutomaticas(p.escribir) : ''
+          if (texto) ctx.writePty(p.id, texto)
         }
         const respuesta = (visor: Visor | undefined, sigueViva: boolean, salida: ReturnType<typeof salidaDesde>): RespuestaTerminal => {
-          const tam = tamanoActual(visor, ctx.ptySize(p.id))
-          return { ...salida, viva: sigueViva && !!visor, cols: tam.cols, rows: tam.rows, ajustado: !!visor?.ajustado }
+          const tam = tamanoActual(ctx.ptySize(p.id))
+          return { ...salida, viva: sigueViva && !!visor, cols: tam.cols, rows: tam.rows, ajustado: false }
         }
         if (p.soloEscribir) return respuesta(v, viva, sinSalida(p))
         const salida = v ? salidaDesde(v, p.desde) : { reinicio: p.desde !== -1, datos: '', hasta: 0, mas: false }
@@ -287,19 +280,8 @@ const feature: Feature = {
       xterm: () => XTERM
     }
 
-    function devolverTamano(id: string, v: Visor): void {
-      if (!v.ajustado) return
-      v.ajustado = null
-      v.pcAlAjustar = null
-      const pc = ctx.ptySize(id)
-      if (pc) ctx.resizePty(id, pc.cols, pc.rows)
-      esperas.avisar(id)
-    }
-
     function soltarVisores(ids?: string[]): void {
       for (const id of ids ?? [...visores.keys()]) {
-        const v = visores.get(id)
-        if (v) devolverTamano(id, v)
         visores.delete(id)
         esperas.soltar(id)
       }
@@ -323,8 +305,6 @@ const feature: Feature = {
       esperas.avisar(id)
     })
     ctx.onPtyExit((id) => {
-      const v = visores.get(id)
-      if (v) v.ajustado = null
       esperas.avisar(id)
     })
 
