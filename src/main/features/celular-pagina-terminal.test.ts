@@ -32,6 +32,15 @@ class Nodo {
   type = ''
   clientWidth = 400
   clientHeight = 300
+  scrollLeft = 0
+  scrollTop = 0
+  offsetWidth = 0
+  offsetHeight = 0
+  rect = { left: 0, top: 0 }
+  hijo: Nodo | null = null
+  getBoundingClientRect(): { left: number; top: number } {
+    return this.rect
+  }
   parentNode: Nodo | null = null
   style: Record<string, string> = {}
   atributos = new Map<string, string>()
@@ -50,8 +59,8 @@ class Nodo {
     n.parentNode = this
     return n
   }
-  querySelector(): null {
-    return null
+  querySelector(): Nodo | null {
+    return this.hijo
   }
 }
 
@@ -92,6 +101,7 @@ interface Pagina {
   enviar: () => boolean
   teclas: Nodo[]
   guardado: Map<string, string>
+  terminal: { buffer: { active: { cursorX: number; cursorY: number } } }
   botones: Nodo[]
   nodo: (id: string) => Nodo
   teclear: (texto: string) => void
@@ -110,6 +120,8 @@ interface Opciones {
   remoto?: boolean
   sinAbortController?: boolean
   guardado?: Record<string, string>
+  /** La pantalla de xterm mide 800x240 (80 columnas de 10 px) dentro de una ventana de 400x300. */
+  pantalla?: boolean
 }
 
 /** Corre app.js con un DOM mínimo, un xterm de mentira y un reloj que se mueve solo cuando el test lo pide, y abre la terminal. */
@@ -135,10 +147,15 @@ async function abrir(responder: Responder, opciones: Opciones = {}): Promise<Pag
     return n
   }
   let alTeclear: (d: string) => void = () => undefined
+  let terminal: { buffer: { active: { cursorX: number; cursorY: number } } } | null = null
   class TerminalFalsa {
     options = { fontSize: 12 }
     cols = 80
     rows = 24
+    buffer = { active: { cursorX: 0, cursorY: 0 } }
+    constructor() {
+      terminal = this
+    }
     open(): void {}
     onData(f: (d: string) => void): void {
       alTeclear = f
@@ -214,6 +231,7 @@ async function abrir(responder: Responder, opciones: Opciones = {}): Promise<Pag
     ...(opciones.sinAbortController ? {} : { AbortController })
   }
   ventana.window = ventana
+  if (opciones.pantalla) nodo('term-pantalla').hijo = Object.assign(new Nodo(), { offsetWidth: 800, offsetHeight: 240 })
   if (opciones.remoto) ventana.slothFetch = async () => ({ status: 200, ok: true, json: async () => estado })
   runInNewContext(PAGINA_JS, ventana)
   // Sellar y abrir con AES en JS puro tarda más con la PC ocupada: se espera a que se aquiete la cadena de promesas, no un tiempo fijo.
@@ -259,6 +277,9 @@ async function abrir(responder: Responder, opciones: Opciones = {}): Promise<Pag
     enviar: () => teclas[0].disabled,
     teclas,
     guardado,
+    get terminal() {
+      return terminal as NonNullable<typeof terminal>
+    },
     botones: botones.filter((b) => b.className === 's-term'),
     nodo,
     teclear: (texto) => alTeclear(texto),
@@ -385,10 +406,33 @@ test('lo que el xterm del celu contesta solo (posición, foco, mouse, atributos,
   for (const solo of [`${E}[24;80R`, `${E}[?1;2c`, `${E}[>0;276;0c`, `${E}[?2004;2$y`, `${E}[I`, `${E}[O`, `${E}[<0;39;19M`, `${E}[<0;39;19m`, `${E}]11;rgb:0b0b/0d0d/1010${E}\\`]) p.teclear(solo)
   p.teclear(`a${E}[Ib${E}[24;80Rc`)
   p.teclear(`${E}[A`)
+  p.teclear(`${E}[1;2R`)
+  p.teclear(`${E}[<64;3;4M`)
   p.teclear(`${E}[200~pega ${E}[I tal cual${E}[201~`)
-  await p.esperar(() => p.escritos.length >= 2)
+  await p.esperar(() => p.escritos.length >= 5)
   await p.avanzar(1000)
-  assert.deepEqual(p.escritos.map((x) => x.b.escribir), ['abc', `${E}[A${E}[200~pega ${E}[I tal cual${E}[201~`])
+  assert.deepEqual(p.escritos.map((x) => x.b.escribir), ['abc', `${E}[A`, `${E}[1;2R`, `${E}[<64;3;4M`, `${E}[200~pega ${E}[I tal cual${E}[201~`], 'F3 con modificador y la rueda pasan; cada tecla con ESC va en su pedido')
+})
+
+test('Esc y «[I» tecleados aparte no viajan juntos, o la PC los tomaría por un reporte de foco', async () => {
+  const p = await abrir(reposo)
+  p.teclear('')
+  p.teclear('[I')
+  await p.esperar(() => p.escritos.length >= 2)
+  assert.deepEqual(p.escritos.map((x) => x.b.escribir), ['', '[I'])
+})
+
+test('con la PC más ancha que el celu, cada vez que llega salida la ventana sigue al cursor', async () => {
+  let soltar: () => void = () => undefined
+  const llega = new Promise<void>((r) => (soltar = r))
+  const p = await abrir((b, n) => (b.soloEscribir ? ok(SALIDA) : n === 1 ? ok(SALIDA) : n === 2 ? llega.then(() => ok({ ...SALIDA, datos: 'x'.repeat(70), hasta: 5 })) : 'colgar'), { pantalla: true })
+  await p.esperar(() => p.mirar.length >= 2)
+  const ventana = p.nodo('term-pantalla')
+  assert.equal(ventana.scrollLeft, 0)
+  p.terminal.buffer.active.cursorX = 70
+  soltar()
+  await p.esperar(() => p.salida.length > 0)
+  assert.equal(ventana.scrollLeft, 70 * 10 + 10 + 20 - 400, 'el cursor (columna 70 de 10 px) queda dentro del ancho de 400 con 2 columnas de margen')
 })
 
 test('las teclas de la botonera siguen yendo aparte y no mueven el foco de la terminal', async () => {
@@ -422,6 +466,9 @@ test('la vista PC o celu se alterna, se pinta y se recuerda por orientación', a
   vista.escuchas.get('click')?.({ preventDefault: () => undefined })
   assert.equal(vista.textContent, 'Vista celu')
   assert.match(vista.atributos.get('aria-label') ?? '', /Vista celu/)
+  assert.equal(vista.atributos.get('data-vista'), 'celu')
+  assert.equal(vista.atributos.has('aria-pressed'), false, 'la etiqueta ya dice el estado: un botón que cambia de nombre no es un interruptor')
+  assert.ok(!PAGINA_JS.includes('id="term-vista" aria-pressed'))
   assert.equal(p.guardado.get('sloth-term-vista-v'), 'celu')
   vista.escuchas.get('click')?.({ preventDefault: () => undefined })
   assert.equal(vista.textContent, 'Vista PC')

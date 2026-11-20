@@ -58,7 +58,7 @@ export const PAGINA_HTML = `<!doctype html>
   <header class="term-top">
     <button type="button" class="term-volver" id="term-volver" aria-label="Volver a las sesiones"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
     <span class="term-nombre" id="term-nombre"></span>
-    <button type="button" class="term-vista" id="term-vista" aria-pressed="false">Vista PC</button>
+    <button type="button" class="term-vista" id="term-vista">Vista PC</button>
   </header>
   <div class="term-aviso" id="term-aviso" role="status" hidden></div>
   <div class="term-pantalla" id="term-pantalla"></div>
@@ -215,7 +215,7 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .term-volver { flex: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 12px; background: transparent; color: var(--texto); }
 .term-nombre { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; color: var(--fuerte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .term-vista { flex: none; min-height: 44px; padding: 0 12px; border: 1px solid var(--borde); border-radius: 12px; background: var(--panel); color: var(--texto); font-size: 13px; font-weight: 600; }
-.term-vista[aria-pressed="true"] { background: #2A2F37; color: var(--fuerte); }
+.term-vista[data-vista="celu"] { background: #2A2F37; color: var(--fuerte); }
 .term-aviso { flex: none; padding: 8px 14px; font-size: 13px; color: var(--espera); background: rgba(255,159,67,0.10); border-bottom: 1px solid rgba(255,176,103,0.3); }
 .term-pantalla { flex: 1; min-height: 0; overflow: auto; padding: 6px 4px; background: #0B0D10; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .term-pantalla .xterm { padding: 0; }
@@ -603,6 +603,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   var term = null, termId = null, termDesde = -1, termCola = [], termTam = null;
   var termCerrada = false, xtermCargando = null, conHistoria = false;
   var termVista = 'pc', termHoriz = false, termAlto = 0, botonesTecla = [];
+  var TERM_SEGUIR_INMEDIATO = 8000;
   var TERM_FUENTE_MIN = 8, TERM_FUENTE_MAX = 15, TERM_FUENTE_CELU = 13.5;
   var termMas = false, termParada = false, termTipo = '', termIguales = 0;
   var termGen = 0, termCtl = null, termMirando = false, termFallas = 0, termPausa = 0, termMirarTimer = null, termWatchdog = null;
@@ -692,6 +693,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   function pintarVista() {
     var b = $('term-vista');
     b.textContent = termVista === 'celu' ? 'Vista celu' : 'Vista PC';
+    b.setAttribute('data-vista', termVista);
     b.setAttribute('aria-label', termVista === 'celu' ? 'Vista celu. Tocá para ver la pantalla entera de la PC' : 'Vista PC. Tocá para ver con letra grande');
   }
   // La elección se recuerda por orientación: acostado conviene otra que parado.
@@ -721,8 +723,18 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
 
   // Lo que sale de teclear en xterm no es todo del usuario: contesta solo a las consultas del programa (posición del
   // cursor, atributos, colores) y avisa foco y toques de mouse. A la terminal de la PC solo va lo que se tipeó.
-  var AUTOMATICAS = /(\\x1b\\[200~[\\s\\S]*?(?:\\x1b\\[201~|$))|\\x1b\\[[?>=]?[\\d;:]*\\$y|\\x1b\\[\\??\\d+;\\d+R|\\x1b\\[[?>=][\\d;]*c|\\x1b\\[\\??\\d+(?:;\\d+)*n|\\x1b\\[\\d+(?:;\\d+)*t|\\x1b\\[[IO]|\\x1b\\[<\\d+;\\d+;\\d+[Mm]|\\x1b\\[M[\\x20-\\uffff]{3}|\\x1b\\][^\\x07\\x1b]*(?:\\x07|\\x1b\\\\)|\\x1bP[^\\x1b]*\\x1b\\\\/g;
-  function sinAutomaticas(t) { return t.replace(AUTOMATICAS, function (m, pegado) { return pegado ? m : ''; }); }
+  // Se deja pasar ESC[1;2R a ESC[1;8R (F3 con modificador: no se distingue de una posición en la fila 1) y la rueda del mouse
+  // (ESC[<64;x;yM y ESC[<65;x;yM), que es el usuario deslizando en un programa que pidió mouse.
+  var AUTOMATICAS = /(\\x1b\\[200~[\\s\\S]*?(?:\\x1b\\[201~|$))|\\x1b\\[[?>=]?[\\d;:]*\\$y|\\x1b\\[(?!1;[2-8]R)\\??\\d+;\\d+R|\\x1b\\[[?>=][\\d;]*c|\\x1b\\[\\??\\d+(?:;\\d+)*n|\\x1b\\[\\d+(?:;\\d+)*t|\\x1b\\[[IO]|\\x1b\\[<(?!6[45];)\\d+;\\d+;\\d+[Mm]|\\x1b\\[M[\\x20-\\uffff]{3}|\\x1b\\][^\\x07\\x1b]*(?:\\x07|\\x1b\\\\)|\\x1bP[^\\x1b]*\\x1b\\\\/g;
+  // Dos veces o más: al sacar una secuencia pueden juntarse los restos y formar otra.
+  function sinAutomaticas(t) {
+    for (var i = 0; i < 16; i++) {
+      var r = t.replace(AUTOMATICAS, function (m, pegado) { return pegado ? m : ''; });
+      if (r === t) break;
+      t = r;
+    }
+    return t;
+  }
 
   // Cuánto ocupa lo que se escribe dentro del JSON del pedido (bytes UTF-8 ya escapados): la PC no acepta
   // sobres de más de 8192 y un ESC pegado pesa 6, una letra con tilde 2.
@@ -870,7 +882,15 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
         // Primero el tamaño: lo que llega se dibujó para ese ancho.
         var cambio = aplicarTam(j);
         if (j.reinicio) term.reset();
-        if (j.datos) term.write(j.datos, cambio || j.reinicio ? function () { term.scrollToBottom(); } : undefined);
+        // Con la PC más ancha que el celu, lo que llega puede dejar el cursor fuera de la ventana: se lo sigue siempre. Con una pantalla
+        // entera (la foto al abrir) medir el cursor en el callback fuerza un layout de más sobre miles de líneas: se hace un rato después.
+        if (j.datos) {
+          var grande = j.datos.length > TERM_SEGUIR_INMEDIATO;
+          term.write(j.datos, function () {
+            if (cambio || j.reinicio) term.scrollToBottom();
+            if (grande) setTimeout(seguirCursor, 150); else seguirCursor();
+          });
+        }
         termDesde = j.hasta;
         termMas = !!j.mas;
         aplicarEstado(j);
@@ -1016,8 +1036,9 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
         term.open($('term-pantalla'));
         term.onData(function (d) {
           var t = sinAutomaticas(d);
-          // El Enter va en otro pedido: pegado al texto, Claude lo toma como parte de lo pegado y no lo manda.
-          if (t) encolar(t, t === '\\r');
+          // El Enter va en otro pedido: pegado al texto, Claude lo toma como parte de lo pegado y no lo manda. Lo que empieza con ESC
+          // (flechas, Esc) tampoco se junta con lo que sigue: ESC y después «[I» tecleados aparte no tienen que parecer un reporte de foco.
+          if (t) encolar(t, t === '\\r' || t.charAt(0) === '\\x1b');
         });
         window.addEventListener('resize', alCambiarVentana);
         window.addEventListener('orientationchange', alCambiarVentana);
