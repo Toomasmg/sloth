@@ -239,7 +239,7 @@ export const SELLO_JS = `(function () {
 
   function aTexto(c) {
     var r = '';
-    for (var i = 0; i < c.length; i += 8192) r += String.fromCharCode.apply(null, c.subarray(i, i + 8192));
+    for (var i = 0; i < c.length; i += 8192) r += String.fromCharCode.apply(null, Array.prototype.slice.call(c, i, i + 8192));
     return r;
   }
 

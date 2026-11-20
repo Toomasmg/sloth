@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createCipheriv, createHash, createHmac, randomBytes, webcrypto } from 'node:crypto'
-import { runInNewContext } from 'node:vm'
+import { createContext, runInContext, runInNewContext } from 'node:vm'
 import { SELLO_JS } from './celular-sello-web'
 import { abrirPedido, derivarClaves, sellarRespuesta } from './celular-sello'
 
@@ -461,4 +461,27 @@ test('las claves de la web se reusan con la expansión cacheada y dan lo mismo',
     const cuerpo = textoAleatorio(rnd, i * 37)
     assert.equal(web.abrirRespuesta(cw, new Uint8Array(iv), sellarRespuesta(cn, iv, cuerpo)), cuerpo)
   }
+})
+
+test('no pasa typed arrays a Function.prototype.apply: hay WebKit y Android viejos que tiran TypeError', () => {
+  const contexto = createContext({ crypto: { getRandomValues: webcrypto.getRandomValues.bind(webcrypto) } })
+  runInContext(
+    `(function () {
+      var original = String.fromCharCode;
+      var f = function () { return original.apply(null, arguments); };
+      f.apply = function (esto, lista) {
+        if (!Array.isArray(lista)) throw new TypeError('apply con un typed array');
+        return original.apply(esto, lista);
+      };
+      String.fromCharCode = f;
+    })()`,
+    contexto
+  )
+  const ventana: { slothSello?: SelloWeb } = {}
+  contexto.window = ventana
+  runInContext(SELLO_JS, contexto)
+  const w = ventana.slothSello as SelloWeb
+  const bytes = new Uint8Array(20_000).map((_, i) => i % 256)
+  assert.equal(w._t.aBase64url(bytes), Buffer.from(bytes).toString('base64url'))
+  assert.equal(w._t.deUtf8(utf8('ñandú '.repeat(5000))), 'ñandú '.repeat(5000))
 })
