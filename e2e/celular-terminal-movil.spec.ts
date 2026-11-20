@@ -103,9 +103,11 @@ test('Celular movil: la terminal anda en un Galaxy y un iPhone simulados, con sa
       const pantalla = term.locator('.xterm-rows')
       await expect(pantalla).toContainText(/shell-lista|fin-grande/, { timeout: 15_000 })
 
+      // Se escribe en la propia terminal: el toque enfoca el textarea de xterm y lo tipeado sale por onData.
       const escribir = async (texto: string): Promise<void> => {
-        await term.getByLabel('Texto para la terminal').fill(texto)
-        await term.getByRole('button', { name: 'Enviar' }).click()
+        await term.locator('.xterm-screen').click()
+        await cel.keyboard.insertText(texto)
+        await cel.keyboard.press('Enter')
       }
       const marca = `celu-escribe-${celu.nombre.length}`
       const veces = async (): Promise<number> => ((await pantalla.textContent()) ?? '').split(marca).length - 1
@@ -137,15 +139,15 @@ test('Celular movil: la terminal anda en un Galaxy y un iPhone simulados, con sa
       test.info().annotations.push({ type: `respuesta mayor de ${celu.nombre}`, description: String(reg.mayor) })
 
       // Teclado virtual: la ventana visible se achica a la mitad; después, el celu acostado.
-      const entrada = cel.getByRole('dialog', { name: 'web' }).getByLabel('Texto para la terminal')
+      const teclas = cel.getByRole('dialog', { name: 'web' }).getByRole('button', { name: 'Control C' })
       await medida(ctx, cel, celu.motor.name(), celu.ficha.viewport.width, Math.round(celu.ficha.viewport.height / 2))
-      await expect(entrada).toBeVisible()
+      await expect(teclas).toBeInViewport()
       await medida(ctx, cel, celu.motor.name(), celu.ficha.viewport.height, celu.ficha.viewport.width)
-      await expect(entrada).toBeVisible()
+      await expect(teclas).toBeInViewport()
 
-      // «Ajustar al celu» y volver.
-      await cel.getByRole('button', { name: 'Ajustar al celu' }).click()
-      await expect(cel.getByRole('button', { name: 'Tamaño de la PC' })).toBeVisible()
+      // La vista se cambia sin tocar la terminal de la PC.
+      await cel.getByRole('button', { name: /^Vista PC/ }).click()
+      await expect(cel.getByRole('button', { name: /^Vista celu/ })).toBeVisible()
       reg.cierre = Date.now()
       await cel.getByRole('button', { name: 'Volver a las sesiones' }).click()
       await expect(cel.getByRole('dialog', { name: 'web' })).toBeHidden()

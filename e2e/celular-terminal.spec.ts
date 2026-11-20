@@ -43,28 +43,38 @@ test('Celular: la terminal del espacio se abre desde el celu, se escribe y vuelv
   const pantalla = term.locator('.xterm-rows')
   await expect(pantalla).toContainText('shell-lista', { timeout: 15_000 })
 
+  // Se escribe en la propia terminal: el toque enfoca el textarea de xterm y lo tipeado sale por onData.
   const escribir = async (texto: string): Promise<void> => {
-    await term.getByLabel('Texto para la terminal').fill(texto)
-    await term.getByRole('button', { name: 'Enviar' }).click()
+    await term.locator('.xterm-screen').click()
+    await celu.keyboard.insertText(texto)
+    await celu.keyboard.press('Enter')
   }
   await escribir("Write-Output ('celu-' + 'escribe')")
   await expect(pantalla).toContainText('celu-escribe')
 
-  await term.getByRole('button', { name: 'Ajustar al celu' }).click()
-  await expect(term.getByRole('button', { name: 'Tamaño de la PC' })).toBeVisible()
-  await escribir("Write-Output ('ancho-' + $Host.UI.RawUI.WindowSize.Width)")
-  await expect.poll(async () => Number(/ancho-(\d+)/.exec((await pantalla.textContent()) ?? '')?.[1] ?? 0)).toBeLessThan(60)
+  // El celu nunca cambia el tamaño de la PC: la terminal mide lo mismo antes y después de cambiar de vista.
+  const pcCols = await page.locator('.terminal-host').first().evaluate((el) => (el as HTMLElement & { __xterm?: { cols: number } }).__xterm?.cols ?? 0)
+  const anchoEnPc = async (marca: string): Promise<number> => {
+    await escribir(`Write-Output ('${marca}-' + $Host.UI.RawUI.WindowSize.Width)`)
+    await expect.poll(async () => new RegExp(`${marca}-(\\d+)`).test((await pantalla.textContent()) ?? '')).toBe(true)
+    return Number(new RegExp(`${marca}-(\\d+)`).exec((await pantalla.textContent()) ?? '')?.[1])
+  }
+  expect(await anchoEnPc('antes')).toBe(pcCols)
+  await term.getByRole('button', { name: /^Vista PC/ }).click()
+  await expect(term.getByRole('button', { name: /^Vista celu/ })).toBeVisible()
+  expect(await anchoEnPc('despues')).toBe(pcCols)
 
-  // Al volver, la terminal recupera el tamaño que tenía en la PC.
   await term.getByRole('button', { name: 'Volver a las sesiones' }).click()
   await expect(term).toBeHidden()
   await page.keyboard.press('Escape')
   await expect(panel).toBeHidden()
   await page.locator('.terminal-host').first().click()
+  // Al cerrar el panel la terminal de la PC puede cambiar de ancho por su cuenta: se lee de nuevo.
+  await page.waitForTimeout(500)
+  const pcFinal = await page.locator('.terminal-host').first().evaluate((el) => (el as HTMLElement & { __xterm?: { cols: number } }).__xterm?.cols ?? 0)
   await page.keyboard.type("Write-Output ('pc-' + $Host.UI.RawUI.WindowSize.Width)")
   await page.keyboard.press('Enter')
-  const pcCols = await page.locator('.terminal-host').first().evaluate((el) => (el as HTMLElement & { __xterm?: { cols: number } }).__xterm?.cols ?? 0)
-  await expect(page.locator('.terminal-host').first()).toContainText(`pc-${pcCols}`)
+  await expect(page.locator('.terminal-host').first()).toContainText(`pc-${pcFinal}`)
 
   // Apagarla en la PC corta al celu en el momento.
   await page.keyboard.press('Control+k')
