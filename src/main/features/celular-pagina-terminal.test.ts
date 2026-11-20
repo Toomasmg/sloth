@@ -30,6 +30,8 @@ class Nodo {
   disabled = false
   value = ''
   type = ''
+  clientWidth = 400
+  clientHeight = 300
   parentNode: Nodo | null = null
   style: Record<string, string> = {}
   atributos = new Map<string, string>()
@@ -50,174 +52,504 @@ class Nodo {
   }
 }
 
-interface Pedido {
+interface Cuerpo {
+  id: string
   desde: number
   escribir?: string
-  largo: number
+  tam?: unknown
+  espera?: number
+  soloEscribir?: boolean
+  sesion?: string
+  n?: number
 }
 
+interface Pedido {
+  b: Cuerpo
+  largo: number
+  en: number
+  abortado: boolean
+  conSenal: boolean
+}
+
+type Contesta = { status: number; cuerpo: (iv: Buffer) => string }
+type Resultado = Contesta | 'red' | 'colgar'
+type Responder = (b: Cuerpo, n: number) => Resultado | Promise<Resultado>
+
+const ok = (datos: object): Contesta => ({ status: 200, cuerpo: (iv: Buffer) => sellarRespuesta(claves, iv, JSON.stringify(datos)) })
+
+/** Lo de siempre: a lo que se escribe y a la primera pantalla se les contesta ya, y después el mirar queda abierto sin novedades. */
+const reposo: Responder = (b) => (b.soloEscribir || b.espera === 0 ? ok(SALIDA) : 'colgar')
+
 interface Pagina {
-  pedidosTerminal: Pedido[]
+  pedidos: Pedido[]
+  mirar: Pedido[]
+  escritos: Pedido[]
+  salida: string[]
   aviso: () => string
   enviar: () => boolean
   botones: Nodo[]
-  escribirEnLaPagina: (texto: string) => void
-  esperar: () => Promise<void>
+  nodo: (id: string) => Nodo
+  teclear: (texto: string) => void
+  esperar: (hasta?: () => boolean) => Promise<void>
+  avanzar: (ms: number) => Promise<void>
+  ahora: () => number
+  ocultar: () => void
+  mostrar: () => void
+  evento: (tipo: string) => void
+  timersAbiertos: () => number
 }
 
-type Responder = (p: { desde: number; escribir?: string }, n: number) => { status: number; cuerpo: (iv: Buffer) => string } | 'red'
+interface Opciones {
+  estado?: EstadoCelular
+  remoto?: boolean
+  sinAbortController?: boolean
+}
 
-const ok = (datos: object) => ({ status: 200, cuerpo: (iv: Buffer) => sellarRespuesta(claves, iv, JSON.stringify(datos)) })
-
-/** Corre app.js con un DOM mínimo y un xterm de mentira, abre la terminal de la primera sesión y deja que sondee. */
-async function abrir(responder: Responder, opciones: { estado?: EstadoCelular; remoto?: boolean } = {}): Promise<Pagina> {
+/** Corre app.js con un DOM mínimo, un xterm de mentira y un reloj que se mueve solo cuando el test lo pide, y abre la terminal. */
+async function abrir(responder: Responder, opciones: Opciones = {}): Promise<Pagina> {
   const nodos = new Map<string, Nodo>()
   const botones: Nodo[] = []
-  const pedidosTerminal: Pedido[] = []
-  let timers = 30
+  const pedidos: Pedido[] = []
+  const salida: string[] = []
+  const esDocumento = new Map<string, () => void>()
+  const esVentana = new Map<string, () => void>()
+  let reloj = Date.now()
+  let semilla = 0
+  const timers = new Map<number, { f: () => void; en: number }>()
   const nodo = (id: string): Nodo => {
     let n = nodos.get(id)
     if (!n) nodos.set(id, (n = Object.assign(new Nodo(), { id, parentNode: new Nodo() })))
     return n
   }
+  let alTeclear: (d: string) => void = () => undefined
   class TerminalFalsa {
     options = { fontSize: 12 }
     cols = 80
     rows = 24
     open(): void {}
     onData(f: (d: string) => void): void {
-      terminalOnData = f
+      alTeclear = f
     }
-    write(_d: string, cb?: () => void): void {
+    write(d: string, cb?: () => void): void {
+      salida.push(d)
       cb?.()
     }
     reset(): void {}
     resize(): void {}
     scrollToBottom(): void {}
   }
-  let terminalOnData: (d: string) => void = () => undefined
-  const estado = opciones.estado ?? ESTADO
-  const ventana: Record<string, unknown> = {
-    document: {
-      hidden: false,
-      fullscreenElement: null,
-      documentElement: {},
-      head: { appendChild: (): void => undefined },
-      getElementById: nodo,
-      createElement: (): Nodo => {
-        const n = new Nodo()
-        botones.push(n)
-        return n
-      },
-      createElementNS: (): Nodo => new Nodo(),
-      addEventListener: (): void => undefined
+  const documento = {
+    hidden: false,
+    fullscreenElement: null,
+    documentElement: {},
+    head: { appendChild: (): void => undefined },
+    getElementById: nodo,
+    createElement: (): Nodo => {
+      const n = new Nodo()
+      botones.push(n)
+      return n
     },
+    createElementNS: (): Nodo => new Nodo(),
+    addEventListener: (tipo: string, f: () => void): void => {
+      esDocumento.set(tipo, f)
+    }
+  }
+  const estado = opciones.estado ?? ESTADO
+  const FechaFalsa = new Proxy(Date, { get: (t, k) => (k === 'now' ? (): number => reloj : Reflect.get(t, k)) })
+  const ventana: Record<string, unknown> = {
+    document: documento,
+    Date: FechaFalsa,
     localStorage: { getItem: (): null => null, setItem: (): void => undefined, removeItem: (): void => undefined },
     location: { hash: `#k=${CLAVE}`, pathname: '/' },
     history: { replaceState: (): void => undefined, pushState: (): void => undefined, back: (): void => undefined },
     crypto: webcrypto,
     navigator: { userAgent: 'Android', standalone: false },
     matchMedia: () => ({ matches: false }),
-    addEventListener: (): void => undefined,
+    addEventListener: (tipo: string, f: () => void): void => {
+      esVentana.set(tipo, f)
+    },
     Terminal: TerminalFalsa,
-    fetch: async (url: string, init: { body?: string }) => {
+    fetch: (url: string, init: { body?: string; signal?: AbortSignal }) => {
       const ab = abrirPedido(claves, url, init.body ?? '')
-      if (!ab) return { status: 401, ok: false, text: async () => '' }
-      if (url === '/api/estado') return { status: 200, ok: true, text: async () => sellarRespuesta(claves, ab.iv, JSON.stringify(estado)) }
-      const b = (JSON.parse(ab.json) as { b: { desde: number; escribir?: string } }).b
-      pedidosTerminal.push({ desde: b.desde, escribir: b.escribir, largo: (init.body ?? '').length })
-      const r = responder(b, pedidosTerminal.length)
-      if (r === 'red') throw new TypeError('Failed to fetch')
-      return { status: r.status, ok: r.status === 200, text: async () => r.cuerpo(ab.iv) }
+      if (!ab) return Promise.resolve({ status: 401, ok: false, text: async () => '' })
+      if (url === '/api/estado') return Promise.resolve({ status: 200, ok: true, text: async () => sellarRespuesta(claves, ab.iv, JSON.stringify(estado)) })
+      const b = (JSON.parse(ab.json) as { b: Cuerpo }).b
+      const reg: Pedido = { b, largo: (init.body ?? '').length, en: reloj, abortado: false, conSenal: !!init.signal }
+      pedidos.push(reg)
+      const r = responder(b, pedidos.length)
+      return new Promise((resolve, reject) => {
+        init.signal?.addEventListener('abort', () => {
+          reg.abortado = true
+          reject(new Error('abortado'))
+        })
+        void Promise.resolve(r).then((v) => {
+          if (v === 'colgar') return
+          if (v === 'red') reject(new TypeError('Failed to fetch'))
+          else resolve({ status: v.status, ok: v.status === 200, text: async () => v.cuerpo(ab.iv) })
+        })
+      })
     },
     setTimeout: (f: () => void, ms: number): number => {
-      // Los sondeos de reposo (estado cada 1,5 s, terminal cada 0,35 s) no hacen falta: solo corren los reintentos y los pedidos seguidos.
-      if (ms !== 1500 && ms !== 350 && timers-- > 0) setImmediate(f)
-      return 0
+      timers.set(++semilla, { f, en: reloj + (ms || 0) })
+      return semilla
     },
-    clearTimeout: (): void => undefined,
-    URLSearchParams
+    clearTimeout: (id: number): void => {
+      timers.delete(id)
+    },
+    URLSearchParams,
+    ...(opciones.sinAbortController ? {} : { AbortController })
   }
   ventana.window = ventana
   if (opciones.remoto) ventana.slothFetch = async () => ({ status: 200, ok: true, json: async () => estado })
   runInNewContext(PAGINA_JS, ventana)
-  // Sellar y abrir con AES en JS puro tarda más con la PC ocupada: se espera a que dejen de llegar pedidos, no un tiempo fijo.
-  const esperar = async (): Promise<void> => {
-    let visto = -1
-    let quietos = 0
-    for (let i = 0; i < 250 && quietos < 3; i++) {
-      await new Promise((r) => setTimeout(r, 20))
-      quietos = pedidosTerminal.length === visto ? quietos + 1 : 0
-      visto = pedidosTerminal.length
-    }
+  // Sellar y abrir con AES en JS puro tarda más con la PC ocupada: se espera a que se aquiete la cadena de promesas, no un tiempo fijo.
+  const asentar = async (): Promise<void> => {
+    for (let i = 0; i < 6; i++) await new Promise((r) => setImmediate(r))
   }
-  await esperar()
+  const esperar = async (hasta?: () => boolean): Promise<void> => {
+    if (!hasta) return asentar()
+    for (let i = 0; i < 3000 && !hasta(); i++) await new Promise((r) => setImmediate(r))
+    assert.ok(hasta(), 'la condición nunca se dio')
+    await asentar()
+  }
+  const avanzar = async (ms: number): Promise<void> => {
+    const meta = reloj + ms
+    await asentar()
+    for (;;) {
+      const proximo = [...timers].filter(([, t]) => t.en <= meta).sort((a, b) => a[1].en - b[1].en)[0]
+      if (!proximo) break
+      timers.delete(proximo[0])
+      reloj = Math.max(reloj, proximo[1].en)
+      proximo[1].f()
+      await asentar()
+    }
+    reloj = meta
+  }
+  await asentar()
   const boton = botones.find((b) => b.className === 's-term')
   if (!opciones.remoto) {
     assert.ok(boton, 'la sesión tiene su botón «Terminal»')
     boton.escuchas.get('click')?.({ preventDefault: () => undefined })
-    await esperar()
+    await esperar(() => pedidos.length > 0)
   }
   return {
-    pedidosTerminal,
+    pedidos,
+    get mirar() {
+      return pedidos.filter((p) => !p.b.soloEscribir)
+    },
+    get escritos() {
+      return pedidos.filter((p) => p.b.soloEscribir)
+    },
+    salida,
     aviso: () => nodo('term-aviso').textContent,
     enviar: () => nodo('term-enviar').disabled,
     botones: botones.filter((b) => b.className === 's-term'),
-    escribirEnLaPagina: (texto) => {
-      terminalOnData(texto)
+    nodo,
+    teclear: (texto) => alTeclear(texto),
+    esperar,
+    avanzar,
+    ahora: () => reloj,
+    ocultar: () => {
+      documento.hidden = true
+      esDocumento.get('visibilitychange')?.()
     },
-    esperar
+    mostrar: () => {
+      documento.hidden = false
+      esDocumento.get('visibilitychange')?.()
+    },
+    evento: (tipo) => esVentana.get(tipo)?.(),
+    timersAbiertos: () => timers.size
   }
 }
 
 test('una respuesta sellada más grande de lo que acepta la página dice qué pasó y deja de reintentar', async () => {
   const enorme = ok({ ...SALIDA, datos: 'x'.repeat(300_000) })
   const p = await abrir(() => enorme)
+  await p.avanzar(5000)
   assert.match(p.aviso(), /demasiado grande/)
   assert.doesNotMatch(p.aviso(), /Sin conexión/)
   assert.match(p.aviso(), /abrí la terminal de nuevo/)
-  assert.equal(p.pedidosTerminal.length, 3, 'a la tercera falla igual no insiste')
+  assert.equal(p.mirar.length, 3, 'a la tercera falla igual no insiste')
   assert.equal(p.enviar(), true, 'no se puede mandar texto a una terminal parada')
 })
 
 test('una respuesta que no se puede leer no se confunde con falta de conexión', async () => {
   const p = await abrir(() => ({ status: 200, cuerpo: () => sellarRespuesta(claves, Buffer.alloc(16, 5), JSON.stringify(SALIDA)) }))
+  await p.avanzar(5000)
   assert.match(p.aviso(), /No pude leer la respuesta de la PC/)
-  assert.equal(p.pedidosTerminal.length, 3)
+  assert.equal(p.mirar.length, 3)
 })
 
-test('sin red sí es «Sin conexión», y sigue reintentando', async () => {
+test('sin red sí es «Sin conexión» (desde la segunda falla), y reintenta con backoff de 250 ms que duplica hasta 4 s', async () => {
   const p = await abrir(() => 'red')
+  assert.doesNotMatch(p.aviso(), /Sin conexión/, 'una falla sola no asusta')
+  await p.avanzar(60_000)
   assert.match(p.aviso(), /Sin conexión con la PC/)
-  assert.ok(p.pedidosTerminal.length > 3)
+  const gaps = p.mirar.slice(0, 8).map((x, i, l) => (i ? x.en - l[i - 1].en : 0)).slice(1)
+  assert.deepEqual(gaps, [250, 500, 1000, 2000, 4000, 4000, 4000])
+})
+
+test('un 429 (la PC pide calma) se trata como falla de red con backoff, no como terminal cerrada', async () => {
+  const p = await abrir(() => ({ status: 429, cuerpo: () => '' }))
+  await p.avanzar(2000)
+  const gaps = p.mirar.map((x, i, l) => (i ? x.en - l[i - 1].en : 0)).slice(1)
+  assert.deepEqual(gaps.slice(0, 3), [250, 500, 1000])
+  assert.doesNotMatch(p.aviso(), /cerrada/)
+  assert.equal(p.enviar(), false)
 })
 
 test('si la respuesta viene por partes (mas), la página pide la siguiente sin esperar y sigue desde donde quedó', async () => {
-  const p = await abrir((_p, n) => ok({ ...SALIDA, datos: `parte${n}`, hasta: n * 10, mas: n < 3 }))
-  assert.deepEqual(p.pedidosTerminal.map((x) => x.desde), [-1, 10, 20])
+  const p = await abrir((b, n) => (b.soloEscribir ? ok(SALIDA) : n <= 3 ? ok({ ...SALIDA, datos: `parte${n}`, hasta: n * 10, mas: n < 3 }) : 'colgar'))
+  await p.esperar(() => p.mirar.length >= 4)
+  assert.deepEqual(p.mirar.map((x) => x.b.desde), [-1, 10, 20, 30])
+  assert.deepEqual(p.mirar.map((x) => x.b.espera), [0, 0, 0, 20000], 'con más por mandar no se espera; al quedar al día, sí')
+  assert.deepEqual(p.salida, ['parte1', 'parte2', 'parte3'])
+})
+
+test('mirar: el primero pide la pantalla ya; los siguientes dejan 20 s abierto, no llevan escribir y llevan la sesión', async () => {
+  const p = await abrir((b, n) => (b.soloEscribir ? ok(SALIDA) : n === 1 ? ok({ ...SALIDA, datos: 'hola', hasta: 7 }) : 'colgar'))
+  await p.esperar(() => p.mirar.length >= 2)
+  assert.deepEqual(p.mirar[0].b, { id: 'ws-1', desde: -1, espera: 0, sesion: p.mirar[0].b.sesion })
+  assert.match(p.mirar[0].b.sesion ?? '', /^[A-Za-z0-9]{16}$/)
+  assert.equal(p.mirar[1].b.desde, 7)
+  assert.equal(p.mirar[1].b.espera, 20000)
+  assert.equal(p.mirar[1].b.escribir, undefined)
+  assert.equal(p.mirar[1].b.sesion, p.mirar[0].b.sesion)
+  assert.equal(p.mirar[1].conSenal, true, 'se puede cortar')
+})
+
+test('en reposo no hay pedidos: el mirar sigue abierto y no se reabre a los 350 ms', async () => {
+  const p = await abrir(reposo)
+  await p.esperar(() => p.mirar.length >= 2)
+  const antes = p.pedidos.length
+  await p.avanzar(27_000)
+  assert.equal(p.pedidos.length, antes, 'ni un pedido más: el mirar sigue abierto')
+  assert.equal(p.mirar[1].abortado, false)
+})
+
+test('una tecla sale ya, en su propio pedido soloEscribir con número, sin espera y sin pedir salida', async () => {
+  const p = await abrir(reposo)
+  const t0 = p.ahora()
+  p.teclear('a')
+  await p.esperar(() => p.escritos.length >= 1)
+  const e = p.escritos[0]
+  assert.equal(p.ahora(), t0, 'sin esperar ningún timer')
+  assert.deepEqual(e.b, { id: 'ws-1', desde: 0, soloEscribir: true, sesion: p.mirar[0].b.sesion, n: 1, escribir: 'a' })
+})
+
+test('lo que se teclea mientras viaja otra tecla se junta en el pedido siguiente, y el orden se mantiene', async () => {
+  let soltarPrimera: (r: Resultado) => void = () => undefined
+  const p = await abrir((b, n) => {
+    if (!b.soloEscribir) return 'colgar'
+    return b.escribir === 'a' ? new Promise<Resultado>((r) => (soltarPrimera = r)) : ok(SALIDA)
+  })
+  p.teclear('a')
+  await p.esperar(() => p.escritos.length >= 1)
+  p.teclear('b')
+  p.teclear('c')
+  await p.esperar()
+  assert.equal(p.escritos.length, 1, 'uno por vez')
+  soltarPrimera(ok(SALIDA))
+  await p.esperar(() => p.escritos.length >= 2)
+  assert.deepEqual(p.escritos.map((x) => [x.b.escribir, x.b.n]), [['a', 1], ['bc', 2]])
+})
+
+test('el formulario manda el texto y el Enter en pedidos aparte y en orden', async () => {
+  const p = await abrir(reposo)
+  p.nodo('term-texto').value = 'ls -la'
+  p.nodo('term-form').escuchas.get('submit')?.({ preventDefault: () => undefined })
+  await p.esperar(() => p.escritos.length >= 2)
+  assert.deepEqual(p.escritos.map((x) => x.b.escribir), ['ls -la', '\r'])
 })
 
 test('lo que se pega se parte en pedidos que la PC acepta, aunque sean puros ESC', async () => {
-  const p = await abrir(() => ok(SALIDA))
+  const p = await abrir(reposo)
   const pegado = '\x1b'.repeat(2500) + 'ñ'.repeat(1000) + '😀'.repeat(300)
-  p.escribirEnLaPagina(pegado)
-  await p.esperar()
-  const enviados = p.pedidosTerminal.filter((x) => x.escribir !== undefined)
-  assert.ok(enviados.length >= 3, JSON.stringify(p.pedidosTerminal.map((x) => [x.desde, x.escribir?.length, x.largo])) + p.aviso())
-  for (const e of enviados) {
+  p.teclear(pegado)
+  await p.esperar(() => p.escritos.map((x) => x.b.escribir).join('') === pegado)
+  assert.ok(p.escritos.length >= 3, JSON.stringify(p.escritos.map((x) => [x.b.escribir?.length, x.largo])) + p.aviso())
+  for (const e of p.escritos) {
     assert.ok(e.largo <= MAX_SOBRE_BYTES, `un pedido sellado de ${e.largo}`)
-    assert.ok(pesoJson(e.escribir as string) <= 3000)
-    assert.ok(!/[\ud800-\udbff]$/.test(e.escribir as string), 'no corta un emoji')
+    assert.ok(pesoJson(e.b.escribir as string) <= 3000)
+    assert.ok(!/[\ud800-\udbff]$/.test(e.b.escribir as string), 'no corta un emoji')
   }
-  assert.equal(enviados.map((x) => x.escribir).join(''), pegado)
+  assert.deepEqual(p.escritos.map((x) => x.b.n), p.escritos.map((_, i) => i + 1), 'numerados sin huecos')
 })
 
 test('si la PC contestó pero la página no pudo leerlo, lo que se había escrito no se manda dos veces', async () => {
   const enorme = ok({ ...SALIDA, datos: 'x'.repeat(300_000) })
-  const p = await abrir((pedido) => (pedido.escribir === 'ls' ? enorme : ok(SALIDA)))
-  p.escribirEnLaPagina('ls')
+  const p = await abrir((b) => (b.soloEscribir ? (b.escribir === 'ls' ? enorme : ok(SALIDA)) : 'colgar'))
+  p.teclear('ls')
+  await p.esperar(() => p.escritos.length >= 1)
+  await p.avanzar(10_000)
+  assert.equal(p.escritos.filter((x) => x.b.escribir === 'ls').length, 1)
+})
+
+test('red que cae con una escritura: se reenvía con el MISMO número, y lo que se teclee después va aparte y después', async () => {
+  let intentos = 0
+  const p = await abrir((b) => {
+    if (!b.soloEscribir) return 'colgar'
+    return b.escribir === 'x' && ++intentos === 1 ? 'red' : ok(SALIDA)
+  })
+  p.teclear('x')
+  await p.esperar(() => p.escritos.length >= 1)
+  p.teclear('y')
   await p.esperar()
-  assert.equal(p.pedidosTerminal.filter((x) => x.escribir === 'ls').length, 1)
+  assert.equal(p.escritos.length, 1, 'espera el backoff antes de reintentar')
+  await p.avanzar(250)
+  await p.esperar(() => p.escritos.length >= 3)
+  assert.deepEqual(p.escritos.map((x) => [x.b.escribir, x.b.n]), [['x', 1], ['x', 1], ['y', 2]])
+})
+
+test('una escritura que cuelga se corta a los 10 s y se reintenta con el mismo número', async () => {
+  let intentos = 0
+  const p = await abrir((b) => (!b.soloEscribir ? 'colgar' : ++intentos === 1 ? 'colgar' : ok(SALIDA)))
+  p.teclear('z')
+  await p.esperar(() => p.escritos.length >= 1)
+  await p.avanzar(9999)
+  assert.equal(p.escritos[0].abortado, false)
+  await p.avanzar(1)
+  assert.equal(p.escritos[0].abortado, true)
+  await p.avanzar(250)
+  await p.esperar(() => p.escritos.length >= 2)
+  assert.deepEqual(p.escritos.map((x) => [x.b.escribir, x.b.n]), [['z', 1], ['z', 1]])
+})
+
+test('«Ajustar al celu» y volver al tamaño de la PC viajan como escrituras numeradas, sin salida', async () => {
+  const p = await abrir((b) => (b.soloEscribir ? ok({ ...SALIDA, cols: 48, rows: 18, ajustado: !!b.tam && b.tam !== 'pc' }) : 'colgar'))
+  p.nodo('term-ajustar').escuchas.get('click')?.({ preventDefault: () => undefined })
+  await p.esperar(() => p.escritos.length >= 1)
+  const t = p.escritos[0].b.tam as { cols: number; rows: number }
+  assert.ok(Number.isInteger(t.cols) && Number.isInteger(t.rows))
+  assert.equal(p.escritos[0].b.soloEscribir, true)
+  assert.equal(p.nodo('term-ajustar').textContent, 'Tamaño de la PC')
+  p.nodo('term-ajustar').escuchas.get('click')?.({ preventDefault: () => undefined })
+  await p.esperar(() => p.escritos.length >= 2)
+  assert.equal(p.escritos[1].b.tam, 'pc')
+  assert.deepEqual(p.escritos.map((x) => x.b.n), [1, 2])
+})
+
+test('una respuesta de una escritura aplica tamaño y estado, nunca salida', async () => {
+  const p = await abrir((b) => (b.soloEscribir ? ok({ ...SALIDA, datos: 'no-debería', hasta: 99, viva: false }) : 'colgar'))
+  p.teclear('a')
+  await p.esperar(() => p.escritos.length >= 1)
+  assert.deepEqual(p.salida, [])
+  assert.match(p.aviso(), /cerrada en la PC/)
+  assert.equal(p.mirar[0].b.desde, -1)
+})
+
+test('oculta la página: el mirar se corta y no hay pedidos; al volver hay uno enseguida desde el mismo punto', async () => {
+  const p = await abrir((b, n) => (b.soloEscribir ? ok(SALIDA) : n === 1 ? ok({ ...SALIDA, hasta: 5 }) : 'colgar'))
+  await p.esperar(() => p.mirar.length >= 2)
+  const abierto = p.mirar[1]
+  p.ocultar()
+  assert.equal(abierto.abortado, true)
+  const antes = p.pedidos.length
+  await p.avanzar(120_000)
+  assert.equal(p.pedidos.length, antes, 'oculta: ni un pedido de terminal')
+  p.mostrar()
+  await p.esperar(() => p.mirar.length >= 3)
+  assert.equal(p.mirar[2].b.desde, 5)
+  assert.equal(p.mirar[2].b.espera, 20000)
+})
+
+test('la respuesta de un mirar viejo (la página se ocultó y volvió) se ignora y no mueve el punto', async () => {
+  let soltar: (r: Resultado) => void = () => undefined
+  const p = await abrir(
+    (b, n) => (b.soloEscribir ? ok(SALIDA) : n === 1 ? ok({ ...SALIDA, hasta: 5 }) : n === 2 ? new Promise<Resultado>((r) => (soltar = r)) : 'colgar'),
+    { sinAbortController: true }
+  )
+  await p.esperar(() => p.mirar.length >= 2)
+  p.ocultar()
+  p.mostrar()
+  await p.esperar(() => p.mirar.length >= 3)
+  soltar(ok({ ...SALIDA, datos: 'viejo', hasta: 99 }))
+  await p.esperar()
+  assert.deepEqual(p.salida, [])
+  assert.deepEqual(p.mirar.map((x) => x.b.desde), [-1, 5, 5])
+  assert.equal(p.mirar[1].conSenal, false, 'sin AbortController también anda')
+})
+
+test('con la página oculta una escritura en vuelo termina, pero la siguiente espera a que vuelva', async () => {
+  let soltarPrimera: (r: Resultado) => void = () => undefined
+  const p = await abrir((b) => (!b.soloEscribir ? 'colgar' : b.escribir === 'a' ? new Promise<Resultado>((r) => (soltarPrimera = r)) : ok(SALIDA)))
+  p.teclear('a')
+  await p.esperar(() => p.escritos.length >= 1)
+  p.teclear('b')
+  p.ocultar()
+  assert.equal(p.escritos[0].abortado, false, 'la escritura no se corta')
+  soltarPrimera(ok(SALIDA))
+  await p.avanzar(5000)
+  assert.equal(p.escritos.length, 1)
+  p.mostrar()
+  await p.esperar(() => p.escritos.length >= 2)
+  assert.deepEqual(p.escritos.map((x) => x.b.escribir), ['a', 'b'])
+})
+
+test('volver la red (online) corta el pedido colgado y abre uno nuevo', async () => {
+  const p = await abrir(reposo)
+  await p.esperar(() => p.mirar.length >= 2)
+  const colgado = p.mirar[p.mirar.length - 1]
+  const n = p.mirar.length
+  p.evento('online')
+  assert.equal(colgado.abortado, true)
+  await p.esperar(() => p.mirar.length >= n + 1)
+})
+
+test('un mirar que no contesta en 28 s se corta, cuenta como falla y se reintenta con backoff', async () => {
+  const p = await abrir((b, n) => (b.soloEscribir ? ok(SALIDA) : n === 1 ? ok({ ...SALIDA, hasta: 3 }) : 'colgar'))
+  await p.esperar(() => p.mirar.length >= 2)
+  const colgado = p.mirar[1]
+  await p.avanzar(27_999)
+  assert.equal(colgado.abortado, false)
+  await p.avanzar(1)
+  assert.equal(colgado.abortado, true)
+  assert.equal(p.mirar.length, 2)
+  await p.avanzar(250)
+  await p.esperar(() => p.mirar.length >= 3)
+  assert.equal(p.mirar[2].b.desde, 3, 'sigue desde el mismo punto: ni hueco ni repetido')
+})
+
+test('una respuesta vacía enseguida (la PC soltó la espera) no vuelve el mirar un lazo apretado', async () => {
+  const p = await abrir((b) => (b.soloEscribir ? ok(SALIDA) : ok(SALIDA)))
+  await p.esperar(() => p.mirar.length >= 2)
+  assert.equal(p.mirar.length, 2)
+  await p.avanzar(499)
+  assert.equal(p.mirar.length, 2)
+  await p.avanzar(1)
+  await p.esperar(() => p.mirar.length >= 3)
+})
+
+test('con la terminal cerrada en la PC se mira de a poco (cada 2 s) y se vuelve a abrir sola', async () => {
+  const p = await abrir((b) => (b.soloEscribir ? ok(SALIDA) : ok({ ...SALIDA, viva: false })))
+  await p.esperar(() => p.mirar.length >= 1)
+  await p.avanzar(1999)
+  assert.equal(p.mirar.length, 1)
+  await p.avanzar(1)
+  await p.esperar(() => p.mirar.length >= 2)
+  assert.match(p.aviso(), /cerrada en la PC/)
+})
+
+test('al cerrar la terminal se corta el pedido abierto y no queda ningún pedido más', async () => {
+  const p = await abrir(reposo)
+  await p.esperar(() => p.mirar.length >= 1)
+  const colgado = p.mirar[p.mirar.length - 1]
+  p.nodo('term-volver').escuchas.get('click')?.({ preventDefault: () => undefined })
+  assert.equal(colgado.abortado, true)
+  const antes = p.pedidos.length
+  await p.avanzar(120_000)
+  assert.equal(p.pedidos.length, antes)
+})
+
+test('una escritura rechazada por la PC (apagada, hora corrida) vacía la cola y no reintenta', async () => {
+  const p = await abrir((b) => (b.soloEscribir ? { status: 403, cuerpo: (iv) => sellarRespuesta(claves, iv, JSON.stringify({ error: 'La terminal desde el celu está apagada en Sloth.' })) } : 'colgar'))
+  p.teclear('a')
+  p.teclear('b')
+  await p.esperar(() => p.escritos.length >= 1)
+  await p.avanzar(10_000)
+  assert.equal(p.escritos.length, 1)
+  assert.match(p.aviso(), /apagada en Sloth/)
+  assert.equal(p.enviar(), true)
 })
 
 test('en «Desde cualquier red» la sesión muestra «Terminal» apagado, y con la terminal apagada en la PC no muestra nada', async () => {

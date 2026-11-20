@@ -257,12 +257,14 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   var leer = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
   // La versión remota define window.slothFetch: se busca en cada pedido, no al cargar. En el Wi-Fi
   // los pedidos van sellados con la clave del QR (window.slothSello).
-  var sellado = function (ruta, objeto) {
+  var sellado = function (ruta, objeto, senal) {
     return new Promise(function (resolve, reject) {
       var claves = window.slothSello.abrirClave(token);
       if (!claves) { resolve({ ok: false, status: 401 }); return; }
       var s = window.slothSello.sellarPedido(claves, ruta, objeto);
-      fetch(ruta, { method: 'POST', cache: 'no-store', headers: { 'content-type': 'text/plain' }, body: s.sobre })
+      var opciones = { method: 'POST', cache: 'no-store', headers: { 'content-type': 'text/plain' }, body: s.sobre };
+      if (senal) opciones.signal = senal;
+      fetch(ruta, opciones)
         .then(function (r) {
           if (r.status !== 200 && r.status !== 400 && r.status !== 403 && r.status !== 404 && r.status !== 409) return { ok: false, status: r.status };
           return r.text().then(function (texto) {
@@ -275,9 +277,9 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
         .then(resolve, reject);
     });
   };
-  var pedirApi = function (ruta, objeto) {
+  var pedirApi = function (ruta, objeto, senal) {
     if (window.slothFetch) return window.slothFetch(ruta, objeto ? { method: 'POST', cache: 'no-store', headers: { 'content-type': 'application/json' }, body: JSON.stringify(objeto) } : { cache: 'no-store' });
-    return sellado(ruta, objeto || {});
+    return sellado(ruta, objeto || {}, senal);
   };
 
   var viejo = leer('sloth-token');
@@ -594,14 +596,24 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   }
 
 
-  // Terminal: el celu pide «lo nuevo desde el chunk N» cada poco y manda lo que se tipea, todo sellado
-  // por el mismo canal que el estado. xterm se carga recién al abrirla (pesa ~500 kB).
+  // Terminal, con dos lazos. «Mirar» deja un pedido abierto en la PC (hasta 20 s) que contesta apenas hay salida
+  // nueva; «escribir» manda lo que se teclea en pedidos aparte, de a uno y en orden, y la PC contesta ya.
+  // Todo sellado por el mismo canal que el estado. xterm se carga recién al abrirla (pesa ~500 kB).
   var TECLAS = { esc: '\\x1b', tab: '\\t', arriba: '\\x1b[A', abajo: '\\x1b[B', der: '\\x1b[C', izq: '\\x1b[D', ctrlc: '\\x03', enter: '\\r' };
-  var TERM_MS = 350, TERM_MAX = 1500;
-  var term = null, termId = null, termDesde = -1, termTimer = null, termEnVuelo = false, termCola = [], termTam = null;
-  var termAjustado = false, termPedirTam = null, termCerrada = false, termFallas = 0, xtermCargando = null, conHistoria = false;
+  var TERM_MAX = 1500, TERM_ESPERA = 20000, TERM_MARGEN = 8000, TERM_ESCRIBIR_MAX = 10000;
+  var term = null, termId = null, termDesde = -1, termCola = [], termTam = null, termTamPend = null;
+  var termAjustado = false, termCerrada = false, xtermCargando = null, conHistoria = false;
   var termMas = false, termParada = false, termTipo = '', termIguales = 0;
+  var termGen = 0, termCtl = null, termMirando = false, termFallas = 0, termPausa = 0, termMirarTimer = null, termWatchdog = null;
+  var termEscribiendo = false, termEscFallas = 0, termEscTok = 0, termEscTimer = null, termEscCtl = null, termEscWatchdog = null, termN = 0;
   var TERM_PESO = 3000, TERM_IGUALES = 3;
+  // Identifica a esta página ante la PC: con el número de cada escritura, un reintento no se escribe dos veces.
+  var TERM_SESION = (function () {
+    var abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', r = '', b = null;
+    try { b = new Uint8Array(16); window.crypto.getRandomValues(b); } catch (e) { b = null; }
+    for (var i = 0; i < 16; i++) r += abc.charAt((b ? b[i] : Math.floor(Math.random() * 62)) % 62);
+    return r;
+  })();
 
   function cargarXterm() {
     if (window.Terminal) return Promise.resolve();
@@ -677,7 +689,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     var i = 0;
     while (i < texto.length) {
       var ult = termCola[termCola.length - 1];
-      var junta = !aparte && !!ult && !ult.aparte;
+      var junta = !aparte && !!ult && !ult.aparte && !ult.n;
       var p = junta ? ult.p : 0, largo = junta ? ult.t.length : 0, ini = i;
       while (i < texto.length) {
         var u = unidades(texto, i), w = pesoCar(texto, i, u);
@@ -689,92 +701,231 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       if (junta) { ult.t += texto.slice(ini, i); ult.p = p; }
       else termCola.push({ t: texto.slice(ini, i), p: p, aparte: !!aparte });
     }
-    tickTerm();
+    enviarEscritura();
   }
 
-  function tickTerm() {
-    clearTimeout(termTimer);
-    if (!termId || !term || termEnVuelo || termParada || document.hidden) return;
-    var pedido = { id: termId, desde: termDesde };
-    var item = termCola.shift();
-    if (item) pedido.escribir = item.t;
-    if (termPedirTam) { pedido.tam = termPedirTam; termPedirTam = null; }
-    var id = termId;
-    termEnVuelo = true;
-    pedirApi('/api/terminal', pedido)
+  var retardoTerm = function (fallas) { return fallas ? Math.min(4000, 250 * Math.pow(2, fallas - 1)) : 0; };
+  var botonesTerm = function () { $('term-enviar').disabled = $('term-ajustar').disabled = termCerrada || termParada; };
+
+  // Lo que llegue de un pedido de mirar anterior a esto ya no vale: se compara termGen.
+  function soltarMirar() {
+    termGen++;
+    clearTimeout(termMirarTimer);
+    clearTimeout(termWatchdog);
+    if (termCtl) { try { termCtl.abort(); } catch (e) { /* ya estaba cortado */ } termCtl = null; }
+    termMirando = false;
+  }
+
+  function soltarEscribir() {
+    termEscTok++;
+    clearTimeout(termEscTimer);
+    termEscTimer = null;
+    clearTimeout(termEscWatchdog);
+    if (termEscCtl) { try { termEscCtl.abort(); } catch (e) { /* ya estaba cortado */ } termEscCtl = null; }
+    termEscribiendo = false;
+  }
+
+  function aplicarTam(j) {
+    var cambio = !termTam || termTam.cols !== j.cols || termTam.rows !== j.rows;
+    if (cambio) { termTam = { cols: j.cols, rows: j.rows }; encajar(); }
+    return cambio;
+  }
+
+  function aplicarEstado(j) {
+    termAjustado = j.ajustado;
+    $('term-ajustar').setAttribute('aria-pressed', termAjustado ? 'true' : 'false');
+    $('term-ajustar').textContent = termAjustado ? 'Tamaño de la PC' : 'Ajustar al celu';
+    termCerrada = !j.viva;
+    avisoTerm(termCerrada ? 'La terminal está cerrada en la PC. Abrila ahí para seguir desde acá.' : '');
+    botonesTerm();
+  }
+
+  function rechazoDeLaPc(j) {
+    termCerrada = true;
+    termCola = [];
+    termTamPend = null;
+    avisoTerm(j && j.error === 'reloj' ? HORA_CORRIDA : (j && j.error) || 'La PC no dejó abrir la terminal.');
+    botonesTerm();
+  }
+
+  function falloMirar(tipo) {
+    termMas = false;
+    termFallas++;
+    termPausa = retardoTerm(termFallas);
+    if (tipo === 'red') {
+      termTipo = '';
+      termIguales = 0;
+      if (termFallas >= 2) avisoTerm('Sin conexión con la PC. Reintentando…');
+      return;
+    }
+    // La PC sí contestó: lo que se mira no cambia nada allá, se pide de nuevo desde el mismo punto.
+    termIguales = tipo === termTipo ? termIguales + 1 : 1;
+    termTipo = tipo;
+    var motivo = tipo === 'grande' ? 'La respuesta de la PC era demasiado grande para el celu.' : 'No pude leer la respuesta de la PC.';
+    if (termIguales >= TERM_IGUALES) {
+      termParada = true;
+      termCola = [];
+      termTamPend = null;
+      avisoTerm(motivo + ' Volvé a las sesiones y abrí la terminal de nuevo.');
+    } else avisoTerm(motivo + ' Reintentando…');
+  }
+
+  function programarMirar() {
+    if (termParada) return;
+    if (termPausa > 0) termMirarTimer = setTimeout(mirar, termPausa);
+    else mirar();
+  }
+
+  function mirar() {
+    clearTimeout(termMirarTimer);
+    if (!termId || !term || termMirando || termParada || document.hidden) return;
+    var id = termId, gen = termGen;
+    var espera = termDesde < 0 || termMas ? 0 : TERM_ESPERA;
+    var ctl = window.AbortController ? new AbortController() : null;
+    var t0 = Date.now();
+    termCtl = ctl;
+    termMirando = true;
+    termWatchdog = setTimeout(function () {
+      if (gen !== termGen) return;
+      soltarMirar();
+      falloMirar('red');
+      programarMirar();
+    }, espera + TERM_MARGEN);
+    pedirApi('/api/terminal', { id: id, desde: termDesde, espera: espera, sesion: TERM_SESION }, ctl ? ctl.signal : null)
       .then(function (r) {
+        if (gen !== termGen) return null;
         if (r.status === 401) { cerrarTerminal(false); consultar(); return null; }
         if (!r.json) throw new Error('http ' + r.status);
         return r.json().then(function (j) { return { r: r, j: j }; });
       })
       .then(function (x) {
-        if (!x || id !== termId) return;
+        if (!x || gen !== termGen) return;
         termFallas = 0;
         termTipo = '';
         termIguales = 0;
+        termPausa = 0;
         if (!x.r.ok) {
-          termCerrada = true;
-          termCola = [];
-          avisoTerm(x.j && x.j.error === 'reloj' ? HORA_CORRIDA : (x.j && x.j.error) || 'La PC no dejó abrir la terminal.');
+          rechazoDeLaPc(x.j);
+          termPausa = 2000;
           return;
         }
         var j = x.j;
         // Primero el tamaño: lo que llega se dibujó para ese ancho.
-        var cambio = !termTam || termTam.cols !== j.cols || termTam.rows !== j.rows;
-        if (cambio) { termTam = { cols: j.cols, rows: j.rows }; encajar(); }
+        var cambio = aplicarTam(j);
         if (j.reinicio) term.reset();
         if (j.datos) term.write(j.datos, cambio || j.reinicio ? function () { term.scrollToBottom(); } : undefined);
         termDesde = j.hasta;
         termMas = !!j.mas;
-        termAjustado = j.ajustado;
-        $('term-ajustar').setAttribute('aria-pressed', termAjustado ? 'true' : 'false');
-        $('term-ajustar').textContent = termAjustado ? 'Tamaño de la PC' : 'Ajustar al celu';
-        termCerrada = !j.viva;
-        avisoTerm(termCerrada ? 'La terminal está cerrada en la PC. Abrila ahí para seguir desde acá.' : '');
+        aplicarEstado(j);
+        // Una respuesta vacía casi enseguida (la PC soltó la espera) no puede volverse un lazo apretado.
+        if (termCerrada) termPausa = 2000;
+        else if (espera > 0 && !j.datos && !j.reinicio && !j.mas && !cambio && Date.now() - t0 < 400) termPausa = 500;
       }, function (err) {
-        if (id !== termId) return;
-        termMas = false;
-        termFallas++;
-        var tipo = err && (err.message === 'grande' || err.message === 'sello') ? err.message : 'red';
-        if (tipo === 'red') {
-          // El pedido pudo no llegar: se reenvía lo que iba escrito.
-          if (item) termCola.unshift(item);
-          termTipo = '';
-          termIguales = 0;
-          avisoTerm('Sin conexión con la PC. Reintentando…');
-          return;
-        }
-        // La PC sí contestó (y ya escribió lo que iba): no se reenvía, o se escribiría dos veces.
-        termIguales = tipo === termTipo ? termIguales + 1 : 1;
-        termTipo = tipo;
-        var motivo = tipo === 'grande' ? 'La respuesta de la PC era demasiado grande para el celu.' : 'No pude leer la respuesta de la PC.';
-        if (termIguales >= TERM_IGUALES) {
-          termParada = true;
-          termCola = [];
-          avisoTerm(motivo + ' Volvé a las sesiones y abrí la terminal de nuevo.');
-        } else avisoTerm(motivo + ' Reintentando…');
+        if (gen !== termGen) return;
+        falloMirar(err && (err.message === 'grande' || err.message === 'sello') ? err.message : 'red');
       })
       .then(function () {
-        termEnVuelo = false;
-        if (id !== termId) return;
-        $('term-enviar').disabled = $('term-ajustar').disabled = termCerrada || termParada;
-        if (termParada) return;
-        termTimer = setTimeout(tickTerm, termCola.length || termMas ? 0 : termFallas ? Math.min(5000, 700 * termFallas) : TERM_MS);
+        if (gen !== termGen) return;
+        clearTimeout(termWatchdog);
+        termCtl = null;
+        termMirando = false;
+        botonesTerm();
+        programarMirar();
       });
   }
 
+  function quitarEscrito(item) {
+    if (termTamPend === item) termTamPend = null;
+    else if (termCola[0] === item) termCola.shift();
+  }
+
+  function programarEscritura() {
+    if (!termEscFallas) enviarEscritura();
+    else termEscTimer = setTimeout(function () { termEscTimer = null; enviarEscritura(); }, retardoTerm(termEscFallas));
+  }
+
+  function falloEscribir() {
+    termEscFallas++;
+    if (termEscFallas >= 2) avisoTerm('Sin conexión con la PC. Reintentando…');
+  }
+
+  // Un pedido por vez y en orden. Mientras no haya respuesta el item sigue en la cola con su número: si la
+  // red falla se reenvía igual y la PC, que ya lo hizo, no lo repite.
+  function enviarEscritura() {
+    // Con un reintento esperando su backoff, teclear más no lo adelanta.
+    if (termEscTimer || !termId || !term || termEscribiendo || termParada || termCerrada || document.hidden) return;
+    var item = termTamPend || termCola[0];
+    if (!item) return;
+    if (!item.n) item.n = ++termN;
+    var pedido = { id: termId, desde: termDesde, soloEscribir: true, sesion: TERM_SESION, n: item.n };
+    if (item.tam) pedido.tam = item.tam;
+    else pedido.escribir = item.t;
+    var tok = ++termEscTok;
+    var ctl = window.AbortController ? new AbortController() : null;
+    termEscCtl = ctl;
+    termEscribiendo = true;
+    termEscWatchdog = setTimeout(function () {
+      if (tok !== termEscTok) return;
+      soltarEscribir();
+      falloEscribir();
+      programarEscritura();
+    }, TERM_ESCRIBIR_MAX);
+    pedirApi('/api/terminal', pedido, ctl ? ctl.signal : null)
+      .then(function (r) {
+        if (tok !== termEscTok) return null;
+        if (r.status === 401) { cerrarTerminal(false); consultar(); return null; }
+        if (!r.json) throw new Error('http ' + r.status);
+        return r.json().then(function (j) { return { r: r, j: j }; });
+      })
+      .then(function (x) {
+        if (!x || tok !== termEscTok) return;
+        termEscFallas = 0;
+        if (!x.r.ok) { rechazoDeLaPc(x.j); return; }
+        quitarEscrito(item);
+        aplicarTam(x.j);
+        aplicarEstado(x.j);
+      }, function (err) {
+        if (tok !== termEscTok) return;
+        if (err && (err.message === 'grande' || err.message === 'sello')) {
+          // La PC sí contestó (y ya escribió lo que iba): no se reenvía, o se escribiría dos veces.
+          quitarEscrito(item);
+          avisoTerm('No pude leer la respuesta de la PC.');
+        } else falloEscribir();
+      })
+      .then(function () {
+        if (tok !== termEscTok) return;
+        clearTimeout(termEscWatchdog);
+        termEscCtl = null;
+        termEscribiendo = false;
+        programarEscritura();
+      });
+  }
+
+  function reanudarTerm() {
+    if (!termId || !term) return;
+    soltarMirar();
+    clearTimeout(termEscTimer);
+    termEscTimer = null;
+    mirar();
+    enviarEscritura();
+  }
+
   function abrirTerminal(id, nombre) {
+    soltarMirar();
+    soltarEscribir();
     termId = id;
     termDesde = -1;
     termCola = [];
+    termTamPend = null;
     termTam = null;
     termCerrada = false;
     termFallas = 0;
+    termEscFallas = 0;
+    termPausa = 0;
     termMas = false;
     termParada = false;
     termTipo = '';
     termIguales = 0;
-    termPedirTam = null;
     $('term-nombre').textContent = nombre;
     $('term').hidden = false;
     $('term-enviar').disabled = $('term-ajustar').disabled = false;
@@ -796,26 +947,30 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
         term.onData(function (d) { encolar(d, false); });
         window.addEventListener('resize', encajar);
       } else term.reset();
-      tickTerm();
+      mirar();
+      enviarEscritura();
     }, function () { avisoTerm('No se pudo cargar la terminal. Revisá la conexión con la PC.'); });
   }
 
   function cerrarTerminal(desdeHistoria) {
     if (!termId) return;
     var id = termId;
-    if (termAjustado) pedirApi('/api/terminal', { id: id, desde: termDesde, tam: 'pc' }).then(null, function () { /* la PC lo devuelve sola al rato */ });
+    if (termAjustado) pedirApi('/api/terminal', { id: id, desde: termDesde, tam: 'pc', soloEscribir: true, sesion: TERM_SESION, n: ++termN }).then(null, function () { /* la PC lo devuelve sola al rato */ });
     termId = null;
     termAjustado = false;
     termCola = [];
-    clearTimeout(termTimer);
+    termTamPend = null;
+    soltarMirar();
+    soltarEscribir();
     $('term').hidden = true;
     if (!desdeHistoria) { try { history.back(); } catch (e) { /* sin historial */ } }
   }
 
   $('term-volver').addEventListener('click', function () { cerrarTerminal(false); });
   $('term-ajustar').addEventListener('click', function () {
-    termPedirTam = termAjustado ? 'pc' : tamDelCelu();
-    tickTerm();
+    if (!termId || !term) return;
+    termTamPend = { tam: termAjustado ? 'pc' : tamDelCelu(), n: 0 };
+    enviarEscritura();
   });
   if (document.querySelectorAll) {
     [].forEach.call(document.querySelectorAll('[data-tecla]'), function (b) {
@@ -833,9 +988,11 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   });
 
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) { clearTimeout(timer); clearTimeout(termTimer); }
-    else { consultar(); tickTerm(); }
+    if (document.hidden) { clearTimeout(timer); soltarMirar(); clearTimeout(termEscTimer); termEscTimer = null; }
+    else { consultar(); reanudarTerm(); }
   });
+  window.addEventListener('online', reanudarTerm);
+  window.addEventListener('pageshow', reanudarTerm);
   consultar();
 })();
 `

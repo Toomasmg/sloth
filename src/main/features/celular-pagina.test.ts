@@ -68,6 +68,7 @@ async function correrPagina(slothFetch?: (url: string, init?: unknown) => Promis
     crypto: webcrypto,
     navigator: { userAgent: 'Android', standalone: false },
     matchMedia: () => ({ matches: false }),
+    addEventListener: (): void => undefined,
     fetch: async (url: string, init: Pedido['init']) => {
       fetchs.push({ url, init })
       const ab = abrirPedido(claves, url, init?.body ?? '')
