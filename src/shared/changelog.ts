@@ -9,6 +9,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.7',
+    date: '2026-11-20',
+    title: 'Escribir desde el celu sin romper la terminal',
+    items: [
+      'Escribir desde el celu ya no rompe la terminal de la PC: antes se le colaban avisos de foco y clics de mouse, y «Ajustar al celu» le cambiaba el tamaño de verdad.',
+      'El celu ya no cambia nunca el tamaño de la terminal de la PC. Podés ver la terminal en «Vista PC» (toda la pantalla) o en «Vista celu» (letra grande que sigue el cursor), también con el celu de costado.',
+      'Se escribe tocando la terminal, sin barra aparte, y la terminal y las teclas especiales quedan por encima del teclado.',
+      'El aviso de actualización es ahora un chip chico en la barra superior: ya no se superpone con el buscador ni con los indicadores de estado.'
+    ]
+  },
+  {
     version: '0.7.6',
     date: '2026-11-20',
     title: 'La terminal del celu, rápida y que anda',
