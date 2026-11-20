@@ -127,7 +127,10 @@ const AUTOMATICAS: [string, string][] = [
   ['foco afuera', `${E}[O`],
   ['mouse SGR apretado', `${E}[<0;39;19M`],
   ['mouse SGR soltado', `${E}[<0;39;19m`],
-  ['mouse SGR con rueda', `${E}[<64;3;4M`],
+  ['mouse SGR botón derecho', `${E}[<2;3;4M`],
+  ['posición en la fila 1 con columna de dos cifras', `${E}[1;12R`],
+  ['posición en la fila 1 con columna 9', `${E}[1;9R`],
+  ['posición en la fila 2', `${E}[2;3R`],
   ['mouse X10', `${E}[M !!`],
   ['color por OSC con BEL', `${E}]10;rgb:e8e8/eaea/eded\x07`],
   ['color por OSC con ST', `${E}]11;rgb:0b0b/0d0d/1010${E}\\`],
@@ -172,6 +175,29 @@ test('sinAutomaticas solo quita: nunca agrega ni reordena', () => {
     assert.ok(r.length <= e.length)
   }
   assert.equal(sinAutomaticas(`${E}[24;`), `${E}[24;`, 'una secuencia a medias no se toca')
+})
+
+test('sinAutomaticas es idempotente: al sacar una secuencia no queda otra armada con los restos', () => {
+  assert.equal(sinAutomaticas(`${E}[${E}[II`), '')
+  assert.equal(sinAutomaticas(`${E}[<${E}[O0;1;1M`), '')
+  const entradas = ['', 'hola', `${E}[${E}[II`, `${E}[2${E}[I4;80R`, `${E}[${E}[${E}[III`, `a${E}]1${E}[O0;?\x07b`, `${E}[200~${E}[I${E}[201~`]
+  for (const e of entradas) {
+    const r = sinAutomaticas(e)
+    assert.equal(sinAutomaticas(r), r, JSON.stringify(e))
+  }
+})
+
+test('lo que se podría confundir con una respuesta pero lo tipea el usuario pasa: F3 con modificador y la rueda del mouse', () => {
+  for (let mod = 2; mod <= 8; mod++) assert.equal(sinAutomaticas(`${E}[1;${mod}R`), `${E}[1;${mod}R`, `F3 con modificador ${mod}`)
+  for (const rueda of [`${E}[<64;3;4M`, `${E}[<65;30;4M`]) assert.equal(sinAutomaticas(rueda), rueda)
+  assert.equal(sinAutomaticas(`${E}[<640;3;4M`), '', '640 no es la rueda')
+  assert.equal(sinAutomaticas(`${E}[?1;2R`), '', 'con ? es una posición')
+})
+
+test('Esc y «[I» juntos no se distinguen de un reporte de foco: la PC los saca, por eso la página no los junta', () => {
+  assert.equal(sinAutomaticas(`${E}[I`), '')
+  assert.equal(sinAutomaticas(`${E}`), E)
+  assert.equal(sinAutomaticas('[I'), '[I')
 })
 
 const claves = derivarClaves(Buffer.alloc(32, 7).toString('base64url')) as Claves

@@ -221,9 +221,21 @@ export function sinSalida(p: PedidoTerminal): { reinicio: false; datos: ''; hast
  * corchetes, que se deja tal cual: lo de adentro es texto del usuario.
  */
 const AUTOMATICAS =
-  /(\x1b\[200~[\s\S]*?(?:\x1b\[201~|$))|\x1b\[[?>=]?[\d;:]*\$y|\x1b\[\??\d+;\d+R|\x1b\[[?>=][\d;]*c|\x1b\[\??\d+(?:;\d+)*n|\x1b\[\d+(?:;\d+)*t|\x1b\[[IO]|\x1b\[<\d+;\d+;\d+[Mm]|\x1b\[M[\x20-\uffff]{3}|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1bP[^\x1b]*\x1b\\/g
+  /(\x1b\[200~[\s\S]*?(?:\x1b\[201~|$))|\x1b\[[?>=]?[\d;:]*\$y|\x1b\[(?!1;[2-8]R)\??\d+;\d+R|\x1b\[[?>=][\d;]*c|\x1b\[\??\d+(?:;\d+)*n|\x1b\[\d+(?:;\d+)*t|\x1b\[[IO]|\x1b\[<(?!6[45];)\d+;\d+;\d+[Mm]|\x1b\[M[\x20-\uffff]{3}|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1bP[^\x1b]*\x1b\\/g
 
-/** Le saca a lo que manda el celu las secuencias completas que no tipeó nadie. Solo quita, nunca agrega. */
+/**
+ * Le saca a lo que manda el celu las secuencias completas que no tipeó nadie. Solo quita, nunca agrega. Se repite porque
+ * al sacar una secuencia pueden juntarse los restos y formar otra; así el resultado ya no cambia si se vuelve a pasar.
+ * Dos límites a propósito, para no perder entrada de verdad: ESC[1;2R a ESC[1;8R (F3 con modificador) no se descarta aunque
+ * una posición real en la fila 1 se vea igual, y la rueda del mouse (ESC[<64;x;yM y 65) pasa porque es el usuario deslizando.
+ * Una página nueva ya filtra cada tecla por separado y no junta lo que empieza con ESC; esto es la defensa de la PC.
+ */
 export function sinAutomaticas(texto: string): string {
-  return texto.replace(AUTOMATICAS, (m, pegado: string | undefined) => (pegado ? m : ''))
+  let t = texto
+  for (let i = 0; i < 16; i++) {
+    const r = t.replace(AUTOMATICAS, (m, pegado: string | undefined) => (pegado ? m : ''))
+    if (r === t) break
+    t = r
+  }
+  return t
 }
