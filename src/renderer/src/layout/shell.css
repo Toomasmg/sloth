@@ -136,17 +136,14 @@
 .sl-upd:not(:empty) {
   display: flex;
   min-width: 0;
+  flex: none;
+}
+.sl-upd:has(.is-flash) {
   flex: 0 1 auto;
 }
 /* Con el aviso a la vista, el buscador cede ancho (hasta su mínimo) antes de que el aviso pise el chat. */
 .sl-top:has(.sl-upd:not(:empty)) {
   grid-template-columns: minmax(0, 1fr) clamp(240px, calc(100vw - 700px), 520px) minmax(0, 1fr);
-}
-/* Con el aviso a la vista y poco ancho, los resúmenes de estado le dejan el lugar: nunca se pisan. */
-@container sl-right (max-width: 680px) {
-  .sl-top-right:has(.sl-upd:not(:empty)) .sl-top-status {
-    display: none;
-  }
 }
 .sl-chat {
   position: relative;

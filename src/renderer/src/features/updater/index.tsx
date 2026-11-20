@@ -2,8 +2,8 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { ModalLoading } from '../../Modal'
 import type { FeatureUi } from '../host'
 import { useUi } from '../host'
-import { CheckIcon, CloseIcon, UpdateIcon } from '../../icons/SlothIcons'
-import { IconButton } from '../../ui/IconButton'
+import { CheckIcon, UpdateIcon } from '../../icons/SlothIcons'
+import { Tooltip } from '../../ui/Tooltip'
 import { onOpenAbout, onUpdateToast, openAbout, showUpdateToast } from './bus'
 import { setPhase, usePhase } from './phase'
 import { useUpdateDot, useUpdateStatus } from './useUpdateStatus'
@@ -40,17 +40,16 @@ function useUpdateNote(): string {
 }
 
 /**
- * Aviso discreto en la barra superior, en una sola línea: versión, «Ver novedades» (o «Reiniciar») y una × de «Más tarde».
- * «Más tarde» lo oculta y deja un punto en el acceso a Configuración (ver useUpdateDot).
+ * Aviso de la barra superior: un chip compacto con el ícono y la versión (o el %). Cede lugar a los resúmenes
+ * de estado, así que el detalle va en el tooltip; «Más tarde» está en el diálogo de novedades.
  */
 function UpdateBanner(): React.JSX.Element | null {
-  const ui = useUi()
   const st = useUpdateStatus()
   const { phase } = usePhase()
   const note = useUpdateNote()
   if (note) {
     return (
-      <div role="status" className="f-updater-banner is-flash">
+      <div role="status" className="f-updater-banner is-flash" title={note}>
         <CheckIcon size={14} />
         <span className="f-updater-banner-text">{note}</span>
       </div>
@@ -59,56 +58,49 @@ function UpdateBanner(): React.JSX.Element | null {
   if (!st || !st.version || st.later) return null
   const v = st.version
   const queued = !!st.queued
+  const alCerrar = `La ${v} se instala al cerrar Sloth`
 
   let text: string | null = null
   let full = ''
-  let actions: React.ReactNode = null
+  let onClick: (() => void) | null = null
   if (st.state === 'available') {
-    if (queued) {
-      text = `${v} al cerrar`
-      full = `La ${v} se instala al cerrar Sloth`
-    } else {
-      text = `Actualización ${v}`
-      full = `Hay una versión nueva (${v})`
-      actions = (
-        <>
-          <button type="button" className="btn primary sm" onClick={() => setPhase('notes')}>
-            Ver novedades
-          </button>
-          <IconButton
-            label="Más tarde"
-            icon={<CloseIcon size={12} />}
-            size="sm"
-            onClick={() => void ui.invoke('feat:updater:later').catch(() => showUpdateToast('No se pudo dejar el aviso para más tarde'))}
-          />
-        </>
-      )
+    text = v
+    if (queued) full = alCerrar
+    else {
+      full = `Hay una versión nueva (${v}): ver novedades`
+      onClick = () => setPhase('notes')
     }
   } else if (st.state === 'downloading') {
-    text = queued ? `${v} al cerrar` : `Descargando ${st.percent ?? 0} %`
-    full = queued ? `La ${v} se instala al cerrar Sloth` : `Descargando la ${v}: ${st.percent ?? 0} %`
+    text = queued ? v : `${st.percent ?? 0} %`
+    full = queued ? alCerrar : `Descargando la ${v}: ${st.percent ?? 0} %`
   } else if (st.state === 'ready') {
-    if (queued) {
-      text = `${v} al cerrar`
-      full = `La ${v} se instala al cerrar Sloth`
-    } else {
-      text = `${v} lista`
-      full = `Sloth ${v} ya está descargada`
-      actions = (
-        <button type="button" className="btn primary sm" onClick={() => setPhase('dl')}>
-          Reiniciar
-        </button>
-      )
+    text = v
+    if (queued) full = alCerrar
+    else {
+      full = `Sloth ${v} ya está descargada: reiniciar para instalarla`
+      onClick = () => setPhase('dl')
     }
   }
   if (!text || (phase === 'dl' && st.state === 'downloading')) return null
 
-  return (
-    <div role="status" className={`f-updater-banner${actions ? ' has-act' : ''}`} aria-label={full} title={full}>
+  const inner = (
+    <>
       <UpdateIcon size={14} />
       <span className="f-updater-banner-text">{text}</span>
-      {actions}
-    </div>
+    </>
+  )
+  return (
+    <Tooltip text={full}>
+      {onClick ? (
+        <button type="button" className="f-updater-banner is-act" aria-label={full} onClick={onClick}>
+          {inner}
+        </button>
+      ) : (
+        <div role="status" className="f-updater-banner" aria-label={full} tabIndex={0}>
+          {inner}
+        </div>
+      )}
+    </Tooltip>
   )
 }
 
