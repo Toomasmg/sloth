@@ -4,8 +4,8 @@ import { crearEsperas, type Esperas, type MotivoEspera } from './celular-espera'
 
 const pausa = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
-function esperar(e: Esperas, id: string, ms: number, cancelar?: AbortSignal): Promise<MotivoEspera> {
-  const p = e.esperar(id, ms, cancelar)
+function esperar(e: Esperas, id: string, ms: number, cancelar?: AbortSignal, dueno?: string): Promise<MotivoEspera> {
+  const p = e.esperar(id, ms, cancelar, dueno)
   assert.ok(p, 'había cupo')
   return p
 }
@@ -145,5 +145,45 @@ test('ms raros se acotan: negativo o NaN vence ya, y uno enorme sigue siendo una
   const larga = esperar(e, 'a', 10 ** 9)
   e.soltar('a')
   assert.equal(await larga, 'soltada')
+  assert.equal(e.activas(), 0)
+})
+
+test('dos celus en la misma terminal esperan los dos y un aviso despierta a ambos; el tercero no entra', async () => {
+  const e = crearEsperas({ coalescenciaMs: 2 })
+  const a = esperar(e, 'ws', 5000, undefined, 'celu-a')
+  const b = esperar(e, 'ws', 5000, undefined, 'celu-b')
+  assert.equal(e.activas(), 2)
+  assert.equal(e.esperar('ws', 5000, undefined, 'celu-c'), null)
+  const otra = esperar(e, 'otra', 5000, undefined, 'celu-c')
+  e.avisar('ws')
+  assert.deepEqual(await Promise.all([a, b]), ['dato', 'dato'])
+  assert.equal(e.activas(), 1, 'la de otra terminal sigue')
+  e.soltarTodas()
+  assert.equal(await otra, 'soltada')
+  assert.equal(e.activas(), 0)
+})
+
+test('un celu que vuelve a pedir suelta solo a su propia espera, no a la del otro', async () => {
+  const e = crearEsperas()
+  const a1 = esperar(e, 'ws', 5000, undefined, 'celu-a')
+  const b = esperar(e, 'ws', 5000, undefined, 'celu-b')
+  const a2 = esperar(e, 'ws', 5000, undefined, 'celu-a')
+  assert.equal(await a1, 'soltada')
+  assert.equal(e.activas(), 2)
+  e.soltar('ws')
+  assert.deepEqual(await Promise.all([a2, b]), ['soltada', 'soltada'])
+  assert.equal(e.activas(), 0)
+})
+
+test('el tope por terminal no le quita cupo a las demás ni deja rastro al rechazar', async () => {
+  const e = crearEsperas({ maxGlobal: 3, maxPorTerminal: 1 })
+  const a = esperar(e, 'a', 5000)
+  assert.equal(e.esperar('a', 5000, undefined, 'otro'), null)
+  const b = esperar(e, 'b', 5000)
+  const c = esperar(e, 'c', 5000)
+  assert.equal(e.esperar('d', 5000), null)
+  assert.equal(e.activas(), 3)
+  e.soltarTodas()
+  await Promise.all([a, b, c])
   assert.equal(e.activas(), 0)
 })

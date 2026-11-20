@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { EstadoCelular } from '../../shared/celular'
 import { abrirPedido, crearRepetidos, derivarClaves, fechaValida, sellarRespuesta } from './celular-sello'
 import { manifiesto, PAGINA_CSS, PAGINA_HTML, PAGINA_JS } from './celular-pagina'
+import { crearLimite } from './celular-limite'
 import { leerPedidoTerminal, type PedidoTerminal, type RespuestaTerminal } from './celular-terminal-core'
 
 /** Lo que la PC le da a cualquier fuente: el estado y cómo responder un permiso. */
@@ -12,8 +13,8 @@ export interface ProveedorDeEstado {
   puedeAprobar(): boolean
   clave(): string
   icono(): Buffer | null
-  /** La terminal de un espacio, vista desde el celu. Con `error`, no se pudo (apagado, cerrada, no existe). */
-  terminal(p: PedidoTerminal): Promise<RespuestaTerminal | { status: 403 | 404; error: string }>
+  /** La terminal de un espacio, vista desde el celu. Con `error`, no se pudo (apagado, no existe, demasiadas esperas). `cancelar` salta si el celu cortó la conexión con el pedido abierto. */
+  terminal(p: PedidoTerminal, cancelar?: AbortSignal): Promise<RespuestaTerminal | { status: 403 | 404 | 429; error: string }>
   /** xterm.js y su css, para que la página del celu dibuje la terminal. */
   xterm(): { js: string; css: string } | null
 }
@@ -83,6 +84,7 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
   let server: Server | null = null
   let puertoReal = o.puerto
   const repetidos = crearRepetidos()
+  const limite = crearLimite()
 
   async function atender(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const ruta = (req.url ?? '/').split('?')[0]
@@ -113,9 +115,14 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
 
       if (ruta === '/api/estado') return sellado(200, await o.proveedor.estado())
       if (ruta === '/api/terminal') {
+        // Después del MAC y del anti-replay: quien no tiene la clave no le gasta el cupo al celu de verdad.
+        if (!limite.permitir(req.socket.remoteAddress ?? '?', Date.now())) return enviar(res, 429, null)
         const p = leerPedidoTerminal(sobre.b)
         if (!p) return sellado(400, { error: 'Pedido inválido.' })
-        const r = await o.proveedor.terminal(p)
+        const corte = new AbortController()
+        res.once('close', () => corte.abort())
+        const r = await o.proveedor.terminal(p, corte.signal)
+        if (res.destroyed) return
         return 'error' in r ? sellado(r.status, { error: r.error }) : sellado(200, r)
       }
       if (!o.proveedor.puedeAprobar()) return sellado(403, { error: 'Aprobar desde el celu está apagado en Sloth.' })
@@ -158,7 +165,10 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
           else res.end()
         })
       })
-      s.keepAliveTimeout = 5000
+      // El pedido de «mirar» queda abierto hasta 25 s: la conexión tiene que sobrevivir a eso y a la pausa entre pedidos.
+      s.keepAliveTimeout = 30_000
+      s.headersTimeout = 35_000
+      s.maxConnections = 64
       await new Promise<void>((resolve, reject) => {
         s.once('error', reject)
         s.listen(o.puerto, o.host, () => {

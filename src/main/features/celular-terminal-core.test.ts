@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { leerPedidoTerminal, tamanoActual, ESPERA_MAX_MS, MAX_DATOS_PESO, MAX_ESCRIBIR, MAX_VISOR_CHARS, nuevoVisor, pesoJson, ponerFoto, salidaDesde, sumarSalida, vencidos, type Visor } from './celular-terminal-core'
+import { debeEsperar, leerPedidoTerminal, sinSalida, tamanoActual, ESPERA_MAX_MS, MAX_DATOS_PESO, MAX_ESCRIBIR, MAX_VISOR_CHARS, nuevoVisor, pesoJson, ponerFoto, salidaDesde, sumarSalida, vencidos, type Visor } from './celular-terminal-core'
 import { derivarClaves, sellarRespuesta, type Claves } from './celular-sello'
 
 const c = (seq: number, data = `[${seq}]`) => ({ seq, data })
@@ -85,14 +85,15 @@ test('sesion y n van juntos, validados, y solo con una escritura', () => {
   assert.deepEqual(leerPedidoTerminal(ok), ok)
   assert.deepEqual(leerPedidoTerminal({ id: 'ws', desde: 0, tam: 'pc', sesion: 'a_b-c_d-e', n: 1 }), { id: 'ws', desde: 0, tam: 'pc', sesion: 'a_b-c_d-e', n: 1 })
   assert.equal(leerPedidoTerminal({ ...ok, sesion: undefined }), null, 'n sin sesion')
-  assert.equal(leerPedidoTerminal({ id: 'ws', desde: 0, escribir: 'a', sesion: 'abcDEF12' }), null, 'sesion sin n')
+  assert.deepEqual(leerPedidoTerminal({ id: 'ws', desde: 0, espera: 20000, sesion: 'abcDEF12' }), { id: 'ws', desde: 0, espera: 20000, sesion: 'abcDEF12' }, 'sesion sola (el mirar)')
   for (const mala of ['corta', 'x'.repeat(41), 'con espacio1', 'ñandúñandú', 7, null, '../../etc']) {
     assert.equal(leerPedidoTerminal({ ...ok, sesion: mala }), null, String(mala))
   }
   for (const mala of [0, -1, 1.5, NaN, '7', 1_000_000_001, true, null]) {
     assert.equal(leerPedidoTerminal({ ...ok, n: mala }), null, String(mala))
   }
-  assert.equal(leerPedidoTerminal({ id: 'ws', desde: 0, sesion: 'abcDEF12', n: 1 }), null, 'sin nada que escribir')
+  assert.equal(leerPedidoTerminal({ id: 'ws', desde: 0, sesion: 'abcDEF12', n: 1 }), null, 'n sin nada que escribir')
+  assert.equal(leerPedidoTerminal({ id: 'ws', desde: 0, espera: 5, sesion: 'abcDEF12', n: 1 }), null)
 })
 
 test('el pedido de antes, sin los campos nuevos, sigue valiendo y no los inventa', () => {
@@ -219,4 +220,21 @@ test('en el peor caso del visor (150000 caracteres de puros ESC) la respuesta se
   assert.ok(sellada(salidaDesde(cajas, -1)) < 200_000)
   const incremental = visorDe([{ seq: 1, data: 'a' }, ansi(2, 20_000), ansi(3, 20_000)])
   assert.ok(sellada(salidaDesde(incremental, 1)) < 200_000)
+})
+
+test('el mirar queda abierto solo si no hay nada nuevo, la terminal vive y no es la primera pantalla', () => {
+  const vacio = { reinicio: false, datos: '' }
+  const mirar = { id: 'ws', desde: 5, espera: 20000 }
+  assert.equal(debeEsperar(mirar, vacio, true), true)
+  assert.equal(debeEsperar(mirar, { reinicio: false, datos: 'hola' }, true), false, 'hay salida: se responde ya')
+  assert.equal(debeEsperar(mirar, { reinicio: true, datos: '' }, true), false, 'reinicio: se responde ya')
+  assert.equal(debeEsperar(mirar, vacio, false), false, 'cerrada: se avisa ya')
+  assert.equal(debeEsperar({ ...mirar, desde: -1 }, vacio, true), false, 'primera vez')
+  assert.equal(debeEsperar({ id: 'ws', desde: 5 }, vacio, true), false, 'sin espera: como antes')
+  assert.equal(debeEsperar({ id: 'ws', desde: 5, espera: 0 }, vacio, true), false)
+  assert.equal(debeEsperar({ ...mirar, soloEscribir: true, escribir: 'a' }, vacio, true), false)
+})
+
+test('sin salida: sigue desde donde estaba el celu', () => {
+  assert.deepEqual(sinSalida({ id: 'ws', desde: 12 }), { reinicio: false, datos: '', hasta: 12, mas: false })
 })
