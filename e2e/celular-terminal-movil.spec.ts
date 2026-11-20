@@ -119,7 +119,18 @@ test('Celular movil: la terminal anda en un Galaxy y un iPhone simulados, con sa
       await term.getByRole('button', { name: 'Enter' }).click()
       await expect.poll(veces).toBe(2)
       await escribir('Start-Sleep 60')
-      await term.getByRole('button', { name: 'Control C' }).click()
+      // Un Ctrl C que llega antes de que la shell arranque el comando se pierde: se repite hasta que aparece el prompt de nuevo.
+      const prompts = async (): Promise<number> => (((await pantalla.textContent()) ?? '').match(/❯/g) ?? []).length
+      const conSleep = await prompts()
+      await expect
+        .poll(
+          async () => {
+            await term.getByRole('button', { name: 'Control C' }).click()
+            return (await prompts()) > conSleep
+          },
+          { intervals: [800], timeout: 20_000 }
+        )
+        .toBe(true)
       await escribir("Write-Output ('tras-' + 'cc')")
       await expect(pantalla).toContainText('tras-cc', { timeout: 10_000 })
       for (const tecla of ['Tab', 'Esc', 'Flecha izquierda', 'Flecha derecha', 'Flecha abajo']) await term.getByRole('button', { name: tecla }).click()

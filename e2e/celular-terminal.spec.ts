@@ -70,8 +70,17 @@ test('Celular: la terminal del espacio se abre desde el celu, se escribe y vuelv
   await expect(panel).toBeHidden()
   await page.locator('.terminal-host').first().click()
   // Al cerrar el panel la terminal de la PC puede cambiar de ancho por su cuenta: se lee de nuevo.
-  await page.waitForTimeout(500)
-  const pcFinal = await page.locator('.terminal-host').first().evaluate((el) => (el as HTMLElement & { __xterm?: { cols: number } }).__xterm?.cols ?? 0)
+  const colsPc = (): Promise<number> => page.locator('.terminal-host').first().evaluate((el) => (el as HTMLElement & { __xterm?: { cols: number } }).__xterm?.cols ?? 0)
+  let previo = -1
+  await expect
+    .poll(async () => {
+      const c = await colsPc()
+      const quieto = c === previo
+      previo = c
+      return quieto
+    }, { intervals: [250] })
+    .toBe(true)
+  const pcFinal = await colsPc()
   await page.keyboard.type("Write-Output ('pc-' + $Host.UI.RawUI.WindowSize.Width)")
   await page.keyboard.press('Enter')
   await expect(page.locator('.terminal-host').first()).toContainText(`pc-${pcFinal}`)

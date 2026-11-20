@@ -136,7 +136,7 @@ test('Celular: terminal de PC ancha en Galaxy e iPhone, vertical y horizontal; l
           return { colPx: sc.offsetWidth / cols, desliza: p.scrollWidth > p.clientWidth + 1 }
         }, pc0.cols)
       const vertical = await medidas()
-            expect(vertical.colPx, 'ancho de una columna en vista PC').toBeGreaterThanOrEqual(4.2)
+      expect(vertical.colPx, 'ancho de una columna en vista PC').toBeGreaterThanOrEqual(4.2)
       await foto('1-vista-pc')
       const vistaPc = await caja(cel, '.term')
       const alto = await cel.evaluate(() => window.innerHeight)
@@ -164,7 +164,12 @@ test('Celular: terminal de PC ancha en Galaxy e iPhone, vertical y horizontal; l
           .toBe(true)
       }
       await cursorVisible(alto)
+      // Mientras se tipea, sin Enter: el cursor corre más allá del ancho de la ventana y la vista lo sigue.
+      await term.locator('.xterm-screen').click()
+      await cel.keyboard.insertText('x'.repeat(150))
+      await cursorVisible(alto)
       await foto('2-vista-celu')
+      await term.getByRole('button', { name: 'Control C' }).click()
       await igualAPc('con vista celu')
 
       // Teclado virtual (ventana visible a la mitad): la terminal y la botonera quedan arriba del teclado, con el cursor a la vista.
