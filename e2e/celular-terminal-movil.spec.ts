@@ -22,18 +22,24 @@ const CELUS = [
 interface Registro {
   consola: string[]
   fallos: string[]
+  /** Pedidos de /api/terminal que la propia página cortó: el «mirar» abierto al cerrar la terminal. */
+  cortados: string[]
   estados: Record<string, number[]>
   mayor: number
 }
 
 function vigilar(p: Page): Registro {
-  const r: Registro = { consola: [], fallos: [], estados: {}, mayor: 0 }
+  const r: Registro = { consola: [], fallos: [], cortados: [], estados: {}, mayor: 0 }
   p.on('console', (m) => {
     if (m.type() === 'error' || m.type() === 'warning') r.consola.push(`${m.type()}: ${m.text()}`)
   })
   p.on('pageerror', (e) => r.consola.push(`pageerror: ${e.message}`))
   p.on('requestfailed', (q) => {
-    if (!q.url().includes('fonts.g')) r.fallos.push(`${q.url()} ${q.failure()?.errorText}`)
+    if (q.url().includes('fonts.g')) return
+    const motivo = `${q.url()} ${q.failure()?.errorText}`
+    // Al cerrar la terminal la página corta el «mirar» que la PC tiene abierto: no es un fallo. Cualquier otro sí.
+    if (new URL(q.url()).pathname === '/api/terminal' && /ERR_ABORTED|cancel/i.test(q.failure()?.errorText ?? '')) r.cortados.push(motivo)
+    else r.fallos.push(motivo)
   })
   p.on('response', (s) => {
     const ruta = new URL(s.url()).pathname
@@ -140,6 +146,7 @@ test('Celular movil: la terminal anda en un Galaxy y un iPhone simulados, con sa
 
       expect(reg.consola, `consola de ${celu.nombre}`).toEqual([])
       expect(reg.fallos, `pedidos fallidos de ${celu.nombre}`).toEqual([])
+      expect(reg.cortados.length, `«mirar» cortados de ${celu.nombre}: uno por cada vez que se cerró la terminal`).toBeLessThanOrEqual(2)
       expect(reg.estados['/xterm.js']).toEqual([200])
       expect(reg.estados['/xterm.css']).toEqual([200])
       await ctx.close()
