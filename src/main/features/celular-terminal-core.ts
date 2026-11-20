@@ -7,10 +7,6 @@ export interface Visor {
   /** Hasta qué seq llegó la foto inicial; mientras es null, todavía no llegó. */
   foto: number | null
   usadoEn: number
-  /** El tamaño que le puso el celu, o null si quedó el de la PC. */
-  ajustado: { cols: number; rows: number } | null
-  /** El de la PC cuando el celu la achicó: si la PC cambia de tamaño después, gana la PC. */
-  pcAlAjustar: { cols: number; rows: number } | null
 }
 
 export interface PedidoTerminal {
@@ -18,7 +14,7 @@ export interface PedidoTerminal {
   /** Último seq que ya tiene el celu; -1 la primera vez. */
   desde: number
   escribir?: string
-  /** Un tamaño para achicar la terminal al celu, o 'pc' para devolverle el de la PC. */
+  /** Lo mandaban las páginas viejas para achicar la terminal: se valida y no hace nada, el celu nunca cambia el tamaño de la PC. */
   tam?: { cols: number; rows: number } | 'pc'
   /** Cuánto puede esperar la PC (ms) a que haya salida nueva antes de contestar vacío. Solo en un pedido de mirar. */
   espera?: number
@@ -39,6 +35,7 @@ export interface RespuestaTerminal {
   viva: boolean
   cols: number
   rows: number
+  /** Siempre false: lo lee la página vieja que quedó en caché. */
   ajustado: boolean
 }
 
@@ -51,7 +48,7 @@ const SESION_RE = /^[A-Za-z0-9_-]{8,40}$/
 const N_MAX = 1_000_000_000
 
 export function nuevoVisor(ahora: number): Visor {
-  return { chunks: [], tam: 0, foto: null, usadoEn: ahora, ajustado: null, pcAlAjustar: null }
+  return { chunks: [], tam: 0, foto: null, usadoEn: ahora }
 }
 
 function recortar(v: Visor): void {
@@ -196,21 +193,15 @@ export function leerPedidoTerminal(b: unknown): PedidoTerminal | null {
   return p
 }
 
-/** Los visores que nadie consulta hace rato: se sueltan y, si el celu la había achicado, la terminal vuelve al tamaño de la PC. */
+/** Los visores que nadie consulta hace rato. */
 export function vencidos(visores: ReadonlyMap<string, Visor>, ahora: number, venceMs = VISOR_VENCE_MS): string[] {
   return [...visores].filter(([, v]) => ahora - v.usadoEn > venceMs).map(([id]) => id)
 }
 
 type Tam = { cols: number; rows: number } | null
 
-/** El tamaño real de la terminal: el del celu si la achicó y la PC no la cambió desde entonces; si no, el de la PC. */
-export function tamanoActual(v: Visor | undefined, pc: Tam): { cols: number; rows: number } {
-  if (v?.ajustado) {
-    const a = v.pcAlAjustar
-    if (!pc || (a && a.cols === pc.cols && a.rows === pc.rows)) return v.ajustado
-    v.ajustado = null
-    v.pcAlAjustar = null
-  }
+/** El tamaño de la terminal: el de la PC, que el celu nunca cambia. */
+export function tamanoActual(pc: Tam): { cols: number; rows: number } {
   return pc ?? { cols: 80, rows: 24 }
 }
 
@@ -222,4 +213,17 @@ export function debeEsperar(p: PedidoTerminal, salida: { reinicio: boolean; dato
 /** La respuesta de un pedido que no trae salida: el celu sigue desde donde estaba. */
 export function sinSalida(p: PedidoTerminal): { reinicio: false; datos: ''; hasta: number; mas: false } {
   return { reinicio: false, datos: '', hasta: p.desde, mas: false }
+}
+
+/**
+ * Lo que el xterm del celu emite solo y no tipeó nadie: respuestas a consultas del programa (posición del cursor,
+ * atributos, modos, tamaño, colores), reportes de foco y de mouse (SGR y X10). El primer grupo es un pegado entre
+ * corchetes, que se deja tal cual: lo de adentro es texto del usuario.
+ */
+const AUTOMATICAS =
+  /(\x1b\[200~[\s\S]*?(?:\x1b\[201~|$))|\x1b\[[?>=]?[\d;:]*\$y|\x1b\[\??\d+;\d+R|\x1b\[[?>=][\d;]*c|\x1b\[\??\d+(?:;\d+)*n|\x1b\[\d+(?:;\d+)*t|\x1b\[[IO]|\x1b\[<\d+;\d+;\d+[Mm]|\x1b\[M[\x20-\uffff]{3}|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1bP[^\x1b]*\x1b\\/g
+
+/** Le saca a lo que manda el celu las secuencias completas que no tipeó nadie. Solo quita, nunca agrega. */
+export function sinAutomaticas(texto: string): string {
+  return texto.replace(AUTOMATICAS, (m, pegado: string | undefined) => (pegado ? m : ''))
 }

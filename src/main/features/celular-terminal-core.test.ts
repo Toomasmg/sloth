@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { debeEsperar, leerPedidoTerminal, sinSalida, tamanoActual, ESPERA_MAX_MS, MAX_DATOS_PESO, MAX_ESCRIBIR, MAX_VISOR_CHARS, nuevoVisor, pesoJson, ponerFoto, salidaDesde, sumarSalida, vencidos, type Visor } from './celular-terminal-core'
+import { debeEsperar, leerPedidoTerminal, sinAutomaticas, sinSalida, tamanoActual, ESPERA_MAX_MS, MAX_DATOS_PESO, MAX_ESCRIBIR, MAX_VISOR_CHARS, nuevoVisor, pesoJson, ponerFoto, salidaDesde, sumarSalida, vencidos, type Visor } from './celular-terminal-core'
 import { derivarClaves, sellarRespuesta, type Claves } from './celular-sello'
 
 const c = (seq: number, data = `[${seq}]`) => ({ seq, data })
@@ -107,15 +107,71 @@ test('vencen los visores que nadie consulta', () => {
   assert.deepEqual(vencidos(m, 40_000), ['a'])
 })
 
-test('el tamaño: el del celu mientras la PC no se mueva; si la PC cambia, gana la PC', () => {
-  const v = nuevoVisor(0)
-  assert.deepEqual(tamanoActual(v, { cols: 120, rows: 30 }), { cols: 120, rows: 30 })
-  assert.deepEqual(tamanoActual(undefined, null), { cols: 80, rows: 24 })
-  v.ajustado = { cols: 45, rows: 40 }
-  v.pcAlAjustar = { cols: 120, rows: 30 }
-  assert.deepEqual(tamanoActual(v, { cols: 120, rows: 30 }), { cols: 45, rows: 40 })
-  assert.deepEqual(tamanoActual(v, { cols: 140, rows: 30 }), { cols: 140, rows: 30 })
-  assert.equal(v.ajustado, null)
+test('el tamaño es el de la PC; el celu no lo cambia', () => {
+  assert.deepEqual(tamanoActual({ cols: 120, rows: 30 }), { cols: 120, rows: 30 })
+  assert.deepEqual(tamanoActual(null), { cols: 80, rows: 24 })
+})
+
+const E = '\x1b'
+const AUTOMATICAS: [string, string][] = [
+  ['posición del cursor', `${E}[24;80R`],
+  ['posición con ?', `${E}[?24;80R`],
+  ['atributos primarios', `${E}[?1;2c`],
+  ['atributos secundarios', `${E}[>0;276;0c`],
+  ['modo reportado', `${E}[?2004;2$y`],
+  ['modo ANSI reportado', `${E}[4;2$y`],
+  ['estado del dispositivo', `${E}[0n`],
+  ['estado con ?', `${E}[?0n`],
+  ['tamaño en caracteres', `${E}[8;24;80t`],
+  ['foco adentro', `${E}[I`],
+  ['foco afuera', `${E}[O`],
+  ['mouse SGR apretado', `${E}[<0;39;19M`],
+  ['mouse SGR soltado', `${E}[<0;39;19m`],
+  ['mouse SGR con rueda', `${E}[<64;3;4M`],
+  ['mouse X10', `${E}[M !!`],
+  ['color por OSC con BEL', `${E}]10;rgb:e8e8/eaea/eded\x07`],
+  ['color por OSC con ST', `${E}]11;rgb:0b0b/0d0d/1010${E}\\`],
+  ['DECRQSS', `${E}P1$r0m${E}\\`]
+]
+
+test('lo que el xterm del celu contesta solo se saca, sin importar dónde venga', () => {
+  for (const [nombre, sec] of AUTOMATICAS) {
+    assert.equal(sinAutomaticas(sec), '', nombre)
+    assert.equal(sinAutomaticas(`ls${sec}\r`), 'ls\r', `${nombre} entre teclas`)
+    assert.equal(sinAutomaticas(sec + sec), '', `${nombre} repetida`)
+  }
+  assert.equal(sinAutomaticas(AUTOMATICAS.map(([, s]) => s).join('') + 'x'), 'x')
+})
+
+test('las teclas de verdad pasan tal cual', () => {
+  const teclas = [
+    'hola', 'ñandú é', '\r', '\x7f', '\x03', E, '\t', `${E}[Z`, `${E}[A`, `${E}[B`, `${E}[C`, `${E}[D`, `${E}[H`, `${E}[F`,
+    `${E}[1;5C`, `${E}[3~`, `${E}[5~`, `${E}OP`, `${E}[15~`, `${E}f`, `${E}[u`, `${E}[27;5;13~`, '😀', 'ESC[I sin ESC'
+  ]
+  for (const t of teclas) assert.equal(sinAutomaticas(t), t, JSON.stringify(t))
+  assert.equal(sinAutomaticas(teclas.join('')), teclas.join(''))
+})
+
+test('un pegado entre corchetes no se toca por dentro', () => {
+  const pegado = `${E}[200~hola ${E}[I ${E}[24;80R chau${E}[201~`
+  assert.equal(sinAutomaticas(pegado), pegado)
+  assert.equal(sinAutomaticas(`${E}[I${pegado}${E}[O`), pegado)
+  assert.equal(sinAutomaticas(`${E}[200~sin cierre ${E}[I`), `${E}[200~sin cierre ${E}[I`)
+})
+
+test('sinAutomaticas solo quita: nunca agrega ni reordena', () => {
+  const entradas = ['', 'a', `a${E}[Ib${E}[<0;1;1Mc${E}[24;80R`, `${E}[`, `${E}[24;`, `${E}]10;sin cerrar`, `${E}[200~${E}[I${E}[201~${E}[O`]
+  for (const e of entradas) {
+    const r = sinAutomaticas(e)
+    let i = 0
+    for (const c of r) {
+      i = e.indexOf(c, i)
+      assert.ok(i >= 0, `${JSON.stringify(r)} sale de ${JSON.stringify(e)}`)
+      i++
+    }
+    assert.ok(r.length <= e.length)
+  }
+  assert.equal(sinAutomaticas(`${E}[24;`), `${E}[24;`, 'una secuencia a medias no se toca')
 })
 
 const claves = derivarClaves(Buffer.alloc(32, 7).toString('base64url')) as Claves
