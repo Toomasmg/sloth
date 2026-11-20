@@ -49,7 +49,7 @@ export const PAGINA_HTML = `<!doctype html>
     <div class="pedido" id="pedido" hidden></div>
     <div class="calma" id="calma"><span class="calma-t">Nada te espera</span><span class="calma-s" id="calma-s">Ningún permiso pendiente.</span></div>
     <h2 class="titulo-lista">Sesiones <span id="resumen"></span></h2>
-    <p class="term-nota" id="term-nota" hidden>La terminal de cada sesión se abre con el QR del Wi-Fi de casa, no con el de «Desde cualquier red».</p>
+    <p class="term-nota" id="term-nota" hidden>La terminal de cada sesión no se abre desde «Desde cualquier red». Escaneá el QR del Wi-Fi de casa (en Sloth, panel Celular, el de arriba) con el celu conectado a ese Wi-Fi.</p>
     <ul class="lista" id="lista"></ul>
     <p class="hoy" id="hoy">Hoy: sin datos</p>
   </section>
@@ -212,6 +212,7 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .aviso-pantalla p { margin: 0 auto; max-width: 36ch; color: var(--suave); }
 .lista .s-term { flex: none; min-height: 44px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border-radius: 12px; border: 1px solid rgba(140,194,255,0.35); background: rgba(90,169,255,0.12); color: var(--trabaja); font-size: 13px; font-weight: 600; }
 .lista .s-term .s-term-ico { font: 700 13px var(--mono); }
+.lista .s-term:disabled { opacity: 0.5; cursor: default; }
 .term-nota { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--panel); border: 1px solid var(--borde); font-size: 12px; color: var(--suave); }
 .term { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; background: var(--fondo); padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 .term-top { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--borde); }
@@ -249,6 +250,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     sleeping: { t: 'Dormido', c: '#9AA0A6', f: 'rgba(154,160,166,0.10)' },
     exited: { t: 'Cerrado', c: '#9AA0A6', f: 'rgba(154,160,166,0.10)' }
   };
+  var MAX_RESPUESTA = 262144;
   var HORA_CORRIDA = 'Revisá la hora del celu: está corrida respecto de la PC.';
   var $ = function (id) { return document.getElementById(id); };
   var guardar = function (k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } };
@@ -264,8 +266,9 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
         .then(function (r) {
           if (r.status !== 200 && r.status !== 400 && r.status !== 403 && r.status !== 404 && r.status !== 409) return { ok: false, status: r.status };
           return r.text().then(function (texto) {
+            if (texto.length > MAX_RESPUESTA) throw new Error('grande');
             var plano = window.slothSello.abrirRespuesta(claves, s.iv, texto);
-            if (plano === null) throw new Error('respuesta sin sellar');
+            if (plano === null) throw new Error('sello');
             return { ok: r.ok, status: r.status, json: function () { return Promise.resolve(JSON.parse(plano)); } };
           });
         })
@@ -481,13 +484,21 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       li.appendChild(punto);
       li.appendChild(texto);
       li.appendChild(lado);
-      if (e.terminal && !window.slothFetch && s.estado !== 'exited') {
+      var enWifi = e.terminal && !window.slothFetch;
+      var soloWifi = !!window.slothFetch && !!e.terminalEnWifi;
+      if ((enWifi || soloWifi) && s.estado !== 'exited') {
         var bt = el('button', 's-term');
         bt.appendChild(el('span', 's-term-ico', '>_'));
         bt.appendChild(el('span', '', 'Terminal'));
         bt.type = 'button';
-        bt.setAttribute('aria-label', 'Abrir la terminal de ' + s.nombre);
-        bt.addEventListener('click', function () { abrirTerminal(s.id, s.nombre); });
+        if (soloWifi) {
+          bt.disabled = true;
+          bt.setAttribute('aria-label', 'Terminal de ' + s.nombre + ': escaneá el QR del Wi-Fi de casa para abrirla');
+          bt.setAttribute('aria-describedby', 'term-nota');
+        } else {
+          bt.setAttribute('aria-label', 'Abrir la terminal de ' + s.nombre);
+          bt.addEventListener('click', function () { abrirTerminal(s.id, s.nombre); });
+        }
         li.appendChild(bt);
       }
       lista.appendChild(li);
@@ -589,6 +600,8 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   var TERM_MS = 350, TERM_MAX = 1500;
   var term = null, termId = null, termDesde = -1, termTimer = null, termEnVuelo = false, termCola = [], termTam = null;
   var termAjustado = false, termPedirTam = null, termCerrada = false, termFallas = 0, xtermCargando = null, conHistoria = false;
+  var termMas = false, termParada = false, termTipo = '', termIguales = 0;
+  var TERM_PESO = 3000, TERM_IGUALES = 3;
 
   function cargarXterm() {
     if (window.Terminal) return Promise.resolve();
@@ -642,20 +655,46 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     return { cols: Math.max(20, Math.min(500, Math.floor(anchoUtil() / w))), rows: Math.max(5, Math.min(200, Math.floor(($('term-pantalla').clientHeight - 12) / h))) };
   }
 
+  // Cuánto ocupa lo que se escribe dentro del JSON del pedido (bytes UTF-8 ya escapados): la PC no acepta
+  // sobres de más de 8192 y un ESC pegado pesa 6, una letra con tilde 2.
+  function unidades(t, i) {
+    var c = t.charCodeAt(i), d = t.charCodeAt(i + 1);
+    return c >= 0xd800 && c < 0xdc00 && d >= 0xdc00 && d < 0xe000 ? 2 : 1;
+  }
+  function pesoCar(t, i, u) {
+    var c = t.charCodeAt(i);
+    if (u === 2) return 4;
+    if (c === 34 || c === 92 || c === 8 || c === 9 || c === 10 || c === 12 || c === 13) return 2;
+    if (c < 32) return 6;
+    if (c < 128) return 1;
+    if (c < 2048) return 2;
+    if (c >= 0xd800 && c < 0xe000) return 6;
+    return 3;
+  }
+
   function encolar(texto, aparte) {
     if (termCerrada || !texto) return;
-    var ult = termCola[termCola.length - 1];
-    for (var i = 0; i < texto.length; i += TERM_MAX) {
-      var parte = texto.slice(i, i + TERM_MAX);
-      if (!aparte && ult && !ult.aparte && ult.t.length + parte.length <= TERM_MAX) ult.t += parte;
-      else termCola.push(ult = { t: parte, aparte: !!aparte });
+    var i = 0;
+    while (i < texto.length) {
+      var ult = termCola[termCola.length - 1];
+      var junta = !aparte && !!ult && !ult.aparte;
+      var p = junta ? ult.p : 0, largo = junta ? ult.t.length : 0, ini = i;
+      while (i < texto.length) {
+        var u = unidades(texto, i), w = pesoCar(texto, i, u);
+        if (p + w > TERM_PESO || largo + (i - ini) + u > TERM_MAX) break;
+        p += w;
+        i += u;
+      }
+      if (i === ini) { termCola.push({ t: '', p: 0, aparte: false }); continue; }
+      if (junta) { ult.t += texto.slice(ini, i); ult.p = p; }
+      else termCola.push({ t: texto.slice(ini, i), p: p, aparte: !!aparte });
     }
     tickTerm();
   }
 
   function tickTerm() {
     clearTimeout(termTimer);
-    if (!termId || !term || termEnVuelo || document.hidden) return;
+    if (!termId || !term || termEnVuelo || termParada || document.hidden) return;
     var pedido = { id: termId, desde: termDesde };
     var item = termCola.shift();
     if (item) pedido.escribir = item.t;
@@ -671,6 +710,8 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       .then(function (x) {
         if (!x || id !== termId) return;
         termFallas = 0;
+        termTipo = '';
+        termIguales = 0;
         if (!x.r.ok) {
           termCerrada = true;
           termCola = [];
@@ -684,22 +725,41 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
         if (j.reinicio) term.reset();
         if (j.datos) term.write(j.datos, cambio || j.reinicio ? function () { term.scrollToBottom(); } : undefined);
         termDesde = j.hasta;
+        termMas = !!j.mas;
         termAjustado = j.ajustado;
         $('term-ajustar').setAttribute('aria-pressed', termAjustado ? 'true' : 'false');
         $('term-ajustar').textContent = termAjustado ? 'Tamaño de la PC' : 'Ajustar al celu';
         termCerrada = !j.viva;
         avisoTerm(termCerrada ? 'La terminal está cerrada en la PC. Abrila ahí para seguir desde acá.' : '');
-      }, function () {
+      }, function (err) {
         if (id !== termId) return;
-        if (item) termCola.unshift(item);
+        termMas = false;
         termFallas++;
-        avisoTerm('Sin conexión con la PC. Reintentando…');
+        var tipo = err && (err.message === 'grande' || err.message === 'sello') ? err.message : 'red';
+        if (tipo === 'red') {
+          // El pedido pudo no llegar: se reenvía lo que iba escrito.
+          if (item) termCola.unshift(item);
+          termTipo = '';
+          termIguales = 0;
+          avisoTerm('Sin conexión con la PC. Reintentando…');
+          return;
+        }
+        // La PC sí contestó (y ya escribió lo que iba): no se reenvía, o se escribiría dos veces.
+        termIguales = tipo === termTipo ? termIguales + 1 : 1;
+        termTipo = tipo;
+        var motivo = tipo === 'grande' ? 'La respuesta de la PC era demasiado grande para el celu.' : 'No pude leer la respuesta de la PC.';
+        if (termIguales >= TERM_IGUALES) {
+          termParada = true;
+          termCola = [];
+          avisoTerm(motivo + ' Volvé a las sesiones y abrí la terminal de nuevo.');
+        } else avisoTerm(motivo + ' Reintentando…');
       })
       .then(function () {
         termEnVuelo = false;
         if (id !== termId) return;
-        $('term-enviar').disabled = $('term-ajustar').disabled = termCerrada;
-        termTimer = setTimeout(tickTerm, termCola.length ? 0 : termFallas ? Math.min(5000, 700 * termFallas) : TERM_MS);
+        $('term-enviar').disabled = $('term-ajustar').disabled = termCerrada || termParada;
+        if (termParada) return;
+        termTimer = setTimeout(tickTerm, termCola.length || termMas ? 0 : termFallas ? Math.min(5000, 700 * termFallas) : TERM_MS);
       });
   }
 
@@ -710,6 +770,10 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     termTam = null;
     termCerrada = false;
     termFallas = 0;
+    termMas = false;
+    termParada = false;
+    termTipo = '';
+    termIguales = 0;
     termPedirTam = null;
     $('term-nombre').textContent = nombre;
     $('term').hidden = false;
