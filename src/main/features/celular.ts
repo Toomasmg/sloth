@@ -255,7 +255,7 @@ const feature: Feature = {
           }
         }
         const tam = tamanoActual(v, ctx.ptySize(p.id))
-        const salida = v ? salidaDesde(v, p.desde) : { reinicio: p.desde !== -1, datos: '', hasta: 0 }
+        const salida = v ? salidaDesde(v, p.desde) : { reinicio: p.desde !== -1, datos: '', hasta: 0, mas: false }
         return { ...salida, viva: viva && !!v, cols: tam.cols, rows: tam.rows, ajustado: !!v?.ajustado }
       },
       xterm: () => XTERM

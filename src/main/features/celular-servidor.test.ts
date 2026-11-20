@@ -182,7 +182,7 @@ test('terminal: sin sello no hay nada; con el pedido mal armado, 400; apagada, 4
 })
 
 test('terminal prendida: la salida vuelve sellada (nada en claro en la red)', async () => {
-  const terminal: ProveedorDeEstado['terminal'] = async () => ({ reinicio: true, datos: 'secreto-de-la-terminal', hasta: 3, viva: true, cols: 80, rows: 24, ajustado: false })
+  const terminal: ProveedorDeEstado['terminal'] = async () => ({ reinicio: true, datos: 'secreto-de-la-terminal', hasta: 3, mas: false, viva: true, cols: 80, rows: 24, ajustado: false })
   await conServidor({ terminal }, async (base) => {
     const r = await postSellado(base, '/api/terminal', { id: 'ws-1', desde: -1 })
     assert.equal(r.status, 200)
