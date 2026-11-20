@@ -15,7 +15,9 @@ import { limitesDeCuenta } from '../codex-limites'
 import { armarEstado, claveValida, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type TipoAviso } from './celular-core'
 import { crearFuenteWifi, type FuenteDeEstado, type ProveedorDeEstado } from './celular-servidor'
 import { XTERM } from './celular-xterm'
-import { nuevoVisor, ponerFoto, salidaDesde, sumarSalida, tamanoActual, vencidos, type Visor } from './celular-terminal-core'
+import { debeEsperar, nuevoVisor, ponerFoto, salidaDesde, sinSalida, sumarSalida, tamanoActual, vencidos, type RespuestaTerminal, type Visor } from './celular-terminal-core'
+import { crearEsperas } from './celular-espera'
+import { crearEscrituras } from './celular-escrituras'
 import { crearFuenteRemota, type CambioRemoto } from './celular-remoto'
 import { sesionChat } from './chat'
 import { kindOf, labelOf } from '../../shared/permissions-core'
@@ -117,6 +119,8 @@ const feature: Feature = {
     let remotoError: string | null = null
     let celuActivo = false
     const visores = new Map<string, Visor>()
+    const esperas = crearEsperas()
+    const escrituras = crearEscrituras()
     let vencedor: NodeJS.Timeout | null = null
 
 
@@ -225,7 +229,7 @@ const feature: Feature = {
       puedeAprobar: () => cfg.aprobar,
       clave: () => cfg.clave,
       icono: leerIcono,
-      async terminal(p) {
+      async terminal(p, cancelar) {
         if (!cfg.terminal) return { status: 403, error: 'La terminal desde el celu está apagada en Sloth.' }
         if (!ctx.store.workspace(p.id)) return { status: 404, error: 'Ese espacio ya no está en la PC.' }
         const b = await ctx.backend()
@@ -245,18 +249,40 @@ const feature: Feature = {
           }
         }
         if (v) v.usadoEn = Date.now()
-        if (v && viva && p.escribir) ctx.writePty(p.id, p.escribir)
-        if (v && viva && p.tam) {
-          if (p.tam === 'pc') devolverTamano(p.id, v)
-          else {
-            v.ajustado = p.tam
-            v.pcAlAjustar = ctx.ptySize(p.id)
-            ctx.resizePty(p.id, p.tam.cols, p.tam.rows)
+        // Un reintento (la respuesta se perdió) trae el mismo número: lo que ya se escribió no se escribe dos veces.
+        const repetida = p.sesion !== undefined && p.n !== undefined && (p.escribir !== undefined || p.tam !== undefined) && !escrituras.nueva(p.id, p.sesion, p.n, Date.now())
+        if (v && viva && !repetida) {
+          if (p.escribir) ctx.writePty(p.id, p.escribir)
+          if (p.tam) {
+            if (p.tam === 'pc') devolverTamano(p.id, v)
+            else {
+              v.ajustado = p.tam
+              v.pcAlAjustar = ctx.ptySize(p.id)
+              ctx.resizePty(p.id, p.tam.cols, p.tam.rows)
+              esperas.avisar(p.id)
+            }
           }
         }
-        const tam = tamanoActual(v, ctx.ptySize(p.id))
+        const respuesta = (visor: Visor | undefined, sigueViva: boolean, salida: ReturnType<typeof salidaDesde>): RespuestaTerminal => {
+          const tam = tamanoActual(visor, ctx.ptySize(p.id))
+          return { ...salida, viva: sigueViva && !!visor, cols: tam.cols, rows: tam.rows, ajustado: !!visor?.ajustado }
+        }
+        if (p.soloEscribir) return respuesta(v, viva, sinSalida(p))
         const salida = v ? salidaDesde(v, p.desde) : { reinicio: p.desde !== -1, datos: '', hasta: 0, mas: false }
-        return { ...salida, viva: viva && !!v, cols: tam.cols, rows: tam.rows, ajustado: !!v?.ajustado }
+        if (v && p.espera && debeEsperar(p, salida, viva)) {
+          const espera = esperas.esperar(p.id, p.espera, cancelar, p.sesion)
+          if (espera === null) return { status: 429, error: 'La PC tiene demasiadas terminales abiertas desde el celu.' }
+          v.usadoEn = Date.now()
+          const motivo = await espera
+          // Mientras esperaba pudo apagarse la terminal del celu o soltarse el visor: se vuelve a mirar todo, nada de lo de antes vale.
+          if (!cfg.terminal) return { status: 403, error: 'La terminal desde el celu está apagada en Sloth.' }
+          const actual = visores.get(p.id)
+          if (actual) actual.usadoEn = Date.now()
+          const sigue = b.isRunning(p.id)
+          if (!actual || motivo === 'soltada' || motivo === 'cancelada') return respuesta(actual, sigue, sinSalida(p))
+          return respuesta(actual, sigue, salidaDesde(actual, p.desde))
+        }
+        return respuesta(v, viva, salida)
       },
       xterm: () => XTERM
     }
@@ -267,14 +293,17 @@ const feature: Feature = {
       v.pcAlAjustar = null
       const pc = ctx.ptySize(id)
       if (pc) ctx.resizePty(id, pc.cols, pc.rows)
+      esperas.avisar(id)
     }
 
-    function soltarVisores(ids: string[] = [...visores.keys()]): void {
-      for (const id of ids) {
+    function soltarVisores(ids?: string[]): void {
+      for (const id of ids ?? [...visores.keys()]) {
         const v = visores.get(id)
         if (v) devolverTamano(id, v)
         visores.delete(id)
+        esperas.soltar(id)
       }
+      if (!ids) esperas.soltarTodas()
       if (!visores.size && vencedor) {
         clearInterval(vencedor)
         vencedor = null
@@ -289,17 +318,21 @@ const feature: Feature = {
 
     ctx.onPtyData((id, chunks) => {
       const v = visores.get(id)
-      if (v) sumarSalida(v, chunks)
+      if (!v) return
+      sumarSalida(v, chunks)
+      esperas.avisar(id)
     })
     ctx.onPtyExit((id) => {
       const v = visores.get(id)
       if (v) v.ajustado = null
+      esperas.avisar(id)
     })
 
     async function detener(): Promise<void> {
       const f = fuente
       fuente = null
       ipServida = null
+      esperas.soltarTodas()
       if (f) await f.detener()
     }
 
