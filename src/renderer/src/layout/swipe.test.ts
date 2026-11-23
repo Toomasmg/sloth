@@ -81,3 +81,8 @@ test('la inercia sola, con algún salto chico, no cambia de nuevo', () => {
 test('un deslizamiento largo que acelera sin frenarse cambia una sola vez', () => {
   assert.deepEqual(gesto([[10, 0], [20, 0], [30, 0], [40, 0], [50, 0], [60, 0], [70, 0], [80, 0], [90, 0]]).cambios, [1])
 })
+
+test('los dedos que frenan un poco y vuelven a acelerar en el mismo gesto no saltan dos paneles', () => {
+  assert.deepEqual(gesto([...Array(6).fill([20, 0]), [30, 0], [8, 0], [25, 0], ...Array(8).fill([20, 0])]).cambios, [1])
+  assert.deepEqual(gesto([...Array(6).fill([20, 0]), [35, 0], [10, 0], [6, 0], [30, 0], [35, 0], ...Array(10).fill([25, 0])]).cambios, [1])
+})

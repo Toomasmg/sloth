@@ -5,13 +5,18 @@
  */
 
 /** Recorrido horizontal (px de deltaX acumulados) para cambiar de panel. */
-export const UMBRAL_SWIPE = 90
+export const UMBRAL_SWIPE = 110
 /** Sin eventos por este tiempo, el gesto terminó. */
 export const FIN_GESTO_MS = 220
 /** Sin eventos por este tiempo, el panel que acompañaba a los dedos vuelve a su lugar. */
 export const SOLTAR_MS = 120
 /** Cuánto acompaña el panel a los dedos antes de cambiar (px, a cada lado). */
 const MAX_ARRASTRE = 56
+/**
+ * Tras un cambio, volver a acelerar para el mismo lado cuenta como dedos nuevos recién pasado este tiempo:
+ * a mitad de un deslizamiento los dedos frenan y aceleran solos, y eso saltaba dos paneles (de la 1 a la 3).
+ */
+const ENTRE_CAMBIOS_MS = 300
 
 export interface EstadoSwipe {
   acumulado: number
@@ -22,9 +27,10 @@ export interface EstadoSwipe {
   signo: number
   pico: number
   piso: number
+  cambioEn: number
 }
 
-export const swipeInicial = (): EstadoSwipe => ({ acumulado: 0, usado: false, ultimo: -Infinity, signo: 0, pico: 0, piso: 0 })
+export const swipeInicial = (): EstadoSwipe => ({ acumulado: 0, usado: false, ultimo: -Infinity, signo: 0, pico: 0, piso: 0, cambioEn: -Infinity })
 
 /**
  * La inercia de Windows sigue mandando eventos un buen rato después de soltar, cada vez más chicos y
@@ -32,10 +38,10 @@ export const swipeInicial = (): EstadoSwipe => ({ acumulado: 0, usado: false, ul
  * como el mismo gesto (y había que tocar el pad para cortarla). Si los eventos ya se frenaron y vuelven
  * a acelerar, o cambian de sentido, son dedos nuevos.
  */
-function dedosNuevos(s: EstadoSwipe, dx: number): boolean {
+function dedosNuevos(s: EstadoSwipe, dx: number, ahora: number): boolean {
   const m = Math.abs(dx)
   if (m >= 4 && Math.sign(dx) !== s.signo) return true
-  return s.piso < s.pico * 0.4 && m > s.piso * 2 + 4
+  return ahora - s.cambioEn >= ENTRE_CAMBIOS_MS && s.piso < s.pico * 0.25 && m > s.piso * 2 + 4
 }
 
 export interface PasoSwipe {
@@ -48,7 +54,7 @@ export interface PasoSwipe {
 
 export function pasoSwipe(s: EstadoSwipe, dx: number, dy: number, ahora: number): PasoSwipe {
   const horizontal = Math.abs(dx) > Math.abs(dy)
-  const nuevo = ahora - s.ultimo > FIN_GESTO_MS || (s.usado && horizontal && dedosNuevos(s, dx))
+  const nuevo = ahora - s.ultimo > FIN_GESTO_MS || (s.usado && horizontal && dedosNuevos(s, dx, ahora))
   let base: EstadoSwipe = nuevo ? { ...swipeInicial(), ultimo: ahora } : { ...s, ultimo: ahora }
   if (base.usado && horizontal) base = { ...base, pico: Math.max(base.pico, Math.abs(dx)), piso: Math.min(base.piso, Math.abs(dx)) }
   // Un gesto vertical (subir el historial) nunca cambia de panel, aunque se desvíe un poco.
@@ -56,7 +62,7 @@ export function pasoSwipe(s: EstadoSwipe, dx: number, dy: number, ahora: number)
   const acumulado = base.acumulado + dx
   if (Math.abs(acumulado) >= UMBRAL_SWIPE) {
     const m = Math.abs(dx)
-    return { estado: { ...base, acumulado: 0, usado: true, signo: Math.sign(dx), pico: m, piso: m }, cambio: acumulado > 0 ? 1 : -1, arrastre: 0 }
+    return { estado: { ...base, acumulado: 0, usado: true, signo: Math.sign(dx), pico: m, piso: m, cambioEn: ahora }, cambio: acumulado > 0 ? 1 : -1, arrastre: 0 }
   }
   return { estado: { ...base, acumulado }, cambio: null, arrastre: arrastreDe(acumulado) }
 }
