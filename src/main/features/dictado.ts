@@ -15,6 +15,7 @@ import {
   WHISPER_MODEL,
   errorDictado,
   hilos,
+  timeoutMs,
   textoDeSalida,
   wavValido,
   whisperArgs
@@ -31,7 +32,6 @@ import { raizDatos } from '../perfil'
  * transcribir(wav), ajustes(tipo). Una transcripción a la vez: la que llega mientras otra corre espera su turno.
  */
 
-const TIMEOUT_MS = 120_000
 /** Cada cuánto se avisa el avance a la UI: el stream manda miles de chunks. */
 const AVISO_MS = 250
 const MAX_MODELO_BYTES = 256 * 1024 * 1024
@@ -113,7 +113,7 @@ async function transcribir(c: FeatureContext, wav: Uint8Array): Promise<Resultad
       execFile(
         exe,
         whisperArgs({ model, wav: file, threads: hilos(availableParallelism()) }),
-        { cwd: dir, windowsHide: true, timeout: TIMEOUT_MS, maxBuffer: 1024 * 1024, encoding: 'utf8' },
+        { cwd: dir, windowsHide: true, timeout: timeoutMs(wav.byteLength), maxBuffer: 1024 * 1024, encoding: 'utf8' },
         (err, out) => (err ? reject(err) : resolve(out))
       )
     })

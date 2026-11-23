@@ -38,7 +38,15 @@ export function hilos(cpus: number): number {
 }
 
 export function whisperArgs(o: { model: string; wav: string; threads: number }): string[] {
-  return ['-m', o.model, '-f', o.wav, '-l', 'es', '-t', String(o.threads), '-nt', '-np', '--prompt', PISTA]
+  // --carry-initial-prompt: sin él la pista solo vale para los primeros 30 s y después vuelve el castellano
+  // de España («vosotros sabéis»). -mc acota lo que arrastra de una ventana a otra, para que un error no
+  // contagie a lo que sigue.
+  return ['-m', o.model, '-f', o.wav, '-l', 'es', '-t', String(o.threads), '-nt', '-np', '--prompt', PISTA, '--carry-initial-prompt', '-mc', '64']
+}
+
+/** Tiempo para transcribir un WAV de 16 kHz mono: 30 s fijos más 4 veces lo que dura (una PC lenta tarda más que el audio). */
+export function timeoutMs(wavBytes: number): number {
+  return 30_000 + 4 * Math.max(0, (wavBytes - 44) / 32)
 }
 
 const MAX_TEXTO = 4000

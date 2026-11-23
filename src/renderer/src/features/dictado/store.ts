@@ -19,7 +19,8 @@ export interface VistaDictado {
 const INACTIVO: VistaDictado = { estado: 'inactivo' }
 const vistas = new Map<string, VistaDictado>()
 const subs = new Set<() => void>()
-let activa: { paneId: string; grab: Grabacion } | null = null
+/** La grabación en curso y las partes que ya se mandaron a transcribir, en orden. */
+let activa: { paneId: string; grab: Grabacion; partes: Promise<ResultadoDictado>[] } | null = null
 
 function set(paneId: string, v: VistaDictado): void {
   vistas.set(paneId, v)
@@ -117,13 +118,17 @@ export async function empezar(paneId: string, onTexto: (texto: string) => void):
   }
   set(paneId, { estado: 'escuchando' })
   try {
-    const grab = await grabar(() => void terminar(paneId, onTexto))
+    const partes: Promise<ResultadoDictado>[] = []
+    const grab = await grabar(
+      () => void terminar(paneId, onTexto),
+      (wav) => partes.push(transcribir(wav))
+    )
     // Si mientras se pedía el micrófono se tocó otro panel o se canceló, se suelta.
     if (vistas.get(paneId)?.estado !== 'escuchando' || activa) {
       grab.descartar()
       return
     }
-    activa = { paneId, grab }
+    activa = { paneId, grab, partes }
   } catch (e) {
     set(paneId, { estado: 'inactivo', error: errorDeMicrofono(e) })
   }
@@ -131,7 +136,7 @@ export async function empezar(paneId: string, onTexto: (texto: string) => void):
 
 export async function terminar(paneId: string, onTexto: (texto: string) => void): Promise<void> {
   if (activa?.paneId !== paneId) return
-  const { grab } = activa
+  const { grab, partes } = activa
   activa = null
   set(paneId, { estado: 'transcribiendo' })
   const off = window.sloth.feat.on('feat:dictado:modelo', (p: unknown) => {
@@ -141,16 +146,23 @@ export async function terminar(paneId: string, onTexto: (texto: string) => void)
   })
   try {
     const wav = await grab.terminar()
-    if (!wav) return set(paneId, { estado: 'inactivo', vacio: true })
-    const r = (await window.sloth.feat.invoke('feat:dictado:transcribir', wav)) as ResultadoDictado
-    if (!r.ok) return set(paneId, { estado: 'inactivo', error: r.error })
-    if (r.texto) onTexto(r.texto)
-    set(paneId, r.texto ? INACTIVO : { estado: 'inactivo', vacio: true })
-  } catch (e) {
-    set(paneId, { estado: 'inactivo', error: { tipo: 'otro', mensaje: `No se pudo transcribir (${cleanError(e)}).`, ajustes: false } })
+    if (wav) partes.push(transcribir(wav))
+    const resultados = await Promise.all(partes)
+    // Lo que sí se transcribió se pega igual: una parte que falla no tira el dictado entero.
+    const texto = resultados.flatMap((r) => (r.ok && r.texto ? [r.texto] : [])).join(' ')
+    const fallo = resultados.find((r): r is Extract<ResultadoDictado, { ok: false }> => !r.ok)
+    if (texto) onTexto(texto)
+    if (fallo) set(paneId, { estado: 'inactivo', error: fallo.error })
+    else set(paneId, texto ? INACTIVO : { estado: 'inactivo', vacio: true })
   } finally {
     off()
   }
+}
+
+function transcribir(wav: Uint8Array): Promise<ResultadoDictado> {
+  return (window.sloth.feat.invoke('feat:dictado:transcribir', wav) as Promise<ResultadoDictado>).catch(
+    (e: unknown): ResultadoDictado => ({ ok: false, error: { tipo: 'otro', mensaje: `No se pudo transcribir (${cleanError(e)}).`, ajustes: false } })
+  )
 }
 
 /** Si el panel se cierra mientras graba, se suelta el micrófono sin transcribir. */

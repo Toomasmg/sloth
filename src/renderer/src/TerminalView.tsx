@@ -43,6 +43,10 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
       ...opts,
       cursorBlink: opts.cursorBlink && document.visibilityState === 'visible',
       allowProposedApi: true,
+      // xterm 6 pasa cada px del touchpad a 1,25 px de historial: subir un poco saltaba de golpe. Con la
+      // mitad, el touchpad acompaña a los dedos y la rueda del mouse baja ~3 líneas por muesca.
+      scrollSensitivity: 0.5,
+      smoothScrollDuration: 100,
       // Links OSC 8 (los que arma Claude Code). El handler por defecto de xterm abre una ventana en blanco
       // y después navega: el main la rechaza por no ser https y el link no abría nada.
       linkHandler: { activate: (_e, uri) => abrirLink(uri) }
