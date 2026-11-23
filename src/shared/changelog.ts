@@ -9,6 +9,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.8',
+    date: '2026-11-23',
+    title: 'Dictado largo sin perderse y scroll más suave',
+    items: [
+      'El dictado se transcribe por partes en cada pausa mientras hablás: en los dictados largos ya no se pierde el hilo ni aparecen frases sin sentido, y al soltar el texto llega más rápido.',
+      'El dictado respeta el voseo en todo el audio, no solo en los primeros segundos, y no inventa texto en los silencios.',
+      'Subir y bajar en la terminal con el touchpad es más suave: un movimiento chico ya no salta de golpe.',
+      'Deslizar con dos dedos cambia de a una terminal: ya no pasa de la 1 a la 3 de un solo movimiento.'
+    ]
+  },
+  {
     version: '0.7.7',
     date: '2026-11-20',
     title: 'Escribir desde el celu sin romper la terminal',
