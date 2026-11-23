@@ -1,12 +1,24 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { MAX_WAV_BYTES, errorDictado, hilos, limpiarTexto, textoDeSalida, wavValido, whisperArgs } from './dictado-core'
+import { MAX_WAV_BYTES, errorDictado, hilos, limpiarTexto, textoDeSalida, timeoutMs, wavValido, whisperArgs } from './dictado-core'
 import { encodeWav } from '../shared/wav'
 
 test('whisperArgs pide español, sin marcas de tiempo y con la pista', () => {
   const a = whisperArgs({ model: 'm.bin', wav: 'a.wav', threads: 4 })
   assert.deepEqual(a.slice(0, 8), ['-m', 'm.bin', '-f', 'a.wav', '-l', 'es', '-t', '4'])
   assert.ok(a.includes('-nt') && a.includes('-np') && a.includes('--prompt'))
+})
+
+test('whisperArgs repite la pista en cada ventana y acota el contexto', () => {
+  const a = whisperArgs({ model: 'm.bin', wav: 'a.wav', threads: 4 })
+  assert.ok(a.includes('--carry-initial-prompt'))
+  assert.equal(a[a.indexOf('-mc') + 1], '64')
+})
+
+test('timeoutMs crece con lo que dura el audio', () => {
+  assert.equal(timeoutMs(44), 30_000)
+  assert.equal(timeoutMs(44 + 32_000 * 25), 130_000)
+  assert.equal(timeoutMs(44 + 32_000 * 300), 1_230_000)
 })
 
 test('hilos: la mitad de los núcleos, entre 2 y 8', () => {
