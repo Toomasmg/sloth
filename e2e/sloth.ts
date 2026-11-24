@@ -23,6 +23,8 @@ export interface Seed {
   onboarding?: boolean
   /** Flags de Chromium de más (p. ej. un micrófono falso que lee un .wav). */
   chromiumArgs?: string[]
+  /** Nombre de la cuenta principal (por defecto «Prueba»). */
+  accountLabel?: string
 }
 
 export const ACCOUNT_ID = 'acc-e2e'
@@ -53,7 +55,7 @@ function seedUserData(dir: string, seed: Seed): void {
   const state = {
     version: 1,
     accounts: [
-      { id: ACCOUNT_ID, label: 'Prueba', configDir, createdAt: 1_700_000_000_000 },
+      { id: ACCOUNT_ID, label: seed.accountLabel ?? 'Prueba', configDir, createdAt: 1_700_000_000_000 },
       ...(seed.extraAccounts ?? []).map((label, i) => {
         const extraDir = join(dir, 'accounts', `acc-extra-${i}`)
         mkdirSync(extraDir, { recursive: true })
