@@ -8,7 +8,7 @@ import { rms, unir } from './wav'
 
 export interface OpcionesCortador {
   rate: number
-  /** Una parte no se corta antes de esto (s): las muy cortas pierden contexto. */
+  /** Una parte no se corta antes de esto (s): con poco audio, Whisper se equivoca más y hasta cambia de idioma. */
   minSegundos?: number
   /** Ni pasa de esto (s): sin pausa, se corta en el momento más callado de los últimos segundos. */
   maxSegundos?: number
@@ -38,8 +38,8 @@ export function tieneVoz(audio: Float32Array, rate: number): boolean {
 }
 
 export function crearCortador(o: OpcionesCortador): Cortador {
-  const min = (o.minSegundos ?? 4) * o.rate
-  const max = (o.maxSegundos ?? 25) * o.rate
+  const min = (o.minSegundos ?? 15) * o.rate
+  const max = (o.maxSegundos ?? 28) * o.rate
   const pausa = (o.pausaSegundos ?? 0.7) * o.rate
   let cuadros: Float32Array[] = []
   let niveles: number[] = []

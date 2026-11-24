@@ -236,3 +236,12 @@ test('rendimiento: normalize descarta campo por campo y reset vuelve a sin lími
   c.rendimiento.enchufada.nucleos = 1
   assert.equal(s.rendimiento.enchufada.nucleos, 4)
 })
+
+test('dictadoPreciso: apagado por defecto, se prende con un patch y sobrevive a normalize', () => {
+  assert.equal(DEFAULT_SETTINGS.terminal.dictadoPreciso, false)
+  const s = applyPatch(DEFAULT_SETTINGS, { terminal: { dictadoPreciso: true } })
+  assert.equal(s.terminal.dictadoPreciso, true)
+  assert.equal(normalize(JSON.parse(JSON.stringify(s))).terminal.dictadoPreciso, true)
+  assert.equal(normalize({ terminal: { fontSize: 14 } }).terminal.dictadoPreciso, false)
+  assert.throws(() => applyPatch(DEFAULT_SETTINGS, { terminal: { dictadoPreciso: 'sí' } }))
+})

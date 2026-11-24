@@ -69,6 +69,12 @@ export function TerminalSection(): React.JSX.Element {
           <Segmented<CursorShape> aria-label="Forma del cursor" value={t.cursorStyle} options={CURSOR_ORDER.map((c) => ({ value: c, label: CURSOR_LABEL[c] }))} onChange={(cursorStyle) => save({ terminal: { cursorStyle } })} />
         </Row>
         <ToggleRow title="Cursor que parpadea" checked={t.cursorBlink} onChange={(cursorBlink) => save({ terminal: { cursorBlink } })} />
+        <ToggleRow
+          title="Dictado más preciso"
+          hint="Usa un modelo más grande: se equivoca mucho menos, pero tarda bastante más en transcribir. La primera vez baja 574 MB."
+          checked={t.dictadoPreciso}
+          onChange={(dictadoPreciso) => save({ terminal: { dictadoPreciso } })}
+        />
         <Row title={<label htmlFor="f-set-tscroll">Historial</label>} hint="Líneas que se guardan para subir con la rueda. Más líneas, más memoria.">
           <Slider
             id="f-set-tscroll"
