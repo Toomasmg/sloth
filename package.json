@@ -23,6 +23,7 @@
     "dist": "npm run build && electron-builder --win",
     "release": "node scripts/release.mjs",
     "test:e2e": "npm run build && playwright test",
+    "readme:demo": "npm run build && playwright test -c playwright.readme.config.ts && node scripts/readme/gif.mjs",
     "perf": "npm run build && playwright test -c perf/playwright.config.ts",
     "test:e2e:update": "npm run build && playwright test --update-snapshots=all"
   },
