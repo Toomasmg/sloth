@@ -9,6 +9,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.8.0',
+    date: '2026-11-26',
+    title: 'Pulido general: paneles, permisos, cupo y conectores',
+    items: [
+      'Aviso: con la terminal enfocada, Ctrl+N, Ctrl+Shift+M, Ctrl+Alt+1–4 y Ctrl+Shift+Enter ahora le llegan a la terminal (vim, tmux, less) en vez de abrir cosas de Sloth. Fuera de la terminal siguen igual.',
+      'Los permisos de comandos destructivos se marcan como «Destructivo» y no se pueden dejar en «siempre permitir».',
+      'El cupo de cada cuenta (estimado, ventana de 5 h) se ve en la barra lateral.',
+      'Conectores: se arregló que los servidores MCP de alcance usuario no se detectaran al probarlos, y los errores ya no muestran claves ni direcciones completas.',
+      'Paneles de terminal con un solo foco, cabecera con fondo, estado en píldora y pestañas más claras.',
+      'Tickets, Historial y Ramas comparten encabezado y ancho; las cargas muestran esqueletos animados (quietos si pedís menos movimiento).',
+      'Barra superior con los estados siempre visibles, pendientes de PR en el riel y aviso cuando la ventana es muy angosta (mínimo 900×560).',
+      'Panel de Espacios, barra lateral, botones y diálogos rediseñados con más contraste y consistencia entre pantallas.'
+    ]
+  },
+  {
     version: '0.7.8',
     date: '2026-11-23',
     title: 'Dictado largo sin perderse y scroll más suave',
