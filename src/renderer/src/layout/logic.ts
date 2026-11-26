@@ -7,6 +7,13 @@
 export type ViewMode = 'uno' | 'dos' | 'tres' | 'cuatro'
 export const LAYOUT_CAP: Record<ViewMode, number> = { uno: 1, dos: 2, tres: 3, cuatro: 4 }
 export const LAYOUT_LABEL: Record<ViewMode, string> = { uno: 'Uno', dos: 'Dos', tres: 'Tres', cuatro: 'Cuatro' }
+/** La distribución que se está viendo de verdad: la elegida, recortada por lo que entra y por los paneles abiertos. */
+export function modoReal(elegido: ViewMode, cap: number, abiertos: number): ViewMode {
+  const visibles = Math.min(cap, abiertos)
+  if (visibles < 1 || visibles >= LAYOUT_CAP[elegido]) return elegido
+  const modos: ViewMode[] = ['uno', 'dos', 'tres', 'cuatro']
+  return modos.find((m) => LAYOUT_CAP[m] === visibles) ?? elegido
+}
 /** Desde este ancho de ventana (px), Tres pone sus 3 paneles en una fila; por debajo, 2 arriba y 1 abajo. */
 export const TRES_WIDE_PX = 1100
 /** Dónde cae un panel arrastrado respecto del panel de destino. */

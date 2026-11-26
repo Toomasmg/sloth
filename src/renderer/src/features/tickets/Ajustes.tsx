@@ -197,7 +197,7 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => voi
             <label className="field f-tickets-ajustes-campo">
               <span>Modelo</span>
               <Select value={snap.config.model} onChange={(e) => set({ model: e.target.value })}>
-                <option value="haiku">Haiku (barato)</option>
+                <option value="haiku">Haiku (económico)</option>
                 <option value="sonnet">Sonnet</option>
                 <option value="opus">Opus</option>
               </Select>
@@ -237,7 +237,7 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => voi
       {via === 'mcp' && (
         <div className="f-tickets-ajustes-fila">
           <CampoTope
-            etiqueta="Tope de vueltas por consulta"
+            etiqueta="Cuántas veces puede consultar Claude"
             valor={snap.config.maxTurns}
             vacio={String(VUELTAS_DEFECTO)}
             min={1}
@@ -271,12 +271,12 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => voi
               {c.nombre}: hoy {costo(c.hoy.costUsd)} · 7 días {costo(c.semana.costUsd)}
             </span>
           ))}
-          {snap.motorExperimental && <span>Con Codex el costo aparece como «sin dato» y el tope de costo no aplica; el tope de vueltas cuenta llamadas al conector.</span>}
+          {snap.motorExperimental && <span>Con Codex el costo aparece como «sin dato» y el tope de costo no aplica; el límite de consultas cuenta llamadas al conector.</span>}
         </div>
       )}
 
       <details className="f-tickets-propios" onToggle={(e) => e.currentTarget.open && setPropiosVistos(true)}>
-        <summary>Conectores propios</summary>
+        <summary>Tus propias conexiones</summary>
         {propiosVistos && <Propios snap={snap} />}
       </details>
 

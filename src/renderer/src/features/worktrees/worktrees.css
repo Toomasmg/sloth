@@ -36,10 +36,10 @@
 }
 .f-wt-inner {
   width: 100%;
-  max-width: 1040px;
+  max-width: var(--view-max);
   margin: 0 auto;
   box-sizing: border-box;
-  padding: clamp(18px, 3vw, 32px) clamp(16px, 4vw, 40px) 56px;
+  padding: var(--view-pad-top) var(--view-pad-x) 56px;
   display: flex;
   flex-direction: column;
   gap: 20px;

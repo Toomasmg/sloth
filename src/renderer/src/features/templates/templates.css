@@ -304,9 +304,9 @@
   line-height: 1.5;
 }
 .tp-detail {
-  max-width: 760px;
+  max-width: var(--view-max-narrow);
   margin: 0 auto;
-  padding: clamp(18px, 3.5vw, 32px) clamp(16px, 4vw, 36px) 56px;
+  padding: var(--view-pad-top) var(--view-pad-x) 56px;
   display: flex;
   flex-direction: column;
   gap: 20px;

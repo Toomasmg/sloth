@@ -95,7 +95,7 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
     setTried(true)
     if (!supabaseUrl) return setMsg({ ok: false, text: 'Falta la URL del proyecto.' })
     if (!/^https:\/\//.test(supabaseUrl)) return setMsg({ ok: false, text: 'La URL tiene que empezar con https://.' })
-    if (!anonKey) return setMsg({ ok: false, text: 'Falta la clave publicable.' })
+    if (!anonKey) return setMsg({ ok: false, text: 'Falta la clave de acceso.' })
     void act(async () => {
       await ui.invoke('feat:chat:setConfig', { supabaseUrl, anonKey })
       setKey('')
@@ -242,11 +242,11 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
 
       <form className="f-set-card f-set-form" onSubmit={saveCfg} noValidate>
         <label className="f-set-stack">
-          <span className="f-set-hint">URL del proyecto de Supabase</span>
+          <span className="f-set-hint">Dirección del proyecto del chat (Supabase)</span>
           <Input mono type="url" value={url} placeholder="https://xxxx.supabase.co" autoComplete="off" spellCheck={false} aria-invalid={tried && !url.trim()} onChange={(e) => setUrl(e.target.value)} />
         </label>
         <label className="f-set-stack">
-          <span className="f-set-hint">Clave publicable (la que empieza con sb_publishable)</span>
+          <span className="f-set-hint">Clave de acceso (la pública, que empieza con sb_publishable)</span>
           <span className="f-set-inline">
             <input
               className="f-set-input mono"
@@ -263,7 +263,7 @@ export function TeamSection({ onClose }: { onClose(): void }): React.JSX.Element
             </Button>
           </span>
         </label>
-        <p className="f-set-note warn">Nunca pegues acá la clave service_role: Sloth la rechaza porque daría acceso total a la base.</p>
+        <p className="f-set-note warn">Nunca pegues acá la clave secreta del proyecto: Sloth la rechaza porque daría acceso total a la base.</p>
         <div className="f-set-actions">
           {cfg?.active?.source === 'settings' && !confirmDel && (
             <Button variant="ghost" size="sm" disabled={busy} onClick={() => setConfirmDel(true)}>

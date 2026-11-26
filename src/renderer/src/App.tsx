@@ -48,6 +48,7 @@ import {
   defaultSizes,
   shapeFor,
   loadSizes,
+  modoReal,
   locatePane,
   movePane,
   sameOrder,
@@ -434,6 +435,7 @@ export function App(): React.JSX.Element {
     return () => ro.disconnect()
   }, [])
   const cap = capForWidth(LAYOUT_CAP[viewMode], areaW)
+  const modoVisto = modoReal(viewMode, cap, openPanes.length)
   const anchoAviso = avisoAncho(LAYOUT_CAP[viewMode], cap, openPanes.length)
   const tabsRef = useRef<HTMLDivElement>(null)
   const ghostRef = useRef<HTMLDivElement>(null)
@@ -745,7 +747,7 @@ export function App(): React.JSX.Element {
   const permsLabel = pendingPerms === 1 ? '1 pide permiso' : `${pendingPerms} piden permiso`
   const waitingLabel = `${needsYou} te ${needsYou === 1 ? 'espera' : 'esperan'}`
   const workingLabel = `${working} trabajando`
-  const doneLabel = `${done} ${done === 1 ? 'listo' : 'listos'}`
+  const doneLabel = `${done} ${done === 1 ? 'terminó' : 'terminaron'}`
   const activeTerms = workspaces.filter((w) => agents[w.id] && agents[w.id].state !== 'exited' && agents[w.id].state !== 'sleeping').length
   /** Primer espacio con ese estado (para ir al tocar un resumen). */
   const firstWs = (s: AgentStatus['state']): Workspace | undefined => workspaces.find((w) => agents[w.id]?.state === s)
@@ -929,7 +931,7 @@ export function App(): React.JSX.Element {
                 <button type="button" className="sl-sum is-done" onClick={() => { const w = firstWs('done'); if (w) openPane(w.id) }} aria-label={doneLabel} title={`${doneLabel}. Ir al que terminó`}>
                   <StateIcon state="done" size={12} />
                   <span>{done}</span>
-                  <span className="sl-sum-t">{done === 1 ? 'listo' : 'listos'}</span>
+                  <span className="sl-sum-t">{done === 1 ? 'terminó' : 'terminaron'}</span>
                 </button>
               )}
               <TitlebarOnly name="prs" />
@@ -1020,8 +1022,8 @@ export function App(): React.JSX.Element {
                   )}
                   <div className="sl-layout" role="group" aria-label="Distribución de paneles">
                     {(['uno', 'dos', 'tres', 'cuatro'] as const).map((k, i) => (
-                      <Tooltip key={k} text={`${LAYOUT_LABEL[k]}: ${LAYOUT_CAP[k] === 1 ? '1 panel' : `hasta ${LAYOUT_CAP[k]} paneles`} a la vista${viewMode === k && anchoAviso ? `. ${anchoAviso}` : ''}`} shortcut={`Ctrl+Alt+${i + 1}`}>
-                        <button type="button" aria-pressed={viewMode === k} aria-label={`${LAYOUT_LABEL[k]}: ${LAYOUT_CAP[k] === 1 ? '1 panel' : `hasta ${LAYOUT_CAP[k]} paneles`} a la vista`} onClick={() => pickLayout(k)}>
+                      <Tooltip key={k} text={`${LAYOUT_LABEL[k]}: ${LAYOUT_CAP[k] === 1 ? '1 panel' : `hasta ${LAYOUT_CAP[k]} paneles`} a la vista${viewMode === k && modoVisto !== k ? ` (elegida; ahora se ven ${LAYOUT_CAP[modoVisto]})` : ''}${viewMode === k && anchoAviso ? `. ${anchoAviso}` : ''}`} shortcut={`Ctrl+Alt+${i + 1}`}>
+                        <button type="button" aria-pressed={modoVisto === k} aria-label={`${LAYOUT_LABEL[k]}: ${LAYOUT_CAP[k] === 1 ? '1 panel' : `hasta ${LAYOUT_CAP[k]} paneles`} a la vista`} onClick={() => pickLayout(k)}>
                           {i + 1}
                         </button>
                       </Tooltip>
