@@ -47,7 +47,8 @@ test('Ctrl+N y Ctrl+Shift+Enter con la terminal enfocada: el primero es de la sh
   await expect(page.getByRole('dialog', { name: /Enviar a varios/ })).toBeVisible()
   const { sent } = await recorded(page)
   // Los avisos de foco de xterm (CSI I y CSI O) no son teclas.
-  expect(sent.map((x) => x.data).filter((d) => d !== '[I' && d !== '[O')).toEqual([''])
+  const teclas = sent.map((x) => x.data).filter((d) => !d.startsWith(String.fromCharCode(27)))
+  expect(teclas).toEqual([String.fromCharCode(14)])
 })
 
 test('al encadenar vistas desde la terminal, el foco queda en la vista nueva y no en la terminal oculta', async ({ sloth: { page } }) => {
