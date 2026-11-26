@@ -171,10 +171,27 @@ export const projectsDirOf = (p: SettingsPayload = state): string => p.settings.
 
 /* ---------- Terminal ---------- */
 
+// Fuentes con íconos Powerline/Nerd que ya pueden estar en la PC; Sloth no descarga ninguna. Van antes del monospace genérico.
+export const NERD_FONTS: readonly string[] = ['Symbols Nerd Font Mono', 'Symbols Nerd Font', 'CaskaydiaCove Nerd Font Mono', 'MesloLGS NF', 'JetBrainsMono Nerd Font Mono']
+const NERD_STACK = NERD_FONTS.map((f) => `"${f}"`).join(', ')
+
 const FONT_STACK: Record<TerminalSettings['fontFamily'], string> = {
-  'JetBrains Mono': '"JetBrains Mono Variable", "Cascadia Code", Consolas, monospace',
-  'Cascadia Code': '"Cascadia Code", "Cascadia Mono", Consolas, monospace',
-  Consolas: 'Consolas, "Cascadia Mono", monospace'
+  'JetBrains Mono': `"JetBrains Mono Variable", "Cascadia Code", Consolas, ${NERD_STACK}, monospace`,
+  'Cascadia Code': `"Cascadia Code", "Cascadia Mono", Consolas, ${NERD_STACK}, monospace`,
+  Consolas: `Consolas, "Cascadia Mono", ${NERD_STACK}, monospace`
+}
+
+/** Si alguna fuente con símbolos Nerd está instalada: compara el ancho de un glifo del área privada contra dos bases. */
+export function hayFuenteNerd(): boolean {
+  const ctx = document.createElement('canvas').getContext('2d')
+  if (!ctx) return true
+  const muestra = ''
+  const ancho = (fam: string): number => {
+    ctx.font = `32px ${fam}`
+    return ctx.measureText(muestra).width
+  }
+  const bases = ['monospace', 'serif'].map((b) => ancho(b))
+  return NERD_FONTS.some((f) => ['monospace', 'serif'].some((b, i) => ancho(`"${f}", ${b}`) !== bases[i]))
 }
 export const termFontStack = (f: TerminalSettings['fontFamily']): string => FONT_STACK[f]
 

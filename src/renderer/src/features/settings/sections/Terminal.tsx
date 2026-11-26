@@ -1,4 +1,5 @@
-import { termFontStack, useSettings } from '../store'
+import { useMemo } from 'react'
+import { hayFuenteNerd, termFontStack, useSettings } from '../store'
 import { LINE_HEIGHT, SCROLLBACK, SHELLS, TERM_FONTS, TERM_FONT, type CursorShape, type ShellChoice, type TermFont } from '../../../../../shared/settings-model'
 import { Group, Row, Slider, ToggleRow, useSave } from '../ui'
 import { Segmented, Select } from '../../../ui'
@@ -10,6 +11,7 @@ const CURSOR_ORDER: CursorShape[] = ['bloque', 'barra', 'subrayado']
 export function TerminalSection(): React.JSX.Element {
   const p = useSettings()
   const t = p.settings.terminal
+  const conNerd = useMemo(() => hayFuenteNerd(), [])
   const save = useSave()
   const th = termTheme(p)
   const cursor =
@@ -41,7 +43,14 @@ export function TerminalSection(): React.JSX.Element {
       </pre>
       )}
       <Group id="g-term" label="Texto y cursor">
-        <Row title={<label htmlFor="f-set-tfont">Fuente</label>}>
+        <Row
+          title={<label htmlFor="f-set-tfont">Fuente</label>}
+          hint={
+            conNerd
+              ? undefined
+              : 'Si el prompt muestra recuadros en lugar de íconos, instalá una fuente Nerd (por ejemplo «Symbols Nerd Font Mono») en Windows: Sloth la usa sola.'
+          }
+        >
           <Select id="f-set-tfont" value={t.fontFamily} onChange={(e) => save({ terminal: { fontFamily: e.target.value as TermFont } })}>
             {TERM_FONTS.map((f) => (
               <option key={f} value={f}>

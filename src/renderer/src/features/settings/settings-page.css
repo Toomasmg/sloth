@@ -967,3 +967,21 @@ button.f-set-toggle:disabled {
 .f-set-check.aviso .f-set-check-ico {
   color: var(--warn-fg);
 }
+
+.f-set-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 8px;
+}
+.f-set-empty-main {
+  padding: 24px 0;
+}
+.f-set-empty-main h1 {
+  margin: 0;
+  font-size: var(--fs-16, 16px);
+}
+.f-set-empty-main h1:focus {
+  outline: none;
+}
