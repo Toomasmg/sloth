@@ -14,6 +14,7 @@ import {
   ZOOM_MIN
 } from './photo-crop'
 import { canManage, TeamModal } from './shared'
+import { Button } from '../../../ui'
 
 type PhotoMode = 'keep' | 'none' | 'remove' | 'new'
 const STEP = 4
@@ -276,20 +277,20 @@ export function TeamEditor({
 
           <div className="f-chat-team-actions">
             {canEdit && (
-              <button type="button" className="btn sm" onClick={() => fileRef.current?.click()} disabled={locked}>
+              <Button look="classic" size="sm" onClick={() => fileRef.current?.click()} disabled={locked}>
                 <Camera size={14} aria-hidden="true" />
                 {photoMode === 'new' ? 'Cambiar imagen' : 'Elegir foto'}
-              </button>
+              </Button>
             )}
             {canEdit && editing && (photoMode === 'keep' || photoMode === 'new') && (
-              <button type="button" className="btn sm ghost" onClick={removePhoto} disabled={locked}>
+              <Button look="classic" size="sm" variant="ghost" onClick={removePhoto} disabled={locked}>
                 Quitar foto
-              </button>
+              </Button>
             )}
             {canEdit && (photoMode === 'remove' || photoMode === 'new') && (
-              <button type="button" className="btn sm ghost" onClick={undoPhoto} disabled={locked}>
+              <Button look="classic" size="sm" variant="ghost" onClick={undoPhoto} disabled={locked}>
                 {photoMode === 'new' ? 'Descartar recorte' : 'Deshacer'}
-              </button>
+              </Button>
             )}
           </div>
           <input ref={fileRef} type="file" accept={PHOTO_ACCEPT_ATTR} hidden onChange={(e) => void pickFile(e)} aria-label="Elegir imagen de la foto del equipo" />
@@ -303,11 +304,11 @@ export function TeamEditor({
         )}
 
         <div className="modal-actions">
-          <button type="button" className="btn" onClick={onClose} disabled={busy}>
+          <Button look="classic" onClick={onClose} disabled={busy}>
             {created ? 'Cerrar' : 'Cancelar'}
-          </button>
+          </Button>
           {!created && (
-            <button type="submit" className="btn primary" disabled={locked || !nameOk || !descOk}>
+            <Button type="submit" look="classic" variant="primary" disabled={locked || !nameOk || !descOk}>
               {busy ? (
                 'Guardando…'
               ) : (
@@ -315,7 +316,7 @@ export function TeamEditor({
                   <Check size={14} aria-hidden="true" /> {editing ? 'Guardar' : 'Crear equipo'}
                 </>
               )}
-            </button>
+            </Button>
           )}
         </div>
       </form>
