@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
+import type { Cupo } from '../../../shared/cupo'
 import type { Account, AccountStatus, AgentStatus, Workspace } from '../../../shared/types'
+import { CupoMedidor } from '../CupoMedidor'
+import { textoCupo } from '../cupo-texto'
+import { fmtTok } from '../format'
 import { openSettings } from '../features/settings/bus'
 import { colorHex } from '../features/templates/catalog'
 import { STATE_LABEL, shortPath } from '../format'
@@ -23,6 +27,9 @@ export interface SidebarProps {
   agents: Readonly<Record<string, AgentStatus>>
   /** Plan de cada cuenta tal como lo escribió el usuario en Configuración. */
   plans: Readonly<Record<string, string>>
+  /** Cupo estimado de la ventana de 5 h por cuenta; sin entrada, la cuenta no lleva cuenta de uso. */
+  cupos: Readonly<Record<string, Cupo>>
+  ahora: number
   openIds: readonly string[]
   focusedId: string | null
   /** Espacio que se está renombrando en la fila (el renombre desde el panel no entra acá). */
@@ -148,7 +155,8 @@ export function Sidebar(p: SidebarProps): React.JSX.Element {
           const loggedOut = st !== undefined && !st.loggedIn
           // El resumen cuenta todos los espacios de la cuenta (el filtro no lo cambia) y se ve también plegada.
           const sum = resumenCuenta(todos.map((w) => w.id), (id) => p.agents[id]?.state, p.permisos)
-          const accLabel = [acc.label, loggedOut ? 'sin sesión: iniciá sesión' : plan ? `plan ${plan}` : '', sum.texto].filter(Boolean).join(', ')
+          const cupo = loggedOut ? undefined : p.cupos[acc.id]
+          const accLabel = [acc.label, loggedOut ? 'sin sesión: iniciá sesión' : plan ? `plan ${plan}` : '', cupo ? textoCupo(cupo, p.ahora, fmtTok).etiqueta : '', sum.texto].filter(Boolean).join(', ')
           return (
             <section key={acc.id} className="sl-acc" data-account-id={acc.id} aria-label={`Cuenta ${acc.label}`} style={{ '--acc': p.colorOf(acc.id) } as CSSProperties}>
               <div className="sl-acc-head">
@@ -171,6 +179,7 @@ export function Sidebar(p: SidebarProps): React.JSX.Element {
                   <span className={`sl-acc-id${loggedOut ? ' is-off' : ''}`}>
                     <span className="sl-acc-name">{acc.label}</span>
                     {loggedOut ? <span className="sl-acc-warn">Sin sesión</span> : plan && <span className={`sl-acc-plan${plan.trim().toLowerCase() === 'team' ? ' is-team' : ''}`}>{plan}</span>}
+                    {cupo && <CupoMedidor cupo={cupo} ahora={p.ahora} className="sl-acc-cupo" />}
                   </span>
                   {sum.texto && (
                     <span className="sl-acc-sum" aria-hidden="true">

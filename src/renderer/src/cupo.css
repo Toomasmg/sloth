@@ -1,0 +1,54 @@
+/* Medidor del cupo estimado: barra fina y texto. El color sale del nivel y nunca va solo (siempre hay texto). */
+.cupo {
+  --cupo-color: var(--text-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: var(--fs-11);
+  line-height: 14px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.cupo.is-ok {
+  --cupo-color: var(--success-fg);
+}
+.cupo.is-atencion {
+  --cupo-color: var(--waiting);
+}
+.cupo.is-alto,
+.cupo.is-lleno {
+  --cupo-color: var(--danger);
+}
+.cupo-bar {
+  display: block;
+  height: 3px;
+  border-radius: var(--r-full);
+  background: var(--divider-strong);
+  overflow: hidden;
+}
+.cupo-fill {
+  display: block;
+  width: var(--cupo-pct);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--cupo-color);
+  transition: width var(--t-fast) var(--ease);
+}
+.cupo-txt {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cupo.is-alto .cupo-txt,
+.cupo.is-lleno .cupo-txt {
+  color: var(--danger-fg);
+  font-weight: 600;
+}
+.cupo-txt > svg {
+  flex: none;
+}

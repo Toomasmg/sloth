@@ -129,6 +129,21 @@ test('applyPatch: planes recortados, vacío o null los quita, largo y control re
   assert.throws(() => applyPatch(D, { accountPlans: { a1: 3 } }))
 })
 
+test('applyPatch: tope de cupo entero, 0 o null lo quita, fuera de rango rechazado', () => {
+  const con = applyPatch(D, { accountCupos: { a1: 2_500_000 } })
+  assert.equal(con.accountCupos.a1, 2_500_000)
+  assert.deepEqual(applyPatch(con, { accountCupos: { a1: null } }).accountCupos, {})
+  assert.deepEqual(applyPatch(con, { accountCupos: { a1: 0 } }).accountCupos, {})
+  for (const malo of [-1, 1.5, 2e9, '5', Number.NaN]) assert.throws(() => applyPatch(D, { accountCupos: { a1: malo } }), String(malo))
+  assert.throws(() => applyPatch(D, { accountCupos: { 'a b': 5 } }))
+  assert.throws(() => applyPatch(D, { accountCupos: { a1: 5 } }, { accountExists: () => false }))
+})
+
+test('normalize: un archivo viejo sin accountCupos queda con el mapa vacío, y uno con topes inválidos los descarta', () => {
+  assert.deepEqual(normalize({ theme: 'claro' }).accountCupos, {})
+  assert.deepEqual(normalize({ accountCupos: { a: 100, b: 'x', c: -3 } }).accountCupos, { a: 100 })
+})
+
 test('applyPatch: demasiados colores falla', () => {
   const c: Record<string, string> = {}
   for (let i = 0; i <= MAX_ACCOUNT_COLORS; i++) c[`c${i}`] = ACCOUNT_PALETTE[0].hex

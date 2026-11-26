@@ -248,6 +248,12 @@ html[data-theme='light'] .sl-acc {
   border-radius: var(--r-full);
   background: var(--waiting);
 }
+/* El cupo baja siempre a su propia línea: ocupa todo el ancho del bloque de nombre y plan. */
+.sl-acc-cupo {
+  flex: 1 1 100%;
+  line-height: 14px;
+  margin-bottom: 2px;
+}
 .sl-acc-name {
   flex: 0 1 auto;
   min-width: 0;

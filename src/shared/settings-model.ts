@@ -3,6 +3,8 @@
  * Sin imports de Electron ni de Node: lo usan main (settings.ts), la interfaz y las pruebas.
  */
 
+import { TOPE_MAX } from './cupo'
+
 export type ThemeChoice = 'oscuro' | 'noche' | 'claro' | 'sistema'
 export type Density = 'compacta' | 'cómoda'
 export type TermFont = 'JetBrains Mono' | 'Cascadia Code' | 'Consolas'
@@ -74,6 +76,8 @@ export interface SlothSettings {
   accountColors: Record<string, string>
   /** accountId → plan escrito a mano («Pro», «Max»…). Es una etiqueta: Sloth nunca la lee de credenciales. */
   accountPlans: Record<string, string>
+  /** accountId → tope propio de la ventana de 5 h, en tokens (ver cupo.ts). Sin entrada: el del plan. */
+  accountCupos: Record<string, number>
   openAtLogin: boolean
   confirmClosePanes: boolean
   /** Reabrir los espacios que estaban abiertos al iniciar (lo aplica la app al arrancar). */
@@ -177,6 +181,7 @@ export const DEFAULT_SETTINGS: SlothSettings = {
   },
   accountColors: {},
   accountPlans: {},
+  accountCupos: {},
   openAtLogin: false,
   confirmClosePanes: true,
   reopenSpaces: true,
@@ -204,6 +209,7 @@ export const cloneSettings = (s: SlothSettings): SlothSettings => ({
   terminal: { ...s.terminal },
   accountColors: { ...s.accountColors },
   accountPlans: { ...s.accountPlans },
+  accountCupos: { ...s.accountCupos },
   notify: { ...s.notify },
   shortcuts: { ...s.shortcuts },
   rendimiento: { ...s.rendimiento, enchufada: { ...s.rendimiento.enchufada }, bateria: { ...s.rendimiento.bateria } }
@@ -328,7 +334,7 @@ export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOp
   checkKeys(
     patch,
     [
-      'theme', 'density', 'uiFontSize', 'accent', 'terminal', 'accountColors', 'accountPlans', 'openAtLogin', 'confirmClosePanes',
+      'theme', 'density', 'uiFontSize', 'accent', 'terminal', 'accountColors', 'accountPlans', 'accountCupos', 'openAtLogin', 'confirmClosePanes',
       'reopenSpaces', 'keepTerminalsAlive', 'confirmQuit', 'sleepAfterMin', 'editor', 'projectsDir', 'sounds', 'soundName', 'noMolestar', 'notify', 'updateChannel', 'lightMode', 'shortcuts', 'rendimiento'
     ],
     ''
@@ -414,6 +420,20 @@ export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOp
     }
     if (Object.keys(next.accountPlans).length > MAX_ACCOUNT_COLORS) throw new Error('Demasiados planes de cuenta.')
   }
+  if ('accountCupos' in patch) {
+    const cu = patch.accountCupos
+    if (!isObj(cu)) throw new Error('accountCupos tiene que ser un objeto.')
+    for (const [id, tope] of Object.entries(cu)) {
+      if (!ACCOUNT_ID.test(id)) throw new Error('Id de cuenta inválido.')
+      if (tope === null || tope === 0) {
+        delete next.accountCupos[id]
+        continue
+      }
+      if (opts.accountExists && !opts.accountExists(id)) throw new Error('Esa cuenta no existe.')
+      next.accountCupos[id] = intIn(tope, 1, TOPE_MAX, 'El tope de la ventana de 5 h')
+    }
+    if (Object.keys(next.accountCupos).length > MAX_ACCOUNT_COLORS) throw new Error('Demasiados topes de cuenta.')
+  }
   if ('shortcuts' in patch) {
     const s = patch.shortcuts
     if (!isObj(s)) throw new Error('shortcuts tiene que ser un objeto.')
@@ -462,6 +482,8 @@ export function normalize(raw: unknown): SlothSettings {
     for (const [id, v] of Object.entries(src.accountColors).slice(0, MAX_ACCOUNT_COLORS)) tryPatch({ accountColors: { [id]: v } })
   if (isObj(src.accountPlans))
     for (const [id, v] of Object.entries(src.accountPlans).slice(0, MAX_ACCOUNT_COLORS)) tryPatch({ accountPlans: { [id]: v } })
+  if (isObj(src.accountCupos))
+    for (const [id, v] of Object.entries(src.accountCupos).slice(0, MAX_ACCOUNT_COLORS)) tryPatch({ accountCupos: { [id]: v } })
   if (isObj(src.shortcuts))
     for (const [id, v] of Object.entries(src.shortcuts).slice(0, MAX_SHORTCUTS)) tryPatch({ shortcuts: { [id]: v } })
   return out
@@ -485,6 +507,7 @@ export function resetSection(current: SlothSettings, section: unknown): SlothSet
     case 'cuentas':
       next.accountColors = {}
       next.accountPlans = {}
+      next.accountCupos = {}
       break
     case 'general':
       next.reopenSpaces = d.reopenSpaces

@@ -103,10 +103,11 @@ export async function initSettings(): Promise<void> {
 }
 
 /** Cambio parcial. Los mapas (terminal, notify) se fusionan; accountColors y shortcuts: null quita. */
-export type SettingsPatch = Partial<Omit<SlothSettings, 'terminal' | 'accountColors' | 'accountPlans' | 'notify' | 'shortcuts'>> & {
+export type SettingsPatch = Partial<Omit<SlothSettings, 'terminal' | 'accountColors' | 'accountPlans' | 'accountCupos' | 'notify' | 'shortcuts'>> & {
   terminal?: Partial<TerminalSettings>
   notify?: Partial<NotifySettings>
   accountPlans?: Record<string, string | null>
+  accountCupos?: Record<string, number | null>
   accountColors?: Record<string, string | null>
   shortcuts?: Partial<Record<ShortcutId, string | null>>
 }
@@ -115,7 +116,7 @@ export type SettingsPatch = Partial<Omit<SlothSettings, 'terminal' | 'accountCol
 export async function updateSettings(patch: SettingsPatch): Promise<void> {
   const prev = state
   const s = cloneSettings(prev.settings)
-  const { terminal, accountColors, accountPlans, notify, shortcuts, ...rest } = patch
+  const { terminal, accountColors, accountPlans, accountCupos, notify, shortcuts, ...rest } = patch
   Object.assign(s, rest)
   if (terminal) Object.assign(s.terminal, terminal)
   if (notify) Object.assign(s.notify, notify)
@@ -128,6 +129,11 @@ export async function updateSettings(patch: SettingsPatch): Promise<void> {
     for (const [id, c] of Object.entries(accountPlans)) {
       if (c === null) delete s.accountPlans[id]
       else s.accountPlans[id] = c
+    }
+  if (accountCupos)
+    for (const [id, c] of Object.entries(accountCupos)) {
+      if (c === null || c === 0) delete s.accountCupos[id]
+      else s.accountCupos[id] = c
     }
   if (shortcuts)
     for (const [id, c] of Object.entries(shortcuts)) {
