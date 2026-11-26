@@ -35,19 +35,23 @@ export const PAGINA_HTML = `<!doctype html>
     <span>Para verlo sin la barra del navegador: tocá Compartir y «Agregar a inicio», y abrilo desde ese ícono.</span>
     <button type="button" id="pista-ok">Entendido</button>
   </div>
+  <section class="atencion" id="atencion" aria-label="Lo que te espera">
+    <div class="pedido" id="pedido" hidden></div>
+    <ul class="esperan" id="esperan"></ul>
+    <div class="calma" id="calma"><span class="calma-t">Nada te espera</span><span class="calma-s" id="calma-s">Ningún permiso ni pregunta pendiente.</span></div>
+  </section>
   <div class="relojes">
     <section class="reloj" id="g5" aria-label="Límite de 5 horas"></section>
     <section class="reloj" id="g7" aria-label="Límite semanal"></section>
+    <section class="limites" id="limites" aria-label="Límites"></section>
   </div>
   <section class="centro">
-    <div class="contadores">
-      <div class="contador c-espera"><span class="num" id="n-espera">0</span><span class="etq">Te necesita</span></div>
-      <div class="contador c-listo"><span class="num" id="n-listo">0</span><span class="etq">Terminaron</span></div>
-      <div class="contador c-trabaja"><span class="num" id="n-trabaja">0</span><span class="etq">Trabajando</span></div>
+    <div class="contadores" role="group" aria-label="Filtrar las sesiones por estado">
+      <button type="button" class="contador c-espera" id="f-waiting" aria-pressed="false"><span class="num" id="n-espera">0</span><span class="etq">Te necesita</span></button>
+      <button type="button" class="contador c-listo" id="f-done" aria-pressed="false"><span class="num" id="n-listo">0</span><span class="etq">Terminaron</span></button>
+      <button type="button" class="contador c-trabaja" id="f-working" aria-pressed="false"><span class="num" id="n-trabaja">0</span><span class="etq">Trabajando</span></button>
     </div>
-    <div class="pedido" id="pedido" hidden></div>
-    <div class="calma" id="calma"><span class="calma-t">Nada te espera</span><span class="calma-s" id="calma-s">Ningún permiso pendiente.</span></div>
-    <h2 class="titulo-lista">Sesiones <span id="resumen"></span></h2>
+    <h2 class="titulo-lista"><span id="titulo-lista">Sesiones</span> <span class="resumen" id="resumen"></span></h2>
     <p class="term-nota" id="term-nota" hidden>La terminal de cada sesión no se abre desde «Desde cualquier red». Escaneá el QR del Wi-Fi de casa (en Sloth, panel Celular, el de arriba) con el celu conectado a ese Wi-Fi.</p>
     <ul class="lista" id="lista"></ul>
     <p class="hoy" id="hoy">Hoy: sin datos</p>
@@ -101,7 +105,7 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
   display: grid; gap: 14px;
   padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "top" "pista" "relojes" "centro";
+  grid-template-areas: "top" "pista" "atencion" "relojes" "centro";
   align-content: start;
 }
 .top { grid-area: top; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -114,15 +118,37 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .conexion.ok .punto { background: var(--listo); }
 .conexion.mal { color: var(--espera); border-color: rgba(255,176,103,0.45); }
 .conexion.mal .punto { background: var(--rojo); }
-.relojes { grid-area: relojes; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.reloj { display: flex; flex-direction: column; align-items: center; gap: 2px; background: var(--panel); border: 1px solid var(--borde); border-radius: 20px; padding: 10px 6px 12px; min-width: 0; }
+.relojes { grid-area: relojes; min-width: 0; }
+.reloj { display: none; flex-direction: column; align-items: center; gap: 2px; background: var(--panel); border: 1px solid var(--borde); border-radius: 20px; padding: 10px 6px 12px; min-width: 0; }
 .reloj svg { width: 100%; max-width: 170px; height: auto; display: block; }
 .reloj .pie { font-size: 12px; color: var(--suave); text-align: center; min-height: 1.4em; }
 .aguja { transform-origin: 100px 100px; transition: transform 600ms cubic-bezier(.3,1.4,.5,1); }
 .valor { transition: stroke-dasharray 600ms ease; }
+.limites { display: flex; flex-direction: column; gap: 8px; background: var(--panel); border: 1px solid var(--borde); border-radius: 16px; padding: 10px 12px; }
+.lim { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 14px; align-items: center; }
+.lim.con-cuenta { grid-template-columns: minmax(0, 0.8fr) repeat(2, minmax(0, 1fr)); }
+.lim-cuenta { font-size: 13px; font-weight: 600; color: var(--fuerte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lim-v { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; align-items: center; min-width: 0; }
+.lim-n { font-size: 12px; color: var(--suave); }
+.lim-pct { font: 600 13px var(--mono); color: var(--fuerte); min-width: 4ch; text-align: right; }
+.barra { height: 6px; border-radius: 3px; background: var(--pista); overflow: hidden; }
+.barra i { display: block; height: 100%; border-radius: 3px; }
+.lim-pie { grid-column: 1 / -1; font-size: 12px; color: var(--suave); }
+.atencion { grid-area: atencion; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.esperan { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.esperan:empty { display: none; }
+.esperan li { border-radius: 16px; padding: 12px 14px; background: var(--panel); border: 1px solid rgba(255,176,103,0.3); display: flex; flex-direction: column; gap: 6px; }
+.e-cab { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.e-nombre { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; color: var(--fuerte); overflow-wrap: anywhere; }
+.e-hace { flex: none; font: 500 11px var(--mono); color: var(--suave); }
+.e-cuenta { font-size: 12px; color: var(--suave); }
+.e-msj { font-size: 14px; color: var(--texto); overflow-wrap: anywhere; white-space: pre-line; }
+.e-nota { font-size: 12px; color: var(--suave); }
+.esperan .s-term { align-self: flex-start; }
 .centro { grid-area: centro; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .contadores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.contador { border-radius: 14px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid; }
+.contador { border-radius: 14px; padding: 10px 8px; min-height: 44px; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid; }
+.contador[aria-pressed="true"] { box-shadow: inset 0 0 0 2px currentColor; }
 .contador .num { font: 700 30px/1.1 var(--mono); }
 .contador .etq { font-size: 11px; font-weight: 600; }
 .c-espera { background: rgba(255,159,67,0.14); border-color: rgba(255,176,103,0.4); color: var(--espera); }
@@ -144,7 +170,7 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .calma-t { font-size: 15px; font-weight: 600; color: var(--listo); }
 .calma-s { font-size: 12px; color: var(--suave); }
 .titulo-lista { margin: 4px 0 0; font-size: 16px; font-weight: 700; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.titulo-lista span { font-size: 12px; font-weight: 400; color: var(--suave); }
+.titulo-lista .resumen { font-size: 12px; font-weight: 400; color: var(--suave); }
 .lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .lista li { background: var(--panel); border: 1px solid var(--borde); border-radius: 16px; padding: 11px 14px; display: flex; align-items: center; gap: 12px; min-width: 0; }
 .lista .punto { width: 10px; height: 10px; border-radius: 50%; flex: none; }
@@ -161,15 +187,21 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
   .app {
     height: 100%; gap: 16px;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.55fr) minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1fr);
-    grid-template-areas: "g5 top g7" "g5 pista g7" "g5 centro g7";
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-areas: "g5 top g7" "g5 pista g7" "g5 atencion g7" "g5 centro g7";
     align-content: stretch; align-items: center;
     background: radial-gradient(ellipse at 50% 120%, #15181D 0%, var(--fondo) 70%);
   }
   .relojes { display: contents; }
   #g5 { grid-area: g5; }
   #g7 { grid-area: g7; }
-  .reloj { background: none; border: 0; padding: 0; }
+  .reloj { display: flex; background: none; border: 0; padding: 0; }
+  .limites { display: none; }
+  .atencion { align-self: stretch; }
+  .pedido:not([hidden]) ~ .esperan, .esperan li:nth-child(n+2) { display: none; }
+  .esperan li { padding: 10px 12px; gap: 4px; }
+  .e-cuenta { display: none; }
+  .e-msj { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
   .reloj svg { max-width: 260px; }
   .app { gap: 8px 16px; padding-top: max(10px, env(safe-area-inset-top)); padding-bottom: max(10px, env(safe-area-inset-bottom)); }
   .marca { display: none; }
@@ -344,7 +376,8 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       g.appendChild(svg('line', { x1: mayor ? 150 : 156, y1: 100, x2: 163, y2: 100, stroke: mayor ? '#5A606A' : '#3A3F47', 'stroke-width': mayor ? 2.5 : 2, transform: 'rotate(' + (150 + i * 24) + ' 100 100)' }));
     }
     s.appendChild(g);
-    var tag = svg('text', { x: 100, y: 72, 'text-anchor': 'middle', fill: '#9AA0A6', 'font-size': 12, 'font-weight': 600, 'letter-spacing': 2, 'font-family': 'Inter, sans-serif' });
+    // Abajo del porcentaje: la aguja barre de 150° a 390° y nunca baja de y=130, así no tacha el rótulo.
+    var tag = svg('text', { x: 100, y: 172, 'text-anchor': 'middle', fill: '#9AA0A6', 'font-size': 11, 'font-weight': 600, 'letter-spacing': 2, 'font-family': 'Inter, sans-serif' });
     tag.textContent = etiqueta;
     s.appendChild(tag);
     var aguja = svg('line', { x1: 100, y1: 100, x2: 158, y2: 100, stroke: '#F1F3F4', 'stroke-width': 4, 'stroke-linecap': 'round', 'class': 'aguja' });
@@ -360,19 +393,21 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   }
   var relojes = { g5: armarReloj($('g5'), '5 HORAS'), g7: armarReloj($('g7'), 'SEMANA') };
 
-  function pintarReloj(r, v, nombreLargo) {
+  var colorDe = function (f) { return f >= 0.85 ? '#FF6B5B' : f >= 0.6 ? '#FFB547' : '#7CC4FF'; };
+  function pintarReloj(r, v, nombreLargo, quien) {
+    var antes = quien ? quien + ' · ' : '';
     if (!v) {
       r.valor.setAttribute('stroke-dasharray', '0 ' + CIRC);
       r.valor.setAttribute('opacity', '0');
       r.aguja.style.transform = 'rotate(150deg)';
       r.aguja.setAttribute('opacity', '0.35');
       r.pct.textContent = '—';
-      r.pie.textContent = 'Sin datos todavía';
+      r.pie.textContent = antes + 'Sin datos todavía';
       r.s.setAttribute('aria-label', nombreLargo + ': sin datos todavía. Aparece cuando Claude responda en esta cuenta.');
       return;
     }
     var f = Math.max(0, Math.min(1, v.pct / 100));
-    var color = f >= 0.85 ? '#FF6B5B' : f >= 0.6 ? '#FFB547' : '#7CC4FF';
+    var color = colorDe(f);
     r.valor.setAttribute('stroke', color);
     r.valor.setAttribute('opacity', '1');
     r.valor.setAttribute('stroke-dasharray', (ARCO * f).toFixed(1) + ' ' + CIRC);
@@ -380,29 +415,103 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     r.aguja.setAttribute('opacity', '1');
     r.pct.textContent = Math.round(v.pct) + '%';
     var texto = reinicio(v.reiniciaEn);
-    r.pie.textContent = texto;
+    r.pie.textContent = antes + texto;
     r.s.setAttribute('aria-label', nombreLargo + ': ' + Math.round(v.pct) + ' % usado. ' + texto);
   }
 
+  var TODAS = 'todas';
+  var FILTROS = { waiting: 'Te necesita', done: 'Terminaron', working: 'Trabajando' };
+  var filtroEstado = null;
+  var nombreCuenta = function (e, id) { var c = e.cuentas.filter(function (x) { return x.id === id; })[0]; return c ? c.nombre : ''; };
+  var cuentasEnVista = function (e) { return cuentaElegida === TODAS ? e.cuentas : e.cuentas.filter(function (c) { return c.id === cuentaElegida; }); };
+  var deLaCuenta = function (e) { return cuentaElegida === TODAS ? e.sesiones : e.sesiones.filter(function (s) { return s.cuentaId === cuentaElegida; }); };
+  var pctDe = function (v) { return v ? v.pct : -1; };
+
   function pintarCuentas(e) {
     var cont = $('cuentas');
-    if (!e.cuentas.some(function (c) { return c.id === cuentaElegida; })) {
-      var conDatos = e.cuentas.filter(function (c) { return c.cincoHoras || c.semana; })[0];
-      cuentaElegida = (conDatos || e.cuentas[0] || { id: null }).id;
-    }
+    var varias = e.cuentas.length > 1;
+    var existe = e.cuentas.some(function (c) { return c.id === cuentaElegida; });
+    if (cuentaElegida === TODAS ? !varias : !existe) cuentaElegida = varias ? TODAS : (e.cuentas[0] || { id: null }).id;
     cont.textContent = '';
-    cont.hidden = e.cuentas.length < 2;
-    e.cuentas.forEach(function (c) {
+    cont.hidden = !varias;
+    [{ id: TODAS, nombre: 'Todas' }].concat(e.cuentas).forEach(function (c) {
       var b = el('button', '', c.nombre);
       b.type = 'button';
       b.setAttribute('aria-pressed', c.id === cuentaElegida ? 'true' : 'false');
       b.addEventListener('click', function () { cuentaElegida = c.id; guardar('sloth-cuenta', c.id); pintar(); });
       cont.appendChild(b);
     });
-    var actual = e.cuentas.filter(function (c) { return c.id === cuentaElegida; })[0];
-    pintarReloj(relojes.g5, actual && actual.cincoHoras, 'Límite de 5 horas');
-    pintarReloj(relojes.g7, actual && actual.semana, 'Límite semanal');
-    $('hoy').textContent = actual && actual.hoy ? 'Hoy: ' + tokens(actual.hoy.tokens) + ' tokens · ' + actual.hoy.mensajes + ' mensajes' : 'Hoy: sin datos';
+    var enVista = cuentasEnVista(e);
+    // Acostado entran dos relojes: con «Todas», los de la cuenta más cerca del límite de 5 h.
+    var actual = enVista.slice().sort(function (a, b) { return pctDe(b.cincoHoras) - pctDe(a.cincoHoras); })[0];
+    var quien = cuentaElegida === TODAS && actual ? actual.nombre : '';
+    pintarReloj(relojes.g5, actual && actual.cincoHoras, 'Límite de 5 horas' + (quien ? ' de ' + quien : ''), quien);
+    pintarReloj(relojes.g7, actual && actual.semana, 'Límite semanal' + (quien ? ' de ' + quien : ''), quien);
+    var hoy = enVista.filter(function (c) { return c.hoy; });
+    var tk = 0, msj = 0;
+    hoy.forEach(function (c) { tk += c.hoy.tokens; msj += c.hoy.mensajes; });
+    $('hoy').textContent = hoy.length ? 'Hoy: ' + tokens(tk) + ' tokens · ' + msj + (msj === 1 ? ' mensaje' : ' mensajes') : 'Hoy: sin datos';
+  }
+
+  function ventanaCompacta(nombre, v) {
+    var cel = el('div', 'lim-v');
+    cel.appendChild(el('span', 'lim-n', nombre));
+    var barra = el('span', 'barra');
+    var relleno = el('i');
+    if (v) {
+      var f = Math.max(0, Math.min(1, v.pct / 100));
+      relleno.style.width = (f * 100).toFixed(1) + '%';
+      relleno.style.background = colorDe(f);
+    }
+    barra.appendChild(relleno);
+    cel.appendChild(barra);
+    cel.appendChild(el('span', 'lim-pct', v ? Math.round(v.pct) + ' %' : '—'));
+    return cel;
+  }
+
+  // Parado, los límites van en una franja (una fila por cuenta) para que lo urgente quede arriba sin bajar.
+  function pintarLimites(e) {
+    var cont = $('limites');
+    cont.textContent = '';
+    var lista = cuentasEnVista(e);
+    cont.hidden = !lista.length;
+    var varias = lista.length > 1;
+    var cuando = function (nombre, v) {
+      if (!v) return nombre + ' sin datos';
+      var r = reinicio(v.reiniciaEn);
+      return nombre + ' ' + r.charAt(0).toLowerCase() + r.slice(1);
+    };
+    var pct = function (v) { return v ? Math.round(v.pct) + ' % usado' : 'sin datos'; };
+    lista.forEach(function (c) {
+      var fila = el('div', varias ? 'lim con-cuenta' : 'lim');
+      if (varias) fila.appendChild(el('span', 'lim-cuenta', c.nombre));
+      fila.appendChild(ventanaCompacta('5 h', c.cincoHoras));
+      fila.appendChild(ventanaCompacta('Semana', c.semana));
+      var pie = !c.cincoHoras && !c.semana ? 'Sin datos todavía: aparecen cuando Claude responda en esta cuenta.' : cuando('5 h', c.cincoHoras) + ' · ' + cuando('Semana', c.semana);
+      if (!varias) fila.appendChild(el('span', 'lim-pie', pie));
+      fila.setAttribute('role', 'img');
+      fila.setAttribute('aria-label', c.nombre + '. Límite de 5 horas: ' + pct(c.cincoHoras) + '. Semanal: ' + pct(c.semana) + '. ' + pie);
+      cont.appendChild(fila);
+    });
+  }
+
+  function botonTerminal(e, s) {
+    var enWifi = e.terminal && !window.slothFetch;
+    var soloWifi = !!window.slothFetch && !!e.terminalEnWifi;
+    if (!(enWifi || soloWifi) || s.estado === 'exited') return null;
+    var bt = el('button', 's-term');
+    bt.appendChild(el('span', 's-term-ico', '>_'));
+    bt.appendChild(el('span', '', 'Terminal'));
+    bt.type = 'button';
+    if (soloWifi) {
+      bt.disabled = true;
+      bt.setAttribute('aria-label', 'Terminal de ' + s.nombre + ': escaneá el QR del Wi-Fi de casa para abrirla');
+      bt.setAttribute('aria-describedby', 'term-nota');
+    } else {
+      bt.setAttribute('aria-label', 'Abrir la terminal de ' + s.nombre);
+      bt.addEventListener('click', function () { abrirTerminal(s.id, s.nombre); });
+    }
+    return bt;
   }
 
   function textoError(error) {
@@ -428,16 +537,13 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   function pintarPedido(e) {
     var p = e.pedidos[0];
     var caja = $('pedido');
-    $('calma').hidden = !!p;
     caja.hidden = !p;
-    if (!p) {
-      var ultimaListo = e.sesiones.filter(function (s) { return s.estado === 'done'; })[0];
-      $('calma-s').textContent = ultimaListo ? ultimaListo.nombre + ' terminó hace ' + hace(ahoraPc() - ultimaListo.desde) : 'Ningún permiso pendiente.';
-      return;
-    }
+    if (!p) return;
     caja.textContent = '';
     var cab = el('div');
-    cab.appendChild(el('div', 'p-nombre', p.sesion + (e.pedidos.length > 1 ? '  ·  1 de ' + e.pedidos.length : '')));
+    var ses = e.sesiones.filter(function (s) { return s.id === p.sesionId; })[0];
+    var cuenta = e.cuentas.length > 1 && ses ? '  ·  ' + nombreCuenta(e, ses.cuentaId) : '';
+    cab.appendChild(el('div', 'p-nombre', p.sesion + cuenta + (e.pedidos.length > 1 ? '  ·  1 de ' + e.pedidos.length : '')));
     cab.appendChild(el('div', 'p-texto', 'Pide permiso: ' + p.texto + ' · hace ' + hace(ahoraPc() - p.desde)));
     caja.appendChild(cab);
     if (e.aprobar) {
@@ -457,15 +563,44 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     if (errorPedido) caja.appendChild(el('div', 'p-error', errorPedido));
   }
 
+  // «Te necesita» sin pedido de permiso: Claude preguntó algo o espera que sigas. Va arriba, con el mensaje entero.
+  function pintarEsperan(e) {
+    var cont = $('esperan');
+    cont.textContent = '';
+    var conPedido = {};
+    e.pedidos.forEach(function (p) { conPedido[p.sesionId] = true; });
+    var esperan = e.sesiones.filter(function (s) { return s.estado === 'waiting' && !conPedido[s.id]; });
+    esperan.forEach(function (s) {
+      var li = el('li');
+      var cab = el('div', 'e-cab');
+      cab.appendChild(el('span', 'e-nombre', s.nombre));
+      cab.appendChild(el('span', 'e-hace', hace(ahoraPc() - s.desde)));
+      li.appendChild(cab);
+      if (e.cuentas.length > 1) li.appendChild(el('span', 'e-cuenta', nombreCuenta(e, s.cuentaId)));
+      li.appendChild(el('span', 'e-msj', s.detalle || 'Claude espera tu respuesta.'));
+      li.appendChild(botonTerminal(e, s) || el('span', 'e-nota', 'Respondé en la PC.'));
+      cont.appendChild(li);
+    });
+    var hay = e.pedidos.length > 0 || esperan.length > 0;
+    $('calma').hidden = hay;
+    if (!hay) {
+      var ultimaListo = e.sesiones.filter(function (s) { return s.estado === 'done'; })[0];
+      $('calma-s').textContent = ultimaListo ? ultimaListo.nombre + ' terminó hace ' + hace(ahoraPc() - ultimaListo.desde) : 'Ningún permiso ni pregunta pendiente.';
+    }
+  }
+
   function pintarLista(e) {
     var lista = $('lista');
     lista.textContent = '';
+    // La de la tarjeta de arriba (el pedido o, si no hay, la primera que espera) va al final: acostado se oculta.
     var conPedido = e.pedidos[0] ? e.pedidos[0].sesionId : null;
-    var nombres = {};
-    e.cuentas.forEach(function (c) { nombres[c.id] = c.nombre; });
+    if (!conPedido) conPedido = (e.sesiones.filter(function (s) { return s.estado === 'waiting'; })[0] || { id: null }).id;
+    var base = deLaCuenta(e);
+    var visibles = filtroEstado ? base.filter(function (s) { return s.estado === filtroEstado; }) : base;
+    var conCuenta = e.cuentas.length > 1 && cuentaElegida === TODAS;
     if (!e.sesiones.length) lista.appendChild(el('li', 'vacio', 'No hay espacios abiertos en la PC.'));
-    // La del pedido va al final: acostado se oculta y no le quita lugar a las otras tres.
-    var orden = e.sesiones.filter(function (s) { return s.id !== conPedido; }).concat(e.sesiones.filter(function (s) { return s.id === conPedido; }));
+    else if (!visibles.length) lista.appendChild(el('li', 'vacio', filtroEstado ? 'Ninguna sesión en «' + FILTROS[filtroEstado] + '»' + (cuentaElegida === TODAS ? '' : ' en esta cuenta') + '.' : 'Esta cuenta no tiene espacios abiertos.'));
+    var orden = visibles.filter(function (s) { return s.id !== conPedido; }).concat(visibles.filter(function (s) { return s.id === conPedido; }));
     orden.forEach(function (s) {
       var st = ESTADOS[s.estado] || ESTADOS.idle;
       var li = el('li', s.id === conPedido ? 'del-pedido' : '');
@@ -473,8 +608,10 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       punto.style.background = st.c;
       var texto = el('div', 's-texto');
       texto.appendChild(el('span', 's-nombre', s.nombre));
-      var cuenta = nombres[s.cuentaId] || '';
-      texto.appendChild(el('span', 's-detalle', cuenta + (s.detalle ? ' · ' + s.detalle : '')));
+      var partes = [];
+      if (conCuenta) partes.push(nombreCuenta(e, s.cuentaId));
+      if (s.detalle) partes.push(s.detalle);
+      if (partes.length) texto.appendChild(el('span', 's-detalle', partes.join(' · ')));
       var lado = el('div', 's-lado');
       var chip = el('span', 's-estado', st.t);
       chip.style.color = st.c;
@@ -484,33 +621,23 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       li.appendChild(punto);
       li.appendChild(texto);
       li.appendChild(lado);
-      var enWifi = e.terminal && !window.slothFetch;
-      var soloWifi = !!window.slothFetch && !!e.terminalEnWifi;
-      if ((enWifi || soloWifi) && s.estado !== 'exited') {
-        var bt = el('button', 's-term');
-        bt.appendChild(el('span', 's-term-ico', '>_'));
-        bt.appendChild(el('span', '', 'Terminal'));
-        bt.type = 'button';
-        if (soloWifi) {
-          bt.disabled = true;
-          bt.setAttribute('aria-label', 'Terminal de ' + s.nombre + ': escaneá el QR del Wi-Fi de casa para abrirla');
-          bt.setAttribute('aria-describedby', 'term-nota');
-        } else {
-          bt.setAttribute('aria-label', 'Abrir la terminal de ' + s.nombre);
-          bt.addEventListener('click', function () { abrirTerminal(s.id, s.nombre); });
-        }
-        li.appendChild(bt);
-      }
+      var bt = botonTerminal(e, s);
+      if (bt) li.appendChild(bt);
       lista.appendChild(li);
     });
-    var n = function (k) { return e.sesiones.filter(function (s) { return s.estado === k; }).length; };
+    var n = function (k) { return base.filter(function (s) { return s.estado === k; }).length; };
     $('n-espera').textContent = n('waiting');
-    $('n-espera').parentNode.classList.toggle('hay', n('waiting') > 0);
+    $('f-waiting').classList.toggle('hay', n('waiting') > 0);
     $('n-listo').textContent = n('done');
     $('n-trabaja').textContent = n('working');
+    for (var k in FILTROS) $('f-' + k).setAttribute('aria-pressed', filtroEstado === k ? 'true' : 'false');
     $('term-nota').hidden = !(window.slothFetch && e.terminalEnWifi);
-    $('resumen').textContent = e.sesiones.length ? e.sesiones.length + (e.sesiones.length === 1 ? ' abierta' : ' abiertas') : '';
+    var abiertas = e.sesiones.length + (e.sesiones.length === 1 ? ' abierta' : ' abiertas');
+    $('resumen').textContent = !e.sesiones.length ? '' : visibles.length === e.sesiones.length ? abiertas : visibles.length + ' de ' + abiertas;
   }
+  Object.keys(FILTROS).forEach(function (k) {
+    $('f-' + k).addEventListener('click', function () { filtroEstado = filtroEstado === k ? null : k; pintar(); });
+  });
 
   function pintarConexion() {
     var c = $('conexion');
@@ -528,7 +655,9 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     pintarConexion();
     if (!ultimo) return;
     pintarCuentas(ultimo);
+    pintarLimites(ultimo);
     pintarPedido(ultimo);
+    pintarEsperan(ultimo);
     pintarLista(ultimo);
   }
 
