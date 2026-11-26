@@ -4,7 +4,7 @@ import { cleanError } from '../../format'
 import { getSettings } from '../settings/store'
 import { CheckIcon, DoneIcon, IdleIcon, PermissionIcon } from '../../icons/SlothIcons'
 import { View } from '../../ui/View'
-import { Button, EmptyState } from '../../ui'
+import { Button, EmptyState, PageHead } from '../../ui'
 import { HistoryIcon } from '../../icons/SlothIcons'
 import { marks, wordsOf } from '../help/text'
 import { capacidadesDe, motivoSinCapacidad } from '../../../../shared/proveedores'
@@ -295,10 +295,7 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
       actions={<span className="hist-head-count">{rows ? plural(total, 'sesión guardada', 'sesiones guardadas') : ''}</span>}
     >
       <div className="hist-wrap">
-        <div className="hist-intro ui-intro">
-          <h1 id="hist-title">Historial de sesiones</h1>
-          <p>Cada vez que trabajaste con Claude en un espacio queda una sesión. Retomala cuando quieras.</p>
-        </div>
+        <PageHead titleId="hist-title" title="Historial de sesiones" description="Cada vez que trabajaste con Claude en un espacio queda una sesión. Retomala cuando quieras." />
 
         <div className="hist-cols">
           <aside className="hist-aside" aria-label="Filtros">
@@ -415,10 +412,7 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
                 say={say}
               />
             ) : (
-              <div className="hist-nosel">
-                  <span className="hist-empty-title">Elegí una sesión</span>
-                <span className="hint">Vas a ver la conversación y los archivos que tocó.</span>
-              </div>
+              <EmptyState size="sm" icon={<HistoryIcon size={20} />} title="Elegí una sesión" description="Vas a ver la conversación y los archivos que tocó." as="p" />
             )}
           </section>
         </div>

@@ -4,7 +4,7 @@ import { View } from '../../ui/View'
 import { cleanError } from '../../format'
 import { spaceStatus } from '../broadcast/state'
 import { CloseIcon, SearchIcon, SettingsIcon, TicketIcon } from '../../icons/SlothIcons'
-import { Button, EmptyState } from '../../ui'
+import { Button, EmptyState, PageHead } from '../../ui'
 import { openSettings } from '../settings/bus'
 import type { Workspace } from '../../../../shared/types'
 import { categoriaDe, SIN_CONECTOR, type FiltroVista } from '../../../../shared/tickets'
@@ -560,14 +560,11 @@ export function Board(): React.JSX.Element {
       }
     >
       <div className="f-tickets-main">
-        <div className="ui-intro">
-          <h1 id="f-tickets-title" className="f-tickets-h1">
-            {etiquetaTablero(snap)}
-          </h1>
-          <p className="f-tickets-lead">
-            {filtro ? 'Tus tickets y los de las personas que elijas. Empezá uno y Sloth arma el espacio para trabajarlo.' : 'Tus tickets y los del equipo. Empezá uno y Sloth arma el espacio para trabajarlo.'}
-          </p>
-        </div>
+        <PageHead
+          titleId="f-tickets-title"
+          title={etiquetaTablero(snap)}
+          description={filtro ? 'Tus tickets y los de las personas que elijas. Empezá uno y Sloth arma el espacio para trabajarlo.' : 'Tus tickets y los del equipo. Empezá uno y Sloth arma el espacio para trabajarlo.'}
+        />
 
         {confirming && (
           <div className="f-tickets-alert f-tickets-confirm" role="alertdialog" aria-label={`Confirmar consulta a ${n}`}>

@@ -146,17 +146,6 @@
   flex-direction: column;
   gap: 18px;
 }
-.f-tickets-h1 {
-  margin: 0;
-  font-size: var(--fs-24);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-.f-tickets-lead {
-  margin: 6px 0 0;
-  color: var(--text-2);
-  line-height: 1.5;
-}
 
 /* ---------- Avisos ---------- */
 .f-tickets-alert {

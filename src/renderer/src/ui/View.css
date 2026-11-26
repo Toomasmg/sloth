@@ -16,6 +16,8 @@
   /* Un solo ancho y margen para todas las páginas: angosto para lectura y formularios, ancho para listas y tableros. */
   --view-max: 1040px;
   --view-max-narrow: 760px;
+  /* Maestro-detalle (Historial): tres columnas piden más aire que una lista. */
+  --view-max-wide: 1400px;
   --view-pad-x: clamp(16px, 4vw, 40px);
   --view-pad-top: clamp(20px, 4vw, 36px);
 }
