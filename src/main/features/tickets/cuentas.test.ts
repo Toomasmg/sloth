@@ -257,7 +257,7 @@ test('mensajeCuenta dice qué hacer', () => {
   const propio = { ...GRUV, herramientas: { ...GRUV.herramientas, prefijo: 'mcp__gruv-tomy__' } }
   assert.equal(
     mensajeCuenta(propio, { tipo: 'falta' }, 'Personal', ['Cosmos', 'Otra']),
-    'La cuenta «Personal» no tiene el servidor MCP de Gruv. Agregalo en esa cuenta y tocá «Volver a revisar». Lo tiene: «Cosmos», «Otra».'
+    'La cuenta «Personal» no tiene el servidor MCP de Gruv. Agregalo en esa cuenta con alcance usuario (claude mcp add --scope user) y tocá «Volver a revisar»: uno de alcance local o de proyecto solo anda dentro de su carpeta y Sloth consulta desde otra. Lo tiene: «Cosmos», «Otra».'
   )
   const tiene = { tipo: 'tiene', adaptado: false, verificado: true } as const
   assert.equal(
@@ -266,9 +266,9 @@ test('mensajeCuenta dice qué hacer', () => {
   )
   assert.equal(
     mensajeCuenta(GRUV, { ...tiene, nombre: 'gruv-tomy', prefijo: 'mcp__gruv-tomy__', estado: 'needs-auth' }, 'Cosmos', []),
-    'Abrí una terminal con la cuenta «Cosmos», corré /mcp y autenticá «gruv-tomy».'
+    'El servidor «gruv-tomy» pide iniciar sesión. Abrí una terminal con la cuenta «Cosmos», corré /mcp, elegí «gruv-tomy», autenticalo y volvé a actualizar.'
   )
-  assert.match(mensajeCuenta(GRUV, { ...tiene, nombre: 'gruv-tomy', prefijo: 'mcp__gruv-tomy__', estado: 'failed' }, 'Cosmos', []) ?? '', /no arrancó/)
+  assert.match(mensajeCuenta(GRUV, { ...tiene, nombre: 'gruv-tomy', prefijo: 'mcp__gruv-tomy__', estado: 'failed' }, 'Cosmos', []) ?? '', /No se pudo conectar a «gruv-tomy».*no arrancó.*Probar/)
   assert.match(mensajeCuenta(GRUV, { ...tiene, nombre: 'gruv-tomy', prefijo: 'mcp__gruv-tomy__', estado: 'pending', verificado: false }, 'Cosmos', []) ?? '', /no respondió a tiempo.*\/mcp/)
   const conectado = mensajeCuenta(GRUV, { ...tiene, nombre: 'gruv-tomy', prefijo: 'mcp__gruv-tomy__', estado: 'connected', verificado: false }, 'Cosmos', []) ?? ''
   assert.match(conectado, /figura conectado.*todavía no se revisaron sus herramientas.*Volver a revisar/)

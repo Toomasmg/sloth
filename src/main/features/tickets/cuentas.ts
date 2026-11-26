@@ -285,7 +285,7 @@ export function mensajeCuenta(def: ConectorMcp, d: Disponibilidad, cuenta: strin
       ? `La cuenta «${cuenta}» tiene «${p.nombre}», pero le faltan herramientas que usa ${n}: ${p.faltan.join(', ')}. Copiá ${n} como conector propio y ajustá sus herramientas, o agregalas al servidor.`
       : esClaudeAi
       ? `Conectá ${n} en claude.ai con la cuenta «${cuenta}» (claude.ai → Configuración → Conectores) y tocá «Volver a revisar».`
-      : `La cuenta «${cuenta}» no tiene el servidor MCP de ${n}. Agregalo en esa cuenta y tocá «Volver a revisar».`
+      : `La cuenta «${cuenta}» no tiene el servidor MCP de ${n}. Agregalo en esa cuenta con alcance usuario (claude mcp add --scope user) y tocá «Volver a revisar»: uno de alcance local o de proyecto solo anda dentro de su carpeta y Sloth consulta desde otra.`
     return otras.length ? `${base} Lo tiene: ${otras.map((o) => `«${o}»`).join(', ')}.` : base
   }
   if (d.tipo === 'elegir' && d.opciones.length === 1)
@@ -295,8 +295,9 @@ export function mensajeCuenta(def: ConectorMcp, d: Disponibilidad, cuenta: strin
   if (d.estado === 'needs-auth')
     return deClaudeAi
       ? `${n} necesita que lo vuelvas a autorizar en claude.ai con la cuenta «${cuenta}».`
-      : `Abrí una terminal con la cuenta «${cuenta}», corré /mcp y autenticá «${d.nombre}».`
-  if (d.estado === 'failed') return `El servidor «${d.nombre}» de la cuenta «${cuenta}» no arrancó. Revisalo con /mcp en una terminal de esa cuenta.`
+      : `El servidor «${d.nombre}» pide iniciar sesión. Abrí una terminal con la cuenta «${cuenta}», corré /mcp, elegí «${d.nombre}», autenticalo y volvé a actualizar.`
+  if (d.estado === 'failed')
+    return `No se pudo conectar a «${d.nombre}» (cuenta «${cuenta}»): no arrancó. Tocá «Probar» en los ajustes de Tickets para ver el motivo, o revisalo con /mcp en una terminal de esa cuenta.`
   if (usable(d) && d.verificado && d.estado !== 'pending') return undefined
   // Conectado pero sin haberle visto las herramientas: no es que no responda, es que falta revisarlo.
   if (d.estado === 'connected')
