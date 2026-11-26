@@ -21,7 +21,6 @@ export const PAGINA_HTML = `<!doctype html>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icono.png">
 <link rel="icon" href="/icono.png">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600;700&amp;display=swap">
 <link rel="stylesheet" href="/app.css">
 </head>
 <body>
@@ -1107,6 +1106,6 @@ export function manifiesto(): string {
     orientation: 'any',
     background_color: '#08090B',
     theme_color: '#08090B',
-    icons: [{ src: '/icono.png', sizes: '256x256', type: 'image/png', purpose: 'any' }]
+    icons: [{ src: '/icono.png', sizes: '192x192', type: 'image/png', purpose: 'any' }]
   })
 }

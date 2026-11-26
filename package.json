@@ -79,6 +79,10 @@
         "to": "icon.png"
       },
       {
+        "from": "src/celu-web/iconos/icono-192.png",
+        "to": "celu-icono.png"
+      },
+      {
         "from": "out/daemon/sloth-daemon.cjs",
         "to": "daemon/sloth-daemon.cjs"
       },

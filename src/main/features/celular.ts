@@ -167,7 +167,8 @@ const feature: Feature = {
 
     const leerIcono = (): Buffer | null => {
       if (icono !== undefined) return icono
-      const ruta = [join(process.resourcesPath, 'icon.png'), join(__dirname, '../../build/icon-256.png'), join(__dirname, '../../build/icon.png')].find((p) => existsSync(p))
+      // El de 192 px pesa 15 KB; el icon.png de la app, medio mega, solo queda de respaldo.
+      const ruta = [join(process.resourcesPath, 'celu-icono.png'), join(__dirname, '../../src/celu-web/iconos/icono-192.png'), join(process.resourcesPath, 'icon.png'), join(__dirname, '../../build/icon-256.png')].find((p) => existsSync(p))
       try {
         icono = ruta ? readFileSync(ruta) : null
       } catch {

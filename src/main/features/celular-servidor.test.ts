@@ -148,13 +148,35 @@ test('si el pedido ya no está, el celu recibe el motivo sellado', async () => {
   })
 })
 
+test('los archivos de la página se revalidan con ETag: si el celu ya los tiene, 304 sin cuerpo', async () => {
+  await conServidor({ icono: () => Buffer.from('png') }, async (base) => {
+    for (const ruta of ['/app.js', '/app.css', '/icono.png']) {
+      const r = await fetch(base + ruta)
+      assert.equal(r.status, 200)
+      assert.equal(r.headers.get('cache-control'), 'no-cache')
+      const etag = r.headers.get('etag') ?? ''
+      assert.match(etag, /^"[\w-]+"$/)
+      await r.arrayBuffer()
+      const otra = await fetch(base + ruta, { headers: { 'if-none-match': etag } })
+      assert.equal(otra.status, 304, ruta)
+      assert.equal(await otra.text(), '')
+      assert.equal((await fetch(base + ruta, { headers: { 'if-none-match': '"viejo"' } })).status, 200)
+    }
+  })
+})
+
 test('la página se sirve sin clave, con CSP y sin referer; lo desconocido es 404', async () => {
   await conServidor({}, async (base) => {
     const r = await fetch(`${base}/`)
     assert.equal(r.status, 200)
     assert.match(r.headers.get('content-security-policy') ?? '', /script-src 'self'/)
     assert.equal(r.headers.get('referrer-policy'), 'no-referrer')
-    assert.ok(!(await r.text()).includes(CLAVE))
+    const html = await r.text()
+    assert.ok(!html.includes(CLAVE))
+    // Sin hosts de afuera: sin internet (o con un portal cautivo) la página no queda en blanco esperándolos.
+    assert.doesNotMatch(html, /(?:href|src)="https?:/)
+    assert.doesNotMatch(r.headers.get('content-security-policy') ?? '', /https?:/)
+    assert.equal(r.headers.get('cache-control'), 'no-store')
     const js = await fetch(`${base}/app.js`)
     assert.equal(js.status, 200)
     assert.ok((await js.text()).includes('slothSello'))

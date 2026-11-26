@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { EstadoCelular } from '../../shared/celular'
 import { abrirPedido, crearRepetidos, derivarClaves, fechaValida, sellarRespuesta } from './celular-sello'
@@ -42,8 +43,7 @@ const SEGURIDAD = {
 const CSP = [
   "default-src 'none'",
   "script-src 'self'",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  'font-src https://fonts.gstatic.com',
+  "style-src 'self' 'unsafe-inline'",
   "img-src 'self'",
   "connect-src 'self'",
   "manifest-src 'self'",
@@ -56,6 +56,21 @@ function enviar(res: ServerResponse, status: number, tipo: string | null, cuerpo
   const headers: Record<string, string> = { ...SEGURIDAD, ...extra }
   if (tipo) headers['content-type'] = tipo
   res.writeHead(status, headers).end(cuerpo)
+}
+
+// Los archivos de la página no cambian mientras corre la app: el celu los revalida con ETag y no los baja de nuevo en cada carga.
+// La URL queda igual porque build-celu-web reemplaza esas rutas tal cual.
+const etiquetas = new Map<string, { cuerpo: string | Buffer; etag: string }>()
+
+function enviarEstatico(req: IncomingMessage, res: ServerResponse, ruta: string, tipo: string, cuerpo: string | Buffer): void {
+  let e = etiquetas.get(ruta)
+  if (e?.cuerpo !== cuerpo) {
+    e = { cuerpo, etag: `"${createHash('sha256').update(cuerpo).digest('base64url').slice(0, 22)}"` }
+    etiquetas.set(ruta, e)
+  }
+  const extra = { 'cache-control': 'no-cache', etag: e.etag }
+  if (req.headers['if-none-match'] === e.etag) return enviar(res, 304, null, undefined, extra)
+  enviar(res, 200, tipo, cuerpo, extra)
 }
 
 function leerCuerpo(req: IncomingMessage): Promise<string | null> {
@@ -144,17 +159,17 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
 
     if (!esGet) return enviar(res, 405, null, undefined, { allow: 'GET' })
     if (ruta === '/') return enviar(res, 200, 'text/html; charset=utf-8', PAGINA_HTML, { 'content-security-policy': CSP })
-    if (ruta === '/app.css') return enviar(res, 200, 'text/css; charset=utf-8', PAGINA_CSS)
-    if (ruta === '/app.js') return enviar(res, 200, 'text/javascript; charset=utf-8', PAGINA_JS)
+    if (ruta === '/app.css') return enviarEstatico(req, res, ruta, 'text/css; charset=utf-8', PAGINA_CSS)
+    if (ruta === '/app.js') return enviarEstatico(req, res, ruta, 'text/javascript; charset=utf-8', PAGINA_JS)
     if (ruta === '/xterm.js' || ruta === '/xterm.css') {
       const x = o.proveedor.xterm()
       if (!x) return enviar(res, 404, null)
-      return ruta === '/xterm.js' ? enviar(res, 200, 'text/javascript; charset=utf-8', x.js) : enviar(res, 200, 'text/css; charset=utf-8', x.css)
+      return ruta === '/xterm.js' ? enviarEstatico(req, res, ruta, 'text/javascript; charset=utf-8', x.js) : enviarEstatico(req, res, ruta, 'text/css; charset=utf-8', x.css)
     }
     if (ruta === '/manifest.webmanifest') return enviar(res, 200, 'application/manifest+json; charset=utf-8', manifiesto())
     if (ruta === '/icono.png') {
       const png = o.proveedor.icono()
-      return png ? enviar(res, 200, 'image/png', png) : enviar(res, 404, null)
+      return png ? enviarEstatico(req, res, ruta, 'image/png', png) : enviar(res, 404, null)
     }
     return enviar(res, 404, null)
   }
