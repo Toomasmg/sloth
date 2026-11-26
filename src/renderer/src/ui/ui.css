@@ -154,7 +154,10 @@
 .ui-icon-btn.is-loading {
   cursor: progress;
 }
-.ui-btn-kbd {
+/* Doble clase: el `kbd` global y el de tema claro lo pisan con gris sobre el color del botón. */
+.ui-btn .ui-btn-kbd {
+  color: inherit;
+  box-shadow: none;
   padding: 0 var(--s-1);
   border-radius: var(--r-sm);
   background: color-mix(in srgb, currentColor 16%, transparent);

@@ -806,6 +806,7 @@ export function App(): React.JSX.Element {
       setNewWsMode(mode)
     },
     onBeforeClosePane,
+    askConfirm,
     notifyError,
     paneActions: (paneId) => actionsFor(paneId, 'pane'),
     invoke: (channel, ...args) => api.feat.invoke(channel, ...args),

@@ -351,7 +351,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
   const gitHint = !carpetaTrim
     ? 'Escribí la ruta, elegí una reciente o soltá una carpeta en la ventana.'
     : cur && !cur.exists
-      ? 'No encontramos esa carpeta en esta PC.'
+      ? showErr('carpeta') ? '' : 'No encontramos esa carpeta en esta PC.'
       : cur?.isGit
         ? `Repo git · rama ${cur.branch ?? 'sin rama (HEAD suelto)'}`
         : cur

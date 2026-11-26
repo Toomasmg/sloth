@@ -35,6 +35,8 @@ export interface UiCtx {
    */
   onBeforeClosePane(guard: PaneGuard): () => void
   notifyError(message: string): void
+  /** Diálogo de confirmación propio de Sloth (no el `confirm` del sistema). Resuelve true si el usuario acepta. */
+  askConfirm(o: { title: string; body: string; yes: string; no?: string }): Promise<boolean>
   /**
    * Acciones de un panel o espacio, ya ordenadas: las del núcleo y las que suman las funciones. Las usan
    * el menú del espacio (clic derecho, «…» del panel, pestaña) y la paleta, así todos muestran lo mismo.
@@ -77,6 +79,8 @@ export interface Command {
   shortcut?: string
   /** Ícono opcional para la paleta (p. ej. `<GearSix size={16} />` de Phosphor, con aria-hidden). */
   icon?: React.ReactNode
+  /** Si está, el comando se muestra apagado y no se ejecuta; el texto es el motivo. */
+  disabledReason?: string
   run(): void | Promise<void>
 }
 
