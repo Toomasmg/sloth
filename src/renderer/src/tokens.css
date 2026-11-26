@@ -72,13 +72,13 @@
   /* ---------- Color: texto ---------- */
   --text: #ececf0;
   --text-2: #a6abb8;
-  --text-3: #8b909c;
-  --placeholder: #80869a;
+  --text-3: #9297a2;
+  --placeholder: #82889c;
 
   /* ---------- Color: bordes ---------- */
   --divider: rgba(255, 255, 255, 0.07);
   --divider-strong: rgba(255, 255, 255, 0.12);
-  --control-border: #646b7d;
+  --control-border: #6b7283;
 
   /* ---------- Color: acción y estados de Claude ---------- */
   --accent: #8ab4ff;
@@ -187,20 +187,20 @@ html[data-theme='light'] {
   --text: #1d2027;
   --text-2: #434a57;
   --text-3: #5c6270;
-  --placeholder: #6b7180;
+  --placeholder: #626775;
 
   --divider: rgba(16, 22, 34, 0.08);
   --divider-strong: rgba(16, 22, 34, 0.14);
-  --control-border: #858b97;
+  --control-border: #808591;
 
   --accent: #2862d0;
   --accent-fg: #ffffff;
   --accent-soft: rgba(40, 98, 208, 0.12);
   --working: #2862d0;
   --working-soft: rgba(40, 98, 208, 0.12);
-  --waiting: #a35a00;
+  --waiting: #9e5700;
   --waiting-soft: rgba(163, 90, 0, 0.12);
-  --done: #1a7f57;
+  --done: #187752;
   --done-soft: rgba(26, 127, 87, 0.12);
   --danger: #c62828;
   --danger-soft: rgba(198, 40, 40, 0.1);
@@ -290,7 +290,7 @@ html[data-theme='light'][data-accent='cielo'] {
   --accent-soft: rgba(40, 98, 208, 0.12);
 }
 html[data-theme='light'][data-accent='hoja'] {
-  --accent: #1a7f57;
+  --accent: #187752;
   --accent-fg: #ffffff;
   --accent-soft: rgba(26, 127, 87, 0.12);
 }
@@ -300,7 +300,7 @@ html[data-theme='light'][data-accent='lila'] {
   --accent-soft: rgba(111, 79, 214, 0.12);
 }
 html[data-theme='light'][data-accent='ambar'] {
-  --accent: #a35a00;
+  --accent: #9e5700;
   --accent-fg: #ffffff;
   --accent-soft: rgba(163, 90, 0, 0.12);
 }
