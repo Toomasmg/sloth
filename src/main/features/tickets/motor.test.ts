@@ -105,6 +105,12 @@ function conModoPermisos(args: string[]): string[] {
   return [...args.slice(0, i + 1), '--disable-slash-commands', '--permission-mode', 'default', ...args.slice(i + 1), '--max-turns', '40']
 }
 
+/** Los prompts de lectura piden «error» cuando las herramientas fallan (diferencia deliberada con 0.6.4): la línea nueva va antes de la de «no tenés el conector». */
+function conErrorDeHerramienta(prompt: string, antesDe: string, listas: string): string {
+  const linea = `Si las herramientas de Gruv fallan y no pudiste leer nada, respondé {"error":"<el motivo que dieron, en pocas palabras>",${listas}} en vez de una lista vacía.`
+  return prompt.replace(antesDe, () => `${linea}\n${antesDe}`)
+}
+
 /**
  * Diferencias deliberadas de la consulta de lista con 0.6.4 (fix/tickets-lista-grande): páginas de 50 en vez de 100
  * (una de 100 pasaba el máximo de salida de una herramienta MCP), sin pedirle al modelo que reescriba los criterios
@@ -112,7 +118,7 @@ function conModoPermisos(args: string[]): string[] {
  * ver_mi_perfil (que se suma a las herramientas permitidas) porque ver_mi_inicio no lo trae.
  */
 function listaNueva(prompt: string): string {
-  return prompt
+  return conErrorDeHerramienta(prompt, 'Si no tenés ninguna herramienta de Gruv', '"tickets":[]')
     .replace('Tu id y tu nombre en Gruv los sacás de ver_mi_inicio.', GRUV.pistas.yo.sinId)
     .replace('limite: 100. Si vuelven 100, seguí con desplazamiento: 100, 200…', 'limite: 50. Si vuelven 50, seguí con desplazamiento: 50, 100…')
     .replace('recortado a 200 caracteres, si la trae. "criterios" son hasta 5 criterios de aceptación, con "texto" (máx. 120 caracteres) y "hecho" (true o false), si los trae.', 'recortado a 120 caracteres, si la trae.')
@@ -136,7 +142,7 @@ function esquemaNuevo(schema: unknown): unknown {
 function detalleNuevo(prompt: string): string {
   const id = /^Del ticket (.+) \(el valor/m.exec(prompt)?.[1] ?? ''
   const json = JSON.stringify(id)
-  return prompt
+  return conErrorDeHerramienta(prompt, 'Si no hay criterios o comentarios', '"criterios":[],"comentarios":[]')
     .replace(/(3\. Llamá a ver_reloj con .+\n)/, (_, paso: string) => `${paso}4. Llamá a ver_ticket con {"id":${json}}.\n`)
     .replace('{"criterios":[{"id"', '{"descripcion":"…","criterios":[{"id"')
     .replace('\n"minutos_total" son', () => `\n"descripcion": ${GRUV.pistas.descripcion} Texto plano, de hasta 1500 caracteres, sin copiar datos de contacto ni personales (correos, teléfonos); si el ticket no trae nada, no pongas "descripcion".\n"minutos_total" son`)
@@ -539,4 +545,26 @@ test('lista por alcance: lo que no entró (tope de tickets o lo que dice el mode
   assert.equal(parseClaudeOutput(GRUV, sobre({ tickets: tickets(3), no_leidos: -5 }), true).noLeidos, undefined)
   assert.equal(parseClaudeOutput(GRUV, sobre({ tickets: tickets(3), no_leidos: 40 })).noLeidos, undefined)
   assert.match(buildPrompt(GRUV, '', ALCANCE), /"no_leidos"/)
+})
+
+const conError = (extra: Record<string, unknown>): string => JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: '', structured_output: extra })
+
+test('lista: si las herramientas fallaron y Claude lo dice en «error», se muestra el motivo en vez de «no hay tickets»', () => {
+  assert.throws(() => parseClaudeOutput(GRUV, conError({ error: 'HTTP 401: token vencido', tickets: [] })), /Gruv respondió con un error: HTTP 401: token vencido/)
+  assert.throws(() => parsePersonas(GRUV, conError({ error: 'tiempo agotado', personas: [] })), /Gruv respondió con un error: tiempo agotado/)
+  assert.throws(() => parseDetalle(GRUV, conError({ error: 'ticket no encontrado', criterios: [], comentarios: [] })), /Gruv respondió con un error: ticket no encontrado/)
+})
+
+test('lista: un «error» junto con tickets leídos no tira lo que sí se leyó, y sin error una lista vacía sigue siendo vacía', () => {
+  const r = parseClaudeOutput(GRUV, conError({ error: 'una página falló', tickets: [{ id: 'TCK-1', titulo: 'Uno', estado: 'abierto' }] }))
+  assert.equal(r.tickets.length, 1)
+  assert.deepEqual(parseClaudeOutput(GRUV, conError({ tickets: [] })).tickets, [])
+})
+
+test('los prompts de lectura piden el motivo en «error» y la línea de «no tenés el conector» sigue siendo la última', () => {
+  const sin = (p: string): string => p.split('\n').slice(-1)[0]
+  for (const p of [buildPrompt(GRUV, ''), buildDetallePrompt(GRUV, 'TCK-1'), buildPersonasPrompt(GRUV)]) {
+    assert.match(p, /Si las herramientas de Gruv fallan y no pudiste leer nada, respondé \{"error":/)
+    assert.match(sin(p), /sin_gruv/)
+  }
 })
