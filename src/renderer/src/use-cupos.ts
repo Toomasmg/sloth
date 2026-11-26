@@ -22,7 +22,9 @@ export function useCupos(
     for (const a of accounts) {
       const u = usage[a.id]
       if (!u || capacidadesDe(a)?.uso !== true) continue
-      out[a.id] = calcularCupo(u.ventana, topeEfectivo(plans[a.id], topes[a.id]), ahora)
+      const c = calcularCupo(u.ventana, topeEfectivo(plans[a.id], topes[a.id]), ahora)
+      // Sin tope ni uso no hay nada que decir: no se ocupa una línea por cuenta para mostrar vacío.
+      if (c.nivel !== 'sin-tope' || c.usados > 0) out[a.id] = c
     }
     return out
   }, [accounts, usage, plans, topes, ahora])

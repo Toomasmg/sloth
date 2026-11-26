@@ -413,7 +413,7 @@ function TopeField({ label, value, porDefecto, onCommit }: { label: string; valu
   }
   return (
     <label className="f-set-tope">
-      <span className="f-set-hint">Tope de 5 h (estimado)</span>
+      <span className="f-set-hint">Tope 5 h (estimado)</span>
       <input
         className="f-set-input f-set-tope-input"
         inputMode="decimal"
@@ -431,7 +431,7 @@ function TopeField({ label, value, porDefecto, onCommit }: { label: string; valu
           }
         }}
       />
-      <span className="f-set-hint">M tokens{error ? ' · poné un número entre 0,000001 y 1000' : value === undefined && porDefecto !== undefined ? ' · el del plan' : ''}</span>
+      <span className="f-set-hint">{error ? 'Poné un número entre 0,000001 y 1000' : value === undefined && porDefecto !== undefined ? 'M tokens · el del plan' : 'M tokens'}</span>
     </label>
   )
 }

@@ -355,13 +355,13 @@ button.f-set-toggle:disabled {
   gap: var(--s-2);
   margin-top: var(--s-1);
 }
-.f-set-tope-input {
+.f-set-tope .f-set-tope-input {
   width: 72px;
   height: 24px;
   font-size: var(--fs-12);
   text-align: right;
 }
-.f-set-tope-input[aria-invalid='true'] {
+.f-set-tope .f-set-tope-input[aria-invalid='true'] {
   box-shadow: inset 0 0 0 1px var(--danger);
 }
 .f-set-plan-input {
