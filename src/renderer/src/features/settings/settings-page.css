@@ -344,6 +344,26 @@ button.f-set-toggle:disabled {
 .f-set-plan {
   flex: 0 0 120px;
 }
+.f-set-cupo {
+  max-width: 280px;
+  margin-top: var(--s-1);
+}
+.f-set-tope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-1);
+}
+.f-set-tope-input {
+  width: 72px;
+  height: 24px;
+  font-size: var(--fs-12);
+  text-align: right;
+}
+.f-set-tope-input[aria-invalid='true'] {
+  box-shadow: inset 0 0 0 1px var(--danger);
+}
 .f-set-plan-input {
   width: 120px;
   height: 28px;

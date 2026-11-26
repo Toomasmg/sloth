@@ -2,6 +2,9 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api } from '../../../api'
 import { useUi } from '../../host'
 import { MoreIcon } from '../../../icons/SlothIcons'
+import { CupoMedidor } from '../../../CupoMedidor'
+import { useCupos } from '../../../use-cupos'
+import { topeDePlan } from '../../../../../shared/cupo'
 import { fmtTok, totalTok, usageTitle } from '../../../format'
 import { loginPaneId, type Account, type AgenteDisponible } from '../../../../../shared/types'
 import { capacidadesDe, motivoSinCapacidad, nombreProveedor, proveedorIdDe } from '../../../../../shared/proveedores'
@@ -27,6 +30,7 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
   const [confirm, setConfirm] = useState<string | null>(null)
   /** Fila con el menú «más» abierto (usar mi setup, quitar). */
   const [menu, setMenu] = useState<string | null>(null)
+  const { cupos, ahora } = useCupos(ui.accounts, ui.usage, p.settings.accountPlans, p.settings.accountCupos)
 
   /** «Usar mi setup de ~/.claude» de una cuenta: guarda y recarga la lista. */
   const toggleShare = (acc: Account): void => {
@@ -232,6 +236,18 @@ export function AccountsSection({ onClose, adding, setAdding }: { onClose(): voi
                       </div>
                     </dl>
                   )}
+                  {u && cupos[a.id] && (
+                    <>
+                      <CupoMedidor cupo={cupos[a.id]} ahora={ahora} className="f-set-cupo" />
+                      <TopeField
+                        key={`${a.id}-${p.settings.accountCupos[a.id] ?? ''}`}
+                        label={a.label}
+                        value={p.settings.accountCupos[a.id]}
+                        porDefecto={topeDePlan(p.settings.accountPlans[a.id])}
+                        onCommit={(tope) => save({ accountCupos: { [a.id]: tope } })}
+                      />
+                    </>
+                  )}
                   {leyendoLimites && filasL.length > 0 && (
                     <dl className="sl-usage" title={TITULO_LIMITES}>
                       {filasL.map((f) => (
@@ -371,6 +387,51 @@ function PlanField({ label, value, onCommit }: { label: string; value: string; o
           }
         }}
       />
+    </label>
+  )
+}
+
+/** Tope propio de la ventana de 5 h, en millones de tokens. Vacío: vale el del plan (estimado). */
+function TopeField({ label, value, porDefecto, onCommit }: { label: string; value: number | undefined; porDefecto: number | undefined; onCommit(tope: number | null): void }): React.JSX.Element {
+  const [draft, setDraft] = useState(value === undefined ? '' : String(value / 1e6))
+  const [error, setError] = useState(false)
+  const commit = (): void => {
+    const t = draft.trim().replace(',', '.')
+    if (t === '') {
+      setError(false)
+      if (value !== undefined) onCommit(null)
+      return
+    }
+    const m = Number(t)
+    const tope = Math.round(m * 1e6)
+    if (!Number.isFinite(m) || tope < 1 || tope > 1e9) {
+      setError(true)
+      return
+    }
+    setError(false)
+    if (tope !== value) onCommit(tope)
+  }
+  return (
+    <label className="f-set-tope">
+      <span className="f-set-hint">Tope de 5 h (estimado)</span>
+      <input
+        className="f-set-input f-set-tope-input"
+        inputMode="decimal"
+        value={draft}
+        maxLength={7}
+        placeholder={porDefecto === undefined ? 'Sin tope' : String(porDefecto / 1e6)}
+        aria-label={`Tope estimado de la ventana de 5 horas de ${label}, en millones de tokens`}
+        aria-invalid={error}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault()
+            commit()
+          }
+        }}
+      />
+      <span className="f-set-hint">M tokens{error ? ' · poné un número entre 0,000001 y 1000' : value === undefined && porDefecto !== undefined ? ' · el del plan' : ''}</span>
     </label>
   )
 }

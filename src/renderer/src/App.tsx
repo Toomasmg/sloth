@@ -37,6 +37,7 @@ import { StateIcon } from './StateIcon'
 import { PermissionCard, toolLabel } from './PermissionCard'
 import { LogoMark } from './Logo'
 import { decidePermission } from './features/permissions/api'
+import { useCupos } from './use-cupos'
 import { setPaneVisible, useDocumentVisible, useVisiblePolling } from './visibility'
 import {
   LAYOUT_CAP,
@@ -305,6 +306,7 @@ export function App(): React.JSX.Element {
 
   // Color de cuenta: el elegido en Configuración o el automático (se re-renderiza al cambiarlo).
   const appSettings = useSettings()
+  const { cupos, ahora } = useCupos(accounts, usage, appSettings.settings.accountPlans, appSettings.settings.accountCupos)
   const colorOf = (accountId?: string): string =>
     resolveAccountColor(accountId, accountId ? (accountIndex.get(accountId) ?? 0) : 0, appSettings)
 
@@ -946,6 +948,8 @@ export function App(): React.JSX.Element {
             statuses={statuses}
             agents={agents}
             plans={appSettings.settings.accountPlans}
+            cupos={cupos}
+            ahora={ahora}
             openIds={openPanes}
             focusedId={focused}
             editingId={renaming?.from === 'side' ? renaming.id : null}
@@ -1159,6 +1163,8 @@ export function App(): React.JSX.Element {
             accounts={accounts}
             statuses={statuses}
             usage={usage}
+            cupos={cupos}
+            ahora={ahora}
             defaultRepo={newWsPreset?.repoPath ?? workspaces[workspaces.length - 1]?.repoPath ?? ''}
             preset={newWsPreset}
             onClose={() => {
