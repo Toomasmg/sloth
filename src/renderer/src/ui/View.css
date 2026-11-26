@@ -13,6 +13,11 @@
   font-family: var(--font-ui);
   font-size: var(--fs-13);
   animation: fade var(--t-fast) var(--ease);
+  /* Un solo ancho y margen para todas las páginas: angosto para lectura y formularios, ancho para listas y tableros. */
+  --view-max: 1040px;
+  --view-max-narrow: 760px;
+  --view-pad-x: clamp(16px, 4vw, 40px);
+  --view-pad-top: clamp(20px, 4vw, 36px);
 }
 
 .ui-view-head {

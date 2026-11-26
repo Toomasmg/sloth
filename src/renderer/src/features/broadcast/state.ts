@@ -23,8 +23,8 @@ export const SPACE_LABEL: Record<SpaceStatus, string> = {
   perm: 'Pide permiso',
   working: 'Trabajando',
   waiting: 'Te espera',
-  done: 'Listo',
-  idle: 'Listo',
+  done: 'Terminó',
+  idle: 'Sin actividad',
   closed: 'En pausa'
 }
 

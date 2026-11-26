@@ -7,7 +7,7 @@ const CHIPS = [
   { cls: 'is-waiting', n: 6, texto: 'piden permiso' },
   { cls: 'is-waiting', n: 12, texto: 'te esperan' },
   { cls: 'is-working', n: 8, texto: 'trabajando' },
-  { cls: 'is-done', n: 23, texto: 'listos' }
+  { cls: 'is-done', n: 23, texto: 'terminaron' }
 ]
 
 test.describe('barra superior: chips de estado', () => {

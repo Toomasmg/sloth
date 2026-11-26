@@ -1,9 +1,9 @@
 /* Página «Reportar un problema» (ReportPage). Clases rp-*. Medidas y colores según el artboard «Reportar». */
 
 .rp-wrap {
-  max-width: 720px;
+  max-width: var(--view-max-narrow);
   margin: 0 auto;
-  padding: clamp(20px, 4vw, 36px) clamp(16px, 4vw, 40px) 56px;
+  padding: var(--view-pad-top) var(--view-pad-x) 56px;
   display: flex;
   flex-direction: column;
   gap: 24px;

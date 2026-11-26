@@ -203,7 +203,7 @@ function ListBody({ snap, onModal, ui }: { snap: ChatSnapshot; onModal(k: Modal)
           <Ticket size={14} aria-hidden="true" />
           Unirme con una invitación
         </Button>
-        <p className="hint">Si armás el chat de tu equipo, cargá la URL y la clave publicable del proyecto de Supabase.</p>
+        <p className="hint">Si armás el chat de tu equipo, cargá la dirección y la clave de acceso del proyecto del chat.</p>
         <Button
           type="button"
           look="classic"

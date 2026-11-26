@@ -9,17 +9,11 @@ import './dictado.css'
 
 function BotonDictado({ paneId }: { paneId: string }): React.JSX.Element | null {
   const disponible = useDictadoDisponible(paneId)
-  const { estado, error, vacio, progreso } = useDictado(paneId)
-  const novedad = useMostrarNovedad(paneId)
+  const { estado, error, progreso } = useDictado(paneId)
   if (!disponible) return null
   const label = estado === 'escuchando' ? 'Detener dictado' : estado === 'transcribiendo' ? 'Transcribiendo…' : 'Dictar'
   return (
     <>
-      {novedad && estado === 'inactivo' && !error && !vacio && (
-        <button type="button" className="dictado-nuevo" title="Dictá con tu voz. Tocá para ocultar este aviso." onMouseDown={(e) => e.preventDefault()} onClick={marcarConocido}>
-          Nuevo
-        </button>
-      )}
       {estado !== 'inactivo' && (
         <span className="dictado-estado" data-estado={estado} role="status" title={progreso === undefined ? undefined : 'Se baja una sola vez; después el dictado anda sin conexión.'}>
           <span className="dictado-dot" aria-hidden="true" />
@@ -51,7 +45,8 @@ function BotonDictado({ paneId }: { paneId: string }): React.JSX.Element | null 
 /** Avisos en el flujo del panel (no flotan sobre la terminal): novedad, error y «no se escuchó nada». */
 function AvisosDictado({ paneId }: { paneId: string }): React.JSX.Element | null {
   const disponible = useDictadoDisponible(paneId)
-  const { error, vacio } = useDictado(paneId)
+  const { estado, error, vacio } = useDictado(paneId)
+  const novedad = useMostrarNovedad(paneId)
   if (!disponible) return null
   if (error) {
     return (
@@ -76,6 +71,16 @@ function AvisosDictado({ paneId }: { paneId: string }): React.JSX.Element | null
         <div className="dictado-pill" role="status">
           No se escuchó nada
         </div>
+      </div>
+    )
+  }
+  if (novedad && estado === 'inactivo') {
+    return (
+      <div className="dictado-banner">
+        <button type="button" className="dictado-pill dictado-nuevo" title="Tocá para ocultar este aviso." onMouseDown={(e) => e.preventDefault()} onClick={marcarConocido}>
+          <span className="dictado-nuevo-tag">Nuevo</span>
+          <span>Dictá con tu voz</span>
+        </button>
       </div>
     )
   }

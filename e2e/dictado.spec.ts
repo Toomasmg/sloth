@@ -31,12 +31,12 @@ test.describe('dictado', () => {
 
   test('la primera vez avisa que hay dictado, en un solo panel, hasta cerrarlo', async ({ sloth: { page } }) => {
     await expect(page.locator('.xterm')).toHaveCount(1)
-    await expect(page.getByRole('button', { name: 'Nuevo', exact: true })).toHaveCount(1)
-    await page.getByRole('button', { name: 'Nuevo', exact: true }).click()
-    await expect(page.getByRole('button', { name: 'Nuevo', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^Nuevo Dictá con tu voz/ })).toHaveCount(1)
+    await page.getByRole('button', { name: /^Nuevo Dictá con tu voz/ }).click()
+    await expect(page.getByRole('button', { name: /^Nuevo Dictá con tu voz/ })).toHaveCount(0)
     await page.reload()
     await expect(page.locator('.xterm')).toHaveCount(1)
-    await expect(page.getByRole('button', { name: 'Nuevo', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^Nuevo Dictá con tu voz/ })).toHaveCount(0)
   })
 
   test('la terminal no se corre de costado (el dictado de Windows la desplazaba)', async ({ sloth: { page } }) => {
