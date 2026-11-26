@@ -1,0 +1,31 @@
+/* Encabezado común de las páginas grandes (Tickets, Historial, Ramas aparte): un solo tamaño de título y de bajada. */
+.ui-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--s-3) var(--s-4);
+}
+.ui-page-head-text {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.ui-page-title {
+  margin: 0;
+  font-size: var(--fs-18);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: var(--lh-title);
+}
+.ui-page-desc {
+  max-width: 64ch;
+  margin: var(--s-1) 0 0;
+  color: var(--text-2);
+  font-size: var(--fs-13);
+  line-height: var(--lh-body);
+}
+.ui-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}

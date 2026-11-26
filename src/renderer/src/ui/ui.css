@@ -812,3 +812,39 @@
     transition: none;
   }
 }
+
+/* ---------- Skeleton ---------- */
+.ui-skel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.ui-skel-label {
+  padding: 0 var(--s-1);
+  color: var(--text-3);
+  font-size: var(--fs-12);
+}
+.ui-skel-bar {
+  display: block;
+  height: calc(var(--h-lg) - var(--s-1));
+  border-radius: var(--r-md);
+  background: var(--shimmer-a);
+}
+.ui-skel--card .ui-skel-bar {
+  height: calc(var(--s-7) + var(--s-5) - var(--s-1));
+  border-radius: var(--r-lg);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ui-skel-bar {
+    background: linear-gradient(90deg, var(--shimmer-a), var(--shimmer-b), var(--shimmer-a)) 0 0 / 200% 100%;
+    animation: ui-shimmer 1.4s linear 3;
+  }
+}
+@keyframes ui-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}

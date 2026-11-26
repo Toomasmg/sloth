@@ -149,7 +149,7 @@ export function Detail(props: DetailProps): React.JSX.Element {
           <div className="f-tickets-field">
             <span className="f-tickets-lbl">Prioridad</span>
             <span className="f-tickets-val" style={{ color: prioTone(t.prioridad) }}>
-              <PrioGlyph p={t.prioridad} size={13} />
+              <PrioGlyph p={t.prioridad} size={14} />
               {t.prioridad ?? 'Sin prioridad'}
             </span>
           </div>

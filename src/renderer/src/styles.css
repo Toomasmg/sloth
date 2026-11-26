@@ -723,9 +723,9 @@ kbd,
   min-height: 0;
   container-type: inline-size;
   background: var(--term-bg);
-  border-radius: var(--r-md);
-  /* Contorno de 1px como sombra interior: separa del fondo sin "caja dentro de caja". */
-  box-shadow: inset 0 0 0 1px var(--divider);
+  border-radius: var(--r-lg);
+  /* Contorno de 1px por fuera: el hueco de 8 px entre paneles queda igual con y sin foco. */
+  box-shadow: 0 0 0 1px var(--divider);
   /* clip y no hidden: hidden se deja desplazar por código (el dictado de Windows corría la terminal). */
   overflow: clip;
   transition: box-shadow var(--t-med) var(--ease);
@@ -733,8 +733,9 @@ kbd,
 .pane.hidden {
   display: none;
 }
+/* Foco: el mismo aro de 1px, en acento. Sin halo: se cortaba contra el vecino a 8 px. */
 .pane.focused {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acc) 38%, transparent);
+  box-shadow: var(--pane-ring-focus);
 }
 /* «Te necesita»: una línea ámbar arriba, nada de marco grueso ni brillo. */
 .pane::after {

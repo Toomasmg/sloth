@@ -7,6 +7,9 @@
 }
 
 .hist-wrap {
+  width: 100%;
+  max-width: var(--view-max-wide);
+  margin: 0 auto;
   --hist-hover: color-mix(in srgb, var(--text) 4.5%, transparent);
   /* Texto intermedio entre --fg y --fg-2 (artboard #c9cdd6 en oscuro). */
   --hist-text-2: color-mix(in srgb, var(--text) 55%, var(--text-2));
@@ -21,18 +24,6 @@
   margin: 0;
 }
 
-.hist-intro h1 {
-  margin: 0;
-  font-size: var(--fs-24);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-.hist-intro p {
-  margin: 6px 0 0;
-  color: var(--text-2);
-  line-height: 1.5;
-}
-
 .hist-head-count {
   font-size: var(--fs-12);
   color: var(--text-3);
@@ -41,8 +32,8 @@
 .hist-cols {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 16px;
+  align-items: stretch;
+  gap: var(--s-4);
 }
 
 .hist-grow {
@@ -128,6 +119,7 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background var(--t-fast) var(--ease);
 }
 .hist-opt:hover:not([aria-pressed='true']) {
   background: var(--hist-hover);
@@ -214,11 +206,6 @@
   font-size: var(--fs-12);
   line-height: 1.5;
 }
-.hist-loading {
-  margin: 0;
-  padding: 24px 6px;
-  color: var(--text-2);
-}
 .hist-groups {
   display: flex;
   flex-direction: column;
@@ -258,6 +245,7 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background var(--t-fast) var(--ease);
 }
 .hist-card:hover:not([aria-current='true']) {
   background: var(--hist-hover);
@@ -323,26 +311,6 @@
   align-items: center;
   gap: 6px;
 }
-.hist-nosel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 28px 14px;
-  text-align: center;
-  color: var(--text-2);
-}
-.hist-nosel .hint {
-  line-height: 1.5;
-}
-.hist-empty-title {
-  font-weight: 600;
-  color: var(--text);
-}
-.hist-nosel {
-  padding: 40px 10px;
-}
-
 /* Detalle */
 .hist-detail {
   flex: 2 1 440px;
@@ -359,6 +327,8 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* SessionDetail se monta con key por sesión: al elegir otra, el detalle entra con un fundido. */
+  animation: fade var(--t-med) var(--ease);
 }
 .hd-top {
   display: flex;

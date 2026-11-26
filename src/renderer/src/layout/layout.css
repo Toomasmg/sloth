@@ -66,18 +66,21 @@ body.is-resizing-row * {
   background: transparent;
   color: var(--text-3);
   font-size: var(--fs-12);
+  border-radius: var(--r-md) var(--r-md) 0 0;
   cursor: pointer;
-  transition: color var(--t-fast) var(--ease);
+  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
 }
 /* Las que se ven en la grilla, un poco más claras que las que esperan en pestañas. */
 .pane-tab.on-screen {
   color: var(--text-2);
 }
 .pane-tab:hover {
+  background: var(--row-hover);
   color: var(--text);
 }
 /* La enfocada: subrayado de acento (forma, no solo color). */
 .pane-tab.active {
+  background: var(--open-bg);
   color: var(--text);
 }
 .pane-tab.active::after {
@@ -99,13 +102,22 @@ body.is-resizing-row * {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  font-weight: 500;
+}
+.pane-tab.active .pane-tab-title {
   font-weight: 600;
 }
 .pane-tab-n {
   flex: none;
+  min-width: var(--s-4);
+  padding: 0 var(--s-1);
+  border-radius: var(--r-full);
+  background: var(--waiting-soft);
   color: var(--waiting);
   font-size: var(--fs-11);
   font-weight: 700;
+  line-height: var(--s-4);
+  text-align: center;
 }
 .pane-tab.dragging {
   opacity: 0.45;

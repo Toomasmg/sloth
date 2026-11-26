@@ -229,7 +229,7 @@ export function Ajustes({ snap, onClose }: { snap: Snapshot; onClose?: () => voi
         <span className="f-tickets-grow" />
         {onClose && (
           <Button size="sm" onClick={onClose} aria-label="Cerrar ajustes de tickets">
-            <CloseIcon size={13} />
+            <CloseIcon size={14} />
           </Button>
         )}
       </div>

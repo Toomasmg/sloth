@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
 import { EyeIcon, HideIcon, MoreIcon, PencilIcon, TerminalIcon } from '../../icons/SlothIcons'
-import { Button, IconButton, Menu, type MenuItem } from '../../ui'
+import { Button, IconButton, Menu, Skeleton, type MenuItem } from '../../ui'
 import { dayLabel, durLabel, fmtTime, plainSummary, plural, spaceColor, STATUS_LABEL } from './model'
 import type { DetailItem, OpenResult, PrefsReply, SessionInfo, SessionRow } from './types'
 
@@ -120,12 +120,12 @@ export function SessionDetail({
 
   const menuItems: MenuItem[] = [
     isHidden
-      ? { id: 'show', label: 'Volver a mostrar', icon: <EyeIcon size={15} />, onSelect: () => void setHidden(false) }
+      ? { id: 'show', label: 'Volver a mostrar', icon: <EyeIcon size={14} />, onSelect: () => void setHidden(false) }
       : {
           id: 'hide',
           label: 'Quitar de la lista',
           hint: 'La conversación no se toca',
-          icon: <HideIcon size={15} />,
+          icon: <HideIcon size={14} />,
           onSelect: () => setAskHide(true)
         }
   ]
@@ -253,7 +253,7 @@ export function SessionDetail({
         {info ? (
           <p className="hd-summary">{info.lastAnswer || 'Esta sesión no tiene respuestas de texto de Claude.'}</p>
         ) : (
-          <p className="hint">Cargando la conversación…</p>
+          <Skeleton rows={2} showLabel label="Cargando la conversación…" />
         )}
       </section>
 

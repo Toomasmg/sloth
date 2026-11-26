@@ -146,17 +146,6 @@
   flex-direction: column;
   gap: 18px;
 }
-.f-tickets-h1 {
-  margin: 0;
-  font-size: var(--fs-24);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-.f-tickets-lead {
-  margin: 6px 0 0;
-  color: var(--text-2);
-  line-height: 1.5;
-}
 
 /* ---------- Avisos ---------- */
 .f-tickets-alert {
@@ -432,23 +421,6 @@
   min-height: 120px;
   padding: 8px 8px 10px;
 }
-.f-tickets-skel {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.f-tickets-skel > div {
-  height: 66px;
-  border-radius: var(--r-lg);
-  background: var(--card-hover);
-  /* Esqueleto de carga: unas pocas pasadas y queda quieto (nada de animación infinita en listas). */
-  animation: fade var(--t-med) var(--ease) 2 alternate both;
-}
-.f-tickets-skel span {
-  padding: 0 6px;
-  font-size: var(--fs-12);
-  color: var(--text-3);
-}
 .f-tickets-muted {
   font-size: var(--fs-12);
   color: var(--text-3);
@@ -480,6 +452,7 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background var(--t-fast) var(--ease);
 }
 .f-tickets-row:hover {
   background: var(--card-hover);
@@ -871,12 +844,6 @@
 .f-tickets-input:disabled {
   opacity: 0.7;
   cursor: not-allowed;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .f-tickets-skel > div {
-    animation: none;
-  }
 }
 
 /* ---------- Escrituras (0.6.2): toast, comentarios ---------- */
