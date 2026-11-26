@@ -18,6 +18,7 @@ export function captureOpener(propia?: () => Element | null): () => void {
   // Con otra capa ya en primer plano (la vista que reemplazó a esta) el foco es suyo: devolverlo a quien
   // abrió esta lo dejaría en una terminal oculta detrás.
   const otraCapa = (): boolean => {
+    if (!propia) return false
     const capa = document.activeElement?.closest('[role="dialog"][aria-modal="true"]')
     return !!capa && capa !== propia?.()
   }
