@@ -246,6 +246,21 @@ export class ServidorPendienteError extends Error {
 
 export const usable = (d: Disponibilidad): boolean => d.tipo === 'tiene' && d.estado !== 'needs-auth' && d.estado !== 'failed'
 
+/** Con lo que se sabe de la cuenta, la consulta ni se intenta: no tiene el servidor, hay que elegir uno o está caído o sin sesión. */
+export const bloqueaConsulta = (d: Disponibilidad): boolean => d.tipo === 'falta' || d.tipo === 'elegir' || (d.tipo === 'tiene' && (d.estado === 'needs-auth' || d.estado === 'failed'))
+
+/** Una revisión más nueva que esto se cree: el problema es de ahora, no de antes de que la persona lo arreglara. */
+export const REVISION_VIGENTE_MS = 60_000
+
+/**
+ * Lo que bloquea la consulta salió de una revisión vieja: la persona pudo autenticar el servidor con /mcp, arreglarlo o
+ * sumarlo después. Sin volver a mirar, «Actualizar» repite el mismo aviso hasta que toque «Volver a revisar» a mano.
+ */
+export function convieneRevisar(d: Disponibilidad, revisadaEn: number | undefined, ahora: number): boolean {
+  if (!bloqueaConsulta(d) || d.tipo === 'elegir') return false
+  return revisadaEn === undefined || ahora - revisadaEn >= REVISION_VIGENTE_MS
+}
+
 /**
  * Por qué la sesión que acaba de correr no pudo leer el conector, o undefined si lo tenía conectado
  * con sus herramientas. Sirve para que una lista vacía no pase por «no hay tickets».
@@ -270,7 +285,7 @@ export function mensajeCuenta(def: ConectorMcp, d: Disponibilidad, cuenta: strin
       ? `La cuenta «${cuenta}» tiene «${p.nombre}», pero le faltan herramientas que usa ${n}: ${p.faltan.join(', ')}. Copiá ${n} como conector propio y ajustá sus herramientas, o agregalas al servidor.`
       : esClaudeAi
       ? `Conectá ${n} en claude.ai con la cuenta «${cuenta}» (claude.ai → Configuración → Conectores) y tocá «Volver a revisar».`
-      : `La cuenta «${cuenta}» no tiene el servidor MCP de ${n}. Agregalo en esa cuenta y tocá «Volver a revisar».`
+      : `La cuenta «${cuenta}» no tiene el servidor MCP de ${n}. Agregalo en esa cuenta con alcance usuario (claude mcp add --scope user) y tocá «Volver a revisar»: uno de alcance local o de proyecto solo anda dentro de su carpeta y Sloth consulta desde otra.`
     return otras.length ? `${base} Lo tiene: ${otras.map((o) => `«${o}»`).join(', ')}.` : base
   }
   if (d.tipo === 'elegir' && d.opciones.length === 1)
@@ -280,8 +295,9 @@ export function mensajeCuenta(def: ConectorMcp, d: Disponibilidad, cuenta: strin
   if (d.estado === 'needs-auth')
     return deClaudeAi
       ? `${n} necesita que lo vuelvas a autorizar en claude.ai con la cuenta «${cuenta}».`
-      : `Abrí una terminal con la cuenta «${cuenta}», corré /mcp y autenticá «${d.nombre}».`
-  if (d.estado === 'failed') return `El servidor «${d.nombre}» de la cuenta «${cuenta}» no arrancó. Revisalo con /mcp en una terminal de esa cuenta.`
+      : `El servidor «${d.nombre}» pide iniciar sesión. Abrí una terminal con la cuenta «${cuenta}», corré /mcp, elegí «${d.nombre}», autenticalo y volvé a actualizar.`
+  if (d.estado === 'failed')
+    return `No se pudo conectar a «${d.nombre}» (cuenta «${cuenta}»): no arrancó. Tocá «Probar» en los ajustes de Tickets para ver el motivo, o revisalo con /mcp en una terminal de esa cuenta.`
   if (usable(d) && d.verificado && d.estado !== 'pending') return undefined
   // Conectado pero sin haberle visto las herramientas: no es que no responda, es que falta revisarlo.
   if (d.estado === 'connected')

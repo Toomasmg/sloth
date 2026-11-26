@@ -54,3 +54,23 @@ test('los args no permiten ninguna herramienta', () => {
   assert.equal(s[s.indexOf('--output-format') + 1], 'stream-json')
   assert.deepEqual(s.filter((x) => x !== 'stream-json'), a.filter((x) => x !== 'json'))
 })
+
+const conServidor = (nombre: string, status: string, result: Record<string, unknown> = {}): string =>
+  JSON.stringify([{ type: 'system', subtype: 'init', tools: [], mcp_servers: [{ name: nombre, status }] }, { type: 'result', subtype: 'success', is_error: false, ...result }])
+
+test('un servidor propio con nombre con guión que pide sesión no se confunde con «no está conectado en claude.ai»', () => {
+  const p = 'mcp__gruv-tomy__'
+  assert.throws(() => parseDescubrir(p, conServidor('gruv-tomy', 'needs-auth', { structured_output: { herramientas: [] } })), /«gruv-tomy» pide iniciar sesión.*\/mcp/)
+  assert.throws(() => parseDescubrir(p, conServidor('gruv-tomy', 'failed', { structured_output: { herramientas: [] } })), /«gruv-tomy» no arrancó o no conectó.*\/mcp/)
+  assert.throws(() => parseDescubrir(p, conServidor('gruv-tomy', 'pending', { structured_output: { herramientas: [] } })), /no terminó de conectar a tiempo/)
+})
+
+test('el estado del servidor gana sobre el error de la consulta (error_max_turns no explica nada)', () => {
+  assert.throws(() => parseDescubrir('mcp__gruv-tomy__', conServidor('gruv-tomy', 'needs-auth', { subtype: 'error_max_turns', is_error: true })), /pide iniciar sesión/)
+})
+
+test('sin ese servidor en la cuenta, un MCP propio manda a agregarlo con alcance usuario y uno de claude.ai a conectarlo ahí', () => {
+  assert.throws(() => parseDescubrir('mcp__gruv-tomy__', conServidor('otro', 'connected', { structured_output: { herramientas: [] } })), /no tiene un servidor MCP «gruv-tomy».*--scope user/)
+  assert.throws(() => parseDescubrir(P, conServidor('otro', 'connected', { structured_output: { herramientas: [] } })), /claude\.ai/)
+  assert.throws(() => parseDescubrir('mcp__gruv-tomy__', conServidor('gruv-tomy', 'connected', { structured_output: { herramientas: [] } })), /«gruv-tomy» está en la cuenta, pero no mostró ninguna herramienta/)
+})

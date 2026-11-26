@@ -18,6 +18,7 @@ import {
   type Modelo,
   type PendientesLista,
   type PersonaEquipo,
+  type ResultadoPrueba,
   type ServidorMcp,
   type Ticket,
   type TicketsConfig,
@@ -50,7 +51,9 @@ import { deA } from './concurrencia'
 import { buildDescubrirPrompt, parseDescubrir, type Descubiertas } from './descubrir'
 import {
   buildRevisarPrompt,
+  bloqueaConsulta,
   conPrefijo,
+  convieneRevisar,
   disponibilidad,
   elegibles,
   mensajeCuenta,
@@ -113,6 +116,8 @@ import {
   type ResultadoLista
 } from './motor'
 import { mcpAjenos } from './mcp-ajenos'
+import { entornoConsulta } from './entorno-consulta'
+import { buildProbarArgs, buildProbarPrompt, datosDeMcpGet, diagnosticar, limpiarCausa, nombreProbable, parseProbar, type DatosMcp, type ResultadoDePrueba } from './probar'
 import { carpetaFeatures } from '../../perfil'
 
 /**
@@ -130,6 +135,9 @@ const DETALLE_TIMEOUT_MS = 90_000
 /** Una lista grande (varias personas, terminados) tarda más que un detalle; el plazo de las demás consultas no cambia. */
 const LISTA_TIMEOUT_MS = 300_000
 const PERSONAS_TIMEOUT_MS = 120_000
+const PROBAR_TIMEOUT_MS = 75_000
+/** Un servidor que no conecta tarda hasta MCP_TIMEOUT (30 s) en decirlo. */
+const MOTIVO_TIMEOUT_MS = 45_000
 /** Todos los intentos de una consulta juntos no pasan de esto. */
 const REINTENTOS_TOTAL_MS = 300_000
 
@@ -355,9 +363,24 @@ const textoCuenta = (def: ConectorMcp, d: Disponibilidad, run: { accountId: stri
 /** Corta antes de gastar una consulta cuando ya se sabe que la cuenta no puede leer el conector. Sin revisar o pending, se prueba. */
 function chequearCuenta(def: ConectorMcp, run: { accountId: string; label: string }): void {
   const d = dispEn(def, run.accountId)
-  const corta = d.tipo === 'falta' || d.tipo === 'elegir' || (d.tipo === 'tiene' && (d.estado === 'needs-auth' || d.estado === 'failed'))
-  const msg = corta ? textoCuenta(def, d, run) : undefined
+  const msg = bloqueaConsulta(d) ? textoCuenta(def, d, run) : undefined
   if (msg) throw new Error(msg)
+}
+
+/** Si el caché dice que la cuenta no puede (y es viejo), se la mira de nuevo antes de creerlo; el pedido se arma con lo nuevo. */
+async function conCuentaAlDia(def: ConectorMcp, accountId: string): Promise<Ejecucion> {
+  const run = ejecucion(def.nombre, accountId, def)
+  if (descubriendo || !convieneRevisar(dispEn(def, accountId), cuentasCache[accountId]?.revisadaEn, Date.now())) return run
+  descubriendo = true
+  avisar()
+  try {
+    await revisarUna(accountId)
+  } finally {
+    descubriendo = false
+    guardarCuentas()
+    changed()
+  }
+  return ejecucion(def.nombre, accountId, def)
 }
 
 /**
@@ -684,14 +707,9 @@ function ejecucion(nombre: string, accountId: string, mcp?: ConectorMcp): Ejecuc
   if (!exe) throw new Error(p.id === 'claude' ? 'No encontré el ejecutable de Claude Code (claude.exe) en el PATH.' : `No encontré ${nombreProveedor(acc)} en el PATH. ${p.comoInstalar}`)
   const cwd = join(carpeta(), 'tickets-run')
   mkdirSync(cwd, { recursive: true })
-  // Un MCP propio lento puede tardar más que el tope por defecto de Claude Code en arrancar. Con el tope de salida por defecto
-  // (25.000 tokens) una página grande de tickets se rechaza y, sin herramientas para leer el archivo, la consulta da vueltas hasta el plazo.
-  const env = { MCP_TIMEOUT: '30000', MAX_MCP_OUTPUT_TOKENS: '50000', ...baseEnv(p.quitarDelEntorno), ...p.envCuenta(acc.configDir) }
-  const run: Ejecucion = { accountId: acc.id, label: acc.label, exe, cwd, env, envConfigDir: p.envConfigDir, motor, agente: ETIQUETA_AGENTE[p.id] }
-  if (!mcp || defPara(mcp, acc.id).herramientas.prefijo.startsWith('mcp__claude_ai_')) return run
-  // Conectar todos los de claude.ai solo para no usarlos demora cada consulta. Si la variable no existe en esta
-  // versión de Claude Code, no cambia nada: el init los trae igual.
-  return { ...run, sinClaudeAi: true, env: { ...env, ENABLE_CLAUDEAI_MCP_SERVERS: 'false' } }
+  const { env: envConsulta, sinClaudeAi } = entornoConsulta(mcp ? defPara(mcp, acc.id).herramientas.prefijo : undefined)
+  const env = { ...envConsulta, ...baseEnv(p.quitarDelEntorno), ...p.envCuenta(acc.configDir) }
+  return { accountId: acc.id, label: acc.label, exe, cwd, env, envConfigDir: p.envConfigDir, motor, agente: ETIQUETA_AGENTE[p.id], ...(sinClaudeAi ? { sinClaudeAi } : {}) }
 }
 
 /** Cuenta con la que se leen y escriben tickets: la que consultó la última vez. */
@@ -891,7 +909,7 @@ async function refresh(rawAccount: unknown, rawVueltas?: unknown, rawModo?: unkn
   }
   if (def.via === 'gh') return refreshGh(def)
   const requested = typeof rawAccount === 'string' && rawAccount ? rawAccount : undefined
-  const run = ejecucion(def.nombre, requested ?? state.config.queryAccountId ?? (await pickAccount(def)), def)
+  const run = await conCuentaAlDia(def, requested ?? state.config.queryAccountId ?? (await pickAccount(def)))
   try {
     chequearCuenta(def, run)
   } catch (e) {
@@ -1014,7 +1032,7 @@ async function actualizarPersonas(rawAccount: unknown): Promise<TicketsSnapshot>
   const def = activo()
   if (!conFiltro(def) || def.via !== 'mcp') throw new Error(`${def.nombre} no lista personas desde Sloth.`)
   const requested = typeof rawAccount === 'string' && rawAccount ? rawAccount : undefined
-  const run = ejecucion(def.nombre, requested ?? state.config.queryAccountId ?? (await pickAccount(def)), def)
+  const run = await conCuentaAlDia(def, requested ?? state.config.queryAccountId ?? (await pickAccount(def)))
   chequearCuenta(def, run)
   const d = defPara(def, run.accountId)
   const ac = new AbortController()
@@ -1314,6 +1332,38 @@ async function descubrir(rawPrefijo: unknown, rawAccount: unknown): Promise<Desc
   }
 }
 
+/** Una consulta que no llama a ninguna herramienta y solo lee system/init (o el config.toml con Codex). El error queda en el caché de la cuenta. */
+async function revisarUna(id: string): Promise<void> {
+  const previa = cuentasCache[id]
+  try {
+    const run = ejecucion('los conectores', id)
+    if (!run.motor.leeInit) {
+      const nombres = servidoresDeCodex(run)
+      const servidores = servidoresRevisados(nombres)
+      cuentasCache = { ...cuentasCache, [id]: { revisadaEn: Date.now(), servidores, error: servidoresIgnorados(nombres).length ? errorIgnorados(servidoresIgnorados(nombres)) : undefined } }
+      ctx.log(`tickets: revisar: ${nombres.length} servidores en el config de ${run.agente}`)
+      return
+    }
+    const pedido: PedidoMotor = { tarea: 'revisar', model: state.config.model, ajenos: [], schema: REVISAR_SCHEMA }
+    const r = await runClaude({
+      exe: run.exe,
+      args: run.motor.argv(pedido),
+      prompt: buildRevisarPrompt(),
+      cwd: run.cwd,
+      env: { ...run.env, ...run.motor.envExtra(pedido) },
+      quien: 'Claude',
+      timeoutMs: 90_000,
+      temprano: (l) => revisarTemprano(l, Date.now()),
+      parse: (s) => revisarCuenta(run.motor.normalizar(s, pedido), Date.now())
+    })
+    cuentasCache = { ...cuentasCache, [id]: r }
+    ctx.log(`tickets: revisar: ${r.servidores.length} servidores`)
+  } catch (e) {
+    cuentasCache = { ...cuentasCache, [id]: { revisadaEn: Date.now(), servidores: previa?.servidores ?? [], error: (e as Error).message.slice(0, 500) } }
+    ctx.log('tickets: revisar: error')
+  }
+}
+
 /**
  * «Volver a revisar»: una consulta por cuenta, de a tres, que no llama a ninguna herramienta y solo lee
  * system/init. Si en el init no quedó ningún servidor pending, se corta ahí sin esperar al modelo.
@@ -1328,42 +1378,83 @@ async function revisarCuentas(raw: unknown): Promise<TicketsSnapshot> {
   descubriendo = true
   avisar()
   try {
-    await deA(ids, 3, async (id) => {
-      const previa = cuentasCache[id]
-      try {
-        const run = ejecucion('los conectores', id)
-        if (!run.motor.leeInit) {
-          const nombres = servidoresDeCodex(run)
-          const servidores = servidoresRevisados(nombres)
-          cuentasCache = { ...cuentasCache, [id]: { revisadaEn: Date.now(), servidores, error: servidoresIgnorados(nombres).length ? errorIgnorados(servidoresIgnorados(nombres)) : undefined } }
-          ctx.log(`tickets: revisar: ${nombres.length} servidores en el config de ${run.agente}`)
-          return
-        }
-        const pedido: PedidoMotor = { tarea: 'revisar', model: state.config.model, ajenos: [], schema: REVISAR_SCHEMA }
-        const r = await runClaude({
-          exe: run.exe,
-          args: run.motor.argv(pedido),
-          prompt: buildRevisarPrompt(),
-          cwd: run.cwd,
-          env: { ...run.env, ...run.motor.envExtra(pedido) },
-          quien: 'Claude',
-          timeoutMs: 90_000,
-          temprano: (l) => revisarTemprano(l, Date.now()),
-          parse: (s) => revisarCuenta(run.motor.normalizar(s, pedido), Date.now())
-        })
-        cuentasCache = { ...cuentasCache, [id]: r }
-        ctx.log(`tickets: revisar: ${r.servidores.length} servidores`)
-      } catch (e) {
-        cuentasCache = { ...cuentasCache, [id]: { revisadaEn: Date.now(), servidores: previa?.servidores ?? [], error: (e as Error).message.slice(0, 500) } }
-        ctx.log('tickets: revisar: error')
-      }
-    })
+    await deA(ids, 3, revisarUna)
   } finally {
     descubriendo = false
     guardarCuentas()
     changed()
   }
   return snapshot()
+}
+
+/** Por qué un servidor no conecta y dónde está definido: lo único que se lee de `claude mcp get` (lo demás puede traer credenciales). */
+async function datosDeServidor(run: Ejecucion, nombre: string): Promise<DatosMcp | undefined> {
+  if (!nombreProbable(nombre)) return undefined
+  try {
+    return await runClaude({ exe: run.exe, args: ['mcp', 'get', nombre], prompt: '', cwd: run.cwd, env: run.env, quien: 'Claude', timeoutMs: MOTIVO_TIMEOUT_MS, parse: datosDeMcpGet })
+  } catch (e) {
+    ctx.log(`tickets: probar: no pude leer el motivo del servidor: ${limpiarCausa((e as Error).message)}`)
+    return undefined
+  }
+}
+
+/** Una consulta de lectura con la herramienta más simple del conector, para ver que responde de verdad. */
+async function consultaMinima(def: ConectorMcp, run: Ejecucion): Promise<ResultadoDePrueba> {
+  const d = defPara(def, run.accountId)
+  const efectivos = limitesEfectivos(limites())
+  try {
+    return await runClaude({
+      exe: run.exe,
+      args: buildProbarArgs(d, state.config.model, ajenosDe(run, d), limites()),
+      prompt: buildProbarPrompt(d),
+      cwd: run.cwd,
+      env: run.env,
+      quien: def.nombre,
+      timeoutMs: PROBAR_TIMEOUT_MS,
+      parse: (s) => {
+        const sesion = servidoresDeSalida(s)
+        if (sesion) actualizarDesdeInit(run.accountId, sesion, run.sinClaudeAi)
+        medirUso(def.id, s, efectivos)
+        return parseProbar(d, s)
+      }
+    })
+  } catch (e) {
+    if (e instanceof PlazoError) return { plazoS: e.segundos }
+    return { cayo: limpiarCausa((legible(e, run) as Error).message) }
+  }
+}
+
+/**
+ * «Probar»: vuelve a mirar la cuenta, si el servidor no conecta pregunta por qué y, si conecta, hace una consulta mínima.
+ * Contesta conectado, necesita sesión, sin herramientas o error (con el motivo y qué hacer); solo tira si la cuenta no se puede usar.
+ */
+async function probar(rawAccount: unknown): Promise<ResultadoPrueba> {
+  const def = activo()
+  if (def.via !== 'mcp') throw new Error(`${def.nombre} no usa un servidor MCP: no hay nada que probar.`)
+  if (descubriendo) throw new Error('Ya se están revisando las cuentas. Esperá a que termine.')
+  if (running || escribiendo.size) throw new Error('Esperá a que termine lo que está en curso.')
+  const id = typeof rawAccount === 'string' && rawAccount ? rawAccount : (state.config.queryAccountId ?? (await pickAccount(def)))
+  const label = ctx.store.account(id)?.label ?? id
+  const inicio = Date.now()
+  descubriendo = true
+  avisar()
+  try {
+    const previo = ejecucion(def.nombre, id, def)
+    if (!previo.motor.leeInit)
+      return { estado: 'error', mensaje: `Probar todavía no anda con ${previo.agente}: no informa el estado de los servidores.`, queHacer: 'Usá «Actualizar» en el tablero para ver si lee los tickets.', ms: Date.now() - inicio }
+    await revisarUna(id)
+    const d = dispEn(def, id)
+    // El pedido se arma de nuevo: lo que acaba de ver la revisión puede cambiar a qué servidor se le habla.
+    const run = ejecucion(def.nombre, id, def)
+    const sinConectar = d.tipo === 'tiene' && (d.estado === 'failed' || d.estado === 'pending' || d.estado === 'needs-auth')
+    const datos = d.tipo === 'tiene' && sinConectar ? await datosDeServidor(run, d.nombre) : undefined
+    const prueba = d.tipo === 'tiene' && d.estado === 'connected' && d.verificado ? await consultaMinima(def, run) : undefined
+    return diagnosticar({ def, cuenta: label, d, errorRevision: cuentasCache[id]?.error, datos, prueba, ms: Date.now() - inicio })
+  } finally {
+    descubriendo = false
+    guardarCuentas()
+    changed()
+  }
 }
 
 function idOpcional(v: unknown): string | undefined {
@@ -1496,6 +1587,7 @@ const feature: Feature = {
     c.handle('propio', (id: unknown) => structuredClone(noIncluido(id).def))
     c.handle('descubrir', (prefijo: unknown, acc: unknown) => descubrir(prefijo, acc))
     c.handle('revisarCuentas', (acc: unknown) => revisarCuentas(acc))
+    c.handle('probar', (acc: unknown) => probar(acc))
     c.handle('guardarPropio', (raw: unknown, anterior: unknown) => guardarPropio(raw, anterior))
     c.handle('borrarPropio', (id: unknown) => borrarPropio(id))
     c.handle('aceptar', (id: unknown, hash: unknown) => aceptar(id, hash))

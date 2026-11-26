@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { capacidadesDe, motivoSinCapacidad, proveedorIdDe } from '../../../../shared/proveedores'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
-import type { Disponibilidad } from '../../../../shared/tickets'
+import type { Disponibilidad, EstadoPrueba, ResultadoPrueba } from '../../../../shared/tickets'
 import { setSnapshot, timeAgo, type Snapshot } from './model'
 import { Button, Select } from '../../ui'
 
@@ -17,6 +17,15 @@ export function textoDisponibilidad(nombreConector: string, d: Disponibilidad | 
 }
 
 type Tono = 'ok' | 'aviso' | 'falta'
+
+const ETIQUETA_PRUEBA: Record<EstadoPrueba, string> = {
+  conectado: 'Conectado',
+  'necesita-sesion': 'Necesita sesión',
+  'sin-herramientas': 'Sin herramientas',
+  error: 'Error'
+}
+
+export const tonoPrueba = (e: EstadoPrueba): Tono => (e === 'conectado' ? 'ok' : e === 'error' ? 'falta' : 'aviso')
 
 function tonoDe(d: Disponibilidad | undefined): Tono {
   if (!d || d.tipo === 'sin_revisar' || d.tipo === 'elegir') return 'aviso'
@@ -38,6 +47,9 @@ export function CuentasConectores({ snap }: { snap: Snapshot }): React.JSX.Eleme
   const ui = useUi()
   const [err, setErr] = useState<string | null>(null)
   const [manual, setManual] = useState<boolean | null>(null)
+  // Lo último que dijo «Probar» por cuenta; no se guarda: es un diagnóstico del momento.
+  const [pruebas, setPruebas] = useState<Record<string, ResultadoPrueba>>({})
+  const [probando, setProbando] = useState<string | null>(null)
   const cid = snap.config.conectorId
   const nombre = snap.conector.nombre
   const logueadas = ui.accounts.filter((a) => ui.statuses[a.id]?.loggedIn && capacidadesDe(a)?.ticketsHeadless === true)
@@ -46,11 +58,23 @@ export function CuentasConectores({ snap }: { snap: Snapshot }): React.JSX.Eleme
   const elegida = snap.config.queryAccountId
   const dElegida = elegida ? snap.cuentas[elegida]?.conectores[cid] : undefined
   const autoAbierto = (!!dElegida && dElegida.tipo !== 'tiene') || !logueadas.some((a) => snap.cuentas[a.id]?.revisadaEn)
-  const ocupado = snap.revisando || snap.running
+  const ocupado = snap.revisando || snap.running || probando !== null
 
   const revisar = (id?: string): void => {
     setErr(null)
     void ui.invoke<Snapshot>('feat:tickets:revisarCuentas', id).then(setSnapshot, (e) => setErr(cleanError(e)))
+  }
+
+  const probar = (id: string): void => {
+    setErr(null)
+    setProbando(id)
+    void ui
+      .invoke<ResultadoPrueba>('feat:tickets:probar', id)
+      .then(
+        (r) => setPruebas((p) => ({ ...p, [id]: r })),
+        (e) => setErr(cleanError(e))
+      )
+      .finally(() => setProbando(null))
   }
 
   const elegirServidor = (cuenta: string, prefijo: string): void => {
@@ -87,7 +111,19 @@ export function CuentasConectores({ snap }: { snap: Snapshot }): React.JSX.Eleme
                   <Button size="sm" onClick={() => revisar(a.id)} disabled={ocupado} aria-label={`Revisar los conectores de ${a.label}`}>
                     Revisar
                   </Button>
+                  <Button size="sm" onClick={() => probar(a.id)} disabled={ocupado} aria-label={`Probar ${nombre} con ${a.label}`} title="Revisa la cuenta y hace una consulta mínima de lectura para ver que responde">
+                    {probando === a.id ? 'Probando…' : 'Probar'}
+                  </Button>
                 </div>
+                {pruebas[a.id] && (
+                  <div className="f-tickets-cuentas-prueba" role="status">
+                    <p className="f-tickets-cuentas-nota">
+                      <span className={`f-tickets-cuentas-estado ${tonoPrueba(pruebas[a.id].estado)}`}>{ETIQUETA_PRUEBA[pruebas[a.id].estado]}</span> {pruebas[a.id].mensaje}
+                    </p>
+                    {pruebas[a.id].causa && <p className="f-tickets-cuentas-nota">Motivo: {pruebas[a.id].causa}</p>}
+                    {pruebas[a.id].queHacer && <p className="f-tickets-cuentas-nota">Qué hacer: {pruebas[a.id].queHacer}</p>}
+                  </div>
+                )}
                 {v?.error && <p className="f-tickets-cuentas-nota falta">{v.error}</p>}
                 {accion && <p className="f-tickets-cuentas-nota">{accion}</p>}
                 {d?.tipo === 'falta' && (

@@ -173,6 +173,21 @@ export type Disponibilidad =
   /** adaptado: el servidor tiene otro prefijo que el del conector. verificado: se vieron sus herramientas. */
   | { tipo: 'tiene'; nombre: string; prefijo: string; estado: EstadoMcp; adaptado: boolean; verificado: boolean }
 
+/** Qué pasó al probar un conector en una cuenta, en palabras para la persona. */
+export type EstadoPrueba = 'conectado' | 'necesita-sesion' | 'sin-herramientas' | 'error'
+
+export interface ResultadoPrueba {
+  estado: EstadoPrueba
+  /** Una línea: qué se encontró. */
+  mensaje: string
+  /** Por qué, si se pudo saber (lo que dijo Claude Code o la herramienta). */
+  causa?: string
+  /** Qué hacer ahora. */
+  queHacer?: string
+  /** Cuánto tardó, en milisegundos. */
+  ms: number
+}
+
 export interface CuentaVista {
   revisadaEn?: number
   error?: string

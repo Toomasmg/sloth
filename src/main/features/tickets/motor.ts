@@ -304,6 +304,10 @@ export function buildArgs(
   ]
 }
 
+/** Sin esto, una herramienta que falla (token vencido, base caída) termina en una lista vacía que se lee como «no hay tickets». */
+const errorDeHerramienta = (n: string, listas: string[]): string =>
+  `Si las herramientas de ${n} fallan y no pudiste leer nada, respondé {"error":"<el motivo que dieron, en pocas palabras>"${listas.map((k) => `,"${k}":[]`).join('')}} en vez de una lista vacía.`
+
 /**
  * Con `alcance` y un conector que sabe listar por responsable (`pistas.listaPor`), lee los tickets propios
  * y los de las personas pedidas, desde una fecha. Sin eso, lee los de TODO el equipo para que la app pueda
@@ -345,6 +349,7 @@ export function buildPrompt(def: ConectorMcp, assigneeId: string, alcance?: Alca
     'Respondé SOLO con un JSON, sin texto antes ni después y sin bloque de código, con esta forma:',
     J(ejemplo),
     'Si un campo opcional no viene, no lo pongas. Si no hay tickets, devolvé "tickets":[].',
+    errorDeHerramienta(n, ['tickets']),
     `Si no tenés ninguna herramienta de ${n} disponible, respondé exactamente ${J({ error: def.faltaConector.clave, tickets: [] })}.`
   ].join('\n')
 }
@@ -396,6 +401,7 @@ export function buildPersonasPrompt(def: ConectorMcp): string {
     'Respondé SOLO con un JSON, sin texto antes ni después y sin bloque de código, con esta forma:',
     J({ personas: [{ id: '<id>', nombre: '<nombre>' }] }),
     'No pongas mails, teléfonos ni otro dato de las personas: solo "id" y "nombre". No repitas ids.',
+    errorDeHerramienta(n, ['personas']),
     `Si no tenés ninguna herramienta de ${n} disponible, respondé exactamente ${J({ error: def.faltaConector.clave, personas: [] })}.`
   ].join('\n')
 }
@@ -408,7 +414,10 @@ export function buildPersonasArgs(def: ConectorMcp, model: string, ajenos: reado
 /** Lee la lista de personas. Tira ConectorFaltaError si la cuenta no tiene el conector. */
 export function parsePersonas(def: ConectorMcp, stdout: string): PersonaEquipo[] {
   const { data } = parseEnvelope(def, stdout)
-  return normalizePersonas(def, (data as { personas?: unknown } | null)?.personas)
+  const personas = normalizePersonas(def, (data as { personas?: unknown } | null)?.personas)
+  const reportado = personas.length ? undefined : errorReportado(data)
+  if (reportado) throw new Error(`${def.nombre} respondió con un error: ${reportado}`)
+  return personas
 }
 
 /** Un nombre que trae un correo o un teléfono (porque la persona no tiene nombre cargado, o el modelo los juntó) los pierde: lo que queda es el nombre. */
@@ -462,6 +471,7 @@ export function buildDetallePrompt(def: ConectorMcp, id: string): string {
       ? [`"descripcion": ${def.pistas.descripcion} Texto plano, de hasta ${DESCRIPCION_DETALLE_MAX} caracteres, sin copiar datos de contacto ni personales (correos, teléfonos); si el ticket no trae nada, no pongas "descripcion".`]
       : []),
     '"minutos_total" son los minutos del reloj del ticket (número entero); si no hay registro, null.',
+    errorDeHerramienta(n, ['criterios', 'comentarios']),
     `Si no hay criterios o comentarios, devolvé listas vacías. Si no tenés las herramientas de ${n}, respondé exactamente ${J({ error: def.faltaConector.clave, criterios: [], comentarios: [] })}.`
   ].join('\n')
 }
@@ -610,6 +620,12 @@ function noLeidosDe(data: unknown, aceptados: number): number {
   return Math.min(NO_LEIDOS_MAX, cortados + dicho)
 }
 
+/** El motivo que Claude puso en «error» cuando las herramientas fallaron (no la clave de «no tiene el conector», que se trata aparte). */
+export function errorReportado(data: unknown): string | undefined {
+  const e = data && typeof data === 'object' ? (data as { error?: unknown }).error : undefined
+  return str(e, 300)
+}
+
 /** Interpreta el stdout de la consulta de lista. Con `porAlcance` los terminados no se descartan acá: el filtro decide. */
 export function parseClaudeOutput(def: ConectorDef, stdout: string, porAlcance = false): ResultadoLista {
   const { data, env } = parseEnvelope(def, stdout)
@@ -619,6 +635,8 @@ export function parseClaudeOutput(def: ConectorDef, stdout: string, porAlcance =
   if (!tickets.length && Array.isArray(denied) && denied.length) {
     throw new Error(`Claude no pudo usar las herramientas de ${def.nombre} (permiso negado). Probá de nuevo.`)
   }
+  const reportado = tickets.length ? undefined : errorReportado(data)
+  if (reportado) throw new Error(`${def.nombre} respondió con un error: ${reportado}`)
   const estados = normalizeEstados(def, (data as { estados?: unknown })?.estados)
   const me = normYo(def, (data as { yo?: unknown })?.yo)
   const noLeidos = porAlcance ? noLeidosDe(data, tickets.length) : 0
@@ -677,6 +695,8 @@ export function parseDetalle(def: ConectorMcp, stdout: string): Detalle {
   const descripcion = def.pistas.descripcion === undefined ? undefined : normDescripcion(o.descripcion)
   if (!criterios.length && !comentarios.length && minutos === null && !descripcion && def.herramientas.detalle.some((t) => deniedTool(env, t)))
     throw new Error(`${def.nombre} no dejó leer el detalle con esta cuenta (permiso negado).`)
+  const reportado = !criterios.length && !comentarios.length && minutos === null && !descripcion ? errorReportado(data) : undefined
+  if (reportado) throw new Error(`${def.nombre} respondió con un error: ${reportado}`)
   return { criterios, comentarios, minutos, ...(descripcion ? { descripcion } : {}) }
 }
 
