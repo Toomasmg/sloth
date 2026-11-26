@@ -6,6 +6,7 @@ import logo from '../../assets/sloth-logo.png'
 import { setPhase, setRestarting, usePhase } from './phase'
 import { showUpdateToast } from './bus'
 import { useUpdateStatus, type NoteGroup, type UpdateStatus } from './useUpdateStatus'
+import { Button } from '../../ui'
 
 const REPO_URL = 'https://github.com/Toomasmg/sloth'
 
@@ -151,16 +152,16 @@ export function UpdateDialogs(): React.JSX.Element | null {
           })}
         </div>
         <footer className="f-updater-actions">
-          <button type="button" className="btn ghost" onClick={close}>
+          <Button look="classic" variant="ghost" onClick={close}>
             Más tarde
-          </button>
+          </Button>
           <span className="f-updater-grow" />
-          <button type="button" className="btn" onClick={queue}>
+          <Button look="classic" onClick={queue}>
             Al cerrar Sloth
-          </button>
-          <button type="button" className="btn primary" onClick={startDownload} autoFocus>
+          </Button>
+          <Button look="classic" variant="primary" onClick={startDownload} autoFocus>
             Actualizar y reiniciar
-          </button>
+          </Button>
         </footer>
       </>
     )
@@ -176,13 +177,13 @@ export function UpdateDialogs(): React.JSX.Element | null {
     body = (
       <>
         <footer className="f-updater-actions">
-          <button type="button" className="btn ghost" onClick={close}>
+          <Button look="classic" variant="ghost" onClick={close}>
             Cerrar
-          </button>
+          </Button>
           <span className="f-updater-grow" />
-          <button type="button" className="btn primary" onClick={() => (st.version ? void call('feat:updater:download') : void call('feat:updater:check'))} autoFocus>
+          <Button look="classic" variant="primary" onClick={() => (st.version ? void call('feat:updater:download') : void call('feat:updater:check'))} autoFocus>
             Reintentar
-          </button>
+          </Button>
         </footer>
       </>
     )
@@ -201,16 +202,16 @@ export function UpdateDialogs(): React.JSX.Element | null {
           Al reiniciar, Sloth se cierra y se vuelve a abrir. Los espacios y las terminales vuelven solos después, con la misma distribución y la misma cuenta.
         </p>
         <footer className="f-updater-actions">
-          <button type="button" className="btn ghost" onClick={close}>
+          <Button look="classic" variant="ghost" onClick={close}>
             Más tarde
-          </button>
+          </Button>
           <span className="f-updater-grow" />
-          <button type="button" className="btn" onClick={queue}>
+          <Button look="classic" onClick={queue}>
             Al cerrar Sloth
-          </button>
-          <button type="button" className="btn primary" onClick={() => void restartNow()} autoFocus>
+          </Button>
+          <Button look="classic" variant="primary" onClick={() => void restartNow()} autoFocus>
             Reiniciar ahora
-          </button>
+          </Button>
         </footer>
       </>
     )
@@ -238,13 +239,13 @@ export function UpdateDialogs(): React.JSX.Element | null {
           </div>
         </div>
         <footer className="f-updater-actions">
-          <button type="button" className="btn ghost" onClick={close} data-autofocus>
+          <Button look="classic" variant="ghost" onClick={close} data-autofocus>
             Más tarde
-          </button>
+          </Button>
           <span className="f-updater-grow" />
-          <button
+          <Button
             type="button"
-            className="btn"
+            look="classic"
             onClick={() =>
               void call('feat:updater:cancel', () => {
                 setPhase(null)
@@ -253,7 +254,7 @@ export function UpdateDialogs(): React.JSX.Element | null {
             }
           >
             Cancelar descarga
-          </button>
+          </Button>
         </footer>
       </>
     )
@@ -382,13 +383,13 @@ export function AboutModal({ onClose }: { onClose: () => void }): React.JSX.Elem
           </a>
           <span className="f-updater-grow" />
           {ready ? (
-            <button type="button" className="btn primary" onClick={() => void install()} disabled={busy} autoFocus>
+            <Button look="classic" variant="primary" onClick={() => void install()} disabled={busy} autoFocus>
               {busy ? 'Reiniciando…' : 'Reiniciar y actualizar'}
-            </button>
+            </Button>
           ) : (
-            <button type="button" className="btn" onClick={() => void check()} disabled={checking || st?.enabled === false}>
+            <Button look="classic" onClick={() => void check()} disabled={checking || st?.enabled === false}>
               Buscar actualizaciones
-            </button>
+            </Button>
           )}
         </footer>
     </Modal>

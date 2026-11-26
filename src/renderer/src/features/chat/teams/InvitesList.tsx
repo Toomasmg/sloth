@@ -2,6 +2,7 @@ import { useId, useState } from 'react'
 import type { ChatInvite, ChatTeam } from '../../../../../shared/chat'
 import { useUi } from '../../host'
 import { cleanError } from '../../../format'
+import { Button } from '../../../ui'
 
 const dateOf = (ms: number): string => new Date(ms).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
 
@@ -60,12 +61,12 @@ export function InvitesList({ invites, onJoined }: { invites: ChatInvite[]; onJo
                 </span>
               </div>
               <div className="f-chat-team-actions">
-                <button type="button" className="btn sm primary" onClick={() => void accept(inv)} disabled={busy} aria-label={`Aceptar invitación a ${inv.teamName}`}>
+                <Button look="classic" size="sm" variant="primary" onClick={() => void accept(inv)} disabled={busy} aria-label={`Aceptar invitación a ${inv.teamName}`}>
                   {busy ? 'Un momento…' : 'Aceptar'}
-                </button>
-                <button type="button" className="btn sm ghost" onClick={() => void decline(inv)} disabled={busy} aria-label={`Rechazar invitación a ${inv.teamName}`}>
+                </Button>
+                <Button look="classic" size="sm" variant="ghost" onClick={() => void decline(inv)} disabled={busy} aria-label={`Rechazar invitación a ${inv.teamName}`}>
                   Rechazar
-                </button>
+                </Button>
               </div>
             </li>
           )

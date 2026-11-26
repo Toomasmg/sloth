@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AddAccountIcon, ChangesIcon, DoneIcon } from '../../icons/SlothIcons'
 import { api } from '../../api'
 import { Dialog } from './Dialog'
+import { Button } from '../../ui'
 
 /** Texto para mandarle a un compañero. El link de descarga es fijo. */
 export const INVITE_TEXT =
@@ -43,12 +44,12 @@ export function InviteModal({ onClose }: { onClose: () => void }): React.JSX.Ele
             )}
             {copied === 'error' && 'No se pudo copiar'}
           </span>
-          <button type="button" className="btn" onClick={onClose}>
+          <Button look="classic" onClick={onClose}>
             Cerrar
-          </button>
-          <button type="button" className="btn primary" onClick={copy}>
+          </Button>
+          <Button look="classic" variant="primary" onClick={copy}>
             <ChangesIcon size={14} /> Copiar texto
-          </button>
+          </Button>
         </>
       }
     >

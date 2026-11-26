@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useId, useImperativeHandle, useRef, useState, ty
 import { ArrowBendUpLeft, PaperPlaneRight, PencilSimple, X } from '@phosphor-icons/react'
 import { CHAT_LIMITS, type ChatConvRef, type ChatMessage, type ChatProfile } from '../../../../shared/chat'
 import { applyMention, mentionQueryAt } from '../../../../shared/chat-text'
-import { IconButton } from '../../ui'
+import { Button, IconButton } from '../../ui'
 import { firstWords } from './alerts'
 import { composerKey, lastEditable, type ComposerMode } from './message-ops'
 import { ConfirmInline } from './teams/shared'
@@ -292,10 +292,10 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer({ co
         <span id={countId} className={over ? 'f-chat-count over' : 'f-chat-count'}>
           {over ? `Pasaste el límite: ${text.length}/${CHAT_LIMITS.body}` : near ? `${text.length}/${CHAT_LIMITS.body}` : ''}
         </span>
-        <button type="submit" className="btn primary sm" disabled={(!text.trim() && !editing) || over}>
+        <Button type="submit" look="classic" size="sm" variant="primary" disabled={(!text.trim() && !editing) || over}>
           <PaperPlaneRight size={14} aria-hidden="true" />
           {editing ? 'Guardar' : 'Enviar'}
-        </button>
+        </Button>
       </div>
     </form>
   )

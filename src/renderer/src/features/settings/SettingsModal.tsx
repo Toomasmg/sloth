@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AddAccountIcon, SearchIcon, SLOTH_ICONS } from '../../icons/SlothIcons'
 import { useUi } from '../host'
+import { Button } from '../../ui'
 import { View } from '../../ui/View'
 import type { SectionId, SettingsTab } from './bus'
 import { NAV, navOf, normalizeTab, searchSettings } from './search'
@@ -111,9 +112,9 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
                 <p>{meta.sub}</p>
               </div>
               {sec === 'cuentas' && (
-                <button type="button" className="btn primary sm f-set-add" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>
+                <Button look="classic" size="sm" variant="primary" className="f-set-add" aria-expanded={adding} onClick={() => setAdding((v) => !v)}>
                   <AddAccountIcon size={14} /> Agregar cuenta
-                </button>
+                </Button>
               )}
             </header>
             <SaveContext.Provider value={run}>

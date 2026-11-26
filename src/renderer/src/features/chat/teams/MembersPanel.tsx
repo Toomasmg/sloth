@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import { ChatCircle, Crown, ShieldCheck, SignOut, Users, UserMinus } from '@phosphor-icons/react'
 import type { ChatMember, ChatRemoveResult, ChatSnapshot, ChatTeam, ChatThread } from '../../../../../shared/chat'
-import { InlineAlert } from '../../../ui'
+import { Button, InlineAlert } from '../../../ui'
 import { useUi } from '../../host'
 import { cleanError } from '../../../format'
 import { Avatar, canManage, ConfirmInline, roleLabel, TeamModal } from './shared'
@@ -118,28 +118,31 @@ export function MembersPanel({
                 </span>
                 <div className="f-chat-team-actions">
                   {!isMe && (
-                    <button
+                    <Button
                       type="button"
-                      className="btn sm"
+                      look="classic"
+                      size="sm"
                       onClick={() => void writeTo(m)}
                       disabled={busyKey !== null}
                       aria-label={`Escribirle a ${m.profile.login}`}
                     >
                       <ChatCircle size={14} aria-hidden="true" />
                       {busyKey === `dm:${m.profile.id}` ? 'Abriendo…' : 'Escribirle'}
-                    </button>
+                    </Button>
                   )}
                   {canRemove && (
-                    <button
+                    <Button
                       type="button"
-                      className="btn sm danger"
+                      look="classic"
+                      size="sm"
+                      variant="danger"
                       onClick={() => setConfirm({ kind: 'remove', member: m })}
                       disabled={busyKey !== null || confirm !== null}
                       aria-label={`Sacar a ${m.profile.login} del equipo`}
                     >
                       <UserMinus size={14} aria-hidden="true" />
                       Sacar
-                    </button>
+                    </Button>
                   )}
                 </div>
               </li>
@@ -184,23 +187,26 @@ export function MembersPanel({
             onCancel={() => setConfirm(null)}
           />
         ) : (
-          <button
+          <Button
             type="button"
-            className="btn sm ghost f-chat-team-leave"
+            look="classic"
+            size="sm"
+            variant="ghost"
+            className="f-chat-team-leave"
             onClick={() => setConfirm({ kind: 'leave' })}
             disabled={busyKey !== null || confirm !== null || members === null || !me}
           >
             <SignOut size={14} aria-hidden="true" />
             Salir del equipo
-          </button>
+          </Button>
         )}
         <span className="field-help">{members?.length ?? 0} en el equipo</span>
       </footer>
 
       <div className="modal-actions">
-        <button type="button" className="btn" onClick={onClose} disabled={busyKey !== null}>
+        <Button look="classic" onClick={onClose} disabled={busyKey !== null}>
           Cerrar
-        </button>
+        </Button>
       </div>
     </TeamModal>
   )

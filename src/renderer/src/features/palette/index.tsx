@@ -20,6 +20,7 @@ import { useUi, type Command, type FeatureUi, type UiCtx } from '../host'
 import { fuzzyFilter, splitHighlight, type FuzzyMatch } from './fuzzy'
 import { coreCommands, focusPaneTerminal } from './core-commands'
 import './palette.css'
+import { Button } from '../../ui'
 
 // La lista la fija registry.ts al armar FEATURE_UIS, para no importarlo en círculo.
 let featureUis: FeatureUi[] = []
@@ -538,16 +539,18 @@ export function PaletteBar(): React.JSX.Element {
                 {nq && !scoped && (
                   <>
                     <span className="pal-empty-sub">Probá con otra palabra o creá un espacio con ese nombre.</span>
-                    <button
+                    <Button
                       type="button"
-                      className="btn sm primary"
+                      look="classic"
+                      size="sm"
+                      variant="primary"
                       onClick={() => {
                         close(true)
                         ctx.openNewWorkspace('normal', { name: nq.slice(0, 80) })
                       }}
                     >
                       Crear espacio «{nq.slice(0, 40)}»
-                    </button>
+                    </Button>
                   </>
                 )}
               </div>

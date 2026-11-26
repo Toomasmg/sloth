@@ -157,9 +157,9 @@ export function TeamView(): React.JSX.Element {
           {tarde ? (
             <p className="form-error f-team-pad" role="alert">
               No se pudo leer el equipo.{' '}
-              <button type="button" className="btn sm" onClick={reintentar}>
+              <Button look="classic" size="sm" onClick={reintentar}>
                 Reintentar
-              </button>
+              </Button>
             </p>
           ) : (
             <p className="hint f-team-pad">Cargando…</p>
@@ -210,13 +210,13 @@ export function TeamView(): React.JSX.Element {
             <span>
               Crea el espacio <b className="mono">{t.id}</b> y arranca Claude ahí.
             </span>
-            <button type="button" className="btn sm primary" autoFocus disabled={Boolean(busy)} onClick={() => void start(t.id)}>
+            <Button look="classic" size="sm" variant="primary" autoFocus disabled={Boolean(busy)} onClick={() => void start(t.id)}>
               {busy === `start:${t.id}` ? <CircleNotch size={13} className="spin" aria-hidden="true" /> : <Play size={13} weight="fill" aria-hidden="true" />}
               Empezar
-            </button>
-            <button type="button" className="btn sm ghost" onClick={() => setStarting(null)}>
+            </Button>
+            <Button look="classic" size="sm" variant="ghost" onClick={() => setStarting(null)}>
               Cancelar
-            </button>
+            </Button>
           </div>
         )}
       </li>
@@ -335,29 +335,30 @@ export function TeamView(): React.JSX.Element {
               ))}
           </span>
           <div className="f-team-actions">
-            <button type="button" className="btn sm" disabled={ghRunning} onClick={() => void refreshGithub()} title="Vuelve a leer los PRs abiertos con gh (no usa tokens)">
+            <Button look="classic" size="sm" disabled={ghRunning} onClick={() => void refreshGithub()} title="Vuelve a leer los PRs abiertos con gh (no usa tokens)">
               <ArrowClockwise size={14} aria-hidden="true" className={ghRunning ? 'spin' : undefined} /> Actualizar
-            </button>
+            </Button>
             {conector &&
               (ticketsRunning ? (
-                <button type="button" className="btn sm" onClick={() => void ui.invoke('feat:tickets:cancel')}>
+                <Button look="classic" size="sm" onClick={() => void ui.invoke('feat:tickets:cancel')}>
                   <X size={14} aria-hidden="true" /> Cancelar
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button
                   type="button"
-                  className="btn sm"
+                  look="classic"
+                  size="sm"
                   onClick={pedirTraer}
                   title={conector.via === 'mcp' ? 'Usa tokens de la cuenta de Tickets' : 'Lee con GitHub CLI (no usa tokens)'}
                 >
                   <Ticket size={14} aria-hidden="true" /> Traer de {n}
                   {conector.via === 'mcp' && <span className="f-team-subbtn">usa tokens</span>}
-                </button>
+                </Button>
               ))}
             {conector && (
-              <button type="button" className="btn sm ghost" aria-expanded={panel === 'link'} onClick={() => setPanel(panel === 'link' ? 'none' : 'link')}>
+              <Button look="classic" size="sm" variant="ghost" aria-expanded={panel === 'link'} onClick={() => setPanel(panel === 'link' ? 'none' : 'link')}>
                 <LinkSimple size={14} aria-hidden="true" /> Vincular
-              </button>
+              </Button>
             )}
           </div>
         </>
@@ -376,12 +377,12 @@ export function TeamView(): React.JSX.Element {
               <input type="checkbox" onChange={(e) => noPreguntar(e.target.checked)} />
               No volver a preguntar (también en Tickets)
             </label>
-            <button type="button" className="btn sm primary" autoFocus onClick={() => void traer()}>
+            <Button look="classic" size="sm" variant="primary" autoFocus onClick={() => void traer()}>
               Consultar
-            </button>
-            <button type="button" className="btn sm ghost" onClick={() => setConfirmar(false)}>
+            </Button>
+            <Button look="classic" size="sm" variant="ghost" onClick={() => setConfirmar(false)}>
               Cancelar
-            </button>
+            </Button>
           </div>
         )}
 
@@ -424,9 +425,9 @@ export function TeamView(): React.JSX.Element {
               {snap.tickets.filtro.personasElegidas > 0 &&
                 ` y los de ${snap.tickets.filtro.personasElegidas === 1 ? '1 persona elegida' : `${snap.tickets.filtro.personasElegidas} personas elegidas`}`}
               {snap.tickets.filtro.incluirSinAsignar && ', más los sin asignar'}. Se ve todo lo que tienen en curso, en revisión o bloqueado, sin importar cuándo se creó.{' '}
-              <button type="button" className="btn sm ghost" onClick={elegirPersonas}>
+              <Button look="classic" size="sm" variant="ghost" onClick={elegirPersonas}>
                 Elegir personas
-              </button>
+              </Button>
             </p>
           )}
 

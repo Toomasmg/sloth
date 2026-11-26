@@ -4,6 +4,7 @@ import type { ChatTeam } from '../../../../../shared/chat'
 import { useUi } from '../../host'
 import { cleanError } from '../../../format'
 import { TeamModal } from './shared'
+import { Button } from '../../../ui'
 
 const CODE_RE = /^[0-9a-f]{16}$/
 
@@ -66,12 +67,12 @@ export function JoinByCode({ onClose, onJoined }: { onClose(): void; onJoined(te
           </p>
         )}
         <div className="modal-actions">
-          <button type="button" className="btn" onClick={onClose} disabled={busy}>
+          <Button look="classic" onClick={onClose} disabled={busy}>
             Cancelar
-          </button>
-          <button type="submit" className="btn primary" disabled={busy || code.trim() === ''}>
+          </Button>
+          <Button type="submit" look="classic" variant="primary" disabled={busy || code.trim() === ''}>
             {busy ? 'Entrando…' : 'Entrar'}
-          </button>
+          </Button>
         </div>
       </form>
     </TeamModal>

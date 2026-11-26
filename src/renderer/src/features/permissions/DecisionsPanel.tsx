@@ -5,6 +5,7 @@ import { Modal } from '../../Modal'
 import { removeRule, setRule, undoDecision } from './api'
 import { hhmm, usePermissionsList } from './store'
 import { updateSettings, useSettings } from '../settings/store'
+import { Button } from '../../ui'
 
 const TAG: Record<DecisionEntry['tag'], { label: string; cls: string; text: (e: DecisionEntry) => string }> = {
   once: { label: 'Permitido', cls: 'ok', text: (e) => `Permitido una vez · ${e.label}` },
@@ -87,9 +88,9 @@ export function DecisionsPanel({ onClose }: { onClose: () => void }): React.JSX.
                   <span className="pd-text">{t.text(h)}</span>
                 </span>
                 {undoable && (
-                  <button type="button" className="btn sm" onClick={() => void act(() => undoDecision(h.id))}>
+                  <Button look="classic" size="sm" onClick={() => void act(() => undoDecision(h.id))}>
                     Deshacer
-                  </button>
+                  </Button>
                 )}
                 {h.undone && <span className="pd-undone">Deshecho</span>}
               </li>
@@ -117,9 +118,9 @@ export function DecisionsPanel({ onClose }: { onClose: () => void }): React.JSX.
                 />
                 <span className="switch-track" aria-hidden="true" />
               </span>
-              <button type="button" className="btn sm" aria-label={`Quitar la regla ${r.label}`} onClick={() => void act(() => removeRule(r.id))}>
+              <Button look="classic" size="sm" aria-label={`Quitar la regla ${r.label}`} onClick={() => void act(() => removeRule(r.id))}>
                 Quitar
-              </button>
+              </Button>
             </div>
           ))}
           {data && rules.length === 0 && <p className="pd-empty">No hay comandos permitidos siempre.</p>}

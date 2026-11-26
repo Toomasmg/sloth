@@ -5,6 +5,7 @@ import { PermissionIcon, WaitingIcon, CloseIcon } from './icons/SlothIcons'
 import { cleanError } from './format'
 import { openPermissionReview } from './features/permissions/store'
 import './features/permissions/permissions.css'
+import { Button } from './ui'
 
 /** Nombre corto para mostrar: en MCP, la herramienta sin el prefijo. */
 export function toolLabel(tool: string): string {
@@ -144,32 +145,33 @@ export function PermissionCard({ prompt, queued, now, spaceName, accountLabel, o
             placeholder="Motivo (opcional): Claude lo va a leer"
             disabled={busy}
           />
-          <button type="submit" className="btn sm danger" disabled={busy}>
+          <Button type="submit" look="classic" size="sm" variant="danger" disabled={busy}>
             {sending === 'deny' ? 'Rechazando…' : 'Confirmar rechazo'}
-          </button>
-          <button type="button" className="btn sm ghost" disabled={busy} onClick={() => setDenying(false)}>
+          </Button>
+          <Button look="classic" size="sm" variant="ghost" disabled={busy} onClick={() => setDenying(false)}>
             Cancelar
-          </button>
+          </Button>
         </form>
       ) : (
         <div className="pc-actions">
-          <button type="button" className="btn sm primary" disabled={busy} onClick={() => void send('allow')} data-perm-primary>
+          <Button look="classic" size="sm" variant="primary" disabled={busy} onClick={() => void send('allow')} data-perm-primary>
             {sending === 'allow' ? 'Permitiendo…' : 'Permitir una vez'}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="btn sm"
+            look="classic"
+            size="sm"
             disabled={busy}
             onClick={() => void send('allowAlways')}
             title="Guarda una regla para este espacio: los pedidos iguales se aprueban solos"
           >
             {sending === 'allowAlways' ? 'Guardando…' : alwaysLabel(kind)}
-          </button>
+          </Button>
           <span className="spacer" />
-          <button type="button" className="btn sm ghost danger" disabled={busy} onClick={() => setDenying(true)}>
+          <Button look="classic" size="sm" variant="ghost" className="danger" disabled={busy} onClick={() => setDenying(true)}>
             <CloseIcon size={12} aria-hidden="true" />
             Rechazar
-          </button>
+          </Button>
           <button type="button" className="pc-link" disabled={busy} onClick={() => openPermissionReview(prompt.id)}>
             Revisar
           </button>
