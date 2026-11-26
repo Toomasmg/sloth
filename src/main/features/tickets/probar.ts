@@ -50,7 +50,9 @@ export function limpiarCausa(texto: string, max = CAUSA_MAX): string {
   const limpio = texto
     // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u001f\u007f]+/g, ' ')
-    .replace(/Bearer\s+\S+/gi, 'Bearer ***')
+    .replace(/\b(Bearer|Basic)\s+\S+/gi, '$1 ***')
+    .replace(/\b([\w-]*(?:api[_-]?key|token|secret|password|passwd)[\w-]*)\s*[:=]\s*\S+/gi, '$1=***')
+    .replace(/(https?:\/\/)[^\s/?#"']*@/gi, '$1')
     .replace(/(https?:\/\/[^\s/?#"']+)[^\s"']*/gi, '$1')
     .replace(/\b[A-Za-z0-9_+/=.~-]{32,}\b/g, '***')
     .replace(/\s+/g, ' ')
