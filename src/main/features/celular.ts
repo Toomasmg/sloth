@@ -15,6 +15,7 @@ import { LIMITES_ARCHIVO } from '../statusline-core'
 import { agenteDe, capacidadesDe } from '../../shared/proveedores'
 import { limitesDeCuenta } from '../codex-limites'
 import { armarEstado, claveValida, httpsTailscale, ipTailscale, cuerpoNtfy, enlaceAviso, textoAvisoPrivado, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type TipoAviso } from './celular-core'
+import { crearRepetidos } from './celular-sello'
 import { crearFuenteWifi, type FuenteDeEstado, type ProveedorDeEstado } from './celular-servidor'
 import { XTERM } from './celular-xterm'
 import { debeEsperar, nuevoVisor, ponerFoto, salidaDesde, sinSalida, sinAutomaticas, sumarSalida, tamanoActual, vencidos, type RespuestaTerminal, type Visor } from './celular-terminal-core'
@@ -162,6 +163,7 @@ const feature: Feature = {
     const visores = new Map<string, Visor>()
     const esperas = crearEsperas()
     const escrituras = crearEscrituras()
+    const repetidos = crearRepetidos()
     let vencedor: NodeJS.Timeout | null = null
 
 
@@ -479,7 +481,7 @@ const feature: Feature = {
       if (!cfg.tailscale.encendido || !fuente) return
       const ip = ipTs()
       for (const host of ip ? [ip, LOCAL] : [LOCAL]) {
-        const f = crearFuenteWifi({ host, puerto: cfg.puerto, proveedor, log: ctx.log })
+        const f = crearFuenteWifi({ host, puerto: cfg.puerto, proveedor, repetidos, log: ctx.log })
         try {
           await f.iniciar()
           extras.push({ host, f })
@@ -501,7 +503,7 @@ const feature: Feature = {
         error = 'No encontré la red de casa. Conectá la PC al Wi-Fi (o por cable al mismo router que el celu).'
         return
       }
-      const f = crearFuenteWifi({ host: ip, puerto: cfg.puerto, proveedor, log: ctx.log })
+      const f = crearFuenteWifi({ host: ip, puerto: cfg.puerto, proveedor, repetidos, log: ctx.log })
       try {
         await f.iniciar()
         fuente = f

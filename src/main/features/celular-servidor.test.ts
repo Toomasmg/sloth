@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto'
 import { connect, type Socket } from 'node:net'
 import type { EstadoCelular } from '../../shared/celular'
 import { crearFuenteWifi, type OpcionesWifi, type ProveedorDeEstado } from './celular-servidor'
-import { abrirRespuesta, derivarClaves, sellarPedido, type Claves } from './celular-sello'
+import { abrirRespuesta, crearRepetidos, derivarClaves, sellarPedido, type Claves } from './celular-sello'
 
 const CLAVE = Buffer.alloc(32, 7).toString('base64url')
 const ESTADO: EstadoCelular = { ahora: 1, aprobar: false, terminal: false, cuentas: [], sesiones: [], pedidos: [] }
@@ -464,4 +464,21 @@ test('los íconos de 512 (para instalarla como app) se sirven si están; el mani
     const m = (await (await fetch(`${base}/manifest.webmanifest`)).json()) as { icons: { src: string; sizes: string; purpose: string }[] }
     assert.deepEqual(m.icons.map((i) => `${i.src} ${i.sizes} ${i.purpose}`), ['/icono.png 192x192 any', '/icono-512.png 512x512 any', '/icono-maskable.png 512x512 maskable'])
   })
+})
+
+test('dos servidores de la misma PC (Wi-Fi y Tailscale) comparten la memoria de sobres: uno copiado de un lado no vale del otro', async () => {
+  const repetidos = crearRepetidos()
+  const proveedor: ProveedorDeEstado = { estado: async () => ESTADO, decidir: () => undefined, puedeAprobar: () => false, clave: () => CLAVE, icono: () => null, terminal: async () => ({ status: 403, error: 'x' }), xterm: () => null }
+  const a = crearFuenteWifi({ host: '127.0.0.1', puerto: 0, proveedor, repetidos })
+  const b = crearFuenteWifi({ host: '127.0.0.1', puerto: 0, proveedor, repetidos })
+  await a.iniciar()
+  await b.iniciar()
+  try {
+    const sobre = sellarPedido(claves, '/api/estado', JSON.stringify({ t: Date.now(), b: {} }))
+    assert.equal((await enviarSobre(`http://127.0.0.1:${a.puerto()}`, '/api/estado', sobre)).status, 200)
+    assert.equal((await enviarSobre(`http://127.0.0.1:${b.puerto()}`, '/api/estado', sobre)).status, 409)
+  } finally {
+    await a.detener()
+    await b.detener()
+  }
 })

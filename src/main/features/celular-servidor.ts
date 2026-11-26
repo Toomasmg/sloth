@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { EstadoCelular } from '../../shared/celular'
-import { abrirPedido, crearRepetidos, derivarClaves, fechaValida, sellarRespuesta, type Claves } from './celular-sello'
+import { abrirPedido, crearRepetidos, derivarClaves, fechaValida, sellarRespuesta, type Claves, type Repetidos } from './celular-sello'
 import { manifiesto, PAGINA_CSS, PAGINA_HTML, PAGINA_JS } from './celular-pagina'
 import { crearConexiones } from './celular-conexiones'
 import { crearLimite } from './celular-limite'
@@ -108,6 +108,8 @@ export interface OpcionesWifi {
   maxConexionesPorIp?: number
   /** Cuánto puede estar una conexión sin dar señales de vida antes de cortarla (sin un pedido completo no hay motivo para sostenerla). */
   ociosoMs?: number
+  /** Compartido entre los servidores de la misma PC (Wi-Fi, Tailscale, 127.0.0.1): un sobre visto en uno no vale en otro. */
+  repetidos?: Repetidos
   log?: (...args: unknown[]) => void
 }
 
@@ -115,7 +117,7 @@ export interface OpcionesWifi {
 export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): number } {
   let server: Server | null = null
   let puertoReal = o.puerto
-  const repetidos = crearRepetidos()
+  const repetidos = o.repetidos ?? crearRepetidos()
   const limite = crearLimite()
   const conexiones = crearConexiones(o.maxConexionesPorIp)
   // Derivar una clave cuesta dos HMAC: se guarda por clave y se tira cuando deja de estar.
