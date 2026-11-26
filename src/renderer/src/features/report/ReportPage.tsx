@@ -3,6 +3,7 @@ import { useUi } from '../host'
 import { CloseIcon, PlusIcon, WarningIcon } from '../../icons/SlothIcons'
 import { View } from '../../ui/View'
 import './report.css'
+import { Button } from '../../ui'
 
 /** Mismos límites que main (report-core.ts). */
 const TITLE_MIN = 8
@@ -204,15 +205,15 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
               </p>
             )}
             <div className="rp-thanks-actions">
-              <button type="button" className="btn" onClick={() => void viewOnGithub(sent.url)}>
+              <Button look="classic" onClick={() => void viewOnGithub(sent.url)}>
                 Ver en GitHub
-              </button>
-              <button type="button" className="btn primary" onClick={onClose}>
+              </Button>
+              <Button look="classic" variant="primary" onClick={onClose}>
                 Volver a Sloth
-              </button>
-              <button type="button" className="btn ghost" onClick={reset}>
+              </Button>
+              <Button look="classic" variant="ghost" onClick={reset}>
                 Enviar otro reporte
-              </button>
+              </Button>
             </div>
           </section>
         </div>
@@ -334,10 +335,10 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
                 </div>
               ))}
               <div className="rp-steps-foot">
-                <button type="button" className="btn sm rp-add" onClick={addStep} disabled={steps.length >= STEPS_MAX}>
+                <Button look="classic" size="sm" className="rp-add" onClick={addStep} disabled={steps.length >= STEPS_MAX}>
                   <PlusIcon size={13} />
                   Agregar paso
-                </button>
+                </Button>
                 <span className="hint">
                   {steps.length >= STEPS_MAX ? `Llegaste al máximo de ${STEPS_MAX} pasos.` : `Hasta ${STEPS_MAX} pasos. Enter en un paso agrega otro.`}
                 </span>
@@ -406,12 +407,12 @@ export function ReportPage({ onClose }: { onClose: () => void }): React.JSX.Elem
             <span role="status" className={tried && titleBad ? 'rp-send-hint bad' : 'rp-send-hint'}>
               {tried && titleBad ? 'Revisá el título para poder enviar.' : 'Revisá lo que se manda antes de enviar.'}
             </span>
-            <button type="button" className="btn ghost" onClick={onClose}>
+            <Button look="classic" variant="ghost" onClick={onClose}>
               Cancelar
-            </button>
-            <button type="submit" className="btn primary" aria-busy={sending} disabled={sending || shotBusy}>
+            </Button>
+            <Button type="submit" look="classic" variant="primary" aria-busy={sending} disabled={sending || shotBusy}>
               {sending ? 'Abriendo GitHub…' : 'Enviar reporte'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

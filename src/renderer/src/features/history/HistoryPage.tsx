@@ -368,9 +368,9 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
             </div>
 
             {filtersOn && (
-              <button type="button" className="btn hist-clear" onClick={clearFilters}>
+              <Button look="classic" className="hist-clear" onClick={clearFilters}>
                 Limpiar filtros
-              </button>
+              </Button>
             )}
           </aside>
 
@@ -379,13 +379,13 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
               <span className="hist-list-count">{countLabel}</span>
               <span className="hist-grow" />
               {hidden.size > 0 && (
-                <button type="button" className="btn sm ghost" aria-pressed={showHidden} onClick={() => setShowHidden((v) => !v)}>
+                <Button look="classic" size="sm" variant="ghost" aria-pressed={showHidden} onClick={() => setShowHidden((v) => !v)}>
                   {showHidden ? 'Ocultar las ocultas' : `Mostrar ocultas (${hidden.size})`}
-                </button>
+                </Button>
               )}
-              <button type="button" className="btn sm ghost" onClick={() => void load()}>
+              <Button look="classic" size="sm" variant="ghost" onClick={() => void load()}>
                 Actualizar
-              </button>
+              </Button>
             </div>
             {loadErr && (
               <p className="form-error" role="alert">

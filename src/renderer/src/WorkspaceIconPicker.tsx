@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { Button } from './ui'
 
 /** Íconos curados para los espacios (v0.5). El nombre va en el aria-label de cada botón. */
 export const WORKSPACE_ICONS: { icon: string; label: string }[] = [
@@ -126,9 +127,9 @@ export function WorkspaceIconPicker({ name, current, x, y, onPick, onClose }: Pr
           )
         })}
       </div>
-      <button type="button" className="btn sm icon-picker-none" onClick={() => onPick(null)}>
+      <Button look="classic" size="sm" className="icon-picker-none" onClick={() => onPick(null)}>
         Sin ícono
-      </button>
+      </Button>
     </div>
   )
 }
