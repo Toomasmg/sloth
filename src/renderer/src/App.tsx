@@ -22,7 +22,6 @@ import { chatButtonLabel } from './features/chat/alerts'
 import { Badge } from './ui'
 import { openSettings } from './features/settings/bus'
 import { openHelp } from './features/help/bus'
-import { colorHex } from './features/templates/catalog'
 import { comboLabel, isCapturingShortcut, matchShortcut } from './shortcuts'
 import type { ShortcutId } from '../../main/features/settings-model'
 import { GlobalSlot, PaneBannerSlot, PaneHeaderSlot, TitlebarOnly } from './features/slots'
@@ -34,7 +33,6 @@ import { ConfirmDialog, type ConfirmRequest } from './ConfirmDialog'
 import { EmptyState } from './EmptyState'
 import { FirstRun } from './features/onboarding/FirstRun'
 import { StateIcon } from './StateIcon'
-import { resumenCuenta } from './layout/cuenta-resumen'
 import { PermissionCard, toolLabel } from './PermissionCard'
 import { LogoMark } from './Logo'
 import { decidePermission } from './features/permissions/api'
@@ -73,6 +71,9 @@ import { useNavDest } from './layout/nav'
 import { NAV_LABEL } from './layout/nav-model'
 import { sortPaneActions, type PaneAction } from './layout/pane-actions'
 import { WorkspaceContextMenu, WorkspaceMenuButton } from './layout/WorkspaceMenu'
+import { RenameInput } from './layout/RenameInput'
+import { Sidebar } from './layout/Sidebar'
+import { readStorage, writeStorage } from './layout/storage'
 import { TabBar, type TabInfo } from './layout/TabBar'
 import { SOLTAR_MS, direccionDe, pasoSwipe, swipeInicial } from './layout/swipe'
 import { IconButton, Tag, ToastHost, Tooltip, toast } from './ui'
@@ -81,12 +82,11 @@ import './layout/shell.css'
 import { WorkspaceIconPicker } from './WorkspaceIconPicker'
 import { useFolderDrop } from './useFolderDrop'
 import './workspace.css'
-import { cleanError, shortPath, STATE_LABEL } from './format'
+import { cleanError, STATE_LABEL } from './format'
 import {
   BroadcastIcon,
   BranchIcon,
   ChatIcon,
-  ChevronDownIcon,
   CloseIcon,
   EditorIcon,
   FolderIcon,
@@ -95,13 +95,9 @@ import {
   MaximizeIcon,
   PencilIcon,
   PermissionIcon,
-  PlusIcon,
-  SearchIcon,
   SidebarIcon,
   TrashIcon,
   UpdateIcon,
-  WaitingIcon,
-  WorkingIcon,
   WorktreeIcon
 } from './icons/SlothIcons'
 
@@ -122,25 +118,9 @@ const Smiley = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><circle cx="1
 /** Distribución por tecla de Ctrl+Alt+1–4. */
 const LAYOUT_BY_DIGIT: Record<string, ViewMode> = { Digit1: 'uno', Digit2: 'dos', Digit3: 'tres', Digit4: 'cuatro' }
 
-/** Estado de la barra lateral y de las cuentas plegadas (preferencias de esta PC). */
+/** Barra lateral visible y su ancho (preferencias de esta PC). */
 const SIDEBAR_KEY = 'sloth.sidebar.shown'
-const COLLAPSED_KEY = 'sloth.sidebar.collapsed'
 const SIDE_W_KEY = 'sloth.sidebar.width'
-function readStorage(key: string): string | null {
-  try {
-    return window.localStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
-function writeStorage(key: string, value: string): void {
-  try {
-    window.localStorage.setItem(key, value)
-  } catch {
-    /* sin espacio o bloqueado: la preferencia se pierde, nada más */
-  }
-}
-
 export function App(): React.JSX.Element {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [statuses, setStatuses] = useState<Record<string, AccountStatus>>({})
@@ -164,18 +144,8 @@ export function App(): React.JSX.Element {
   // Picker de ícono y menú del espacio en un punto (clic derecho): `back` devuelve el foco a quien los abrió.
   const [iconPick, setIconPick] = useState<{ wsId: string; x: number; y: number; back: () => void } | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ paneId: string; from: 'side' | 'pane'; x: number; y: number; back: () => void } | null>(null)
-  // Barra lateral: visible o no, cuentas plegadas y filtro de espacios.
+  // Barra lateral: visible o no.
   const [sideShown, setSideShown] = useState(() => readStorage(SIDEBAR_KEY) !== '0')
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
-    try {
-      const v = JSON.parse(readStorage(COLLAPSED_KEY) ?? '{}') as unknown
-      return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, boolean>) : {}
-    } catch {
-      return {}
-    }
-  })
-  const [wsQuery, setWsQuery] = useState('')
-  const [filterOpen, setFilterOpen] = useState(false)
   // Ancho de la barra lateral (tirador): lo guardado o el por defecto; se acota a la ventana al mostrarlo.
   const [sideW, setSideW] = useState(() => {
     const n = Number.parseInt(readStorage(SIDE_W_KEY) ?? '', 10)
@@ -198,8 +168,6 @@ export function App(): React.JSX.Element {
   const navDest = useNavDest()
   // Un solo lugar para los avisos de error: la cola de ui/Toast (se quedan hasta que se cierran).
   const notifyError = useCallback((m: string): void => void toast({ tone: 'danger', message: m, duration: 0 }), [])
-
-  useEffect(() => writeStorage(COLLAPSED_KEY, JSON.stringify(collapsed)), [collapsed])
 
   const refreshStatuses = useCallback(() => void api.accountStatuses().then(setStatuses), [])
 
@@ -876,67 +844,6 @@ export function App(): React.JSX.Element {
   const openSideMenu = (ws: Workspace, x: number, y: number): void =>
     setCtxMenu({ paneId: ws.id, from: 'side', x, y, back: () => document.querySelector<HTMLElement>(`[data-ws-btn="${CSS.escape(ws.id)}"]`)?.focus() })
 
-  const renderWs = (ws: Workspace): React.JSX.Element => {
-    const ag = agents[ws.id]
-    const acc = accountById.get(ws.accountId)
-    const open = openPanes.includes(ws.id)
-    const nPerm = permsByWs.get(ws.id)?.length ?? 0
-    const editing = renaming?.id === ws.id && renaming.from === 'side'
-    // En reposo no hay glifo: solo se marca lo que pide mirar (trabaja, espera, terminó, permiso).
-    const glyph = nPerm > 1 ? <span className="sl-perm-n">{nPerm}</span> : nPerm > 0 ? <PermissionIcon size={14} className="ic ic-waiting" /> : ag && ag.state !== 'idle' ? <StateIcon state={ag.state} size={14} /> : null
-    const where = ws.branch ?? shortPath(ws.cwd)
-    return (
-      <li
-        key={ws.id}
-        className="sl-li"
-        data-account-id={ws.accountId}
-        onContextMenu={(e) => {
-          e.preventDefault()
-          openSideMenu(ws, e.clientX, e.clientY)
-        }}
-      >
-        {editing ? (
-          <div className="ws-edit">
-            <RenameInput className="ws-rename" initial={ws.name} label={`Nuevo nombre del espacio ${ws.name}`} onDone={(next) => endRename(ws, 'side', next)} />
-          </div>
-        ) : (
-          <button
-            type="button"
-            className={`sl-row ${open ? 'open' : ''} ${focused === ws.id && open ? 'focused' : ''}`}
-            aria-current={focused === ws.id && open ? 'true' : undefined}
-            data-ws-btn={ws.id}
-            onClick={() => openPane(ws.id)}
-            onDoubleClick={() => setRenaming({ id: ws.id, from: 'side' })}
-            onKeyDown={(e) => {
-              if (e.key === 'F2') {
-                e.preventDefault()
-                setRenaming({ id: ws.id, from: 'side' })
-              } else if ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu') {
-                e.preventDefault()
-                const r = e.currentTarget.getBoundingClientRect()
-                openSideMenu(ws, r.left + 24, r.bottom + 2)
-              }
-            }}
-            aria-label={`${ws.icon ? `${ws.icon} ` : ''}${ws.name}, ${acc?.label ?? 'cuenta borrada'}, ${ag ? STATE_LABEL[ag.state] : 'sin abrir'}${open ? ', abierto' : ''}${nPerm ? `, ${nPerm === 1 ? 'permiso pendiente' : `${nPerm} permisos pendientes`}` : ''}`}
-            title={`${ws.name} · ${where}\nDoble clic o F2 para renombrar · clic derecho para más opciones`}
-          >
-            <span className={`sl-ico${ws.icon ? ' has-emoji' : ''}`} aria-hidden="true" style={ws.color ? ({ '--ws': colorHex(ws.color) } as CSSProperties) : undefined}>
-              {ws.icon ?? null}
-            </span>
-            <span className="sl-name">{ws.name}</span>
-            {ws.ticket && <Tag title={ws.ticket}>{ws.ticket}</Tag>}
-            <span className="sl-glyph" aria-hidden="true">
-              {glyph}
-            </span>
-          </button>
-        )}
-      </li>
-    )
-  }
-
-  const q = wsQuery.trim().toLowerCase()
-  const matchWs = (ws: Workspace): boolean => !q || (ws.name + ' ' + (ws.branch ?? '') + ' ' + (ws.ticket ?? '')).toLowerCase().includes(q)
-  const orphans = workspaces.filter((w) => !accountById.has(w.accountId))
   const menuWs = ctxMenu ? wsById.get(ctxMenu.paneId) : undefined
 
   return (
@@ -1022,151 +929,26 @@ export function App(): React.JSX.Element {
         <NavRail />
 
         <div ref={sideBodyRef} className={`sl-body ${sideShown ? '' : 'no-side'}`} style={{ '--side-w': `${sideWidth}px` } as CSSProperties}>
-          <aside className="sl-side" aria-label="Cuentas y espacios">
-            <div className="sl-side-head">
-              {/* El filtro ocupa el lugar del título: abrirlo no mueve la lista. */}
-              {filterOpen ? (
-                <input
-                  className="sl-filter"
-                  type="search"
-                  autoFocus
-                  value={wsQuery}
-                  onChange={(e) => setWsQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key !== 'Escape') return
-                    e.preventDefault()
-                    e.stopPropagation()
-                    setWsQuery('')
-                    setFilterOpen(false)
-                  }}
-                  placeholder="Nombre, rama o ticket"
-                  aria-label="Filtrar espacios por nombre, rama o ticket"
-                  spellCheck={false}
-                />
-              ) : (
-                <h2 className="sl-side-title">
-                  Espacios
-                  <span className="sl-side-count">{workspaces.length}</span>
-                </h2>
-              )}
-              <IconButton
-                label="Buscar un espacio"
-                icon={<SearchIcon size={15} />}
-                size="sm"
-                pressed={filterOpen}
-                onClick={() => {
-                  if (filterOpen) setWsQuery('')
-                  setFilterOpen(!filterOpen)
-                }}
-              />
-            </div>
-
-            <div className="sl-groups">
-              {accounts.length === 0 && (
-                <section className="sl-acc-none" aria-label="Sin cuentas">
-                  <p className="sl-hint">Agregá una cuenta de Claude para crear tu primer espacio.</p>
-                  <button type="button" className="sl-newbtn is-cta" onClick={() => openSettings('cuentas')}>
-                    <PlusIcon size={15} />
-                    Agregar cuenta
-                  </button>
-                </section>
-              )}
-
-              {accounts.map((acc) => {
-                const st = statuses[acc.id]
-                const mine = workspaces.filter((w) => w.accountId === acc.id)
-                const shown = mine.filter(matchWs)
-                if (q && shown.length === 0) return null
-                const open = !collapsed[acc.id] || !!q
-                const bodyId = `acc-body-${acc.id}`
-                const plan = appSettings.settings.accountPlans[acc.id]
-                const loggedOut = st !== undefined && !st.loggedIn
-                // El resumen cuenta todos los espacios de la cuenta (el filtro no lo cambia) y se ve también plegada.
-                const sum = resumenCuenta(mine.map((w) => w.id), (id) => agents[id]?.state, (id) => permsByWs.get(id)?.length ?? 0)
-                const accLabel = [acc.label, loggedOut ? 'sin sesión: iniciá sesión' : plan ? `plan ${plan}` : '', sum.texto].filter(Boolean).join(', ')
-                return (
-                  <section key={acc.id} className="sl-acc" data-account-id={acc.id} aria-label={`Cuenta ${acc.label}`} style={{ '--acc': colorOf(acc.id) } as CSSProperties}>
-                    <div className="sl-acc-head">
-                      <button
-                        type="button"
-                        className="sl-acc-toggle"
-                        aria-expanded={open}
-                        aria-controls={bodyId}
-                        aria-label={accLabel}
-                        title={[st?.email ? `${acc.label} · ${st.email}` : acc.label, loggedOut ? 'Sin sesión: iniciá sesión' : '', `${open ? 'Ocultar' : 'Mostrar'} sus espacios`].filter(Boolean).join('\n')}
-                        onClick={() => setCollapsed((c) => ({ ...c, [acc.id]: open }))}
-                      >
-                        <ChevronDownIcon size={14} className="sl-acc-chev" />
-                        <span className={`sl-avatar${loggedOut ? ' is-off' : ''}`} aria-hidden="true">
-                          {acc.label.slice(0, 1).toUpperCase()}
-                        </span>
-                        <span className={`sl-acc-id${loggedOut ? ' is-off' : ''}`}>
-                          <span className="sl-acc-name">{acc.label}</span>
-                          {loggedOut ? <span className="sl-acc-warn">Sin sesión</span> : plan && <span className={`sl-acc-plan${plan.trim().toLowerCase() === 'team' ? ' is-team' : ''}`}>{plan}</span>}
-                        </span>
-                        {sum.texto && (
-                          <span className="sl-acc-sum" aria-hidden="true">
-                            {sum.esperan > 0 && (
-                              <span className="sl-acc-stat is-waiting">
-                                <WaitingIcon size={12} />
-                                {sum.esperan}
-                              </span>
-                            )}
-                            {sum.trabajando > 0 && (
-                              <span className="sl-acc-stat is-working">
-                                <WorkingIcon size={12} />
-                                {sum.trabajando}
-                              </span>
-                            )}
-                          </span>
-                        )}
-                      </button>
-                      <IconButton
-                        label={`Nuevo espacio en ${acc.label}`}
-                        icon={<PlusIcon size={14} />}
-                        size="sm"
-                        className="sl-acc-add"
-                        onClick={() => {
-                          setNewWsPreset({ accountId: acc.id })
-                          setNewWsMode('normal')
-                        }}
-                      />
-                    </div>
-                    {open && (
-                      <div id={bodyId}>
-                        {shown.length > 0 ? <ul className="sl-list">{shown.map(renderWs)}</ul> : <p className="sl-acc-empty">Sin espacios. Usá el + de la cuenta para crear uno.</p>}
-                      </div>
-                    )}
-                  </section>
-                )
-              })}
-
-              {orphans.some(matchWs) && (
-                <section className="sl-acc" aria-label="Espacios de una cuenta borrada">
-                  <div className="sl-acc-head">
-                    <span className="sl-acc-toggle is-static">
-                      <span className="sl-acc-id">
-                        <span className="sl-acc-name">Cuenta borrada</span>
-                      </span>
-                    </span>
-                  </div>
-                  <ul className="sl-list">{orphans.filter(matchWs).map(renderWs)}</ul>
-                </section>
-              )}
-
-              {q && accounts.every((acc) => !workspaces.some((w) => w.accountId === acc.id && matchWs(w))) && !orphans.some(matchWs) && (
-                <p className="sl-hint">Ningún espacio coincide con «{wsQuery.trim()}».</p>
-              )}
-            </div>
-
-            <div className="sl-foot">
-              <button type="button" className="sl-newbtn" onClick={() => (accounts.length ? setNewWsMode('normal') : openSettings('cuentas'))} title={accounts.length ? undefined : 'Primero agregá una cuenta de Claude'}>
-                <PlusIcon size={14} />
-                Nuevo espacio
-                <kbd>{comboLabel('new')}</kbd>
-              </button>
-            </div>
-          </aside>
+          <Sidebar
+            accounts={accounts}
+            workspaces={workspaces}
+            statuses={statuses}
+            agents={agents}
+            plans={appSettings.settings.accountPlans}
+            openIds={openPanes}
+            focusedId={focused}
+            editingId={renaming?.from === 'side' ? renaming.id : null}
+            permisos={(id) => permsByWs.get(id)?.length ?? 0}
+            colorOf={colorOf}
+            onOpen={openPane}
+            onStartRename={(id) => setRenaming({ id, from: 'side' })}
+            onRenameDone={(ws, next) => endRename(ws, 'side', next)}
+            onMenu={openSideMenu}
+            onNewWorkspace={(accountId) => {
+              if (accountId) setNewWsPreset({ accountId })
+              setNewWsMode('normal')
+            }}
+          />
 
           <main className={`panes sl-main view-${viewMode} ${openPanes.length === 0 ? 'is-empty' : ''}`} aria-label="Paneles">
             {loaded && openPanes.length === 0 && (workspaces.length === 0 ? <FirstRun /> : <EmptyState onCreate={() => (accounts.length ? setNewWsMode('normal') : openSettings('cuentas'))} />)}
@@ -1475,54 +1257,4 @@ function focusTerminal(id: string, tries = 8): void {
   const ta = document.querySelector<HTMLElement>(`[data-pane-id="${CSS.escape(id)}"] .xterm-helper-textarea`)
   if (ta && ta.closest<HTMLElement>('.pane')?.offsetParent !== null) ta.focus()
   else if (tries > 0) requestAnimationFrame(() => focusTerminal(id, tries - 1))
-}
-
-/** Input para renombrar. Enter o salir guardan (si hay texto); Escape cancela. Responde una sola vez. */
-function RenameInput({
-  initial,
-  label,
-  className,
-  onDone
-}: {
-  initial: string
-  label: string
-  className: string
-  onDone(next: string | null): void
-}): React.JSX.Element {
-  const [text, setText] = useState(initial)
-  const ref = useRef<HTMLInputElement>(null)
-  const done = useRef(false)
-  useEffect(() => {
-    ref.current?.focus()
-    ref.current?.select()
-  }, [])
-  const finish = (next: string | null): void => {
-    if (done.current) return
-    done.current = true
-    onDone(next)
-  }
-  const value = (): string | null => text.trim() || null
-  return (
-    <input
-      ref={ref}
-      className={className}
-      value={text}
-      maxLength={80}
-      aria-label={label}
-      spellCheck={false}
-      autoComplete="off"
-      onChange={(e) => setText(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault()
-          finish(value())
-        } else if (e.key === 'Escape') {
-          e.preventDefault()
-          e.stopPropagation()
-          finish(null)
-        }
-      }}
-      onBlur={() => finish(value())}
-    />
-  )
 }
