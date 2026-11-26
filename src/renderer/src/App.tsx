@@ -724,6 +724,10 @@ export function App(): React.JSX.Element {
   const done = countBy('done')
   /** Pedidos de permiso vivos (uno o más por espacio). El chip del resumen los cuenta; no se repiten en otro lado. */
   const pendingPerms = [...permsByWs.values()].reduce((n, q) => n + q.length, 0)
+  const permsLabel = pendingPerms === 1 ? '1 pide permiso' : `${pendingPerms} piden permiso`
+  const waitingLabel = `${needsYou} te ${needsYou === 1 ? 'espera' : 'esperan'}`
+  const workingLabel = `${working} trabajando`
+  const doneLabel = `${done} ${done === 1 ? 'listo' : 'listos'}`
   const activeTerms = workspaces.filter((w) => agents[w.id] && agents[w.id].state !== 'exited' && agents[w.id].state !== 'sleeping').length
   /** Primer espacio con ese estado (para ir al tocar un resumen). */
   const firstWs = (s: AgentStatus['state']): Workspace | undefined => workspaces.find((w) => agents[w.id]?.state === s)
@@ -882,27 +886,31 @@ export function App(): React.JSX.Element {
           <div className="sl-top-right">
             <div className="sl-top-status" role="status" aria-live="polite">
               {pendingPerms > 0 && (
-                <button type="button" className="sl-sum is-waiting" onClick={() => openPermissionReview()} title="Revisar los pedidos de permiso">
+                <button type="button" className="sl-sum is-waiting" onClick={() => openPermissionReview()} aria-label={permsLabel} title={`${permsLabel}. Revisar los pedidos de permiso`}>
                   <PermissionIcon size={12} />
-                  {pendingPerms === 1 ? '1 pide permiso' : `${pendingPerms} piden permiso`}
+                  <span>{pendingPerms}</span>
+                  <span className="sl-sum-t">{pendingPerms === 1 ? 'pide permiso' : 'piden permiso'}</span>
                 </button>
               )}
               {needsYou > 0 && (
-                <button type="button" className="sl-sum is-waiting" onClick={() => { const w = firstWs('waiting'); if (w) openPane(w.id) }} title="Ir al que te espera">
+                <button type="button" className="sl-sum is-waiting" onClick={() => { const w = firstWs('waiting'); if (w) openPane(w.id) }} aria-label={waitingLabel} title={`${waitingLabel}. Ir al que te espera`}>
                   <StateIcon state="waiting" size={12} />
-                  {needsYou} te {needsYou === 1 ? 'espera' : 'esperan'}
+                  <span>{needsYou}</span>
+                  <span className="sl-sum-t">te {needsYou === 1 ? 'espera' : 'esperan'}</span>
                 </button>
               )}
               {working > 0 && (
-                <button type="button" className="sl-sum is-working" onClick={() => { const w = firstWs('working'); if (w) openPane(w.id) }} title="Ir al primero que está trabajando">
+                <button type="button" className="sl-sum is-working" onClick={() => { const w = firstWs('working'); if (w) openPane(w.id) }} aria-label={workingLabel} title={`${workingLabel}. Ir al primero que está trabajando`}>
                   <StateIcon state="working" size={12} />
-                  {working} trabajando
+                  <span>{working}</span>
+                  <span className="sl-sum-t">trabajando</span>
                 </button>
               )}
               {done > 0 && (
-                <button type="button" className="sl-sum is-done" onClick={() => { const w = firstWs('done'); if (w) openPane(w.id) }} title="Ir al que terminó">
+                <button type="button" className="sl-sum is-done" onClick={() => { const w = firstWs('done'); if (w) openPane(w.id) }} aria-label={doneLabel} title={`${doneLabel}. Ir al que terminó`}>
                   <StateIcon state="done" size={12} />
-                  {done} {done === 1 ? 'listo' : 'listos'}
+                  <span>{done}</span>
+                  <span className="sl-sum-t">{done === 1 ? 'listo' : 'listos'}</span>
                 </button>
               )}
             </div>
