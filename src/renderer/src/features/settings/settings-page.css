@@ -980,7 +980,7 @@ button.f-set-toggle:disabled {
 }
 .f-set-empty-main h1 {
   margin: 0;
-  font-size: var(--fs-16, 16px);
+  font-size: var(--fs-15);
 }
 .f-set-empty-main h1:focus {
   outline: none;
