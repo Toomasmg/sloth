@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react'
 import type { Account, AccountStatus, AgentStatus, Workspace } from '../../../shared/types'
 import { openSettings } from '../features/settings/bus'
 import { colorHex } from '../features/templates/catalog'
@@ -10,6 +10,7 @@ import { IconButton, Tag } from '../ui'
 import { resumenCuenta } from './cuenta-resumen'
 import { RenameInput } from './RenameInput'
 import { armarModelo, leerPlegadas, normalizarFiltro } from './sidebar-model'
+import { accionNav, claveCuenta, claveEspacio, idDeCuenta, itemActivo, itemsNav } from './sidebar-nav'
 import { readStorage, writeStorage } from './storage'
 import './sidebar.css'
 
@@ -41,9 +42,32 @@ export function Sidebar(p: SidebarProps): React.JSX.Element {
   const [consulta, setConsulta] = useState('')
   const [filtroAbierto, setFiltroAbierto] = useState(false)
   useEffect(() => writeStorage(COLLAPSED_KEY, JSON.stringify(plegadas)), [plegadas])
+  const [activo, setActivo] = useState<string | null>(null)
+  const listaRef = useRef<HTMLDivElement>(null)
 
   const filtro = normalizarFiltro(consulta)
   const modelo = useMemo(() => armarModelo(p.accounts, p.workspaces, filtro, plegadas), [p.accounts, p.workspaces, filtro, plegadas])
+  const items = useMemo(() => itemsNav(modelo, filtro), [modelo, filtro])
+  // Un solo elemento de la lista entra en el orden de Tab (roving tabindex): el último con foco o, al
+  // llegar, el espacio enfocado. Las flechas mueven el resto; así recorrerlo no cuesta una parada por fila.
+  const tabClave = itemActivo(items, activo, p.focusedId ? claveEspacio(p.focusedId) : null)
+
+  const irA = (clave: string | null): void => {
+    if (clave) listaRef.current?.querySelector<HTMLElement>(`[data-nav="${CSS.escape(clave)}"]`)?.focus()
+  }
+  const onKeyDownLista = (e: KeyboardEvent<HTMLDivElement>): void => {
+    if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return
+    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-nav]')
+    if (!el) return
+    const accion = accionNav(items, el.dataset.nav ?? null, e.key)
+    if (!accion) return
+    e.preventDefault()
+    if (accion.tipo === 'foco') irA(accion.clave)
+    else if (accion.tipo !== 'nada') {
+      const id = idDeCuenta(accion.clave)
+      if (id) setPlegadas((c) => ({ ...c, [id]: accion.tipo === 'plegar' }))
+    }
+  }
 
   const fila = (ws: Workspace): React.JSX.Element => (
     <FilaEspacio
@@ -55,6 +79,8 @@ export function Sidebar(p: SidebarProps): React.JSX.Element {
       enfocado={p.focusedId === ws.id}
       editando={p.editingId === ws.id}
       permisos={p.permisos(ws.id)}
+      tabStop={tabClave === claveEspacio(ws.id)}
+      onFocusItem={setActivo}
       p={p}
     />
   )
@@ -71,6 +97,11 @@ export function Sidebar(p: SidebarProps): React.JSX.Element {
             value={consulta}
             onChange={(e) => setConsulta(e.target.value)}
             onKeyDown={(e) => {
+              if (e.key === 'ArrowDown') {
+                e.preventDefault()
+                irA(tabClave)
+                return
+              }
               if (e.key !== 'Escape') return
               e.preventDefault()
               e.stopPropagation()
@@ -99,7 +130,7 @@ export function Sidebar(p: SidebarProps): React.JSX.Element {
         />
       </div>
 
-      <div className="sl-groups">
+      <div className="sl-groups" ref={listaRef} onKeyDown={onKeyDownLista}>
         {p.accounts.length === 0 && (
           <section className="sl-acc-none" aria-label="Sin cuentas">
             <p className="sl-hint">Agregá una cuenta de Claude para crear tu primer espacio.</p>
@@ -127,6 +158,9 @@ export function Sidebar(p: SidebarProps): React.JSX.Element {
                   aria-expanded={abierto}
                   aria-controls={bodyId}
                   aria-label={accLabel}
+                  data-nav={claveCuenta(acc.id)}
+                  tabIndex={tabClave === claveCuenta(acc.id) ? 0 : -1}
+                  onFocus={() => setActivo(claveCuenta(acc.id))}
                   title={[st?.email ? `${acc.label} · ${st.email}` : acc.label, loggedOut ? 'Sin sesión: iniciá sesión' : '', `${abierto ? 'Ocultar' : 'Mostrar'} sus espacios`].filter(Boolean).join('\n')}
                   onClick={() => setPlegadas((c) => ({ ...c, [acc.id]: abierto }))}
                 >
@@ -201,10 +235,12 @@ interface FilaProps {
   enfocado: boolean
   editando: boolean
   permisos: number
+  tabStop: boolean
+  onFocusItem(clave: string): void
   p: SidebarProps
 }
 
-function FilaEspacio({ ws, cuenta, agente, abierto, enfocado, editando, permisos, p }: FilaProps): React.JSX.Element {
+function FilaEspacio({ ws, cuenta, agente, abierto, enfocado, editando, permisos, tabStop, onFocusItem, p }: FilaProps): React.JSX.Element {
   // En reposo no hay glifo: solo se marca lo que pide mirar (trabaja, espera, terminó, permiso).
   const glyph = permisos > 1 ? <span className="sl-perm-n">{permisos}</span> : permisos > 0 ? <PermissionIcon size={14} className="ic ic-waiting" /> : agente && agente.state !== 'idle' ? <StateIcon state={agente.state} size={14} /> : null
   const where = ws.branch ?? shortPath(ws.cwd)
@@ -228,6 +264,9 @@ function FilaEspacio({ ws, cuenta, agente, abierto, enfocado, editando, permisos
           className={`sl-row ${abierto ? 'open' : ''} ${actual ? 'focused' : ''}`}
           aria-current={actual ? 'true' : undefined}
           data-ws-btn={ws.id}
+          data-nav={claveEspacio(ws.id)}
+          tabIndex={tabStop ? 0 : -1}
+          onFocus={() => onFocusItem(claveEspacio(ws.id))}
           onClick={() => p.onOpen(ws.id)}
           onDoubleClick={() => p.onStartRename(ws.id)}
           onKeyDown={(e) => {

@@ -57,6 +57,8 @@
 
 /* La lista que se desplaza avisa con una sombra en cada borde que hay más para ver de ese lado. */
 .sl-groups {
+  /* Con las flechas, la fila enfocada no queda tapada por el encabezado que se queda pegado arriba. */
+  scroll-padding-block-start: var(--h-md);
   flex: 1;
   min-height: 0;
   overflow-y: auto;
