@@ -4,11 +4,14 @@ import type { ConectorMcp } from './conector'
 import { conectorPorId } from './conectores'
 import { buildDescubrirArgs } from './descubrir'
 import { buildListaArgs } from './motor'
-import type { CuentaRevisada, ServidorMcp } from '../../../shared/tickets'
+import type { CuentaRevisada, Disponibilidad, ServidorMcp } from '../../../shared/tickets'
 import {
+  bloqueaConsulta,
   buildRevisarPrompt,
   candidatos,
   conPrefijo,
+  convieneRevisar,
+  REVISION_VIGENTE_MS,
   disponibilidad,
   elegibles,
   mensajeCuenta,
@@ -390,4 +393,31 @@ test('un servidor pendiente lleva lo que gastó el intento, para descontarlo del
   assert.equal(e.costoUsd, 0.04)
   assert.equal(new ServidorPendienteError('pendiente').costoUsd, undefined)
   assert.ok(e instanceof Error)
+})
+
+const tiene = (estado: ServidorMcp['estado']): Disponibilidad => ({ tipo: 'tiene', nombre: 'gruv-tomy', prefijo: 'mcp__gruv-tomy__', estado, adaptado: true, verificado: estado === 'connected' })
+
+test('bloqueaConsulta: falta, elegir, sin sesión o caído cortan; conectado y pending se prueban', () => {
+  assert.equal(bloqueaConsulta({ tipo: 'falta' }), true)
+  assert.equal(bloqueaConsulta({ tipo: 'elegir', opciones: [] }), true)
+  assert.equal(bloqueaConsulta(tiene('needs-auth')), true)
+  assert.equal(bloqueaConsulta(tiene('failed')), true)
+  assert.equal(bloqueaConsulta(tiene('connected')), false)
+  assert.equal(bloqueaConsulta(tiene('pending')), false)
+  assert.equal(bloqueaConsulta({ tipo: 'sin_revisar' }), false)
+})
+
+test('convieneRevisar: un «necesita sesión» viejo se vuelve a mirar antes de cortar (la persona pudo autenticar con /mcp)', () => {
+  const ahora = 1_000_000
+  assert.equal(convieneRevisar(tiene('needs-auth'), ahora - REVISION_VIGENTE_MS - 1, ahora), true)
+  assert.equal(convieneRevisar(tiene('failed'), ahora - REVISION_VIGENTE_MS, ahora), true)
+  assert.equal(convieneRevisar({ tipo: 'falta' }, undefined, ahora), true)
+})
+
+test('convieneRevisar: una revisión reciente se cree, y lo que anda o pide elegir no se revisa', () => {
+  const ahora = 1_000_000
+  assert.equal(convieneRevisar(tiene('needs-auth'), ahora - 5_000, ahora), false)
+  assert.equal(convieneRevisar(tiene('connected'), ahora - 10 * REVISION_VIGENTE_MS, ahora), false)
+  assert.equal(convieneRevisar(tiene('pending'), undefined, ahora), false)
+  assert.equal(convieneRevisar({ tipo: 'elegir', opciones: [] }, undefined, ahora), false)
 })

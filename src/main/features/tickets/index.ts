@@ -50,7 +50,9 @@ import { deA } from './concurrencia'
 import { buildDescubrirPrompt, parseDescubrir, type Descubiertas } from './descubrir'
 import {
   buildRevisarPrompt,
+  bloqueaConsulta,
   conPrefijo,
+  convieneRevisar,
   disponibilidad,
   elegibles,
   mensajeCuenta,
@@ -356,9 +358,24 @@ const textoCuenta = (def: ConectorMcp, d: Disponibilidad, run: { accountId: stri
 /** Corta antes de gastar una consulta cuando ya se sabe que la cuenta no puede leer el conector. Sin revisar o pending, se prueba. */
 function chequearCuenta(def: ConectorMcp, run: { accountId: string; label: string }): void {
   const d = dispEn(def, run.accountId)
-  const corta = d.tipo === 'falta' || d.tipo === 'elegir' || (d.tipo === 'tiene' && (d.estado === 'needs-auth' || d.estado === 'failed'))
-  const msg = corta ? textoCuenta(def, d, run) : undefined
+  const msg = bloqueaConsulta(d) ? textoCuenta(def, d, run) : undefined
   if (msg) throw new Error(msg)
+}
+
+/** Si el caché dice que la cuenta no puede (y es viejo), se la mira de nuevo antes de creerlo; el pedido se arma con lo nuevo. */
+async function conCuentaAlDia(def: ConectorMcp, accountId: string): Promise<Ejecucion> {
+  const run = ejecucion(def.nombre, accountId, def)
+  if (descubriendo || !convieneRevisar(dispEn(def, accountId), cuentasCache[accountId]?.revisadaEn, Date.now())) return run
+  descubriendo = true
+  avisar()
+  try {
+    await revisarUna(accountId)
+  } finally {
+    descubriendo = false
+    guardarCuentas()
+    changed()
+  }
+  return ejecucion(def.nombre, accountId, def)
 }
 
 /**
@@ -887,7 +904,7 @@ async function refresh(rawAccount: unknown, rawVueltas?: unknown, rawModo?: unkn
   }
   if (def.via === 'gh') return refreshGh(def)
   const requested = typeof rawAccount === 'string' && rawAccount ? rawAccount : undefined
-  const run = ejecucion(def.nombre, requested ?? state.config.queryAccountId ?? (await pickAccount(def)), def)
+  const run = await conCuentaAlDia(def, requested ?? state.config.queryAccountId ?? (await pickAccount(def)))
   try {
     chequearCuenta(def, run)
   } catch (e) {
@@ -1010,7 +1027,7 @@ async function actualizarPersonas(rawAccount: unknown): Promise<TicketsSnapshot>
   const def = activo()
   if (!conFiltro(def) || def.via !== 'mcp') throw new Error(`${def.nombre} no lista personas desde Sloth.`)
   const requested = typeof rawAccount === 'string' && rawAccount ? rawAccount : undefined
-  const run = ejecucion(def.nombre, requested ?? state.config.queryAccountId ?? (await pickAccount(def)), def)
+  const run = await conCuentaAlDia(def, requested ?? state.config.queryAccountId ?? (await pickAccount(def)))
   chequearCuenta(def, run)
   const d = defPara(def, run.accountId)
   const ac = new AbortController()
@@ -1310,6 +1327,38 @@ async function descubrir(rawPrefijo: unknown, rawAccount: unknown): Promise<Desc
   }
 }
 
+/** Una consulta que no llama a ninguna herramienta y solo lee system/init (o el config.toml con Codex). El error queda en el caché de la cuenta. */
+async function revisarUna(id: string): Promise<void> {
+  const previa = cuentasCache[id]
+  try {
+    const run = ejecucion('los conectores', id)
+    if (!run.motor.leeInit) {
+      const nombres = servidoresDeCodex(run)
+      const servidores = servidoresRevisados(nombres)
+      cuentasCache = { ...cuentasCache, [id]: { revisadaEn: Date.now(), servidores, error: servidoresIgnorados(nombres).length ? errorIgnorados(servidoresIgnorados(nombres)) : undefined } }
+      ctx.log(`tickets: revisar: ${nombres.length} servidores en el config de ${run.agente}`)
+      return
+    }
+    const pedido: PedidoMotor = { tarea: 'revisar', model: state.config.model, ajenos: [], schema: REVISAR_SCHEMA }
+    const r = await runClaude({
+      exe: run.exe,
+      args: run.motor.argv(pedido),
+      prompt: buildRevisarPrompt(),
+      cwd: run.cwd,
+      env: { ...run.env, ...run.motor.envExtra(pedido) },
+      quien: 'Claude',
+      timeoutMs: 90_000,
+      temprano: (l) => revisarTemprano(l, Date.now()),
+      parse: (s) => revisarCuenta(run.motor.normalizar(s, pedido), Date.now())
+    })
+    cuentasCache = { ...cuentasCache, [id]: r }
+    ctx.log(`tickets: revisar: ${r.servidores.length} servidores`)
+  } catch (e) {
+    cuentasCache = { ...cuentasCache, [id]: { revisadaEn: Date.now(), servidores: previa?.servidores ?? [], error: (e as Error).message.slice(0, 500) } }
+    ctx.log('tickets: revisar: error')
+  }
+}
+
 /**
  * «Volver a revisar»: una consulta por cuenta, de a tres, que no llama a ninguna herramienta y solo lee
  * system/init. Si en el init no quedó ningún servidor pending, se corta ahí sin esperar al modelo.
@@ -1324,36 +1373,7 @@ async function revisarCuentas(raw: unknown): Promise<TicketsSnapshot> {
   descubriendo = true
   avisar()
   try {
-    await deA(ids, 3, async (id) => {
-      const previa = cuentasCache[id]
-      try {
-        const run = ejecucion('los conectores', id)
-        if (!run.motor.leeInit) {
-          const nombres = servidoresDeCodex(run)
-          const servidores = servidoresRevisados(nombres)
-          cuentasCache = { ...cuentasCache, [id]: { revisadaEn: Date.now(), servidores, error: servidoresIgnorados(nombres).length ? errorIgnorados(servidoresIgnorados(nombres)) : undefined } }
-          ctx.log(`tickets: revisar: ${nombres.length} servidores en el config de ${run.agente}`)
-          return
-        }
-        const pedido: PedidoMotor = { tarea: 'revisar', model: state.config.model, ajenos: [], schema: REVISAR_SCHEMA }
-        const r = await runClaude({
-          exe: run.exe,
-          args: run.motor.argv(pedido),
-          prompt: buildRevisarPrompt(),
-          cwd: run.cwd,
-          env: { ...run.env, ...run.motor.envExtra(pedido) },
-          quien: 'Claude',
-          timeoutMs: 90_000,
-          temprano: (l) => revisarTemprano(l, Date.now()),
-          parse: (s) => revisarCuenta(run.motor.normalizar(s, pedido), Date.now())
-        })
-        cuentasCache = { ...cuentasCache, [id]: r }
-        ctx.log(`tickets: revisar: ${r.servidores.length} servidores`)
-      } catch (e) {
-        cuentasCache = { ...cuentasCache, [id]: { revisadaEn: Date.now(), servidores: previa?.servidores ?? [], error: (e as Error).message.slice(0, 500) } }
-        ctx.log('tickets: revisar: error')
-      }
-    })
+    await deA(ids, 3, revisarUna)
   } finally {
     descubriendo = false
     guardarCuentas()

@@ -246,6 +246,21 @@ export class ServidorPendienteError extends Error {
 
 export const usable = (d: Disponibilidad): boolean => d.tipo === 'tiene' && d.estado !== 'needs-auth' && d.estado !== 'failed'
 
+/** Con lo que se sabe de la cuenta, la consulta ni se intenta: no tiene el servidor, hay que elegir uno o está caído o sin sesión. */
+export const bloqueaConsulta = (d: Disponibilidad): boolean => d.tipo === 'falta' || d.tipo === 'elegir' || (d.tipo === 'tiene' && (d.estado === 'needs-auth' || d.estado === 'failed'))
+
+/** Una revisión más nueva que esto se cree: el problema es de ahora, no de antes de que la persona lo arreglara. */
+export const REVISION_VIGENTE_MS = 60_000
+
+/**
+ * Lo que bloquea la consulta salió de una revisión vieja: la persona pudo autenticar el servidor con /mcp, arreglarlo o
+ * sumarlo después. Sin volver a mirar, «Actualizar» repite el mismo aviso hasta que toque «Volver a revisar» a mano.
+ */
+export function convieneRevisar(d: Disponibilidad, revisadaEn: number | undefined, ahora: number): boolean {
+  if (!bloqueaConsulta(d) || d.tipo === 'elegir') return false
+  return revisadaEn === undefined || ahora - revisadaEn >= REVISION_VIGENTE_MS
+}
+
 /**
  * Por qué la sesión que acaba de correr no pudo leer el conector, o undefined si lo tenía conectado
  * con sus herramientas. Sirve para que una lista vacía no pase por «no hay tickets».
