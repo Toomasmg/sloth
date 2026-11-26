@@ -121,28 +121,8 @@
   padding: 2px 4px 4px;
   background: var(--bg);
 }
-.pane {
-  border-radius: var(--r-lg);
-  background: var(--term-bg);
-  box-shadow: 0 0 0 1px var(--divider);
-}
-.pane.focused {
-  box-shadow: 0 0 0 1px var(--divider-strong);
-}
 .pane::after {
   height: 1px;
-}
-.pane-head {
-  height: var(--pane-head-h);
-  padding: 0 8px 0 14px;
-  background: transparent;
-  border-bottom: 1px solid var(--divider);
-}
-.pane-title {
-  font-family: var(--font-display);
-  font-size: var(--fs-13);
-  font-weight: 600;
-  letter-spacing: -0.005em;
 }
 .terminal-host {
   padding: 10px 6px 0 14px;
@@ -244,7 +224,7 @@ html[data-theme='light'] .pane {
   box-shadow: 0 0 0 1px var(--divider-strong), var(--e-1);
 }
 html[data-theme='light'] .pane.focused {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), var(--e-1);
+  box-shadow: var(--pane-ring-focus), var(--e-1);
 }
 html[data-theme='light'] .btn {
   background: var(--btn-2);

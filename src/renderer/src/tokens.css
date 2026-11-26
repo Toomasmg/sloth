@@ -148,6 +148,7 @@
   --knob: #ffffff;
   --knob-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --e-side: -16px 0 48px rgba(0, 0, 0, 0.4);
+  --pane-ring-focus: 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent);
   --ink: #0b0d12;
   --amber: #f0b45a;
   --amber-fg: #1c1406;
@@ -253,6 +254,7 @@ html[data-theme='light'] {
   --track-off: #d4d6dc;
   --knob-shadow: 0 1px 2px rgba(16, 22, 34, 0.25);
   --e-side: -16px 0 48px rgba(16, 22, 34, 0.16);
+  --pane-ring-focus: 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent);
 
   --term-bg: #ffffff;
   --term-fg: #1f2430;

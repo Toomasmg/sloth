@@ -382,6 +382,13 @@ body.is-resizing-side .panes {
   align-items: center;
   gap: var(--s-2);
 }
+/* Un separador entre las pestañas y las herramientas de la grilla. */
+.sl-tabbar-tools::before {
+  content: '';
+  width: 1px;
+  height: var(--s-4);
+  background: var(--divider-strong);
+}
 .sl-bcast {
   height: var(--h-sm);
   display: inline-flex;
@@ -395,6 +402,7 @@ body.is-resizing-side .panes {
   font: inherit;
   font-size: var(--fs-12);
   cursor: pointer;
+  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
 }
 .sl-bcast:hover {
   background: var(--hover);
@@ -414,7 +422,10 @@ body.is-resizing-side .panes {
 }
 .sl-layout {
   display: inline-flex;
-  padding: 2px; /* ajuste óptico: el activo queda inscripto */
+  align-items: center;
+  height: var(--h-sm);
+  box-sizing: border-box;
+  padding: 0 var(--s-1); /* ajuste óptico: el activo queda inscripto */
   border-radius: var(--r-md);
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--divider);
@@ -422,6 +433,7 @@ body.is-resizing-side .panes {
 .sl-layout > button {
   min-width: var(--h-xs);
   height: 22px;
+  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
   padding: 0 var(--s-1);
   border: 0;
   border-radius: var(--r-sm);
@@ -436,7 +448,7 @@ body.is-resizing-side .panes {
   color: var(--text);
 }
 .sl-layout > button[aria-pressed='true'] {
-  background: var(--raised);
+  background: var(--seg-on);
   color: var(--text);
   font-weight: 600;
   box-shadow: var(--e-1);
@@ -486,7 +498,7 @@ body.is-resizing-side .panes {
   height: var(--pane-head-h);
   gap: var(--s-2);
   padding: 0 var(--s-1) 0 var(--s-3);
-  background: transparent;
+  background: var(--surface);
   border-bottom: 1px solid var(--divider);
 }
 .sl-main .pane-head::before {
@@ -498,6 +510,11 @@ body.is-resizing-side .panes {
   width: 3px;
   border-radius: 0 var(--r-full) var(--r-full) 0;
   background: var(--acc);
+  transition: opacity var(--t-med) var(--ease);
+}
+/* El color de la cuenta sigue a la vista en todos, pero el panel con foco es el que se lee primero. */
+.pane:not(.focused) > .pane-head::before {
+  opacity: 0.55;
 }
 .sl-main .pane-id {
   align-items: center;
@@ -543,6 +560,10 @@ body.is-resizing-side .panes {
   display: inline-flex;
   align-items: center;
   gap: var(--s-1);
+  height: 20px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-full);
+  background: var(--chip-bg);
   font-size: var(--fs-12);
   font-weight: 500;
   white-space: nowrap;
@@ -551,15 +572,19 @@ body.is-resizing-side .panes {
   color: currentColor;
 }
 .pane-state.is-working {
+  background: var(--working-soft);
   color: var(--working);
 }
 .pane-state.is-waiting {
+  background: var(--waiting-soft);
   color: var(--waiting);
 }
 .pane-state.is-done {
+  background: var(--done-soft);
   color: var(--done);
 }
 .pane-state.is-exited {
+  background: var(--danger-soft);
   color: var(--danger);
 }
 .pane-state.is-sleeping {
@@ -567,6 +592,18 @@ body.is-resizing-side .panes {
 }
 .sl-main .pane-actions {
   gap: 2px;
+}
+/* Maximizar y «…» más discretos en reposo; plenos con el mouse en la cabecera, con foco adentro o en el panel enfocado. */
+@media (hover: hover) {
+  .pane-actions {
+    opacity: 0.7;
+    transition: opacity var(--t-fast) var(--ease);
+  }
+  .pane-head:hover .pane-actions,
+  .pane-actions:focus-within,
+  .pane.focused .pane-actions {
+    opacity: 1;
+  }
 }
 @container (max-width: 480px) {
   .pane-state-detail,
@@ -579,11 +616,6 @@ body.is-resizing-side .panes {
   .pane-id .ui-tag {
     display: none;
   }
-}
-
-/* Foco: el panel activo lleva un anillo de acento (no el color de la cuenta). */
-.pane.focused {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 /* ---------- Barra de estado ---------- */
