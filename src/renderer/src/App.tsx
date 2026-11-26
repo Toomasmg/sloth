@@ -34,6 +34,7 @@ import { ConfirmDialog, type ConfirmRequest } from './ConfirmDialog'
 import { EmptyState } from './EmptyState'
 import { FirstRun } from './features/onboarding/FirstRun'
 import { StateIcon } from './StateIcon'
+import { resumenCuenta } from './layout/cuenta-resumen'
 import { PermissionCard, toolLabel } from './PermissionCard'
 import { LogoMark } from './Logo'
 import { decidePermission } from './features/permissions/api'
@@ -85,6 +86,7 @@ import {
   BroadcastIcon,
   BranchIcon,
   ChatIcon,
+  ChevronDownIcon,
   CloseIcon,
   EditorIcon,
   FolderIcon,
@@ -98,6 +100,8 @@ import {
   SidebarIcon,
   TrashIcon,
   UpdateIcon,
+  WaitingIcon,
+  WorkingIcon,
   WorktreeIcon
 } from './icons/SlothIcons'
 
@@ -879,7 +883,7 @@ export function App(): React.JSX.Element {
     const nPerm = permsByWs.get(ws.id)?.length ?? 0
     const editing = renaming?.id === ws.id && renaming.from === 'side'
     // En reposo no hay glifo: solo se marca lo que pide mirar (trabaja, espera, terminó, permiso).
-    const glyph = nPerm > 0 ? <PermissionIcon size={13} className="ic ic-waiting" /> : ag && ag.state !== 'idle' ? <StateIcon state={ag.state} size={12} /> : null
+    const glyph = nPerm > 1 ? <span className="sl-perm-n">{nPerm}</span> : nPerm > 0 ? <PermissionIcon size={14} className="ic ic-waiting" /> : ag && ag.state !== 'idle' ? <StateIcon state={ag.state} size={14} /> : null
     const where = ws.branch ?? shortPath(ws.cwd)
     return (
       <li
@@ -899,6 +903,7 @@ export function App(): React.JSX.Element {
           <button
             type="button"
             className={`sl-row ${open ? 'open' : ''} ${focused === ws.id && open ? 'focused' : ''}`}
+            aria-current={focused === ws.id && open ? 'true' : undefined}
             data-ws-btn={ws.id}
             onClick={() => openPane(ws.id)}
             onDoubleClick={() => setRenaming({ id: ws.id, from: 'side' })}
@@ -912,16 +917,17 @@ export function App(): React.JSX.Element {
                 openSideMenu(ws, r.left + 24, r.bottom + 2)
               }
             }}
-            aria-label={`${ws.icon ? `${ws.icon} ` : ''}${ws.name}, ${acc?.label ?? 'cuenta borrada'}, ${ag ? STATE_LABEL[ag.state] : 'sin abrir'}${nPerm ? `, ${nPerm === 1 ? 'permiso pendiente' : `${nPerm} permisos pendientes`}` : ''}`}
+            aria-label={`${ws.icon ? `${ws.icon} ` : ''}${ws.name}, ${acc?.label ?? 'cuenta borrada'}, ${ag ? STATE_LABEL[ag.state] : 'sin abrir'}${open ? ', abierto' : ''}${nPerm ? `, ${nPerm === 1 ? 'permiso pendiente' : `${nPerm} permisos pendientes`}` : ''}`}
             title={`${ws.name} · ${where}\nDoble clic o F2 para renombrar · clic derecho para más opciones`}
           >
             <span className={`sl-ico${ws.icon ? ' has-emoji' : ''}`} aria-hidden="true" style={ws.color ? ({ '--ws': colorHex(ws.color) } as CSSProperties) : undefined}>
               {ws.icon ?? null}
             </span>
             <span className="sl-name">{ws.name}</span>
-            {ws.ticket && <Tag>{ws.ticket}</Tag>}
-            {glyph && <span className="sl-glyph">{glyph}</span>}
-            {nPerm > 1 && <span className="sl-perm-n">{nPerm}</span>}
+            {ws.ticket && <Tag title={ws.ticket}>{ws.ticket}</Tag>}
+            <span className="sl-glyph" aria-hidden="true">
+              {glyph}
+            </span>
           </button>
         )}
       </li>
@@ -1018,7 +1024,31 @@ export function App(): React.JSX.Element {
         <div ref={sideBodyRef} className={`sl-body ${sideShown ? '' : 'no-side'}`} style={{ '--side-w': `${sideWidth}px` } as CSSProperties}>
           <aside className="sl-side" aria-label="Cuentas y espacios">
             <div className="sl-side-head">
-              <h2 className="sl-side-title">Espacios</h2>
+              {/* El filtro ocupa el lugar del título: abrirlo no mueve la lista. */}
+              {filterOpen ? (
+                <input
+                  className="sl-filter"
+                  type="search"
+                  autoFocus
+                  value={wsQuery}
+                  onChange={(e) => setWsQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Escape') return
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setWsQuery('')
+                    setFilterOpen(false)
+                  }}
+                  placeholder="Nombre, rama o ticket"
+                  aria-label="Filtrar espacios por nombre, rama o ticket"
+                  spellCheck={false}
+                />
+              ) : (
+                <h2 className="sl-side-title">
+                  Espacios
+                  <span className="sl-side-count">{workspaces.length}</span>
+                </h2>
+              )}
               <IconButton
                 label="Buscar un espacio"
                 icon={<SearchIcon size={15} />}
@@ -1030,31 +1060,12 @@ export function App(): React.JSX.Element {
                 }}
               />
             </div>
-            {filterOpen && (
-              <input
-                className="sl-filter"
-                type="search"
-                autoFocus
-                value={wsQuery}
-                onChange={(e) => setWsQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key !== 'Escape') return
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setWsQuery('')
-                  setFilterOpen(false)
-                }}
-                placeholder="Filtrar por nombre, rama o ticket"
-                aria-label="Filtrar espacios"
-                spellCheck={false}
-              />
-            )}
 
             <div className="sl-groups">
               {accounts.length === 0 && (
                 <section className="sl-acc-none" aria-label="Sin cuentas">
                   <p className="sl-hint">Agregá una cuenta de Claude para crear tu primer espacio.</p>
-                  <button type="button" className="sl-newbtn" onClick={() => openSettings('cuentas')}>
+                  <button type="button" className="sl-newbtn is-cta" onClick={() => openSettings('cuentas')}>
                     <PlusIcon size={15} />
                     Agregar cuenta
                   </button>
@@ -1069,6 +1080,10 @@ export function App(): React.JSX.Element {
                 const open = !collapsed[acc.id] || !!q
                 const bodyId = `acc-body-${acc.id}`
                 const plan = appSettings.settings.accountPlans[acc.id]
+                const loggedOut = st !== undefined && !st.loggedIn
+                // El resumen cuenta todos los espacios de la cuenta (el filtro no lo cambia) y se ve también plegada.
+                const sum = resumenCuenta(mine.map((w) => w.id), (id) => agents[id]?.state, (id) => permsByWs.get(id)?.length ?? 0)
+                const accLabel = [acc.label, loggedOut ? 'sin sesión: iniciá sesión' : plan ? `plan ${plan}` : '', sum.texto].filter(Boolean).join(', ')
                 return (
                   <section key={acc.id} className="sl-acc" data-account-id={acc.id} aria-label={`Cuenta ${acc.label}`} style={{ '--acc': colorOf(acc.id) } as CSSProperties}>
                     <div className="sl-acc-head">
@@ -1077,15 +1092,34 @@ export function App(): React.JSX.Element {
                         className="sl-acc-toggle"
                         aria-expanded={open}
                         aria-controls={bodyId}
-                        aria-label={`Mostrar u ocultar los espacios de ${acc.label}`}
-                        title={st?.email ? `${acc.label} · ${st.email}` : acc.label}
+                        aria-label={accLabel}
+                        title={[st?.email ? `${acc.label} · ${st.email}` : acc.label, loggedOut ? 'Sin sesión: iniciá sesión' : '', `${open ? 'Ocultar' : 'Mostrar'} sus espacios`].filter(Boolean).join('\n')}
                         onClick={() => setCollapsed((c) => ({ ...c, [acc.id]: open }))}
                       >
-                        <span className="sl-avatar" aria-hidden="true">
+                        <ChevronDownIcon size={14} className="sl-acc-chev" />
+                        <span className={`sl-avatar${loggedOut ? ' is-off' : ''}`} aria-hidden="true">
                           {acc.label.slice(0, 1).toUpperCase()}
                         </span>
-                        <span className="sl-acc-name">{acc.label}</span>
-                        {st?.loggedIn ? plan && <span className="sl-acc-plan">{plan}</span> : <span className="sl-acc-warn">Sin sesión</span>}
+                        <span className={`sl-acc-id${loggedOut ? ' is-off' : ''}`}>
+                          <span className="sl-acc-name">{acc.label}</span>
+                          {loggedOut ? <span className="sl-acc-warn">Sin sesión</span> : plan && <span className={`sl-acc-plan${plan.trim().toLowerCase() === 'team' ? ' is-team' : ''}`}>{plan}</span>}
+                        </span>
+                        {sum.texto && (
+                          <span className="sl-acc-sum" aria-hidden="true">
+                            {sum.esperan > 0 && (
+                              <span className="sl-acc-stat is-waiting">
+                                <WaitingIcon size={12} />
+                                {sum.esperan}
+                              </span>
+                            )}
+                            {sum.trabajando > 0 && (
+                              <span className="sl-acc-stat is-working">
+                                <WorkingIcon size={12} />
+                                {sum.trabajando}
+                              </span>
+                            )}
+                          </span>
+                        )}
                       </button>
                       <IconButton
                         label={`Nuevo espacio en ${acc.label}`}
@@ -1107,11 +1141,13 @@ export function App(): React.JSX.Element {
                 )
               })}
 
-              {orphans.length > 0 && (
+              {orphans.some(matchWs) && (
                 <section className="sl-acc" aria-label="Espacios de una cuenta borrada">
                   <div className="sl-acc-head">
                     <span className="sl-acc-toggle is-static">
-                      <span className="sl-acc-name">Cuenta borrada</span>
+                      <span className="sl-acc-id">
+                        <span className="sl-acc-name">Cuenta borrada</span>
+                      </span>
                     </span>
                   </div>
                   <ul className="sl-list">{orphans.filter(matchWs).map(renderWs)}</ul>
@@ -1125,7 +1161,7 @@ export function App(): React.JSX.Element {
 
             <div className="sl-foot">
               <button type="button" className="sl-newbtn" onClick={() => (accounts.length ? setNewWsMode('normal') : openSettings('cuentas'))} title={accounts.length ? undefined : 'Primero agregá una cuenta de Claude'}>
-                <PlusIcon size={15} />
+                <PlusIcon size={14} />
                 Nuevo espacio
                 <kbd>{comboLabel('new')}</kbd>
               </button>
