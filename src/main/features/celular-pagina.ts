@@ -26,7 +26,7 @@ export const PAGINA_HTML = `<!doctype html>
 <body>
 <main class="app" id="app">
   <header class="top">
-    <span class="marca">Sloth</span>
+    <h1 class="marca">Sloth</h1>
     <div class="cuentas" role="group" aria-label="Cuenta" id="cuentas"></div>
     <span class="conexion" id="conexion" role="status"><span class="punto"></span><span id="conexion-texto">Conectando…</span></span>
     <button type="button" class="completa" id="completa" aria-label="Pantalla completa" title="Pantalla completa" hidden><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg></button>
@@ -56,6 +56,7 @@ export const PAGINA_HTML = `<!doctype html>
     <h2 class="titulo-lista"><span id="titulo-lista">Sesiones</span> <span class="resumen" id="resumen"></span></h2>
     <p class="term-nota" id="term-nota" hidden>La terminal de cada sesión no se abre desde «Desde cualquier red». Escaneá el QR del Wi-Fi de casa (en Sloth, panel Celular, el de arriba) con el celu conectado a ese Wi-Fi.</p>
     <ul class="lista" id="lista"></ul>
+    <p class="lista-mas" id="lista-mas" hidden></p>
     <p class="hoy" id="hoy">Hoy: sin datos</p>
   </section>
 </main>
@@ -79,8 +80,13 @@ export const PAGINA_HTML = `<!doctype html>
   </div>
 </section>
 <section class="aviso-pantalla" id="sin-token" hidden>
-  <h1>Este celu no está conectado</h1>
-  <p id="sin-token-texto">Abrí Sloth en la PC, entrá a «Celular» y escaneá el QR.</p>
+  <h1 id="sin-token-titulo">Conectá este celu</h1>
+  <p id="sin-token-texto">Escaneá el QR de Sloth con la cámara.</p>
+  <ol class="pasos">
+    <li>En la PC, abrí Sloth y buscá «Celular» con Ctrl K.</li>
+    <li>Prendé «Ver Sloth en el celu» (o «Desde cualquier red»).</li>
+    <li>Escaneá el QR con la cámara de este celu. Para el de «En tu Wi-Fi», el celu tiene que estar en el mismo Wi-Fi que la PC.</li>
+  </ol>
 </section>
 <script src="/app.js"></script>
 </body>
@@ -111,7 +117,10 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
   align-content: start;
 }
 .top { grid-area: top; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.marca { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; margin-right: auto; }
+.marca { margin: 0 auto 0 0; font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+.cuentas.desliza { -webkit-mask-image: linear-gradient(to right, #000 80%, transparent); mask-image: linear-gradient(to right, #000 80%, transparent); }
+.lista li.fuera { display: none; }
+.lista-mas { margin: 0; font-size: 12px; color: var(--suave); }
 .cuentas { order: 3; flex: 1 1 100%; display: flex; gap: 4px; padding: 3px; background: var(--panel); border: 1px solid var(--borde); border-radius: 12px; overflow-x: auto; }
 .cuentas button { flex: 1 0 auto; min-height: 44px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; color: var(--suave); font-size: 14px; font-weight: 500; white-space: nowrap; }
 .cuentas button[aria-pressed="true"] { background: #2A2F37; color: var(--fuerte); font-weight: 600; }
@@ -233,18 +242,19 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
   .contador { padding: 6px 8px; }
   .contador .num { font-size: 26px; }
   .pedido { padding: 10px 12px; gap: 8px; }
-  .calma { padding: 10px 12px; }
+  .calma { display: none !important; }
   .titulo-lista { display: none; }
   .lista { gap: 2px; }
-  .lista li { background: none; border: 0; padding: 0; min-height: 26px; gap: 8px; }
+  .lista li { flex: none; background: none; border: 0; padding: 0; min-height: 26px; gap: 8px; }
   .lista li.del-pedido { display: none; }
-  .lista li:nth-child(n+4) { display: none; }
   .lista .punto { width: 8px; height: 8px; }
   .lista .s-detalle { display: none; }
   .lista .s-nombre { font-size: 13px; font-weight: 400; color: var(--texto); }
   .lista .s-lado { flex-direction: row; align-items: center; gap: 8px; }
   .lista .s-estado { background: none !important; padding: 0; }
   .lista .s-hace { width: 48px; text-align: right; }
+  .lista .s-term { min-height: 36px; min-width: 44px; padding: 0 10px; justify-content: center; }
+  .lista .s-term span:not(.s-term-ico) { display: none; }
   .lista { flex: 0 1 auto; min-height: 0; overflow: hidden; }
   .hoy { flex: none; }
   .hoy { margin-top: auto; }
@@ -256,6 +266,7 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .aviso-pantalla { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 24px max(24px, env(safe-area-inset-right)) 24px max(24px, env(safe-area-inset-left)); background: var(--fondo); text-align: center; }
 .aviso-pantalla h1 { margin: 0; font-size: 20px; }
 .aviso-pantalla p { margin: 0 auto; max-width: 36ch; color: var(--suave); }
+.aviso-pantalla .pasos { margin: 8px auto 0; padding-left: 1.4em; max-width: 36ch; text-align: left; color: var(--texto); display: flex; flex-direction: column; gap: 8px; }
 .lista .s-term { flex: none; min-height: 44px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border-radius: 12px; border: 1px solid rgba(140,194,255,0.35); background: rgba(90,169,255,0.12); color: var(--trabaja); font-size: 13px; font-weight: 600; }
 .lista .s-term .s-term-ico { font: 700 13px var(--mono); }
 .lista .s-term:disabled { opacity: 0.5; cursor: default; }
@@ -274,6 +285,19 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .term-teclas button { flex: 1 0 auto; min-width: 38px; min-height: 40px; padding: 0 6px; border: 1px solid var(--borde); border-radius: 10px; background: var(--panel); color: var(--texto); font: 600 13px var(--mono); touch-action: manipulation; }
 .term button:disabled { opacity: 0.5; cursor: default; }
 html.con-term, html.con-term body { overflow: hidden; overscroll-behavior: none; }
+@media (min-width: 720px) and (min-height: 601px) {
+  .app {
+    max-width: 1100px; margin: 0 auto; column-gap: 20px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-rows: auto auto auto auto 1fr;
+    grid-template-areas: "top top" "pista pista" "atencion centro" "relojes centro" ". centro";
+  }
+  .cuentas { order: 0; flex: 0 1 auto; }
+}
+@media (prefers-contrast: more) {
+  :root { --suave: #C9CDD2; --borde: #5A616B; }
+  .b-rechazar { border-color: #8A9099; }
+}
 @media (prefers-reduced-motion: reduce) {
   .aguja, .valor { transition: none; }
   .c-espera.hay .num { animation: none; }
@@ -365,6 +389,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     if (h < 24) return h + ' h';
     return Math.floor(h / 24) + ' d';
   }
+  var haceTexto = function (ms) { var h = hace(ms); return h === 'recién' ? h : 'hace ' + h; };
   function reinicio(ms) {
     if (ms === null) return 'Sin hora de reinicio';
     var falta = ms - ahoraPc();
@@ -469,8 +494,16 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     var hoy = enVista.filter(function (c) { return c.hoy; });
     var tk = 0, msj = 0;
     hoy.forEach(function (c) { tk += c.hoy.tokens; msj += c.hoy.mensajes; });
-    $('hoy').textContent = hoy.length ? 'Hoy: ' + tokens(tk) + ' tokens · ' + msj + (msj === 1 ? ' mensaje' : ' mensajes') : 'Hoy: sin datos';
+    $('hoy').textContent = !hoy.length ? 'Hoy: sin datos' : !tk && !msj ? 'Hoy: sin uso todavía' : 'Hoy: ' + tokens(tk) + ' tokens · ' + msj + (msj === 1 ? ' mensaje' : ' mensajes');
+    deslizar();
   }
+
+  // Si las cuentas no entran, el borde derecho se desvanece: hay más deslizando.
+  function deslizar() {
+    var c = $('cuentas');
+    c.classList.toggle('desliza', c.scrollWidth > c.clientWidth + 1 && c.scrollLeft + c.clientWidth < c.scrollWidth - 1);
+  }
+  $('cuentas').addEventListener('scroll', deslizar);
 
   function ventanaCompacta(nombre, v) {
     var cel = el('div', 'lim-v');
@@ -666,7 +699,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     $('calma').hidden = hay;
     if (!hay) {
       var ultimaListo = e.sesiones.filter(function (s) { return s.estado === 'done'; })[0];
-      $('calma-s').textContent = ultimaListo ? ultimaListo.nombre + ' terminó hace ' + hace(ahoraPc() - ultimaListo.desde) : 'Ningún permiso ni pregunta pendiente.';
+      $('calma-s').textContent = ultimaListo ? ultimaListo.nombre + ' terminó ' + haceTexto(ahoraPc() - ultimaListo.desde) : 'Ningún permiso ni pregunta pendiente.';
     }
   }
 
@@ -716,6 +749,26 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     var abiertas = e.sesiones.length + (e.sesiones.length === 1 ? ' abierta' : ' abiertas');
     $('resumen').textContent = !e.sesiones.length ? '' : visibles.length === e.sesiones.length ? abiertas : visibles.length + ' de ' + abiertas;
   }
+  // Acostado la lista tiene el alto que sobra: se muestran las filas que entran enteras y el resto se cuenta.
+  function recortarLista() {
+    var lista = $('lista'), mas = $('lista-mas');
+    var filas = lista.children ? Array.prototype.slice.call(lista.children) : [];
+    filas.forEach(function (li) { li.classList.remove('fuera'); });
+    mas.hidden = true;
+    if (!esHorizontal() || !filas.length || !lista.getBoundingClientRect) return;
+    var desbordan = function () {
+      var fondo = lista.getBoundingClientRect().bottom + 0.5;
+      return filas.filter(function (li) { return li.offsetParent !== null && li.getBoundingClientRect().bottom > fondo; });
+    };
+    if (!desbordan().length) return;
+    mas.hidden = false;
+    mas.textContent = '+';
+    desbordan().forEach(function (li) { li.classList.add('fuera'); });
+    var n = filas.filter(function (li) { return li.classList.contains('fuera'); }).length;
+    mas.textContent = '+' + n + ' más · parado se ven todas';
+  }
+  window.addEventListener('resize', function () { recortarLista(); deslizar(); });
+
   Object.keys(FILTROS).forEach(function (k) {
     $('f-' + k).addEventListener('click', function () { filtroEstado = filtroEstado === k ? null : k; pintar(); });
   });
@@ -729,7 +782,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     if (avisoHora) t.textContent = HORA_CORRIDA;
     else if (!ultimoOk) t.textContent = 'Buscando la PC…';
     else if (lejos < 6000) t.textContent = 'PC conectada';
-    else t.textContent = 'Sin conexión con la PC · hace ' + hace(lejos);
+    else t.textContent = 'Sin conexión con la PC · ' + haceTexto(lejos);
   }
 
   function pintar() {
@@ -740,24 +793,27 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     pintarPedidos(ultimo);
     pintarEsperan(ultimo);
     pintarLista(ultimo);
+    recortarLista();
   }
 
-  function sinToken(texto) {
+  var perdioEscrito = false;
+  function sinToken(titulo, texto) {
     $('app').hidden = true;
     $('sin-token').hidden = false;
-    if (texto) $('sin-token-texto').textContent = texto;
+    if (titulo) $('sin-token-titulo').textContent = titulo;
+    if (texto) $('sin-token-texto').textContent = texto + (perdioEscrito ? ' Lo que escribiste en la terminal y no había llegado a la PC se perdió.' : '');
   }
 
   function consultar() {
     clearTimeout(timer);
-    if (!token) return sinToken(enlaceMalo ? 'El QR no se leyó bien. Escaneá el QR de nuevo en Sloth.' : viejo ? 'Hay que volver a emparejar este celu: escaneá el QR de nuevo en Sloth.' : undefined);
+    if (!token) return enlaceMalo ? sinToken('No se pudo conectar', 'El QR no se leyó bien: escanealo de nuevo, de cerca y con buena luz.') : viejo ? sinToken('Hay que volver a conectar este celu', 'Escaneá el QR de nuevo en Sloth.') : sinToken();
     pedirApi('/api/estado')
       .then(function (r) {
         if (r.status === 401) {
           guardar('sloth-token', null);
           guardar('sloth-clave', null);
           token = null;
-          sinToken('Este celu ya no está autorizado (se regeneró el código en Sloth). Escaneá el QR de nuevo.');
+          sinToken('El código de Sloth cambió', 'Se regeneró el código en la PC (panel «Celular») y este celu quedó afuera. Escaneá el QR nuevo.');
           return null;
         }
         if (r.status === 409) {
@@ -1072,7 +1128,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     pedirApi('/api/terminal', { id: id, desde: termDesde, espera: espera, sesion: TERM_SESION }, ctl ? ctl.signal : null)
       .then(function (r) {
         if (gen !== termGen) return null;
-        if (r.status === 401) { cerrarTerminal(false); consultar(); return null; }
+        if (r.status === 401) { perdioEscrito = termCola.length > 0 || termEscribiendo; cerrarTerminal(false); consultar(); return null; }
         if (!r.json) throw new Error('http ' + r.status);
         return r.json().then(function (j) { return { r: r, j: j }; });
       })
@@ -1167,7 +1223,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     pedirApi('/api/terminal', pedido, ctl ? ctl.signal : null)
       .then(function (r) {
         if (tok !== termEscTok) return null;
-        if (r.status === 401) { cerrarTerminal(false); consultar(); return null; }
+        if (r.status === 401) { perdioEscrito = true; cerrarTerminal(false); consultar(); return null; }
         if (!r.json) throw new Error('http ' + r.status);
         return r.json().then(function (j) { return { r: r, j: j }; });
       })

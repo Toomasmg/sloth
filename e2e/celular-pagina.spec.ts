@@ -12,6 +12,7 @@ const CLAVE = Buffer.alloc(32, 5).toString('base64url')
 const MIN = 60_000
 
 let estado: EstadoCelular
+let claveActual = CLAVE
 const decisiones: string[] = []
 const fuente = crearFuenteWifi({
   host: '127.0.0.1',
@@ -23,7 +24,7 @@ const fuente = crearFuenteWifi({
       estado = { ...estado, pedidos: estado.pedidos.filter((p) => p.id !== id) }
     },
     puedeAprobar: () => estado.aprobar,
-    clave: () => CLAVE,
+    clave: () => claveActual,
     icono: () => null,
     terminal: async () => ({ status: 403, error: 'apagada' }),
     xterm: () => null
@@ -34,6 +35,7 @@ test.beforeAll(() => fuente.iniciar())
 test.afterAll(() => fuente.detener())
 test.beforeEach(() => {
   decisiones.length = 0
+  claveActual = CLAVE
 })
 
 const url = (): string => `http://127.0.0.1:${fuente.puerto()}/#k=${CLAVE}`
@@ -279,6 +281,84 @@ test('Celu: con «Aprobar desde el celu» apagado, los pedidos se ven sin botone
     await expect(page.locator('#pedidos li')).toHaveCount(2)
     await expect(page.getByRole('button', { name: 'Aprobar' })).toHaveCount(0)
     await expect(page.getByText('Respondelo en la PC.', { exact: false })).toHaveCount(1)
+  } finally {
+    await navegador.close()
+  }
+})
+
+test('Celu: acostado con 18 sesiones no corta filas a la mitad, cuenta las que no entran y la terminal se puede tocar', async () => {
+  estado = { ...BASE, terminal: true, sesiones: Array.from({ length: 18 }, (_, i) => sesion(`espacio-${i}`, i % 3 ? 'working' : 'idle')) }
+  const navegador = await chromium.launch()
+  try {
+    const { page } = await abrir(navegador, devices['Galaxy S9+ landscape'])
+    await page.screenshot({ path: test.info().outputPath('acostado-18.png') })
+    const lista = await page.locator('#lista').boundingBox()
+    const filas = page.locator('#lista li:visible')
+    const n = await filas.count()
+    expect(n).toBeGreaterThan(0)
+    for (let i = 0; i < n; i++) {
+      const f = await filas.nth(i).boundingBox()
+      expect(f && lista && f.y + f.height).toBeLessThanOrEqual((lista?.y ?? 0) + (lista?.height ?? 0) + 1)
+    }
+    await expect(page.locator('#lista-mas')).toHaveText(`+${18 - n} más · parado se ven todas`)
+    await expect(page.getByRole('button', { name: 'Abrir la terminal de espacio-0' })).toBeInViewport({ ratio: 1 })
+  } finally {
+    await navegador.close()
+  }
+})
+
+test('Celu: en tablet van dos columnas (lo que espera a la izquierda, la lista a la derecha) y no se estira de lado a lado', async () => {
+  estado = { ...BASE, sesiones: [sesion('api', 'waiting', { detalle: MENSAJE }), ...Array.from({ length: 8 }, (_, i) => sesion(`espacio-${i}`, 'working'))] }
+  const navegador = await chromium.launch()
+  try {
+    const { page } = await abrir(navegador, { viewport: { width: 820, height: 1180 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 })
+    const espera = await page.locator('#esperan li').boundingBox()
+    const lista = await page.locator('#lista').boundingBox()
+    expect(espera && lista && espera.x + espera.width).toBeLessThan(lista?.x ?? 0)
+    expect(espera?.y ?? 999).toBeLessThan(200)
+    expect(lista?.y ?? 999).toBeLessThan(300)
+    await page.screenshot({ path: test.info().outputPath('tablet.png') })
+    await page.setViewportSize({ width: 1600, height: 1000 })
+    const app = await page.locator('#app').boundingBox()
+    expect(app?.width ?? 0).toBeLessThanOrEqual(1100)
+  } finally {
+    await navegador.close()
+  }
+})
+
+test('Celu: sin conectar dice qué hacer; con el código regenerado, por qué quedó afuera', async () => {
+  estado = { ...BASE }
+  const navegador = await chromium.launch()
+  try {
+    const ctx = await navegador.newContext(MOTORES[0].ficha)
+    const page = await ctx.newPage()
+    await page.goto(`http://127.0.0.1:${fuente.puerto()}/`)
+    await expect(page.getByRole('heading', { level: 1, name: 'Conectá este celu' })).toBeVisible()
+    await expect(page.getByRole('listitem').filter({ hasText: 'buscá «Celular» con Ctrl K' })).toBeVisible()
+    await page.screenshot({ path: test.info().outputPath('sin-conectar.png') })
+
+    // Cambiar solo el # no recarga la página.
+    await page.goto(url())
+    await page.reload()
+    await expect(page.getByText('PC conectada')).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Sloth' })).toBeVisible()
+    claveActual = Buffer.alloc(32, 6).toString('base64url')
+    await expect(page.getByRole('heading', { level: 1, name: 'El código de Sloth cambió' })).toBeVisible()
+    await expect(page.getByText(/Escaneá el QR nuevo\.$/)).toBeVisible()
+  } finally {
+    await navegador.close()
+  }
+})
+
+test('Celu: si las cuentas no entran, el borde se desvanece y deja de hacerlo al llegar al final', async () => {
+  estado = { ...BASE, cuentas: ['Personal', 'Trabajo', 'Proyectos-Personales', 'Cliente-Grande', 'Otra'].map((n, i) => cuenta(String(i), n, 10, 10)) }
+  const navegador = await chromium.launch()
+  try {
+    const { page } = await abrir(navegador, MOTORES[0].ficha)
+    const cuentas = page.getByRole('group', { name: 'Cuenta' })
+    await expect(cuentas).toHaveClass(/desliza/)
+    await cuentas.evaluate((c) => c.scrollTo({ left: c.scrollWidth }))
+    await expect(cuentas).not.toHaveClass(/desliza/)
   } finally {
     await navegador.close()
   }
