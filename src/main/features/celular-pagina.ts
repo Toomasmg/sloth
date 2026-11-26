@@ -68,15 +68,30 @@ export const PAGINA_HTML = `<!doctype html>
   </header>
   <div class="term-aviso" id="term-aviso" role="status" hidden></div>
   <div class="term-pantalla" id="term-pantalla"></div>
+  <div class="term-cola" id="term-cola" role="status" hidden><span class="term-cola-texto" id="term-cola-texto"></span><button type="button" id="term-descartar">Descartar</button></div>
+  <form class="term-escribir" id="term-escribir" autocomplete="off">
+    <input id="term-texto" type="text" enterkeyhint="send" maxlength="4000" placeholder="Escribí o dictá un mensaje" aria-label="Mensaje para la terminal">
+    <button type="button" class="term-hist" id="term-hist" aria-label="Lo último que mandaste" disabled>↺</button>
+    <button type="submit" class="term-mandar" id="term-mandar">Mandar</button>
+  </form>
   <div class="term-teclas" role="group" aria-label="Teclas">
+    <button type="button" class="term-a-texto" id="term-a-texto" aria-label="Escribir un mensaje">Aa</button>
     <button type="button" data-tecla="esc">Esc</button>
-    <button type="button" data-tecla="tab">Tab</button>
     <button type="button" data-tecla="arriba" aria-label="Flecha arriba">↑</button>
     <button type="button" data-tecla="abajo" aria-label="Flecha abajo">↓</button>
+    <button type="button" data-tecla="enter" aria-label="Enter">⏎</button>
+    <button type="button" data-tecla="ctrlc" aria-label="Control C">Ctrl C</button>
+    <button type="button" data-tecla="tab">Tab</button>
+    <button type="button" data-tecla="shifttab" aria-label="Shift Tab">⇧Tab</button>
+    <button type="button" data-tecla="escesc" aria-label="Doble Esc">Esc Esc</button>
+    <button type="button" data-tecla="barra" aria-label="Barra">/</button>
     <button type="button" data-tecla="izq" aria-label="Flecha izquierda">←</button>
     <button type="button" data-tecla="der" aria-label="Flecha derecha">→</button>
-    <button type="button" data-tecla="ctrlc" aria-label="Control C">Ctrl C</button>
-    <button type="button" data-tecla="enter" aria-label="Enter">⏎</button>
+    <button type="button" data-tecla="inicio" aria-label="Inicio">Inicio</button>
+    <button type="button" data-tecla="fin" aria-label="Fin">Fin</button>
+    <button type="button" data-tecla="repag" aria-label="Página arriba">RePág</button>
+    <button type="button" data-tecla="avpag" aria-label="Página abajo">AvPág</button>
+    <button type="button" data-tecla="ctrld" aria-label="Control D">Ctrl D</button>
   </div>
 </section>
 <section class="aviso-pantalla" id="sin-token" hidden>
@@ -282,7 +297,23 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .term-pantalla .xterm { padding: 0; }
 .term-teclas { flex: none; display: flex; gap: 4px; padding: 6px 8px; overflow-x: auto; border-top: 1px solid var(--borde); scrollbar-width: none; }
 .term-teclas::-webkit-scrollbar { display: none; }
-.term-teclas button { flex: 1 0 auto; min-width: 38px; min-height: 40px; padding: 0 6px; border: 1px solid var(--borde); border-radius: 10px; background: var(--panel); color: var(--texto); font: 600 13px var(--mono); touch-action: manipulation; }
+.term-teclas button { flex: 1 0 auto; min-width: 44px; min-height: 44px; padding: 0 8px; border: 1px solid var(--borde); border-radius: 10px; background: var(--panel); color: var(--texto); font: 600 13px var(--mono); touch-action: manipulation; white-space: nowrap; }
+.term-escribir { flex: none; display: flex; gap: 6px; padding: 6px 8px 0; border-top: 1px solid var(--borde); }
+.term-escribir input { flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border: 1px solid var(--borde); border-radius: 12px; background: #0B0D10; color: var(--fuerte); font-size: 16px; }
+.term-escribir input::placeholder { color: var(--suave); }
+.term-hist { flex: none; width: 44px; min-height: 44px; border: 1px solid var(--borde); border-radius: 12px; background: var(--panel); color: var(--texto); font-size: 18px; touch-action: manipulation; }
+.term-mandar { flex: none; min-height: 44px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--trabaja); color: #08090B; font-size: 14px; font-weight: 700; touch-action: manipulation; }
+.term-cola { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 12px; color: var(--texto); background: var(--panel); border-top: 1px solid var(--borde); }
+.term-cola-texto { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.term-cola-texto code { font-family: var(--mono); color: var(--fuerte); }
+#term-descartar { flex: none; min-height: 44px; padding: 0 12px; border: 1px solid var(--borde); border-radius: 10px; background: transparent; color: var(--texto); font-weight: 600; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .term-escribir { padding-top: 4px; }
+  .term-teclas { padding: 4px 8px; }
+}
+.term.bajo:not(.escribiendo) .term-escribir, .term.bajo.escribiendo .term-teclas { display: none; }
+.term-teclas .term-a-texto { display: none; }
+.term.bajo .term-teclas .term-a-texto { display: inline-block; }
 .term button:disabled { opacity: 0.5; cursor: default; }
 html.con-term, html.con-term body { overflow: hidden; overscroll-behavior: none; }
 @media (min-width: 720px) and (min-height: 601px) {
@@ -468,7 +499,8 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   var filtroEstado = null;
   var nombreCuenta = function (e, id) { var c = e.cuentas.filter(function (x) { return x.id === id; })[0]; return c ? c.nombre : ''; };
   var cuentasEnVista = function (e) { return cuentaElegida === TODAS ? e.cuentas : e.cuentas.filter(function (c) { return c.id === cuentaElegida; }); };
-  var deLaCuenta = function (e) { return cuentaElegida === TODAS ? e.sesiones : e.sesiones.filter(function (s) { return s.cuentaId === cuentaElegida; }); };
+  // Con una cuenta (o ninguna con datos) no hay selector: se ven todas las sesiones, aunque alguna sea de una cuenta que no vino.
+  var deLaCuenta = function (e) { return cuentaElegida === TODAS || e.cuentas.length < 2 ? e.sesiones : e.sesiones.filter(function (s) { return s.cuentaId === cuentaElegida; }); };
   var pctDe = function (v) { return v ? v.pct : -1; };
 
   function pintarCuentas(e) {
@@ -863,7 +895,12 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   // Terminal, con dos lazos. «Mirar» deja un pedido abierto en la PC (hasta 20 s) que contesta apenas hay salida
   // nueva; «escribir» manda lo que se teclea en pedidos aparte, de a uno y en orden, y la PC contesta ya.
   // Todo sellado por el mismo canal que el estado. xterm se carga recién al abrirla (pesa ~500 kB).
-  var TECLAS = { esc: '\\x1b', tab: '\\t', arriba: '\\x1b[A', abajo: '\\x1b[B', der: '\\x1b[C', izq: '\\x1b[D', ctrlc: '\\x03', enter: '\\r' };
+  var TECLAS = {
+    esc: '\\x1b', escesc: ['\\x1b', '\\x1b'], tab: '\\t', shifttab: '\\x1b[Z', arriba: '\\x1b[A', abajo: '\\x1b[B', der: '\\x1b[C', izq: '\\x1b[D',
+    ctrlc: '\\x03', ctrld: '\\x04', enter: '\\r', barra: '/', inicio: '\\x1b[H', fin: '\\x1b[F', repag: '\\x1b[5~', avpag: '\\x1b[6~'
+  };
+  // Solo en memoria: lo que se le dice a Claude puede tener datos que no conviene dejar guardados en el celu.
+  var TERM_HIST_MAX = 20, termHist = [], termHistI = -1;
   var TERM_MAX = 1500, TERM_ESPERA = 20000, TERM_MARGEN = 8000, TERM_ESCRIBIR_MAX = 10000;
   var term = null, termId = null, termDesde = -1, termCola = [], termTam = null;
   var termCerrada = false, xtermCargando = null, conHistoria = false;
@@ -973,7 +1010,10 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     el.style.top = (vv ? vv.offsetTop : 0) + 'px';
     el.style.height = (vv ? vv.height : window.innerHeight) + 'px';
     el.style.bottom = 'auto';
-    return vv ? vv.height : window.innerHeight;
+    var alto = vv ? vv.height : window.innerHeight;
+    // Con poca altura (teclado abierto, celu acostado) no entran el cuadro y la botonera: queda el que se está usando.
+    if (el.classList) el.classList.toggle('bajo', alto < 420);
+    return alto;
   }
 
   function alCambiarVentana() {
@@ -1035,11 +1075,65 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       if (junta) { ult.t += texto.slice(ini, i); ult.p = p; }
       else termCola.push({ t: texto.slice(ini, i), p: p, aparte: !!aparte });
     }
+    pintarCola();
     enviarEscritura();
   }
 
   var retardoTerm = function (fallas) { return fallas ? Math.min(4000, 250 * Math.pow(2, fallas - 1)) : 0; };
-  var botonesTerm = function () { for (var i = 0; i < botonesTecla.length; i++) botonesTecla[i].disabled = termCerrada || termParada; };
+  var botonesTerm = function () {
+    for (var i = 0; i < botonesTecla.length; i++) botonesTecla[i].disabled = termCerrada || termParada;
+    pintarCola();
+  };
+
+  // Lo que no llega se ve y se puede tirar: si no, con la red caída cada toque se acumula y sale todo junto al volver.
+  var aVista = function (t) {
+    return t.replace(/\\r/g, '⏎').replace(/\\x1b\\[[\\d;]*[A-Za-z~]|\\x1b/g, '⎋').replace(/[\\x00-\\x1f\\x7f]/g, '');
+  };
+  function pintarCola() {
+    var hay = termCola.length > 0 && termEscFallas > 0 && !termCerrada && !termParada;
+    $('term-cola').hidden = !hay;
+    if (!hay) return;
+    var t = '';
+    for (var i = 0; i < termCola.length && t.length < 60; i++) t += aVista(termCola[i].t);
+    if (t.length > 60) t = t.slice(0, 59) + '…';
+    $('term-cola-texto').textContent = 'Sin llegar a la PC: ' + (t || 'teclas');
+  }
+
+  function descartarCola() {
+    var viajaba = !!(termCola[0] && termCola[0].n);
+    soltarEscribir();
+    termCola = [];
+    termEscFallas = 0;
+    termNota = viajaba ? 'Descartado. Lo primero ya había salido: puede que haya llegado a la PC.' : '';
+    avisoTerm(termNota);
+    pintarCola();
+  }
+
+  function limpiarTexto(t) {
+    return t.replace(/[\\x00-\\x1f\\x7f]+/g, ' ');
+  }
+
+  // El cuadro propio deja usar el dictado y el autocorrector del celu, que en la terminal no andan. El Enter va
+  // en otro pedido, igual que al tipear en la terminal, para que Claude no lo tome como parte de lo pegado.
+  function mandarTexto() {
+    var campo = $('term-texto');
+    var t = limpiarTexto(campo.value || '');
+    if (termCerrada || termParada || !termId || !t.trim()) return;
+    encolar(t, true);
+    encolar(TECLAS.enter, true);
+    if (termHist[termHist.length - 1] !== t) termHist.push(t);
+    if (termHist.length > TERM_HIST_MAX) termHist.shift();
+    termHistI = -1;
+    campo.value = '';
+    $('term-hist').disabled = false;
+  }
+
+  // Cada toque trae uno más viejo; después del primero vuelve el cuadro vacío.
+  function historialAnterior() {
+    if (!termHist.length) return;
+    termHistI = termHistI < 0 ? termHist.length - 1 : termHistI - 1;
+    $('term-texto').value = termHistI < 0 ? '' : termHist[termHistI];
+  }
 
   // Lo que llegue de un pedido de mirar anterior a esto ya no vale: se compara termGen.
   function soltarMirar() {
@@ -1178,6 +1272,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
 
   function quitarEscrito(item) {
     if (termCola[0] === item) termCola.shift();
+    pintarCola();
   }
 
   function programarEscritura() {
@@ -1188,6 +1283,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   function falloEscribir(tipo) {
     termEscFallas++;
     if (termEscFallas >= 2) avisoTerm(tipo === 'ocupada' ? 'La PC está ocupada. Reintentando…' : 'Sin conexión con la PC. Reintentando…');
+    pintarCola();
   }
 
   // Un pedido por vez y en orden. Mientras no haya respuesta el item sigue en la cola con su número: si la
@@ -1277,6 +1373,8 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     termTipo = '';
     termIguales = 0;
     termNota = '';
+    termHistI = -1;
+    $('term-texto').value = '';
     $('term-nombre').textContent = nombre;
     $('term').hidden = false;
     botonesTerm();
@@ -1347,9 +1445,27 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       botonesTecla.push(b);
       // Con el dedo sobre una tecla el foco no se mueve: si se movía, el teclado se cerraba en cada toque.
       b.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
-      b.addEventListener('click', function () { encolar(TECLAS[b.getAttribute('data-tecla')], true); });
+      b.addEventListener('click', function () {
+        var v = TECLAS[b.getAttribute('data-tecla')];
+        var lista = typeof v === 'string' ? [v] : v || [];
+        for (var i = 0; i < lista.length; i++) encolar(lista[i], true);
+      });
     });
   }
+  botonesTecla.push($('term-texto'), $('term-mandar'), $('term-a-texto'));
+  $('term-escribir').addEventListener('submit', function (ev) { ev.preventDefault(); mandarTexto(); });
+  // Mandar y el historial no se llevan el foco: el teclado del celu queda abierto para seguir escribiendo.
+  $('term-mandar').addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+  $('term-hist').addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+  $('term-hist').addEventListener('click', historialAnterior);
+  $('term-descartar').addEventListener('click', descartarCola);
+  // Con poca altura el cuadro se esconde detrás de este botón; el foco sale del mismo toque, o iOS no abre el teclado.
+  $('term-a-texto').addEventListener('click', function () {
+    if ($('term').classList) $('term').classList.add('escribiendo');
+    $('term-texto').focus();
+  });
+  $('term-texto').addEventListener('focus', function () { if ($('term').classList) $('term').classList.add('escribiendo'); });
+  $('term-texto').addEventListener('blur', function () { if ($('term').classList) $('term').classList.remove('escribiendo'); });
 
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { clearTimeout(timer); soltarMirar(); clearTimeout(termEscTimer); termEscTimer = null; }

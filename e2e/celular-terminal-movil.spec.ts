@@ -120,7 +120,8 @@ test('Celular movil: la terminal anda en un Galaxy y un iPhone simulados, con sa
       await expect.poll(veces).toBe(2)
       await escribir('Start-Sleep 60')
       // Un Ctrl C que llega antes de que la shell arranque el comando se pierde: se repite hasta que aparece el prompt de nuevo.
-      const prompts = async (): Promise<number> => (((await pantalla.textContent()) ?? '').match(/❯/g) ?? []).length
+      // El prompt depende del perfil de PowerShell de la PC: «❯» con uno armado, «PS C:\…>» sin perfil.
+      const prompts = async (): Promise<number> => (((await pantalla.textContent()) ?? '').match(/❯|PS [^>\n]*>/g) ?? []).length
       const conSleep = await prompts()
       await expect
         .poll(
@@ -133,7 +134,14 @@ test('Celular movil: la terminal anda en un Galaxy y un iPhone simulados, con sa
         .toBe(true)
       await escribir("Write-Output ('tras-' + 'cc')")
       await expect(pantalla).toContainText('tras-cc', { timeout: 10_000 })
-      for (const tecla of ['Tab', 'Esc', 'Flecha izquierda', 'Flecha derecha', 'Flecha abajo']) await term.getByRole('button', { name: tecla }).click()
+      for (const tecla of ['Tab', 'Esc', 'Flecha izquierda', 'Flecha derecha', 'Flecha abajo']) await term.getByRole('button', { name: tecla, exact: true }).click()
+
+      // El cuadro propio (el del dictado y el autocorrector) manda el texto y el Enter.
+      const cuadro = term.getByRole('textbox', { name: 'Mensaje para la terminal' })
+      await cuadro.fill("Write-Output ('desde-' + 'cuadro')")
+      await term.getByRole('button', { name: 'Mandar' }).click()
+      await expect(pantalla).toContainText('desde-cuadro', { timeout: 10_000 })
+      await expect(cuadro).toHaveValue('')
 
       // Salida grande, como la de una sesión de Claude Code: un color distinto por letra, miles de ESC.
       await escribir("$e=[char]27; 1..2000 | % { -join (1..20 | % { \"$e[3$($_ % 7 + 1)mx\" }) }; Write-Output ('fin-' + 'grande')")
