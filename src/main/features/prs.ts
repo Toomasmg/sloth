@@ -322,6 +322,9 @@ const prs: Feature = {
       return snapshot
     })
 
+    // Solo lo guardado: el riel lo pide al arrancar y no debe costar una llamada a GitHub.
+    ctx.handle('peek', () => snapshot)
+
     ctx.handle('refresh', async () => {
       // El remoto de un repo puede haber cambiado (fork a upstream, renombre).
       if (!inflight) slugs.clear()

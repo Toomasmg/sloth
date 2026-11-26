@@ -917,6 +917,7 @@ export function App(): React.JSX.Element {
                   <span className="sl-sum-t">{done === 1 ? 'listo' : 'listos'}</span>
                 </button>
               )}
+              <TitlebarOnly name="prs" />
             </div>
             <div className="sl-upd">
               <TitlebarOnly name="updater" />

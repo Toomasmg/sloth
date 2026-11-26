@@ -1,4 +1,6 @@
 import { useSyncExternalStore } from 'react'
+import type { PrsSnapshot } from '../../../../shared/prs'
+import { contarPendientesPrs, type PendientesPrs } from '../../layout/pendientes'
 
 interface PrsState {
   open: boolean
@@ -35,5 +37,27 @@ export function usePrs(): PrsState {
       return () => listeners.delete(cb)
     },
     () => state
+  )
+}
+
+const SIN_PENDIENTES: PendientesPrs = { propiosRojos: 0, piden: 0, rojos: 0, sinRevision: 0 }
+let pendientes = SIN_PENDIENTES
+const pendientesListeners = new Set<() => void>()
+
+/** Lo que ya sabe el último snapshot (guardado o recién llegado); el riel y la barra lo leen sin pedir nada a GitHub. */
+export function setPrsSnapshot(s: PrsSnapshot): void {
+  const next = contarPendientesPrs(s.repos)
+  if (Object.keys(next).every((k) => next[k as keyof PendientesPrs] === pendientes[k as keyof PendientesPrs])) return
+  pendientes = next
+  for (const l of pendientesListeners) l()
+}
+
+export function usePrsPendientes(): PendientesPrs {
+  return useSyncExternalStore(
+    (cb) => {
+      pendientesListeners.add(cb)
+      return () => pendientesListeners.delete(cb)
+    },
+    () => pendientes
   )
 }

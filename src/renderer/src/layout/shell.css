@@ -117,6 +117,10 @@
   background: var(--done-soft);
   color: var(--done);
 }
+.sl-sum.is-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
 .sl-sum .ic {
   color: currentColor;
 }
@@ -251,6 +255,10 @@
 }
 .sl-rail-badge {
   background: var(--waiting);
+  color: var(--on-accent);
+}
+.sl-rail-badge.is-danger {
+  background: var(--danger);
   color: var(--on-accent);
 }
 

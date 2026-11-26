@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { View } from '../../ui/View'
-import { Button, EmptyState, IconButton, InlineAlert, Menu, Segmented, Tag, Tooltip, toast } from '../../ui'
-import { CheckCircleIcon, ErrorIcon, MoreIcon, PullRequestIcon, RefreshIcon, SpinnerIcon } from '../../icons/SlothIcons'
+import { Button, EmptyState, IconButton, InlineAlert, Menu, Segmented, Tag, toast } from '../../ui'
+import { MoreIcon, PullRequestIcon, RefreshIcon, SpinnerIcon } from '../../icons/SlothIcons'
 import { useAhora } from '../../lib/reloj'
 import { useVisiblePolling } from '../../visibility'
 import { useUi } from '../host'
 import { rebaseBlocker } from '../../../../shared/prs'
 import type { OpenBranchMode, OpenBranchResult, PrRow, PrsProblem, PrsSnapshot, PrTarget, RepoPrs } from '../../../../shared/prs'
 import { DivergedDialog, MergeDialog, RebaseDialog } from './MergeDialog'
-import { ago, checksLabel, counts, filterPrs, reviewLabel, type PrFilter } from './model'
+import { PrChips } from '../PrChips'
+import { estadoDeRow } from '../pr-chips'
+import { ago, counts, filterPrs, type PrFilter } from './model'
 import { closePrs } from './store'
 
 const FILTER_KEY = 'sloth.prs.filter'
@@ -217,18 +219,6 @@ function Problem({ problem, refreshing, onRefresh }: { problem: NonNullable<PrsP
   return <EmptyState icon={icon} title="Ningún espacio apunta a un repo de GitHub" description="Creá un espacio con la carpeta de un repo que tenga remoto en GitHub y van a aparecer sus PRs." />
 }
 
-function ChecksGlyph({ pr }: { pr: PrRow }): React.JSX.Element | null {
-  if (pr.checks === 'none') return null
-  const icon = pr.checks === 'ok' ? <CheckCircleIcon size={15} /> : pr.checks === 'fail' ? <ErrorIcon size={15} /> : <SpinnerIcon size={15} />
-  return (
-    <Tooltip text={checksLabel(pr)}>
-      <span className={`f-prs-checks is-${pr.checks}`} role="img" aria-label={checksLabel(pr)} tabIndex={0}>
-        {icon}
-      </span>
-    </Tooltip>
-  )
-}
-
 interface PrItemProps {
   pr: PrRow
   rebaseBlocked: string | null
@@ -242,7 +232,6 @@ interface PrItemProps {
 }
 
 function PrItem({ pr, rebaseBlocked, canMerge, loading, onUrl, onBranch, onRebase, onMerge, onRefresh }: PrItemProps): React.JSX.Element {
-  const review = reviewLabel(pr.review)
   const failUrl = pr.failing[0]?.url ?? null
   return (
     <li className="f-prs-row">
@@ -256,29 +245,18 @@ function PrItem({ pr, rebaseBlocked, canMerge, loading, onUrl, onBranch, onRebas
           <Tag>
             {pr.base} ← {pr.head}
           </Tag>
-          {pr.isDraft && <Tag mono={false}>Borrador</Tag>}
         </div>
       </div>
       <div className="f-prs-state">
-        <ChecksGlyph pr={pr} />
+        <PrChips estado={estadoDeRow(pr)} />
         {pr.checks === 'fail' && failUrl && (
           <button type="button" className="f-prs-link" onClick={() => onUrl(failUrl)}>
             Ver check fallido
           </button>
         )}
-        {review && (
-          <Tag mono={false} tone={pr.review === 'approved' ? 'done' : pr.review === 'changes' ? 'danger' : 'waiting'}>
-            {review}
-          </Tag>
-        )}
         {pr.reviewRequestedFromMe && (
           <Tag mono={false} tone="accent">
             Te piden revisión
-          </Tag>
-        )}
-        {pr.mergeable === 'conflict' && (
-          <Tag mono={false} tone="danger">
-            Conflictos
           </Tag>
         )}
         <Menu
