@@ -256,7 +256,7 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
               Cancelar
             </Button>
             <span className="f-broadcast-grow" />
-            <Button type="submit" look="classic" variant="primary" kbd="Ctrl+Enter">
+            <Button type="submit" look="classic" variant="primary">
               <PaperPlane size={14} />
               {sendLabel}
             </Button>
