@@ -1,0 +1,571 @@
+/* Panel lateral de cuentas y espacios (Sidebar.tsx). La grilla que lo contiene (.sl-body) vive en shell.css. */
+
+.sl-side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--surface);
+  box-shadow: inset -1px 0 0 var(--divider);
+}
+/* Siempre de 40 px: el título y el filtro se turnan el mismo lugar, así que abrir el filtro no mueve nada. */
+.sl-side-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  height: var(--h-lg);
+  padding: 0 var(--s-2) 0 var(--s-3);
+}
+.sl-side-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  margin: 0;
+  font-size: var(--fs-11);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.sl-side-count {
+  font-weight: 500;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.sl-filter {
+  flex: 1;
+  min-width: 0;
+  height: var(--h-sm);
+  margin-left: calc(-1 * var(--s-1));
+  padding: 0 var(--s-3);
+  border: 1px solid var(--control-border);
+  border-radius: var(--r-md);
+  background: var(--sunken);
+  color: var(--text);
+  font: inherit;
+}
+.sl-filter::placeholder {
+  color: var(--placeholder);
+}
+.sl-filter:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 0;
+}
+
+/* La lista que se desplaza avisa con una sombra en cada borde que hay más para ver de ese lado. */
+.sl-groups {
+  /* Con las flechas, la fila enfocada no queda tapada por el encabezado que se queda pegado arriba. */
+  scroll-padding-block-start: var(--h-md);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  container-type: scroll-state;
+  padding: 0 var(--s-2) var(--s-2);
+}
+.sl-groups::before,
+.sl-groups::after {
+  content: '';
+  display: block;
+  position: sticky;
+  z-index: var(--z-sticky);
+  height: var(--s-4);
+  margin-inline: calc(-1 * var(--s-2));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--t-med) var(--ease);
+}
+.sl-groups::before {
+  top: 0;
+  margin-bottom: calc(-1 * var(--s-4));
+  background: radial-gradient(farthest-side at 50% 0, var(--divider-strong), transparent);
+}
+.sl-groups::after {
+  bottom: 0;
+  margin-top: calc(-1 * var(--s-4));
+  background: radial-gradient(farthest-side at 50% 100%, var(--divider-strong), transparent);
+}
+@container scroll-state(scrollable: block-start) {
+  .sl-groups::before {
+    opacity: 1;
+  }
+}
+@container scroll-state(scrollable: block-end) {
+  .sl-groups::after {
+    opacity: 1;
+  }
+}
+@supports not (container-type: scroll-state) {
+  .sl-groups::before,
+  .sl-groups::after {
+    animation: sl-edge linear both;
+    animation-timeline: scroll();
+  }
+  .sl-groups::before {
+    animation-range: 0 var(--s-5);
+  }
+  .sl-groups::after {
+    animation-direction: reverse;
+    animation-range: calc(100% - var(--s-5)) 100%;
+  }
+}
+@keyframes sl-edge {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Cuenta: grupo sin caja. Su color (--acc) vive en el avatar y en la barra de las filas abiertas.
+   --bar es ese color para la barra: en tema claro se oscurece para que se note sobre el fondo. */
+.sl-acc {
+  --acc: var(--accent);
+  --bar: var(--acc);
+  /* Donde empieza el avatar: flecha y márgenes del encabezado. Las filas se alinean con él. */
+  --sl-indent: calc(var(--s-1) * 2 + var(--s-4));
+  padding-bottom: var(--s-1);
+}
+html[data-theme='light'] .sl-acc {
+  --bar: color-mix(in srgb, var(--acc) 55%, var(--text));
+}
+.sl-acc + .sl-acc {
+  margin-top: var(--s-1);
+}
+/* El encabezado se queda arriba mientras se recorren los espacios de su cuenta. El contenedor
+   permite que el plan se acomode según el ancho real del panel, no el de la ventana. */
+.sl-acc-head {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-pane);
+  display: flex;
+  align-items: center;
+  min-height: var(--h-md);
+  background: var(--surface);
+  container: sl-acc-head / inline-size;
+}
+.sl-acc-toggle {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: 2px var(--s-1);
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sl-acc-toggle:hover {
+  background: var(--hover);
+}
+.sl-acc-toggle.is-static {
+  cursor: default;
+  color: var(--text-2);
+  padding-left: var(--sl-indent);
+}
+.sl-acc-toggle.is-static:hover {
+  background: transparent;
+}
+.sl-acc-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+/* Sin esto no se vería que el grupo se pliega: la flecha apunta a la derecha cuando está plegado. */
+.sl-acc-chev {
+  flex: none;
+  width: var(--s-4);
+  color: var(--text-3);
+  transition: transform var(--t-fast) var(--ease);
+}
+.sl-acc-toggle[aria-expanded='false'] .sl-acc-chev {
+  transform: rotate(-90deg);
+}
+.sl-acc-toggle:hover .sl-acc-chev {
+  color: var(--text-2);
+}
+/* El color se aplica como tinte y no como relleno: sirve igual con cualquier color elegido y en los dos temas. */
+.sl-avatar {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  margin-right: var(--s-1);
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-full);
+  font-size: var(--fs-11);
+  font-weight: 700;
+  color: var(--text);
+  background: color-mix(in srgb, var(--acc) 30%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acc) 70%, transparent);
+}
+.sl-acc-toggle[aria-expanded='false'] .sl-avatar {
+  opacity: 0.7;
+}
+/* Sin sesión se ve también cuando la píldora no entra: un punto ámbar en la esquina del avatar. */
+.sl-avatar.is-off::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: var(--s-2);
+  height: var(--s-2);
+  border-radius: var(--r-full);
+  background: var(--waiting);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+/* Nombre y plan: si el plan no entra al lado del nombre completo, baja a una segunda línea chica en vez
+   de cortar el nombre o desaparecer. Con «Sin sesión» (estado accionable) pasa al revés: la pastilla nunca
+   baja ni se esconde y es el nombre el que se trunca. */
+.sl-acc-id {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  gap: 2px var(--s-2);
+  overflow: hidden;
+  line-height: 20px;
+}
+.sl-acc-id.is-off {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+/* Solo se ve cuando el panel es tan angosto que la pastilla no entra: queda el punto, igual que en el avatar. */
+.sl-acc-id.is-off::before {
+  content: '';
+  display: none;
+  flex: none;
+  width: var(--s-2);
+  height: var(--s-2);
+  margin-right: var(--s-1);
+  border-radius: var(--r-full);
+  background: var(--waiting);
+}
+.sl-acc-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-13);
+  font-weight: 600;
+}
+.sl-acc-plan,
+.sl-acc-warn {
+  flex: none;
+  align-self: center;
+  height: var(--s-4);
+  padding: 0 var(--s-2);
+  border-radius: var(--r-full);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  line-height: var(--s-4);
+  white-space: nowrap;
+}
+.sl-acc-plan {
+  color: var(--text-2);
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
+}
+.sl-acc-plan.is-team {
+  color: var(--team);
+  background: var(--team-soft);
+  box-shadow: none;
+}
+.sl-acc-warn {
+  color: var(--waiting);
+  background: var(--waiting-soft);
+}
+/* Resumen de la cuenta: queda a la vista también plegada. Íconos y números, nunca solo color. */
+.sl-acc-sum {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+.sl-acc-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--fs-12);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sl-acc-stat.is-waiting {
+  color: var(--waiting);
+}
+.sl-acc-stat.is-working {
+  color: var(--working);
+}
+/* Con el panel angosto se saca el avatar y se aprieta el resumen: el nombre y el resumen son lo que no puede faltar.
+   En densidad cómoda los márgenes son más grandes y el avatar se va un poco antes. */
+@container sl-acc-head (max-width: 216px) {
+  .sl-avatar,
+  .sl-acc-warn {
+    display: none;
+  }
+  .sl-acc-id.is-off::before {
+    display: block;
+  }
+  .sl-acc-sum {
+    gap: var(--s-1);
+  }
+  .sl-acc-toggle {
+    padding-inline: 0 var(--s-1);
+    gap: 2px;
+  }
+  .sl-acc-chev {
+    width: 14px;
+  }
+}
+@container sl-acc-head (max-width: 252px) {
+  html[data-density='comfortable'] .sl-avatar {
+    display: none;
+  }
+}
+/* «+» de la cuenta: siempre a la vista pero tenue (los íconos de color atenuado no pierden contraste); pleno al pasar o con foco. */
+.sl-acc-head .sl-acc-add {
+  width: var(--h-xs);
+  height: var(--h-xs);
+  color: var(--text-3);
+}
+.sl-acc-head:hover .sl-acc-add,
+.sl-acc-head .sl-acc-add:hover,
+.sl-acc-head:focus-within .sl-acc-add {
+  color: var(--text);
+}
+.sl-acc-empty {
+  margin: 0;
+  padding: var(--s-1) var(--s-2) var(--s-2) calc(var(--sl-indent) + 20px + var(--s-2));
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+
+.sl-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sl-li {
+  position: relative;
+  min-width: 0;
+}
+/* Espacio: una línea de 32 px. Nada cambia de ancho entre estados: la columna del ícono (20 px, alineada
+   con el avatar) y la del estado (16 px) son fijas. La ruta va en el tooltip. */
+.sl-row {
+  position: relative;
+  width: 100%;
+  height: var(--h-md);
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0 var(--s-2) 0 var(--sl-indent);
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sl-row:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+/* Abierto: barra con el color de la cuenta y texto pleno. Enfocado: además el fondo. */
+.sl-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: var(--s-2);
+  bottom: var(--s-2);
+  width: 2px;
+  border-radius: var(--r-full);
+  background: var(--bar);
+  opacity: 0;
+}
+.sl-row.open {
+  color: var(--text);
+}
+.sl-row.open::before {
+  opacity: 1;
+}
+.sl-row.focused {
+  background: var(--accent-soft);
+}
+.sl-row:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+/* Ícono del espacio: el emoji, o una muestra de su color (gris si no tiene). Es un cuadradito y no un
+   círculo para no confundirse con el estado de Claude, que va a la derecha y es un círculo: muchos
+   colores de espacio son azules como el de «trabajando». */
+.sl-ico {
+  --ws: var(--text-3);
+  width: 20px;
+  height: var(--s-4);
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: var(--fs-12);
+  line-height: 1;
+}
+.sl-ico:not(.has-emoji)::before {
+  content: '';
+  width: var(--s-2);
+  height: var(--s-2);
+  border-radius: calc(var(--r-sm) / 2);
+  background: var(--ws);
+}
+html[data-theme='light'] .sl-ico:not(.has-emoji)::before {
+  background: color-mix(in srgb, var(--ws) 78%, var(--text));
+}
+.sl-name {
+  flex: 1 1 auto;
+  min-width: 6ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+/* La rama es lo que distingue a dos espacios del mismo repo. Ocupa solo lo que sobra después del nombre y
+   del ticket (base 0 y sin ancho propio: no les quita lugar), así que se recorta primero, con elipsis, y
+   desaparece entera si queda menos de 64 px. El margen negativo se come el hueco del gap cuando no se ve. */
+.sl-branch {
+  flex: 1000 1 0;
+  min-width: 0;
+  margin-left: calc(var(--s-2) * -1);
+  overflow: hidden;
+  container: sl-branch / inline-size;
+}
+.sl-branch-in {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding-left: var(--s-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.sl-branch-in svg {
+  flex: none;
+}
+.sl-branch-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@container sl-branch (max-width: 63px) {
+  .sl-branch-in {
+    display: none;
+  }
+}
+/* El ticket se recorta antes de comerse el nombre. */
+.sl-row .ui-tag {
+  display: block;
+  flex: 0 8 auto;
+  min-width: 48px;
+  height: var(--s-5);
+  padding: 0 var(--s-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: var(--s-5);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--divider-strong);
+  color: var(--text-3);
+}
+/* Columna fija del estado: ocupa lugar aunque esté vacía, así el ticket no baila cuando Claude cambia de estado. */
+.sl-glyph {
+  position: relative;
+  flex: none;
+  width: var(--s-4);
+  height: var(--s-4);
+  display: grid;
+  place-items: center;
+}
+.sl-perm-n {
+  min-width: var(--s-4);
+  height: var(--s-4);
+  padding: 0 var(--s-1);
+  border-radius: var(--r-full);
+  background: var(--waiting);
+  color: var(--bg);
+  font-size: var(--fs-11);
+  font-weight: 700;
+  line-height: var(--s-4);
+  text-align: center;
+}
+.sl-hint {
+  margin: 0;
+  padding: var(--s-2);
+  font-size: var(--fs-12);
+  color: var(--text-3);
+}
+.sl-acc-none {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-1) 0;
+}
+
+.sl-foot {
+  flex: none;
+  padding: var(--s-2);
+  box-shadow: inset 0 1px 0 var(--divider);
+}
+/* «Nuevo espacio»: una fila de acción silenciosa, como las del menú. El atajo se ve como tecla. */
+.sl-newbtn {
+  width: 100%;
+  height: var(--h-md);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0 var(--s-2);
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.sl-newbtn:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--text);
+}
+.sl-newbtn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+.sl-newbtn kbd {
+  margin-left: auto;
+}
+/* Sin cuentas es la acción principal del panel: se queda con borde. */
+.sl-newbtn.is-cta {
+  height: var(--h-lg);
+  justify-content: center;
+  padding: 0 var(--s-3);
+  border: 1px solid var(--control-border);
+  color: var(--text);
+}
+.sl-newbtn.is-cta:focus-visible {
+  outline-offset: 2px;
+}
+
+/* Ventanas angostas: el panel se apila arriba de los paneles (ver shell.css). */
+@media (max-width: 760px) {
+  .sl-side {
+    max-height: 36vh;
+    box-shadow: inset 0 -1px 0 var(--divider);
+  }
+}
