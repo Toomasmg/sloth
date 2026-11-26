@@ -32,7 +32,8 @@
   flex: none;
 }
 
-.pal-input {
+/* .pal-field delante: en claro, `html[data-theme='light'] input` le pone fondo blanco al campo. */
+.pal-field .pal-input {
   flex: 1;
   min-width: 0;
   height: 28px;

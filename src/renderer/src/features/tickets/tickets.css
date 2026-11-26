@@ -2,16 +2,9 @@
    Medidas en px literales del artboard. Colores por tokens de themes.css / styles.css;
    los tonos intermedios del artboard se derivan con color-mix() de esos tokens (tema claro incluido). */
 
-/* Chip en la barra de título */
+/* Chip en la barra de título: el color y el fondo (sin pastilla) los da .tb-chip en themes.css */
 .f-tickets-chip-tb {
-  color: var(--text-2);
-  background: var(--hover);
   cursor: pointer;
-}
-.f-tickets-chip-tb:hover,
-.f-tickets-chip-tb[aria-pressed='true'] {
-  background: var(--press);
-  color: var(--text);
 }
 .f-tickets-chip-tb:focus-visible {
   outline: 2px solid var(--accent);

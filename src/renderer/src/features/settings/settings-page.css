@@ -67,7 +67,11 @@
   background: transparent;
   color: var(--text);
   font: inherit;
-  box-shadow: none !important;
+  box-shadow: none;
+}
+.f-set-search input:hover,
+.f-set-search input:focus {
+  box-shadow: none;
 }
 
 .f-set-results {

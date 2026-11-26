@@ -18,14 +18,14 @@
   background: none;
   color: var(--text);
 }
-/* Estados arriba: texto + ícono coloreado, sin pastillas rellenas. */
+/* Estados arriba: texto + ícono coloreado, sin pastillas rellenas (ni en hover: tickets.css no le pone fondo). */
 .tb-chip {
   height: 26px;
   padding: 0 8px;
   border-radius: var(--r-md);
-  background: transparent !important;
-  box-shadow: none !important;
-  color: var(--text-2) !important;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-2);
   font-weight: 500;
   font-size: var(--fs-12);
 }
@@ -114,18 +114,6 @@
   box-shadow: inset 0 0 0 1px var(--divider-strong);
   font-weight: 500;
   border-radius: var(--r-sm);
-}
-
-/* Secciones colapsables al pie: discretas. */
-.f-wt-section,
-.f-templates {
-  border-top: 0 !important;
-}
-.f-wt-title,
-.f-templates-toggle {
-  text-transform: none !important;
-  letter-spacing: 0 !important;
-  font-size: var(--fs-12) !important;
 }
 
 /* ---------- Paneles ---------- */
@@ -389,7 +377,7 @@ html[data-theme='light'] .xterm .xterm-dim {
 
 /* Configuración en claro: tarjetas blancas sobre el modal blanco necesitan contorno. */
 
-/* Cambio de tema suave, salvo con «reducir movimiento». */
+/* Cambio de tema suave, salvo con «reducir movimiento». Dura un instante y tiene que ganarle a todas las transiciones de componentes. */
 @media (prefers-reduced-motion: no-preference) {
   html.f-settings-switching,
   html.f-settings-switching * {
