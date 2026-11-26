@@ -22,7 +22,7 @@ function Global(): React.JSX.Element | null {
   useEffect(
     () =>
       ui.on('feat:celular:celu-nuevo', (c: { dispositivo: string; ip: string }) => {
-        toast({ tone: 'info', message: `Se conectó un celu (${c.dispositivo}, ${c.ip}). Si no fuiste vos, regenerá el código.`, actionLabel: 'Ver', onAction: openCelular, duration: 10_000 })
+        toast({ tone: 'info', message: `Se conectó un celu (${c.dispositivo}, ${c.ip}). Si no fuiste vos, sacalo en el panel.`, actionLabel: 'Ver', onAction: openCelular, duration: 10_000 })
       }),
     [ui]
   )

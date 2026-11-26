@@ -1,14 +1,20 @@
-import { useEffect, useState } from 'react'
-import { textoEvento, type CelularVista } from '../../../../shared/celular'
+import { useEffect, useRef, useState } from 'react'
+import { textoEvento, type CelularVista, type NivelCelu } from '../../../../shared/celular'
 import { cleanError } from '../../format'
 import { SidePanel } from '../../ui/SidePanel'
-import { Button, InlineAlert, Input, Switch, toast } from '../../ui'
+import { Button, InlineAlert, Input, Select, Switch, toast } from '../../ui'
 import { useUi } from '../host'
 import { Qr } from './Qr'
 import { RemotoSeccion } from './RemotoSeccion'
 
 const canal = (op: string): string => `feat:celular:${op}`
 const hora = (ms: number): string => new Date(ms).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
+const dia = (ms: number): string => new Date(ms).toLocaleDateString('es-AR', { day: 'numeric', month: 'numeric' })
+const NIVELES: { value: NivelCelu; label: string }[] = [
+  { value: 'ver', label: 'Ver' },
+  { value: 'aprobar', label: 'Ver y aprobar' },
+  { value: 'controlar', label: 'Ver, aprobar y terminal' }
+]
 
 /** Panel «Celular»: prender el servidor del Wi-Fi, el QR para el celu y lo que el celu puede hacer. */
 export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.Element {
@@ -21,6 +27,13 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
   const [servidor, setServidor] = useState('')
   const [token, setToken] = useState('')
   const [confirmar, setConfirmar] = useState(false)
+  // El botón tocado desaparece con el pedido: el foco va a algo que sigue, o queda en el body y el panel no oye Escape.
+  const srvRef = useRef<HTMLHeadingElement>(null)
+  const accesoRef = useRef<HTMLHeadingElement>(null)
+  const responder = async (id: string, si: boolean): Promise<void> => {
+    await hacer('entrar', { id, si })
+    requestAnimationFrame(() => (si ? accesoRef.current : null)?.focus() ?? srvRef.current?.focus())
+  }
 
   useEffect(() => {
     let vivo = true
@@ -100,7 +113,7 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
           <p className="f-cel-intro">Mirá desde el celu cómo van tus sesiones y cuánto te queda de cada límite, sin salir de lo que estés haciendo.</p>
 
           <section className="f-cel-sec" aria-labelledby="f-cel-srv">
-            <h3 id="f-cel-srv" className="f-cel-h">En tu Wi-Fi</h3>
+            <h3 id="f-cel-srv" className="f-cel-h" ref={srvRef} tabIndex={-1}>En tu Wi-Fi</h3>
             <Switch checked={v.encendido} onChange={(on) => void hacer('encender', on)}>
               Ver Sloth en el celu
             </Switch>
@@ -125,7 +138,7 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
                     Abierto en <span className="f-cel-mono">{`${v.ip}:${v.puerto}`}</span>
                   </p>
                   {v.terminal && <p className="f-cel-ok">Las terminales se abren con este QR.</p>}
-                  <p className="f-cel-nota">Escaneá el QR con la cámara del celu. Tiene que estar en el mismo Wi-Fi que la PC. El QR contiene la clave: no lo compartas.</p>
+                  <p className="f-cel-nota">Escaneá el QR con la cámara del celu, en el mismo Wi-Fi que la PC. El celu te va a mostrar un código: dejalo entrar acá si es el mismo.</p>
                   <p className="f-cel-nota">Para tenerlo como app: en el navegador del celu, «Agregar a pantalla de inicio».</p>
                   <Button size="sm" variant="secondary" onClick={() => void copiar(v.enlace as string, 'Enlace')}>
                     Copiar enlace
@@ -136,6 +149,46 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
               !v.encendido && <p className="f-cel-nota">Apagado: nada se abre en la red hasta que lo prendas.</p>
             )}
             {v.encendido && <p className="f-cel-nota">Si Windows pregunta por el firewall, permití las redes privadas.</p>}
+
+            {v.entradas.map((e) => (
+              <div key={e.id} className="f-cel-entrada" role="group" aria-label={`Pedido para entrar de ${e.nombre}`}>
+                <p>
+                  <strong>{e.nombre}</strong> <span className="f-cel-mono">{e.ip}</span> pide entrar.
+                </p>
+                <p>
+                  ¿El celu muestra <span className="f-cel-codigo">{e.codigo}</span>? Si no es tu celu o no ves ese código, tocá «No».
+                </p>
+                <div className="f-cel-acciones">
+                  <Button size="sm" variant="ghost" onClick={() => void responder(e.id, false)}>
+                    No
+                  </Button>
+                  <Button size="sm" variant="primary" onClick={() => void responder(e.id, true)}>
+                    Dejar entrar
+                  </Button>
+                </div>
+              </div>
+            ))}
+
+            {v.conAcceso.length > 0 && (
+              <>
+                <h4 className="f-cel-h" ref={accesoRef} tabIndex={-1}>
+                  Celus con acceso
+                </h4>
+                <ul className="f-cel-lista f-cel-acceso" aria-label="Celus con acceso">
+                  {v.conAcceso.map((c) => (
+                    <li key={c.id}>
+                      <span className="f-cel-quien">{c.nombre}</span>
+                      <span className="f-cel-desde">desde el {dia(c.creado)}</span>
+                      <Select size="sm" aria-label={`Qué puede hacer ${c.nombre}`} options={NIVELES} value={c.nivel} onChange={(ev) => void hacer('nivel', { id: c.id, nivel: ev.target.value })} />
+                      <Button size="sm" variant="ghost" aria-label={`Sacar a ${c.nombre}`} onClick={() => void hacer('sacar', c.id).then(() => requestAnimationFrame(() => (accesoRef.current ?? srvRef.current)?.focus()))}>
+                        Sacar
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+                <p className="f-cel-nota">Lo que elijas acá nunca pasa por encima de los interruptores de «Permisos». Un celu que no se usa en 30 días sale solo.</p>
+              </>
+            )}
 
             <form
               className="f-cel-fila"
@@ -155,7 +208,7 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
 
             {confirmar ? (
               <div className="f-cel-confirm" role="group" aria-label="Regenerar el código">
-                <p>Los celus conectados dejan de ver Sloth hasta que escaneen el QR nuevo.</p>
+                <p>Cambia el QR y todos los celus con acceso quedan afuera hasta que escaneen el nuevo y los dejes entrar.</p>
                 <div className="f-cel-acciones">
                   <Button size="sm" variant="ghost" onClick={() => setConfirmar(false)}>
                     Cancelar
@@ -209,7 +262,7 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
                   </ul>
                 </>
               )}
-              <p className="f-cel-nota">Desde que abriste Sloth. No guarda lo que se escribió ni los comandos. Si ves un celu que no es tuyo, regenerá el código.</p>
+              <p className="f-cel-nota">Desde que abriste Sloth. No guarda lo que se escribió ni los comandos. Si ves un celu que no es tuyo, sacalo de «Celus con acceso».</p>
             </section>
           )}
 
@@ -221,7 +274,7 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
               Aprobar o rechazar desde el celu
             </Switch>
             <p className={v.aprobar ? 'f-cel-aviso' : 'f-cel-nota'}>
-              Cualquiera con el QR (o la clave) podría aprobar comandos de Claude. Prendelo solo en una red de confianza. Apagado, el celu muestra el pedido pero lo respondés en la PC.
+              Los celus con acceso que tengan «aprobar» podrían aprobar comandos de Claude. Prendelo solo en una red de confianza. Apagado, el celu muestra el pedido pero lo respondés en la PC.
             </p>
             <Switch checked={v.terminal} onChange={(on) => void hacer('terminal', on)}>
               Abrir las terminales desde el celu
@@ -232,10 +285,10 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
               </p>
             )}
             <p className={v.terminal ? 'f-cel-aviso' : 'f-cel-nota'}>
-              Desde el celu vas a poder ver la terminal de cada espacio y escribir en ella como si estuvieras en la PC. Quien tenga el QR (o la clave) puede correr cualquier comando en esta PC. Solo anda en el Wi-Fi de casa: abrí la página con el QR de arriba, no con el de «Desde cualquier red». En cada sesión vas a ver el botón «Terminal».
+              Desde el celu vas a poder ver la terminal de cada espacio y escribir en ella como si estuvieras en la PC. Un celu con acceso y nivel «terminal» puede correr cualquier comando en esta PC. Solo anda en el Wi-Fi de casa: abrí la página con el QR de arriba, no con el de «Desde cualquier red». En cada sesión vas a ver el botón «Terminal».
             </p>
             <p className="f-cel-aviso" role="note">
-              Lo que va entre el celu y la PC viaja cifrado en tu Wi-Fi, con una clave que está solo en el QR. Aun así la página no puede verificarse: alguien que manipule tu red a propósito podría robarte la clave. Usalo en una red propia; en una pública, de hotel o compartida, usá «Desde cualquier red», que va cifrado de punta a punta.
+              Lo que va entre el celu y la PC viaja cifrado en tu Wi-Fi, con una clave que se arma al emparejar el celu. Aun así la página no puede verificarse: alguien que manipule tu red a propósito podría robarte la clave. Usalo en una red propia; en una pública, de hotel o compartida, usá «Desde cualquier red», que va cifrado de punta a punta.
             </p>
           </section>
 

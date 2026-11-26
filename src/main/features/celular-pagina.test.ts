@@ -33,7 +33,11 @@ interface Pedido {
 }
 
 /** Corre app.js en un contexto aparte con un DOM mínimo, como un Android (con requestFullscreen). */
-async function correrPagina(slothFetch?: (url: string, init?: unknown) => Promise<unknown>, hash = `#k=${CLAVE}`, responder?: (ab: { iv: Buffer }) => { status: number; cuerpo: string }): Promise<{ fetchs: Pedido[]; pantallaCompleta: number; hoy: string | undefined; conexion: string | undefined; sinClave: boolean; sinClaveTexto: string | undefined; almacen: Map<string, string>; url: string; notaTerminal: boolean }> {
+type Responder = (ab: { iv: Buffer; json: string }) => { status: number; cuerpo: string }
+/** La clave del enlace ya es la de un celu con acceso: la PC contesta que ya está. */
+const yaEsta: Responder = (ab) => ({ status: 200, cuerpo: sellarRespuesta(claves, ab.iv, JSON.stringify({ ya: true })) })
+
+async function correrPagina(slothFetch?: (url: string, init?: unknown) => Promise<unknown>, hash = `#k=${CLAVE}`, responder?: Responder, emparejar: Responder = yaEsta): Promise<{ fetchs: Pedido[]; pantallaCompleta: number; hoy: string | undefined; conexion: string | undefined; sinClave: boolean; sinClaveTexto: string | undefined; almacen: Map<string, string>; url: string; notaTerminal: boolean; nodo: (id: string) => Nodo | undefined }> {
   const fetchs: Pedido[] = []
   const nodos = new Map<string, Nodo>()
   let pantallaCompleta = 0
@@ -73,6 +77,10 @@ async function correrPagina(slothFetch?: (url: string, init?: unknown) => Promis
       fetchs.push({ url, init })
       const ab = abrirPedido(claves, url, init?.body ?? '')
       if (!ab) return { status: 401, ok: false, text: async () => '' }
+      if (url === '/api/emparejar') {
+        const { status, cuerpo } = emparejar(ab)
+        return { status, ok: status === 200, text: async () => cuerpo }
+      }
       if (responder) {
         const { status, cuerpo } = responder(ab)
         return { status, ok: status === 200, text: async () => cuerpo }
@@ -87,13 +95,13 @@ async function correrPagina(slothFetch?: (url: string, init?: unknown) => Promis
   if (slothFetch) ventana.slothFetch = slothFetch
   runInNewContext(PAGINA_JS, ventana)
   await new Promise((r) => setImmediate(r))
-  return { fetchs, pantallaCompleta, hoy: nodos.get('hoy')?.textContent, conexion: nodos.get('conexion-texto')?.textContent, sinClave: nodos.get('sin-token')?.hidden === false, sinClaveTexto: nodos.get('sin-token-texto')?.textContent, almacen, url, notaTerminal: nodos.get('term-nota')?.hidden === false }
+  return { fetchs, pantallaCompleta, hoy: nodos.get('hoy')?.textContent, conexion: nodos.get('conexion-texto')?.textContent, sinClave: nodos.get('sin-token')?.hidden === false, sinClaveTexto: nodos.get('sin-token-texto')?.textContent, almacen, url, notaTerminal: nodos.get('term-nota')?.hidden === false, nodo: (id) => nodos.get(id) }
 }
 
 test('en el Wi-Fi la página pide /api/estado sellado con la clave del hash, sin pedir pantalla completa', async () => {
-  const { fetchs, pantallaCompleta, hoy, almacen, url } = await correrPagina()
-  assert.equal(fetchs.length, 1)
-  assert.equal(fetchs[0].url, '/api/estado')
+  const { fetchs: todos, pantallaCompleta, hoy, almacen, url } = await correrPagina()
+  assert.deepEqual(todos.map((f) => f.url), ['/api/emparejar', '/api/estado'], 'primero pregunta si la clave es de un celu con acceso o la del QR')
+  const fetchs = todos.slice(1)
   assert.equal(fetchs[0].init?.method, 'POST')
   assert.equal(fetchs[0].init?.headers?.['x-sloth-token'], undefined)
   assert.ok(!(fetchs[0].init?.body ?? '').includes('estado'))
@@ -154,4 +162,36 @@ test('la versión remota avisa que la terminal se abre con el QR del Wi-Fi, solo
   assert.equal((await correrPagina(remota({ ...ESTADO, terminalEnWifi: true }))).notaTerminal, true)
   assert.equal((await correrPagina(remota({ ...ESTADO, terminalEnWifi: false }))).notaTerminal, false)
   assert.equal((await correrPagina()).notaTerminal, false, 'en el Wi-Fi no hace falta el aviso')
+})
+
+test('con la clave del QR, la página pide entrar con una clave propia, muestra el código y no pide el estado', async () => {
+  let cuerpo: { clave?: string } = {}
+  const r = await correrPagina(undefined, `#k=${CLAVE}`, undefined, (ab) => {
+    cuerpo = (JSON.parse(ab.json) as { b: { clave?: string } }).b
+    return { status: 200, cuerpo: sellarRespuesta(claves, ab.iv, JSON.stringify({ codigo: '0042', estado: 'esperando' })) }
+  })
+  assert.deepEqual(r.fetchs.map((f) => f.url), ['/api/emparejar'])
+  assert.match(cuerpo.clave ?? '', /^[\w-]{43}$/)
+  assert.notEqual(cuerpo.clave, CLAVE, 'la clave del celu no es la del QR')
+  assert.equal(Buffer.from(cuerpo.clave ?? '', 'base64url').length, 32)
+  assert.equal(r.nodo('par-codigo')?.textContent, '0042')
+  assert.equal(r.nodo('emparejando')?.hidden, false)
+  assert.equal(r.nodo('app')?.hidden, true)
+  assert.equal(r.almacen.get('sloth-qr'), CLAVE, 'si se recarga, sigue esperando')
+  assert.equal(r.almacen.get('sloth-par'), cuerpo.clave)
+  assert.equal(r.almacen.get('sloth-clave'), undefined, 'todavía no tiene acceso')
+})
+
+test('si la PC dice que no, la página lo dice y olvida el pedido', async () => {
+  const r = await correrPagina(undefined, `#k=${CLAVE}`, undefined, (ab) => ({ status: 200, cuerpo: sellarRespuesta(claves, ab.iv, JSON.stringify({ estado: 'rechazado' })) }))
+  assert.equal(r.sinClave, true)
+  assert.match(r.sinClaveTexto ?? '', /tocaron «No»/)
+  assert.equal(r.almacen.get('sloth-qr'), undefined)
+  assert.equal(r.almacen.get('sloth-par'), undefined)
+})
+
+test('un QR viejo (la PC ya no reconoce su clave) pide escanear el nuevo', async () => {
+  const r = await correrPagina(undefined, `#k=${CLAVE}`, undefined, () => ({ status: 401, cuerpo: '' }))
+  assert.equal(r.sinClave, true)
+  assert.match(r.sinClaveTexto ?? '', /Escaneá el QR nuevo/)
 })

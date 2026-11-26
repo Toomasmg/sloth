@@ -1,7 +1,9 @@
 import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { escribirJsonAtomico, esObjeto, leerJson } from '../json-file'
+import { escribirJsonAtomico, leerJson, respaldar } from '../json-file'
+import { migrar } from '../versionado'
+import { avisoVersionFutura } from '../avisos'
 import { networkInterfaces } from 'node:os'
 import { join } from 'node:path'
 import type { Feature, FeatureContext } from './context'
@@ -19,6 +21,7 @@ import { debeEsperar, nuevoVisor, ponerFoto, salidaDesde, sinSalida, sinAutomati
 import { crearEsperas } from './celular-espera'
 import { crearEscrituras } from './celular-escrituras'
 import { crearActividad, type Quien } from './celular-actividad'
+import { MAX_CELUS, VERSION_CELULAR, crearEntradas, leerCelus, migracionesCelular, nivelValido, paraVista, permisosDe, sinVencidos, usar, type CeluGuardado } from './celular-acceso'
 import { crearFuenteRemota, type CambioRemoto } from './celular-remoto'
 import { sesionChat } from './chat'
 import { kindOf } from '../../shared/permissions-core'
@@ -28,8 +31,9 @@ import { carpetaFeatures } from '../perfil'
 
 /**
  * Función «celular»: un visor en el celu con el estado de las sesiones y el uso de cada cuenta.
- * v1: servidor HTTP en el Wi-Fi de casa con los cuerpos sellados (AES-256-CTR + HMAC) con una clave
- * de 32 bytes que va en el QR, en el `#` para que no viaje en ningún pedido. Apagado por defecto; aprobar desde el celu y los avisos por ntfy, también.
+ * Servidor HTTP en el Wi-Fi de casa con los cuerpos sellados (AES-256-CTR + HMAC). La clave del QR (en el `#`,
+ * para que no viaje en ningún pedido) solo sirve para pedir entrar: cada celu genera la suya y entra cuando en la PC
+ * tocan «Dejar entrar», con un nivel (ver, aprobar, terminal) que se puede cambiar o sacar. Apagado por defecto; aprobar desde el celu y los avisos por ntfy, también.
  * Persiste en userData/features/celular.json (escritura atómica).
  *
  * Límites conocidos (v1): la página es http, así que no hay wake lock ni service worker (la pantalla
@@ -39,7 +43,9 @@ import { carpetaFeatures } from '../perfil'
 interface Config {
   encendido: boolean
   puerto: number
+  /** La del QR: solo sirve para pedir entrar. Cada celu que la PC deja entrar tiene la suya, en `celus`. */
   clave: string
+  celus: CeluGuardado[]
   aprobar: boolean
   /** Ver y escribir en las terminales desde el celu (solo en el Wi-Fi). */
   terminal: boolean
@@ -55,12 +61,28 @@ const nuevoToken = (): string => randomBytes(32).toString('base64url')
 const nuevoTema = (): string => `sloth-${randomBytes(12).toString('hex')}`
 
 function porDefecto(): Config {
-  return { encendido: false, puerto: PUERTO_POR_DEFECTO, clave: nuevoToken(), aprobar: false, terminal: false, ntfy: { encendido: false, tema: nuevoTema(), servidor: NTFY_POR_DEFECTO }, remoto: { encendido: false, aprobar: false, secreto: nuevoToken() } }
+  return { encendido: false, puerto: PUERTO_POR_DEFECTO, clave: nuevoToken(), celus: [], aprobar: false, terminal: false, ntfy: { encendido: false, tema: nuevoTema(), servidor: NTFY_POR_DEFECTO }, remoto: { encendido: false, aprobar: false, secreto: nuevoToken() } }
 }
+
+/** Cómo quedó el archivo al leerlo: migrado (hay que respaldarlo antes de reescribir) o de una versión más nueva (no se toca). */
+const archivo = { migrado: false, futura: false, resto: {} as Record<string, unknown> }
 
 function cargar(): { cfg: Config; claveNueva: boolean } {
   const base = porDefecto()
-  const raw = leerJson(file(), { validar: (v) => (esObjeto(v) ? (v as Partial<Config>) : undefined), porDefecto: (): Partial<Config> => ({}) }).valor
+  const ahora = Date.now()
+  const raw = leerJson(file(), {
+    validar: (v) => {
+      const r = migrar(v, migracionesCelular(ahora), VERSION_CELULAR)
+      if (r.estado === 'invalida') return undefined
+      archivo.migrado = r.estado === 'migrado'
+      archivo.futura = r.estado === 'futura'
+      return r.datos as Partial<Config> & Record<string, unknown>
+    },
+    porDefecto: (): Partial<Config> & Record<string, unknown> => ({})
+  }).valor
+  if (archivo.futura) avisoVersionFutura(file())
+  const { version: _v, encendido: _e, puerto: _p, clave: _c, celus: _cs, aprobar: _a, terminal: _t, ntfy: _n, remoto: _r, ...resto } = raw
+  archivo.resto = resto
   const temaGuardado = raw.ntfy?.tema
   const temaOk = temaValido(temaGuardado)
   const token = tokenNtfyValido(raw.ntfy?.token) ? raw.ntfy.token : undefined
@@ -70,6 +92,7 @@ function cargar(): { cfg: Config; claveNueva: boolean } {
     encendido: raw.encendido === true,
     puerto: puertoValido(raw.puerto) ? raw.puerto : base.puerto,
     clave: claveValida(raw.clave) ? raw.clave : base.clave,
+    celus: leerCelus(raw.celus, ahora, raw.clave),
     aprobar: raw.aprobar === true,
     terminal: raw.terminal === true,
     ntfy: {
@@ -90,7 +113,12 @@ function cargar(): { cfg: Config; claveNueva: boolean } {
 }
 
 function guardarConfig(c: Config): void {
-  escribirJsonAtomico(file(), c)
+  if (archivo.futura) return avisoVersionFutura(file())
+  if (archivo.migrado && existsSync(file())) {
+    respaldar(file())
+    archivo.migrado = false
+  }
+  escribirJsonAtomico(file(), { ...archivo.resto, version: VERSION_CELULAR, ...c })
 }
 
 const ipActual = (): string | null => elegirIp(networkInterfaces())
@@ -102,7 +130,7 @@ const feature: Feature = {
   register(ctx: FeatureContext) {
     const cargada = cargar()
     const cfg = cargada.cfg
-    if (!existsSync(file()) || cargada.claveNueva || cfg.ntfy.temaRenovado) {
+    if (!existsSync(file()) || cargada.claveNueva || cfg.ntfy.temaRenovado || archivo.migrado) {
       try {
         guardarConfig(cfg)
       } catch (e) {
@@ -172,6 +200,48 @@ const feature: Feature = {
         vigia.unref()
       }
     }
+    // Quién tiene acceso y quién pide entrar. Un celu sacado o vencido deja de abrir pedidos en el acto: su clave ya no está.
+    const entradas = crearEntradas()
+    let repintarEntradas: NodeJS.Timeout | null = null
+    const programarEntradas = (): void => {
+      if (repintarEntradas) clearTimeout(repintarEntradas)
+      const ms = entradas.proximoVence(Date.now())
+      repintarEntradas = ms === null ? null : setTimeout(() => {
+        repintarEntradas = null
+        avisar()
+        programarEntradas()
+      }, ms + 50)
+      repintarEntradas?.unref()
+    }
+    const celuDe = (quien?: Quien): CeluGuardado | undefined => (quien?.celu ? cfg.celus.find((c) => c.id === quien.celu) : undefined)
+    /** Sin `quien` (la fuente remota, que tiene su propia llave) valen solo los interruptores. */
+    const permisos = (quien?: Quien): { aprobar: boolean; terminal: boolean } => {
+      if (!quien) return { aprobar: cfg.aprobar, terminal: cfg.terminal }
+      const c = celuDe(quien)
+      return c ? permisosDe(c.nivel, cfg) : { aprobar: false, terminal: false }
+    }
+    const podarCelus = (): void => {
+      const vivos = sinVencidos(cfg.celus, Date.now())
+      if (vivos.length === cfg.celus.length) return
+      cfg.celus = vivos
+      guardar()
+      avisarPronto()
+    }
+    const entrar = (cuerpo: unknown, quien: Quien): { status: number; data: unknown } => {
+      const b = cuerpo as { clave?: unknown; consultar?: unknown } | null
+      if (!b || typeof b !== 'object' || !claveValida(b.clave) || b.clave === cfg.clave) return { status: 400, data: { error: 'Pedido inválido.' } }
+      // Un celu que ya tenía acceso y volvió a escanear el QR sigue con su clave: no se suma otro a la lista.
+      if (cfg.celus.some((c) => c.clave === b.clave)) return { status: 200, data: { estado: 'listo' } }
+      if (b.consultar === true) return { status: 200, data: { estado: entradas.estado(b.clave, Date.now()) } }
+      if (cfg.celus.length >= MAX_CELUS) return { status: 403, data: { error: 'Esta PC ya tiene demasiados celus con acceso. Sacá alguno en el panel «Celular».' } }
+      const r = entradas.pedir(b.clave, quien, Date.now())
+      if ('error' in r) return { status: 409, data: r }
+      ctx.log('un celu pide entrar:', quien.ip)
+      programarEntradas()
+      avisar()
+      return { status: 200, data: { codigo: r.codigo, estado: 'esperando' } }
+    }
+
     const nombreEspacio = (id: string): string => ctx.store.workspace(id)?.name ?? 'un espacio'
     function anotarCelu(quien: Quien | undefined, tipo: 'aprobo' | 'rechazo' | 'abrio' | 'escribio', ws: string): void {
       if (!quien) return
@@ -198,7 +268,9 @@ const feature: Feature = {
       ipCambio,
       remoto: vistaRemota(),
       celus: actividad.conectados(Date.now()),
-      actividad: actividad.eventos().slice(0, 30)
+      actividad: actividad.eventos().slice(0, 30),
+      conAcceso: paraVista(cfg.celus),
+      entradas: entradas.pendientes(Date.now())
     })
     const avisar = (): void => ctx.emit('changed', vista())
 
@@ -240,6 +312,8 @@ const feature: Feature = {
 
     const proveedor: ProveedorDeEstado = {
       async estado(quien) {
+        const c = celuDe(quien)
+        if (c && usar(c, Date.now())) guardar()
         if (quien && actividad.visto(quien, Date.now())) {
           const c = actividad.conectados(Date.now()).find((x) => x.ip === quien.ip)
           ctx.log('celu conectado:', c?.dispositivo ?? '?', quien.ip)
@@ -256,8 +330,7 @@ const feature: Feature = {
         }
         return armarEstado({
           ahora: Date.now(),
-          aprobar: cfg.aprobar,
-          terminal: cfg.terminal,
+          ...permisos(quien),
           cuentas: cuentas.map((a) => ({ id: a.id, label: a.label })),
           espacios: ctx.store.workspaces.map((w) => ({ id: w.id, name: w.name, accountId: w.accountId })),
           agentes: ctx.agents(),
@@ -268,16 +341,23 @@ const feature: Feature = {
       },
       decidir(id, decision, quien) {
         if (!cfg.aprobar) throw new Error('Aprobar desde el celu está apagado en Sloth.')
+        if (!permisos(quien).aprobar) throw new Error('Este celu solo puede mirar. En la PC, panel «Celular», podés darle permiso para aprobar.')
         const ws = pedidos().find((p) => p.id === id)?.ws
         responderPermiso(id, decision)
         if (ws) anotarCelu(quien, decision === 'allow' ? 'aprobo' : 'rechazo', ws)
         ctx.log(`permiso ${decision === 'allow' ? 'aprobado' : 'rechazado'} desde el celu`)
       },
-      puedeAprobar: () => cfg.aprobar,
+      puedeAprobar: (quien) => permisos(quien).aprobar,
       clave: () => cfg.clave,
+      celus: () => {
+        podarCelus()
+        return cfg.celus.map((c) => ({ id: c.id, clave: c.clave }))
+      },
+      entrar,
       icono: leerIcono,
       async terminal(p, cancelar, quien) {
         if (!cfg.terminal) return { status: 403, error: 'La terminal desde el celu está apagada en Sloth.' }
+        if (!permisos(quien).terminal) return { status: 403, error: 'Este celu no tiene permiso para abrir las terminales. En la PC, panel «Celular», podés dárselo.' }
         if (!ctx.store.workspace(p.id)) return { status: 404, error: 'Ese espacio ya no está en la PC.' }
         if (p.desde === -1 && !p.soloEscribir) anotarCelu(quien, 'abrio', p.id)
         const b = await ctx.backend()
@@ -533,10 +613,53 @@ const feature: Feature = {
     ctx.handle('regenerar', () => {
       soltarVisores()
       actividad.olvidarCelus()
+      entradas.olvidar()
       conectadosAntes = 0
       cfg.clave = nuevoToken()
+      cfg.celus = []
       guardar()
       ctx.log('clave regenerada: los celus anteriores quedan afuera')
+      avisar()
+      return vista()
+    })
+
+    ctx.handle('entrar', (p: unknown) => {
+      const b = p as { id?: unknown; si?: unknown } | null
+      if (!b || typeof b !== 'object' || typeof b.id !== 'string' || typeof b.si !== 'boolean') throw new Error('Valor inválido.')
+      const ahora = Date.now()
+      const r = entradas.responder(b.id, b.si, ahora)
+      if (!r) throw new Error('Ese pedido ya venció o se respondió. Que escaneen el QR de nuevo.')
+      if (b.si) {
+        if (cfg.celus.length >= MAX_CELUS) throw new Error('Esta PC ya tiene demasiados celus con acceso. Sacá alguno primero.')
+        const id = randomBytes(6).toString('hex')
+        cfg.celus.push({ id, nombre: r.nombre, clave: r.clave, nivel: 'controlar', creado: ahora, ultimo: ahora })
+        guardar()
+        actividad.anotar({ ip: r.ip, ua: r.ua, celu: id }, 'entro', '', ahora)
+        ctx.log('celu nuevo con acceso:', r.nombre, r.ip)
+      }
+      programarEntradas()
+      avisar()
+      return vista()
+    })
+
+    ctx.handle('nivel', (p: unknown) => {
+      const b = p as { id?: unknown; nivel?: unknown } | null
+      if (!b || typeof b !== 'object' || typeof b.id !== 'string' || !nivelValido(b.nivel)) throw new Error('Valor inválido.')
+      const c = cfg.celus.find((x) => x.id === b.id)
+      if (!c) throw new Error('Ese celu ya no tiene acceso.')
+      c.nivel = b.nivel
+      guardar()
+      avisar()
+      return vista()
+    })
+
+    ctx.handle('sacar', (id: unknown) => {
+      if (typeof id !== 'string') throw new Error('Valor inválido.')
+      const antes = cfg.celus.length
+      cfg.celus = cfg.celus.filter((c) => c.id !== id)
+      if (cfg.celus.length === antes) throw new Error('Ese celu ya no tiene acceso.')
+      guardar()
+      ctx.log('celu sacado desde la PC')
       avisar()
       return vista()
     })

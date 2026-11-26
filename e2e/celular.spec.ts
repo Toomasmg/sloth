@@ -5,12 +5,13 @@ import { join } from 'node:path'
 import { test, expect } from './sloth'
 import { elegirIp } from '../src/main/features/celular-core'
 import { abrirRespuesta, derivarClaves, sellarPedido } from '../src/main/features/celular-sello'
+import { emparejar } from './celular-celu'
 
 test.use({ seed: { workspaces: [{ id: 'ws-web', name: 'web', open: true }] } })
 
 const ip = elegirIp(networkInterfaces())
 
-test('Celular: prende el servidor del Wi-Fi, muestra el QR y la API solo habla con la clave del QR', async ({ sloth: { app, page } }) => {
+test('Celular: prende el servidor del Wi-Fi, muestra el QR y la API solo habla con celus que la PC dejó entrar', async ({ sloth: { app, page } }) => {
   test.skip(!ip, 'Esta PC no tiene una red privada: no hay dónde abrir el servidor.')
   const userData = await app.evaluate(({ app: a }) => a.getPath('userData'))
   const clave = (): string => (JSON.parse(readFileSync(join(userData, 'perfiles', 'principal', 'features', 'celular.json'), 'utf8')) as { clave: string }).clave
@@ -43,7 +44,9 @@ test('Celular: prende el servidor del Wi-Fi, muestra el QR y la API solo habla c
   expect((await fetch(`${base}/api/estado`)).status).toBe(401)
   expect((await fetch(`${base}/api/estado`, { method: 'POST', body: 'no-sellado' })).status).toBe(401)
   const viejo = clave()
-  const con = await llamar('/api/estado', viejo)
+  expect((await llamar('/api/estado', viejo)).status, 'la clave del QR sola no deja ver nada').toBe(401)
+  const celu = await emparejar(panel, base, viejo)
+  const con = await llamar('/api/estado', celu)
   expect(con.status).toBe(200)
   const estado = con.datos as { aprobar: boolean; cuentas: { id: string; cincoHoras: unknown }[] }
   expect(estado.aprobar).toBe(false)
@@ -51,7 +54,7 @@ test('Celular: prende el servidor del Wi-Fi, muestra el QR y la API solo habla c
   expect(estado.cuentas[0].cincoHoras).toBeNull()
 
   // Con alguien adentro, la PC lo dice: aviso, chip en la barra y la lista del panel.
-  await expect(page.getByText(/^Se conectó un celu \(.+, .+\)\. Si no fuiste vos, regenerá el código\.$/)).toBeVisible()
+  await expect(page.getByText(/^Se conectó un celu \(.+, .+\)\. Si no fuiste vos, sacalo en el panel\.$/)).toBeVisible()
   await expect(panel.getByRole('heading', { name: 'Celus conectados' })).toBeVisible()
   await expect(panel.getByRole('list', { name: 'Lo que hicieron los celus' })).toContainText('Se conectó')
   await page.keyboard.press('Escape')
@@ -62,15 +65,27 @@ test('Celular: prende el servidor del Wi-Fi, muestra el QR y la API solo habla c
   await chip.click()
   await expect(panel).toBeVisible()
 
-  expect((await llamar('/api/permiso', viejo, { id: 'x', decision: 'allow' })).status).toBe(403)
+  expect((await llamar('/api/permiso', celu, { id: 'x', decision: 'allow' })).status).toBe(403)
+
+  // Con nivel «Ver», el celu no ve la terminal aunque esté prendida en la PC.
+  await panel.getByRole('switch', { name: 'Abrir las terminales desde el celu' }).click()
+  expect(((await llamar('/api/estado', celu)).datos as { terminal: boolean }).terminal).toBe(true)
+  await panel.getByRole('combobox', { name: /^Qué puede hacer/ }).selectOption('ver')
+  await expect.poll(async () => ((await llamar('/api/estado', celu)).datos as { terminal: boolean }).terminal).toBe(false)
+  expect((await llamar('/api/terminal', celu, { id: 'ws-web', desde: -1 })).status).toBe(403)
+
+  // Sacarlo lo deja afuera en el acto; otro celu emparejado sigue.
+  const otro = await emparejar(panel, base, viejo)
+  await panel.getByRole('button', { name: /^Sacar a / }).first().click()
+  expect((await llamar('/api/estado', celu)).status).toBe(401)
+  expect((await llamar('/api/estado', otro)).status).toBe(200)
 
   await panel.getByRole('button', { name: 'Regenerar código…' }).click()
   await panel.getByRole('button', { name: 'Regenerar código', exact: true }).click()
   await expect.poll(() => clave()).not.toBe(viejo)
-  const claves = derivarClaves(viejo)
-  if (!claves) throw new Error('clave inválida')
-  expect((await fetch(`${base}/api/estado`, { method: 'POST', body: sellarPedido(claves, '/api/estado', JSON.stringify({ t: Date.now() })) })).status).toBe(401)
-  expect((await llamar('/api/estado', clave())).status).toBe(200)
+  expect((await llamar('/api/estado', otro)).status, 'regenerar saca a todos').toBe(401)
+  expect((await llamar('/api/emparejar', viejo, { clave: randomBytes(32).toString('base64url') })).status, 'el QR viejo ya no sirve ni para pedir entrar').toBe(401)
+  expect((await llamar('/api/estado', await emparejar(panel, base, clave()))).status).toBe(200)
 
   await panel.getByRole('switch', { name: 'Ver Sloth en el celu' }).click()
   await expect(panel.getByRole('img', { name: /Código QR/ })).toBeHidden()

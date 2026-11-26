@@ -10,6 +10,7 @@ const CLAVE = Buffer.alloc(32, 7).toString('base64url')
 const ESTADO: EstadoCelular = { ahora: 1, aprobar: false, terminal: false, cuentas: [], sesiones: [], pedidos: [] }
 
 const claves = derivarClaves(CLAVE) as Claves
+const clavesQr = claves
 
 async function conServidor(over: Partial<ProveedorDeEstado>, fn: (base: string, decisiones: string[]) => Promise<void>, opciones: Partial<OpcionesWifi> = {}): Promise<void> {
   const decisiones: string[] = []
@@ -39,11 +40,14 @@ const enviarSobre = (base: string, ruta: string, sobre: string): Promise<Respons
 interface Opciones {
   t?: number
   rutaSellada?: string
+  /** Otra clave que la del QR de siempre (la de un celu con acceso). */
+  con?: string
 }
 
 /** Manda un pedido sellado como lo hace la página y abre la respuesta; la hora y la ruta sellada se pueden falsear. */
 async function postSellado(base: string, ruta: string, obj: unknown, o: Opciones = {}): Promise<{ status: number; cuerpo: unknown; texto: string }> {
   const iv = randomBytes(16)
+  const claves = o.con ? (derivarClaves(o.con) as Claves) : clavesQr
   const sobre = sellarPedido(claves, o.rutaSellada ?? ruta, JSON.stringify({ t: o.t ?? Date.now(), b: obj }), iv)
   const r = await enviarSobre(base, ruta, sobre)
   const texto = await r.text()
@@ -401,4 +405,49 @@ test('conexiones: una que no manda nada se corta sola', async () => {
     },
     { ociosoMs: 150 }
   )
+})
+
+test('emparejar: con la clave del QR solo se pide entrar; los datos abren con la clave de un celu que la PC dejó entrar', async () => {
+  const CELU = Buffer.alloc(32, 9).toString('base64url')
+  const lista: { id: string; clave: string }[] = []
+  const vistos: unknown[] = []
+  await conServidor(
+    {
+      celus: () => lista,
+      entrar: (b, q) => {
+        vistos.push(['entrar', b, q.celu])
+        return { status: 200, data: { codigo: '0042', estado: 'esperando' } }
+      },
+      estado: async (q) => {
+        vistos.push(['estado', q?.celu])
+        return ESTADO
+      },
+      puedeAprobar: (q) => q?.celu === 'c1',
+      decidir: (id, d, q) => void vistos.push(['decidir', id, d, q?.celu])
+    },
+    async (base) => {
+      assert.equal((await postSellado(base, '/api/estado', {})).status, 401, 'el QR solo no deja ver nada')
+      assert.equal((await postSellado(base, '/api/terminal', { id: 'w', desde: -1 })).status, 401)
+      const pide = await postSellado(base, '/api/emparejar', { clave: CELU })
+      assert.equal(pide.status, 200)
+      assert.deepEqual(pide.cuerpo, { codigo: '0042', estado: 'esperando' })
+      assert.equal((await postSellado(base, '/api/estado', {}, { con: CELU })).status, 401, 'sin el sí de la PC, la clave del celu no sirve')
+      lista.push({ id: 'c1', clave: CELU })
+      assert.equal((await postSellado(base, '/api/estado', {}, { con: CELU })).status, 200)
+      const ya = await postSellado(base, '/api/emparejar', { clave: CELU }, { con: CELU })
+      assert.deepEqual([ya.status, ya.cuerpo], [200, { ya: true }], 'con la clave del celu, emparejar dice que ya está')
+      assert.equal((await postSellado(base, '/api/permiso', { id: 'p', decision: 'allow' }, { con: CELU })).status, 200, 'puedeAprobar recibe quién es')
+      lista.length = 0
+      assert.equal((await postSellado(base, '/api/estado', {}, { con: CELU })).status, 401, 'sacado de la lista, queda afuera en el acto')
+      assert.deepEqual(vistos, [['entrar', { clave: CELU }, undefined], ['estado', 'c1'], ['decidir', 'p', 'allow', 'c1']])
+    }
+  )
+})
+
+test('emparejar sin proveedor de entradas (como en v1): la clave del QR da acceso y emparejar contesta que ya está', async () => {
+  await conServidor({}, async (base) => {
+    assert.equal((await postSellado(base, '/api/estado', {})).status, 200)
+    const ya = await postSellado(base, '/api/emparejar', { clave: CLAVE })
+    assert.deepEqual([ya.status, ya.cuerpo], [200, { ya: true }])
+  })
 })

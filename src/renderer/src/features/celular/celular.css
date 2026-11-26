@@ -197,3 +197,32 @@
   color: var(--text);
   font-weight: 600;
 }
+.f-cel-entrada {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border-radius: var(--r-lg);
+  background: var(--waiting-soft);
+}
+.f-cel-entrada p {
+  margin: 0;
+  font-size: var(--fs-12);
+  color: var(--text);
+}
+.f-cel-codigo {
+  font-family: var(--font-mono);
+  font-size: var(--fs-15);
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+.f-cel-acceso li {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.f-cel-acceso .f-cel-desde {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-3);
+}

@@ -204,6 +204,8 @@ async function abrir(responder: Responder, opciones: Opciones = {}): Promise<Pag
       const ab = abrirPedido(claves, url, init.body ?? '')
       if (!ab) return Promise.resolve({ status: 401, ok: false, text: async () => '' })
       if (url === '/api/estado') return Promise.resolve({ status: 200, ok: true, text: async () => sellarRespuesta(claves, ab.iv, JSON.stringify(estado)) })
+      // La clave del enlace ya es la de un celu con acceso: la PC contesta que ya está y la página la usa tal cual.
+      if (url === '/api/emparejar') return Promise.resolve({ status: 200, ok: true, text: async () => sellarRespuesta(claves, ab.iv, JSON.stringify({ ya: true })) })
       const b = (JSON.parse(ab.json) as { b: Cuerpo }).b
       const reg: Pedido = { b, largo: (init.body ?? '').length, en: reloj, abortado: false, conSenal: !!init.signal }
       pedidos.push(reg)

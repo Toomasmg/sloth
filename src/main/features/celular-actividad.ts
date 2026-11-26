@@ -4,6 +4,8 @@ import type { CeluConectado, EventoCelu, TipoEventoCelu } from '../../shared/cel
 export interface Quien {
   ip: string
   ua: string
+  /** El celu con acceso cuya clave abrió el pedido; sin él, el pedido vino con la clave del QR. */
+  celu?: string
 }
 
 /** «Android · Chrome», «iPhone · Safari»… Sirve para reconocerlo en el panel, no para identificarlo: el user-agent se puede falsear. */

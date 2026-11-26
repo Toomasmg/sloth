@@ -1,9 +1,8 @@
-import { readFileSync } from 'node:fs'
 import { networkInterfaces } from 'node:os'
-import { join } from 'node:path'
 import { chromium, devices, webkit, type BrowserContext, type Page } from '@playwright/test'
 import { test, expect } from './sloth'
 import { shellReady } from './terminal'
+import { claveQr, emparejar } from './celular-celu'
 import { elegirIp } from '../src/main/features/celular-core'
 
 /**
@@ -64,8 +63,6 @@ test('Celular movil: la terminal anda en un Galaxy y un iPhone simulados, con sa
   test.skip(!ip, 'Esta PC no tiene una red privada: no hay dónde abrir el servidor.')
   test.setTimeout(300_000)
   await shellReady(page)
-  const userData = await app.evaluate(({ app: a }) => a.getPath('userData'))
-  const clave = (JSON.parse(readFileSync(join(userData, 'perfiles', 'principal', 'features', 'celular.json'), 'utf8')) as { clave: string }).clave
   await page.keyboard.press('Control+k')
   await page.getByRole('combobox').first().fill('Ver Sloth en el celular')
   await page.keyboard.press('Enter')
@@ -74,6 +71,7 @@ test('Celular movil: la terminal anda en un Galaxy y un iPhone simulados, con sa
   await panel.getByRole('button', { name: 'Guardar' }).first().click()
   await panel.getByRole('switch', { name: 'Ver Sloth en el celu' }).click()
   await expect(panel.getByRole('img', { name: /Código QR/ })).toBeVisible()
+  const clave = await emparejar(panel, `http://${ip}:47391`, await claveQr(app))
   const url = `http://${ip}:47391/#k=${clave}`
 
   // Sin la terminal prendida no hay botón; al prenderla aparece sola.

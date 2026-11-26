@@ -343,8 +343,8 @@ test('Celu: sin conectar dice qué hacer; con el código regenerado, por qué qu
     await expect(page.getByText('PC conectada')).toBeVisible()
     await expect(page.getByRole('heading', { level: 1, name: 'Sloth' })).toBeVisible()
     claveActual = Buffer.alloc(32, 6).toString('base64url')
-    await expect(page.getByRole('heading', { level: 1, name: 'El código de Sloth cambió' })).toBeVisible()
-    await expect(page.getByText(/Escaneá el QR nuevo\.$/)).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Este celu ya no tiene acceso' })).toBeVisible()
+    await expect(page.getByText(/Escaneá el QR de Sloth para pedir entrar de nuevo\.$/)).toBeVisible()
   } finally {
     await navegador.close()
   }

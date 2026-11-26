@@ -94,6 +94,32 @@ export interface CelularVista {
   celus: CeluConectado[]
   /** Lo que hicieron los celus desde que se abrió Sloth, lo más nuevo primero (sin contenidos). */
   actividad: EventoCelu[]
+  /** Los celus que la PC dejó entrar por el Wi-Fi, cada uno con su clave (que no viaja al panel). */
+  conAcceso: CeluConAcceso[]
+  /** Celus que escanearon el QR y esperan que en la PC los dejen entrar. */
+  entradas: PedidoEntrada[]
+}
+
+/** Ver: solo mira. Aprobar: también responde permisos. Controlar: también abre las terminales. Siempre dentro de lo que prenden los interruptores del panel. */
+export type NivelCelu = 'ver' | 'aprobar' | 'controlar'
+
+export interface CeluConAcceso {
+  id: string
+  /** «Android · Chrome» del día que entró: sale del user-agent, que se puede falsear. */
+  nombre: string
+  nivel: NivelCelu
+  creado: number
+  /** Último pedido (redondeado a la hora): a los 30 días sin uso, la PC lo saca sola. */
+  ultimo: number
+}
+
+export interface PedidoEntrada {
+  id: string
+  nombre: string
+  ip: string
+  /** El mismo código que muestra el celu: así se sabe que es ese y no otro. */
+  codigo: string
+  en: number
 }
 
 export interface CeluConectado {
@@ -104,7 +130,7 @@ export interface CeluConectado {
   ultimo: number
 }
 
-export type TipoEventoCelu = 'conecto' | 'aprobo' | 'rechazo' | 'abrio' | 'escribio'
+export type TipoEventoCelu = 'conecto' | 'aprobo' | 'rechazo' | 'abrio' | 'escribio' | 'entro'
 
 export interface EventoCelu {
   at: number
@@ -135,6 +161,7 @@ export const PUERTO_POR_DEFECTO = 47321
 export function textoEvento(e: EventoCelu): string {
   const donde = e.espacio ?? 'un espacio'
   if (e.tipo === 'conecto') return 'Se conectó'
+  if (e.tipo === 'entro') return 'Lo dejaste entrar'
   if (e.tipo === 'aprobo') return `Aprobó un permiso en ${donde}`
   if (e.tipo === 'rechazo') return `Rechazó un permiso en ${donde}`
   if (e.tipo === 'abrio') return `Abrió la terminal de ${donde}`

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import type { EstadoCelular } from '../../shared/celular'
-import { abrirPedido, crearRepetidos, derivarClaves, fechaValida, sellarRespuesta } from './celular-sello'
+import { abrirPedido, crearRepetidos, derivarClaves, fechaValida, sellarRespuesta, type Claves } from './celular-sello'
 import { manifiesto, PAGINA_CSS, PAGINA_HTML, PAGINA_JS } from './celular-pagina'
 import { crearConexiones } from './celular-conexiones'
 import { crearLimite } from './celular-limite'
@@ -14,8 +14,14 @@ export interface ProveedorDeEstado {
   estado(quien?: Quien): Promise<EstadoCelular>
   /** Lanza con un mensaje para el celu si no se pudo (venció, ya se respondió). */
   decidir(id: string, decision: 'allow' | 'deny', quien?: Quien): void
-  puedeAprobar(): boolean
+  /** Con `quien`, lo que deja el nivel de ese celu además del interruptor. */
+  puedeAprobar(quien?: Quien): boolean
+  /** La clave del QR: con ella solo se puede pedir entrar. */
   clave(): string
+  /** Las claves de los celus que la PC dejó entrar. Las rutas de datos solo abren con una de estas. */
+  celus?(): { id: string; clave: string }[]
+  /** Un celu que escaneó el QR pide entrar (o pregunta cómo va su pedido). Sin esto, el QR da acceso directo, como en v1. */
+  entrar?(cuerpo: unknown, quien: Quien): { status: number; data: unknown }
   icono(): Buffer | null
   /** La terminal de un espacio, vista desde el celu. Con `error`, no se pudo (apagado, no existe, demasiadas esperas). `cancelar` salta si el celu cortó la conexión con el pedido abierto. */
   terminal(p: PedidoTerminal, cancelar?: AbortSignal, quien?: Quien): Promise<RespuestaTerminal | { status: 403 | 404 | 429; error: string }>
@@ -108,34 +114,75 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
   const repetidos = crearRepetidos()
   const limite = crearLimite()
   const conexiones = crearConexiones(o.maxConexionesPorIp)
+  // Derivar una clave cuesta dos HMAC: se guarda por clave y se tira cuando deja de estar.
+  let derivadas = new Map<string, Claves | null>()
+  const derivar = (clave: string, nuevas: Map<string, Claves | null>): Claves | null => {
+    const c = derivadas.has(clave) ? (derivadas.get(clave) ?? null) : derivarClaves(clave)
+    nuevas.set(clave, c)
+    return c
+  }
+  /** Primero las de los celus; la del QR, al final y sin id. */
+  const llaves = (): { id: string | null; claves: Claves }[] => {
+    const nuevas = new Map<string, Claves | null>()
+    const out: { id: string | null; claves: Claves }[] = []
+    for (const c of o.proveedor.celus?.() ?? []) {
+      const k = derivar(c.clave, nuevas)
+      if (k) out.push({ id: c.id, claves: k })
+    }
+    const qr = derivar(o.proveedor.clave(), nuevas)
+    if (qr) out.push({ id: null, claves: qr })
+    derivadas = nuevas
+    return out
+  }
 
   async function atender(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const ruta = (req.url ?? '/').split('?')[0]
     const metodo = req.method ?? 'GET'
     const esGet = metodo === 'GET' || metodo === 'HEAD'
 
-    if (ruta === '/api/estado' || ruta === '/api/permiso' || ruta === '/api/terminal') {
+    if (ruta === '/api/estado' || ruta === '/api/permiso' || ruta === '/api/terminal' || ruta === '/api/emparejar') {
       // 401 a los GET para que una página vieja ya abierta (con x-sloth-token) pida volver a escanear en vez de quedar en «sin conexión».
       if (esGet) return enviar(res, 401, null)
       if (metodo !== 'POST') return enviar(res, 405, null, undefined, { allow: 'POST' })
-      const claves = derivarClaves(o.proveedor.clave())
-      if (!claves) return enviar(res, 500, null)
       const texto = await leerCuerpo(req)
       if (texto === null) return enviar(res, 413, null)
-      const ab = abrirPedido(claves, ruta, texto)
-      if (!ab) return enviar(res, 401, null)
+      let claves: Claves | null = null
+      let ab: ReturnType<typeof abrirPedido> = null
+      let celu: string | undefined
+      for (const l of llaves()) {
+        ab = abrirPedido(l.claves, ruta, texto)
+        if (ab) {
+          claves = l.claves
+          celu = l.id ?? undefined
+          break
+        }
+      }
+      if (!ab || !claves) return enviar(res, 401, null)
+      const conQr = celu === undefined && !!o.proveedor.entrar
       let sobre: { t?: unknown; b?: unknown } | null = null
       try {
         sobre = JSON.parse(ab.json) as { t?: unknown; b?: unknown } | null
       } catch {
         sobre = null
       }
-      const sellado = (status: number, data: unknown): void => enviar(res, status, 'text/plain; charset=utf-8', sellarRespuesta(claves, ab.iv, JSON.stringify(data)))
+      const iv = ab.iv
+      const sellar = claves
+      const sellado = (status: number, data: unknown): void => enviar(res, status, 'text/plain; charset=utf-8', sellarRespuesta(sellar, iv, JSON.stringify(data)))
       // El MAC ya pasó: la clave es buena. La hora corrida y el reenvío se contestan sellados (no 401) para que el celu no se desempareje.
       if (!sobre || typeof sobre !== 'object') return enviar(res, 401, null)
       if (!fechaValida(sobre.t, Date.now())) return sellado(409, { error: 'reloj' })
       if (repetidos.vistoAntes(ab.iv, Date.now())) return sellado(409, { error: 'repetido' })
-      const quien: Quien = { ip: req.socket.remoteAddress ?? '?', ua: String(req.headers['user-agent'] ?? '').slice(0, 400) }
+      const quien: Quien = { ip: req.socket.remoteAddress ?? '?', ua: String(req.headers['user-agent'] ?? '').slice(0, 400), ...(celu !== undefined && { celu }) }
+
+      if (ruta === '/api/emparejar') {
+        // Ya tiene acceso: la página usa esa clave tal cual (un enlace guardado con la clave del celu, no la del QR).
+        if (!conQr || !o.proveedor.entrar) return sellado(200, { ya: true })
+        if (!limite.permitir(req.socket.remoteAddress ?? '?', Date.now())) return enviar(res, 429, null)
+        const r = o.proveedor.entrar(sobre.b, quien)
+        return sellado(r.status, r.data)
+      }
+      // La clave del QR sola no deja ver ni hacer nada: primero hay que pedir entrar y que la PC diga que sí.
+      if (conQr) return enviar(res, 401, null)
 
       if (ruta === '/api/estado') return sellado(200, await o.proveedor.estado(quien))
       if (ruta === '/api/terminal') {
@@ -149,7 +196,7 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
         if (res.destroyed) return
         return 'error' in r ? sellado(r.status, { error: r.error }) : sellado(200, r)
       }
-      if (!o.proveedor.puedeAprobar()) return sellado(403, { error: 'Aprobar desde el celu está apagado en Sloth.' })
+      if (!o.proveedor.puedeAprobar(quien)) return sellado(403, { error: 'Aprobar desde el celu está apagado en Sloth.' })
       const p = sobre.b as { id?: unknown; decision?: unknown } | null
       if (!p || typeof p !== 'object' || typeof p.id !== 'string' || p.id.length > 100 || (p.decision !== 'allow' && p.decision !== 'deny')) return sellado(400, { error: 'Pedido inválido.' })
       try {

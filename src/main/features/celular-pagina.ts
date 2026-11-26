@@ -94,6 +94,12 @@ export const PAGINA_HTML = `<!doctype html>
     <button type="button" data-tecla="ctrld" aria-label="Control D">Ctrl D</button>
   </div>
 </section>
+<section class="aviso-pantalla" id="emparejando" hidden>
+  <h1>Confirmá en la PC</h1>
+  <p>En Sloth, en el panel «Celular», tocá «Dejar entrar» si ves este código:</p>
+  <p class="par-codigo" id="par-codigo"></p>
+  <p id="par-estado" role="status">Esperando la respuesta de la PC…</p>
+</section>
 <section class="aviso-pantalla" id="sin-token" hidden>
   <h1 id="sin-token-titulo">Conectá este celu</h1>
   <p id="sin-token-texto">Escaneá el QR de Sloth con la cámara.</p>
@@ -280,6 +286,7 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .pista button { flex: none; min-height: 44px; padding: 0 12px; border: 0; border-radius: 9px; background: #2A2F37; color: var(--fuerte); font-weight: 600; }
 .aviso-pantalla { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 24px max(24px, env(safe-area-inset-right)) 24px max(24px, env(safe-area-inset-left)); background: var(--fondo); text-align: center; }
 .aviso-pantalla h1 { margin: 0; font-size: 20px; }
+.aviso-pantalla .par-codigo { margin: 12px auto; font: 700 44px var(--mono); letter-spacing: 0.25em; color: var(--fuerte); }
 .aviso-pantalla p { margin: 0 auto; max-width: 36ch; color: var(--suave); }
 .aviso-pantalla .pasos { margin: 8px auto 0; padding-left: 1.4em; max-width: 36ch; text-align: left; color: var(--texto); display: flex; flex-direction: column; gap: 8px; }
 .lista .s-term { flex: none; min-height: 44px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border-radius: 12px; border: 1px solid rgba(140,194,255,0.35); background: rgba(90,169,255,0.12); color: var(--trabaja); font-size: 13px; font-weight: 600; }
@@ -389,12 +396,15 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   var viejo = leer('sloth-token');
   var enlace = new URLSearchParams(location.hash.slice(1)).get('k');
   var enlaceMalo = false;
+  // La clave del QR solo sirve para pedir entrar: este celu genera la suya y la PC la acepta cuando alguien toca «Dejar entrar».
+  var remota = viejo === 'remoto' || !!window.slothFetch;
   if (enlace) {
-    if (window.slothSello.abrirClave(enlace)) guardar('sloth-clave', enlace);
+    if (window.slothSello.abrirClave(enlace)) guardar(remota ? 'sloth-clave' : 'sloth-qr', enlace);
     else enlaceMalo = true;
     try { history.replaceState(null, '', location.pathname); } catch (e) { /* sin historial */ }
   }
-  var token = viejo === 'remoto' ? viejo : (enlaceMalo ? null : enlace || leer('sloth-clave'));
+  var qr = remota || enlaceMalo ? null : leer('sloth-qr');
+  var token = viejo === 'remoto' ? viejo : (enlaceMalo ? null : (remota && enlace) || leer('sloth-clave'));
   if (viejo && viejo !== 'remoto') guardar('sloth-token', null);
   var cuentaElegida = leer('sloth-cuenta');
   var ultimo = null, desfase = 0, ultimoOk = 0, timer = null, avisoHora = false;
@@ -838,6 +848,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
 
   function consultar() {
     clearTimeout(timer);
+    if (qr) return emparejar();
     if (!token) return enlaceMalo ? sinToken('No se pudo conectar', 'El QR no se leyó bien: escanealo de nuevo, de cerca y con buena luz.') : viejo ? sinToken('Hay que volver a conectar este celu', 'Escaneá el QR de nuevo en Sloth.') : sinToken();
     pedirApi('/api/estado')
       .then(function (r) {
@@ -845,7 +856,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
           guardar('sloth-token', null);
           guardar('sloth-clave', null);
           token = null;
-          sinToken('El código de Sloth cambió', 'Se regeneró el código en la PC (panel «Celular») y este celu quedó afuera. Escaneá el QR nuevo.');
+          sinToken('Este celu ya no tiene acceso', 'Lo sacaron desde la PC, se regeneró el código o pasó un mes sin usarse. Escaneá el QR de Sloth para pedir entrar de nuevo.');
           return null;
         }
         if (r.status === 409) {
@@ -866,6 +877,72 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
         pintar();
       }, function () { pintarConexion(); })
       .then(function () { if (token && !document.hidden) timer = setTimeout(consultar, CADA_MS); });
+  }
+
+  var PAR_CADA_MS = 2000, parPidio = false;
+  // 32 bytes al azar en base64url (43 letras), como las que arma la PC.
+  var B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  function claveNueva() {
+    var b = new Uint8Array(32), t = '';
+    window.crypto.getRandomValues(b);
+    for (var i = 0; i < 32; i += 3) {
+      var n = (b[i] << 16) | ((b[i + 1] || 0) << 8) | (b[i + 2] || 0);
+      t += B64.charAt((n >> 18) & 63) + B64.charAt((n >> 12) & 63) + (i + 1 < 32 ? B64.charAt((n >> 6) & 63) : '') + (i + 2 < 32 ? B64.charAt(n & 63) : '');
+    }
+    return t;
+  }
+  function finEmparejar() {
+    guardar('sloth-qr', null);
+    guardar('sloth-par', null);
+    qr = null;
+    parPidio = false;
+    $('emparejando').hidden = true;
+  }
+  function sinEntrar(titulo, texto) {
+    finEmparejar();
+    token = leer('sloth-clave');
+    if (token) { consultar(); return; }
+    sinToken(titulo, texto);
+  }
+  function entro(clave) {
+    finEmparejar();
+    guardar('sloth-clave', clave);
+    token = clave;
+    $('sin-token').hidden = true;
+    $('app').hidden = false;
+    consultar();
+  }
+  // Pide entrar con la clave del QR y después pregunta cada 2 s cómo va. Un celu que ya tenía clave la reusa: no suma otro a la lista.
+  function emparejar() {
+    clearTimeout(timer);
+    var propia = leer('sloth-par') || leer('sloth-clave') || claveNueva();
+    guardar('sloth-par', propia);
+    token = qr;
+    $('app').hidden = true;
+    $('sin-token').hidden = true;
+    $('emparejando').hidden = false;
+    pedirApi('/api/emparejar', parPidio ? { clave: propia, consultar: true } : { clave: propia })
+      .then(function (r) {
+        if (r.status === 401) { guardar('sloth-par', null); sinEntrar('Este QR ya no sirve', 'En Sloth se regeneró el código. Escaneá el QR nuevo.'); return null; }
+        if (!r.json) throw new Error('http ' + r.status);
+        return r.json().then(function (j) {
+          if (r.ok && j && j.ya === true) { entro(qr); return null; }
+          if (r.status === 409 && j && j.error === 'reloj') { $('par-estado').textContent = HORA_CORRIDA; return true; }
+          if (!r.ok) { guardar('sloth-par', null); sinEntrar('No se pudo pedir entrar', (j && j.error) || 'La PC no aceptó el pedido.'); return null; }
+          if (j.codigo) $('par-codigo').textContent = j.codigo;
+          parPidio = true;
+          if (j.estado === 'listo') { entro(propia); return null; }
+          if (j.estado === 'rechazado') { guardar('sloth-par', null); sinEntrar('No te dejaron entrar', 'En la PC tocaron «No». Si fue un error, escaneá el QR de nuevo.'); return null; }
+          if (j.estado === 'vencido') { guardar('sloth-par', null); sinEntrar('Se venció el pedido', 'Pasaron 5 minutos sin respuesta en la PC. Escaneá el QR de nuevo.'); return null; }
+          $('par-estado').textContent = 'Esperando la respuesta de la PC…';
+          return true;
+        });
+      })
+      .then(null, function () {
+        $('par-estado').textContent = 'Sin conexión con la PC. Reintentando…';
+        return true;
+      })
+      .then(function (seguir) { if (seguir && qr && !document.hidden) timer = setTimeout(emparejar, PAR_CADA_MS); });
   }
 
   // Sin la barra del navegador. Una página http no se puede instalar como app en Android, pero sí
