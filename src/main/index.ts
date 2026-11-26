@@ -362,6 +362,8 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     return term && !accountBusy(id) ? 'ok' : 'en-uso'
   })
 
+  const setupAvisados = new Set<string>()
+
   /** Deja la cuenta lista antes de abrir Claude: settings + hooks y tu setup compartido. */
   function prepareAccount(acc: Account): void {
     // Una cuenta de un agente que esta versión no conoce no se toca: ni hooks ni setup de Claude en su carpeta.
@@ -374,9 +376,15 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     installInto(acc.configDir, baseSettingsFor(acc))
     const report = syncSharedSetup(acc, !accountBusy(acc.id))
     if (report.skipped.length) {
-      console.warn(`[setup] ${acc.label}:`, report.skipped.join('; '))
-      // Sin el label: la gente le pone su nombre y el diagnóstico se comparte.
-      logger.aviso('setup', `cuenta ${store.accounts.indexOf(acc) + 1}: ${report.skipped.join('; ')}`)
+      // Cada terminal que arranca con la cuenta vuelve a dar el mismo motivo: se avisa una vez por cuenta y causa.
+      const motivo = report.skipped.join('; ')
+      const clave = `${acc.id}|${motivo}`
+      if (!setupAvisados.has(clave)) {
+        setupAvisados.add(clave)
+        console.warn(`[setup] ${acc.label}:`, motivo)
+        // Sin el label: la gente le pone su nombre y el diagnóstico se comparte.
+        logger.aviso('setup', `cuenta ${store.accounts.indexOf(acc) + 1}: ${motivo}`)
+      }
     }
     for (const l of prepareListeners) safe('preparar cuenta', () => l(acc))
   }

@@ -24,7 +24,7 @@ export async function grabar(onTope: () => void, onParte: (wav: Uint8Array) => v
   })
   const ctx = new AudioContext({ sampleRate: RATE })
   const src = ctx.createMediaStreamSource(stream)
-  // ScriptProcessor está deprecado pero no necesita un módulo aparte (AudioWorklet) y alcanza para voz.
+  // ScriptProcessor está deprecado; migrar a AudioWorklet queda pendiente (pide un módulo aparte empaquetado y probar el micrófono real). Alcanza para voz.
   const proc = ctx.createScriptProcessor(4096, 1, 1)
   const cortador = crearCortador({ rate: RATE })
   let muestras = 0

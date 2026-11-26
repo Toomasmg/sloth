@@ -53,6 +53,7 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
 
   const results = useMemo(() => searchSettings(q), [q])
   const searching = q.trim().length > 0
+  const sinResultados = searching && results.length === 0
   const pendingLogins = ui.accounts.filter((a) => !ui.statuses[a.id]?.loggedIn).length
   const meta = navOf(sec)
 
@@ -73,7 +74,17 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
 
           {searching ? (
             <div className="f-set-results">
-              <div className="f-set-results-h">{results.length ? `${results.length} ajustes encontrados` : 'Ningún ajuste coincide'}</div>
+              <div className="f-set-results-h" role="status">
+                {results.length ? `${results.length} ajustes encontrados` : 'Ningún ajuste coincide'}
+              </div>
+              {!results.length && (
+                <div className="f-set-empty">
+                  <p className="f-set-hint">Probá con otra palabra, por ejemplo «tema», «fuente» o «atajos».</p>
+                  <Button look="classic" size="sm" onClick={() => setQ('')}>
+                    Limpiar búsqueda
+                  </Button>
+                </div>
+              )}
               {results.map((r) => (
                 <button key={`${r.section}-${r.title}`} type="button" className="f-set-result" onClick={() => pick(r.section)}>
                   <span>{r.title}</span>
@@ -103,6 +114,16 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
         </nav>
 
         <div className="f-set-main">
+          {sinResultados ? (
+            <div className="f-set-col">
+              <div className="f-set-empty f-set-empty-main">
+                <h1 id="f-set-title" tabIndex={-1}>
+                  Sin resultados
+                </h1>
+                <p className="f-set-hint">Ningún ajuste coincide con «{q.trim()}».</p>
+              </div>
+            </div>
+          ) : (
           <div className="f-set-col">
             <header className="f-set-head">
               <div className="f-set-head-text">
@@ -136,6 +157,7 @@ export function SettingsModal({ initialTab, onClose }: { initialTab: SettingsTab
               </div>
             </SaveContext.Provider>
           </div>
+          )}
         </div>
 
         {toast && (
