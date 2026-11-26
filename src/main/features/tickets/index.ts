@@ -113,6 +113,7 @@ import {
   type ResultadoLista
 } from './motor'
 import { mcpAjenos } from './mcp-ajenos'
+import { entornoConsulta } from './entorno-consulta'
 import { carpetaFeatures } from '../../perfil'
 
 /**
@@ -684,14 +685,9 @@ function ejecucion(nombre: string, accountId: string, mcp?: ConectorMcp): Ejecuc
   if (!exe) throw new Error(p.id === 'claude' ? 'No encontré el ejecutable de Claude Code (claude.exe) en el PATH.' : `No encontré ${nombreProveedor(acc)} en el PATH. ${p.comoInstalar}`)
   const cwd = join(carpeta(), 'tickets-run')
   mkdirSync(cwd, { recursive: true })
-  // Un MCP propio lento puede tardar más que el tope por defecto de Claude Code en arrancar. Con el tope de salida por defecto
-  // (25.000 tokens) una página grande de tickets se rechaza y, sin herramientas para leer el archivo, la consulta da vueltas hasta el plazo.
-  const env = { MCP_TIMEOUT: '30000', MAX_MCP_OUTPUT_TOKENS: '50000', ...baseEnv(p.quitarDelEntorno), ...p.envCuenta(acc.configDir) }
-  const run: Ejecucion = { accountId: acc.id, label: acc.label, exe, cwd, env, envConfigDir: p.envConfigDir, motor, agente: ETIQUETA_AGENTE[p.id] }
-  if (!mcp || defPara(mcp, acc.id).herramientas.prefijo.startsWith('mcp__claude_ai_')) return run
-  // Conectar todos los de claude.ai solo para no usarlos demora cada consulta. Si la variable no existe en esta
-  // versión de Claude Code, no cambia nada: el init los trae igual.
-  return { ...run, sinClaudeAi: true, env: { ...env, ENABLE_CLAUDEAI_MCP_SERVERS: 'false' } }
+  const { env: envConsulta, sinClaudeAi } = entornoConsulta(mcp ? defPara(mcp, acc.id).herramientas.prefijo : undefined)
+  const env = { ...envConsulta, ...baseEnv(p.quitarDelEntorno), ...p.envCuenta(acc.configDir) }
+  return { accountId: acc.id, label: acc.label, exe, cwd, env, envConfigDir: p.envConfigDir, motor, agente: ETIQUETA_AGENTE[p.id], ...(sinClaudeAi ? { sinClaudeAi } : {}) }
 }
 
 /** Cuenta con la que se leen y escriben tickets: la que consultó la última vez. */
