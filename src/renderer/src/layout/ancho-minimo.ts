@@ -18,3 +18,10 @@ export function capForWidth(cap: number, areaW: number): number {
   if (!(areaW > 0) || cap <= 1) return cap
   return areaW < PANE_MIN_PX * 2 ? 1 : cap
 }
+
+/** Aviso cuando el ancho deja ver menos paneles que los elegidos (y hay paneles abiertos de sobra); null si no falta nada. */
+export function avisoAncho(elegidos: number, cap: number, abiertos: number): string | null {
+  if (cap >= elegidos || abiertos <= cap) return null
+  const quiere = Math.min(elegidos, abiertos)
+  return `Se ve ${cap} de ${quiere}: falta ancho. Cerrá el panel lateral o agrandá la ventana.`
+}

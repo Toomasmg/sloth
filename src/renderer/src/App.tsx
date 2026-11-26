@@ -65,7 +65,7 @@ import { onEqualize, safeStorage, setViewMode, useViewMode } from './layout/stor
 import { useReorderDrag } from './layout/useReorderDrag'
 import { Separators } from './layout/Separators'
 import { SIDE_DEFAULT, SideResizer, clampSide, sideMax } from './layout/SideResizer'
-import { SIDE_AUTO_BELOW_PX, capForWidth, sideVisible } from './layout/ancho-minimo'
+import { SIDE_AUTO_BELOW_PX, avisoAncho, capForWidth, sideVisible } from './layout/ancho-minimo'
 import { SleepingCard } from './SleepingCard'
 import { openRamas } from './features/worktrees/store'
 import { openHistory } from './features/history/index'
@@ -434,6 +434,7 @@ export function App(): React.JSX.Element {
     return () => ro.disconnect()
   }, [])
   const cap = capForWidth(LAYOUT_CAP[viewMode], areaW)
+  const anchoAviso = avisoAncho(LAYOUT_CAP[viewMode], cap, openPanes.length)
   const tabsRef = useRef<HTMLDivElement>(null)
   const ghostRef = useRef<HTMLDivElement>(null)
   const [layoutMsg, setLayoutMsg] = useState('')
@@ -876,7 +877,7 @@ export function App(): React.JSX.Element {
           <h1 className="sr-only">Sloth</h1>
           <div className="sl-top-left">
             <IconButton
-              label={sideShown ? 'Ocultar la barra lateral' : 'Mostrar la barra lateral'}
+              label={sideShown ? 'Ocultar la barra lateral' : winW < SIDE_AUTO_BELOW_PX ? 'Mostrar la barra lateral (bajo 1000 px de ancho arranca plegada)' : 'Mostrar la barra lateral'}
               shortcut={comboLabel('sidebar')}
               icon={<SidebarIcon size={17} />}
               pressed={sideShown}
@@ -1012,9 +1013,14 @@ export function App(): React.JSX.Element {
                     <BroadcastIcon size={14} aria-hidden="true" />
                     Enviar a varios
                   </button>
+                  {anchoAviso && (
+                    <span className="sl-layout-aviso" role="status" title={anchoAviso}>
+                      {anchoAviso.split(':')[0]}
+                    </span>
+                  )}
                   <div className="sl-layout" role="group" aria-label="Distribución de paneles">
                     {(['uno', 'dos', 'tres', 'cuatro'] as const).map((k, i) => (
-                      <Tooltip key={k} text={`${LAYOUT_LABEL[k]}: ${LAYOUT_CAP[k] === 1 ? '1 panel' : `hasta ${LAYOUT_CAP[k]} paneles`} a la vista`} shortcut={`Ctrl+Alt+${i + 1}`}>
+                      <Tooltip key={k} text={`${LAYOUT_LABEL[k]}: ${LAYOUT_CAP[k] === 1 ? '1 panel' : `hasta ${LAYOUT_CAP[k]} paneles`} a la vista${viewMode === k && anchoAviso ? `. ${anchoAviso}` : ''}`} shortcut={`Ctrl+Alt+${i + 1}`}>
                         <button type="button" aria-pressed={viewMode === k} aria-label={`${LAYOUT_LABEL[k]}: ${LAYOUT_CAP[k] === 1 ? '1 panel' : `hasta ${LAYOUT_CAP[k]} paneles`} a la vista`} onClick={() => pickLayout(k)}>
                           {i + 1}
                         </button>
