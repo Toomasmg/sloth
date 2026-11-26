@@ -6,6 +6,7 @@ import { Button, InlineAlert, Input, Select, Switch, toast } from '../../ui'
 import { useUi } from '../host'
 import { Qr } from './Qr'
 import { RemotoSeccion } from './RemotoSeccion'
+import { TailscaleSeccion } from './TailscaleSeccion'
 
 const canal = (op: string): string => `feat:celular:${op}`
 const hora = (ms: number): string => new Date(ms).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -266,6 +267,8 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
             </section>
           )}
 
+          <TailscaleSeccion v={v} hacer={hacer} copiar={copiar} />
+
           <RemotoSeccion v={v} hacer={hacer} copiar={copiar} ocupado={ocupado} />
 
           <section className="f-cel-sec" aria-labelledby="f-cel-perm">
@@ -281,11 +284,11 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
             </Switch>
             {v.terminal && (
               <p className="f-cel-ok" role="status">
-                {v.enlace ? 'Prendido: el botón «Terminal» aparece en cada sesión al abrir la página con el QR de «En tu Wi-Fi». Con el de «Desde cualquier red» sale apagado.' : 'Prendido, pero «Ver Sloth en el celu» está apagado: no hay QR para abrirlas.'}
+                {v.enlace ? 'Prendido: el botón «Terminal» aparece en cada sesión al abrir la página con el QR de «En tu Wi-Fi» o el de Tailscale. Con el de «Desde cualquier red» sale apagado.' : 'Prendido, pero «Ver Sloth en el celu» está apagado: no hay QR para abrirlas.'}
               </p>
             )}
             <p className={v.terminal ? 'f-cel-aviso' : 'f-cel-nota'}>
-              Desde el celu vas a poder ver la terminal de cada espacio y escribir en ella como si estuvieras en la PC. Un celu con acceso y nivel «terminal» puede correr cualquier comando en esta PC. Solo anda en el Wi-Fi de casa: abrí la página con el QR de arriba, no con el de «Desde cualquier red». En cada sesión vas a ver el botón «Terminal».
+              Desde el celu vas a poder ver la terminal de cada espacio y escribir en ella como si estuvieras en la PC. Un celu con acceso y nivel «terminal» puede correr cualquier comando en esta PC. Anda en el Wi-Fi de casa y por Tailscale: abrí la página con uno de esos QR, no con el de «Desde cualquier red». En cada sesión vas a ver el botón «Terminal».
             </p>
             <p className="f-cel-aviso" role="note">
               Lo que va entre el celu y la PC viaja cifrado en tu Wi-Fi, con una clave que se arma al emparejar el celu. Aun así la página no puede verificarse: alguien que manipule tu red a propósito podría robarte la clave. Usalo en una red propia; en una pública, de hotel o compartida, usá «Desde cualquier red», que va cifrado de punta a punta.

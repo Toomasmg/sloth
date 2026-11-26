@@ -22,7 +22,8 @@ export interface ProveedorDeEstado {
   celus?(): { id: string; clave: string }[]
   /** Un celu que escaneó el QR pide entrar (o pregunta cómo va su pedido). Sin esto, el QR da acceso directo, como en v1. */
   entrar?(cuerpo: unknown, quien: Quien): { status: number; data: unknown }
-  icono(): Buffer | null
+  /** Sin archivo, el de 192 px; si no, uno de ICONOS. */
+  icono(archivo?: string): Buffer | null
   /** La terminal de un espacio, vista desde el celu. Con `error`, no se pudo (apagado, no existe, demasiadas esperas). `cancelar` salta si el celu cortó la conexión con el pedido abierto. */
   terminal(p: PedidoTerminal, cancelar?: AbortSignal, quien?: Quien): Promise<RespuestaTerminal | { status: 403 | 404 | 429; error: string }>
   /** xterm.js y su css, para que la página del celu dibuje la terminal. */
@@ -41,6 +42,9 @@ export interface FuenteDeEstado {
 }
 
 const MAX_CUERPO = 8192
+
+/** Los íconos que pide el manifiesto: el de 192 y, para instalarla como app (por HTTPS), los de 512. */
+const ICONOS: Record<string, string> = { '/icono.png': 'icono-192.png', '/icono-512.png': 'icono-512.png', '/icono-maskable.png': 'icono-maskable-512.png' }
 
 const SEGURIDAD = {
   'cache-control': 'no-store',
@@ -217,8 +221,8 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
       return ruta === '/xterm.js' ? enviarEstatico(req, res, ruta, 'text/javascript; charset=utf-8', x.js) : enviarEstatico(req, res, ruta, 'text/css; charset=utf-8', x.css)
     }
     if (ruta === '/manifest.webmanifest') return enviar(res, 200, 'application/manifest+json; charset=utf-8', manifiesto())
-    if (ruta === '/icono.png') {
-      const png = o.proveedor.icono()
+    if (Object.hasOwn(ICONOS, ruta)) {
+      const png = o.proveedor.icono(ICONOS[ruta])
       return png ? enviarEstatico(req, res, ruta, 'image/png', png) : enviar(res, 404, null)
     }
     return enviar(res, 404, null)

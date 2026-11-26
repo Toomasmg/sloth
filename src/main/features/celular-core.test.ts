@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { AccountUsage, AgentStatus } from '../../shared/types'
-import { aMs, claveValida, armarEstado, cuerpoNtfy, enlaceAviso, textoAvisoPrivado, MAX_PEDIDO, pedidoParaCelu, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type Entrada } from './celular-core'
+import { aMs, claveValida, armarEstado, cuerpoNtfy, enlaceAviso, textoAvisoPrivado, MAX_PEDIDO, pedidoParaCelu, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, httpsTailscale, ipTailscale, type Entrada } from './celular-core'
 
 const v4 = (address: string, internal = false) => ({ address, family: 'IPv4', internal })
 
@@ -232,4 +232,20 @@ test('textoAvisoPrivado no dice el espacio ni lo que dijo Claude', () => {
   assert.deepEqual(textoAvisoPrivado('termino'), { titulo: 'Sloth', cuerpo: 'Una sesión terminó.' })
   assert.deepEqual(textoAvisoPrivado('teNecesita'), { titulo: 'Sloth', cuerpo: 'Una sesión te necesita.' })
   assert.deepEqual(textoAvisoPrivado('permiso'), { titulo: 'Sloth', cuerpo: 'Una sesión pide permiso.' })
+})
+
+test('ipTailscale: la IPv4 del rango de Tailscale (100.64/10), no otra', () => {
+  const v4 = (address: string, internal = false) => ({ address, family: 'IPv4', internal })
+  assert.equal(ipTailscale({ 'Wi-Fi': [v4('192.168.1.5')], Tailscale: [v4('100.101.102.103')] }), '100.101.102.103')
+  assert.equal(ipTailscale({ 'Wi-Fi': [v4('192.168.1.5')] }), null)
+  assert.equal(ipTailscale({ x: [v4('100.63.0.1'), v4('100.128.0.1')] }), null, 'fuera del rango no es Tailscale')
+  assert.equal(ipTailscale({ x: [{ address: 'fd7a:115c:a1e0::1', family: 'IPv6', internal: false }] }), null)
+})
+
+test('httpsTailscale: solo direcciones https de ts.net, normalizadas', () => {
+  assert.equal(httpsTailscale('https://mi-pc.tailnet-abc.ts.net/'), 'https://mi-pc.tailnet-abc.ts.net')
+  assert.equal(httpsTailscale('  HTTPS://Mi-PC.Tail1.TS.NET  '), 'https://mi-pc.tail1.ts.net')
+  for (const malo of ['http://mi-pc.tail.ts.net', 'https://mi-pc.tail.ts.net.evil.com', 'https://evil.com/?x=.ts.net', 'https://mi-pc.tail.ts.net/ruta', 'https://ts.net', 'https://-a.tail.ts.net', 1, null]) {
+    assert.equal(httpsTailscale(malo), null, String(malo))
+  }
 })

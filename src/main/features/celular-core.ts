@@ -34,6 +34,25 @@ export function elegirIp(redes: Record<string, InterfazRed[] | undefined>): stri
   return (candidatas.find((c) => WIFI.test(c.nombre)) ?? candidatas[0])?.ip ?? null
 }
 
+/** La IP de Tailscale de la PC (100.64.0.0/10), o null si Tailscale no está conectado. */
+export function ipTailscale(redes: Record<string, InterfazRed[] | undefined>): string | null {
+  for (const lista of Object.values(redes)) {
+    for (const r of lista ?? []) {
+      const v4 = r.family === 'IPv4' || r.family === 4
+      const [a, b] = r.address.split('.').map(Number)
+      if (v4 && !r.internal && a === 100 && b >= 64 && b <= 127) return r.address
+    }
+  }
+  return null
+}
+
+/** La dirección que da `tailscale serve` (https://<pc>.<tailnet>.ts.net), sin barra final; null si no es una de esas. */
+export function httpsTailscale(v: unknown): string | null {
+  if (typeof v !== 'string' || v.length > 200) return null
+  const m = /^https:\/\/((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+ts\.net)\/?$/i.exec(v.trim())
+  return m ? `https://${m[1].toLowerCase()}` : null
+}
+
 /** La clave del QR: 32 bytes en base64url canónico (43 caracteres). */
 export const claveValida = (v: unknown): v is string => typeof v === 'string' && derivarClaves(v) !== null
 

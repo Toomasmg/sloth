@@ -14,7 +14,7 @@ import { CELU_WEB_URL, enlaceCelu, secretoValido } from '../../shared/celu-remot
 import { LIMITES_ARCHIVO } from '../statusline-core'
 import { agenteDe, capacidadesDe } from '../../shared/proveedores'
 import { limitesDeCuenta } from '../codex-limites'
-import { armarEstado, claveValida, cuerpoNtfy, enlaceAviso, textoAvisoPrivado, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type TipoAviso } from './celular-core'
+import { armarEstado, claveValida, httpsTailscale, ipTailscale, cuerpoNtfy, enlaceAviso, textoAvisoPrivado, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type TipoAviso } from './celular-core'
 import { crearFuenteWifi, type FuenteDeEstado, type ProveedorDeEstado } from './celular-servidor'
 import { XTERM } from './celular-xterm'
 import { debeEsperar, nuevoVisor, ponerFoto, salidaDesde, sinSalida, sinAutomaticas, sumarSalida, tamanoActual, vencidos, type RespuestaTerminal, type Visor } from './celular-terminal-core'
@@ -52,16 +52,19 @@ interface Config {
   /** `privado`: los avisos no llevan el nombre del espacio ni el mensaje de Claude. */
   ntfy: { encendido: boolean; tema: string; servidor: string; token?: string; temaRenovado?: boolean; privado?: boolean }
   remoto: { encendido: boolean; aprobar: boolean; secreto: string }
+  /** Apagado por defecto: abre la misma página en la IP de Tailscale y en 127.0.0.1 (para `tailscale serve`). */
+  tailscale: { encendido: boolean; https?: string }
 }
 
 const REVISAR_IP_MS = 15_000
+const LOCAL = '127.0.0.1'
 
 const file = (): string => join(carpetaFeatures(), 'celular.json')
 const nuevoToken = (): string => randomBytes(32).toString('base64url')
 const nuevoTema = (): string => `sloth-${randomBytes(12).toString('hex')}`
 
 function porDefecto(): Config {
-  return { encendido: false, puerto: PUERTO_POR_DEFECTO, clave: nuevoToken(), celus: [], aprobar: false, terminal: false, ntfy: { encendido: false, tema: nuevoTema(), servidor: NTFY_POR_DEFECTO }, remoto: { encendido: false, aprobar: false, secreto: nuevoToken() } }
+  return { encendido: false, puerto: PUERTO_POR_DEFECTO, clave: nuevoToken(), celus: [], aprobar: false, terminal: false, ntfy: { encendido: false, tema: nuevoTema(), servidor: NTFY_POR_DEFECTO }, remoto: { encendido: false, aprobar: false, secreto: nuevoToken() }, tailscale: { encendido: false } }
 }
 
 /** Cómo quedó el archivo al leerlo: migrado (hay que respaldarlo antes de reescribir) o de una versión más nueva (no se toca). */
@@ -81,7 +84,8 @@ function cargar(): { cfg: Config; claveNueva: boolean } {
     porDefecto: (): Partial<Config> & Record<string, unknown> => ({})
   }).valor
   if (archivo.futura) avisoVersionFutura(file())
-  const { version: _v, encendido: _e, puerto: _p, clave: _c, celus: _cs, aprobar: _a, terminal: _t, ntfy: _n, remoto: _r, ...resto } = raw
+  const { version: _v, encendido: _e, puerto: _p, clave: _c, celus: _cs, aprobar: _a, terminal: _t, ntfy: _n, remoto: _r, tailscale: _ts, ...resto } = raw
+  const https = httpsTailscale(raw.tailscale?.https)
   archivo.resto = resto
   const temaGuardado = raw.ntfy?.tema
   const temaOk = temaValido(temaGuardado)
@@ -107,7 +111,8 @@ function cargar(): { cfg: Config; claveNueva: boolean } {
       encendido: raw.remoto?.encendido === true,
       aprobar: raw.aprobar === true && raw.remoto?.aprobar === true,
       secreto: secretoValido(raw.remoto?.secreto) ? raw.remoto.secreto : base.remoto.secreto
-    }
+    },
+    tailscale: { encendido: raw.tailscale?.encendido === true, ...(https && { https }) }
   }
   return { cfg, claveNueva }
 }
@@ -122,6 +127,7 @@ function guardarConfig(c: Config): void {
 }
 
 const ipActual = (): string | null => elegirIp(networkInterfaces())
+const ipTs = (): string | null => ipTailscale(networkInterfaces())
 
 let detenerTodo: (() => Promise<void>) | null = null
 
@@ -138,12 +144,16 @@ const feature: Feature = {
       }
     }
     let fuente: (FuenteDeEstado & { puerto(): number }) | null = null
+    // Por Tailscale: la IP 100.x (directo, http) y 127.0.0.1 (lo que `tailscale serve` pasa a HTTPS). Mismo proveedor y mismas claves.
+    let extras: { host: string; f: FuenteDeEstado }[] = []
+    let tsServida: string | null = null
+    let tsError: string | null = null
     let ipServida: string | null = null
     let ipCambio = false
     let error: string | null = null
     let errorDePuerto = false
     let revisor: NodeJS.Timeout | null = null
-    let icono: Buffer | null | undefined
+    const iconos = new Map<string, Buffer | null>()
     const enviados = new Map<string, number>()
     let fuenteRemota: FuenteDeEstado | null = null
     let remotoEstado: RemotoVista['estado'] = 'apagado'
@@ -267,6 +277,14 @@ const feature: Feature = {
       error,
       ipCambio,
       remoto: vistaRemota(),
+      tailscale: {
+        encendido: cfg.tailscale.encendido,
+        ip: tsServida ?? ipTs(),
+        enlace: tsServida ? `http://${tsServida}:${cfg.puerto}/#k=${cfg.clave}` : null,
+        https: cfg.tailscale.https ?? null,
+        enlaceHttps: cfg.tailscale.https && extras.some((x) => x.host === LOCAL) ? `${cfg.tailscale.https}/#k=${cfg.clave}` : null,
+        error: tsError
+      },
       celus: actividad.conectados(Date.now()),
       actividad: actividad.eventos().slice(0, 30),
       conAcceso: paraVista(cfg.celus),
@@ -274,16 +292,20 @@ const feature: Feature = {
     })
     const avisar = (): void => ctx.emit('changed', vista())
 
-    const leerIcono = (): Buffer | null => {
-      if (icono !== undefined) return icono
+    const leerIcono = (archivo = 'icono-192.png'): Buffer | null => {
+      const visto = iconos.get(archivo)
+      if (visto !== undefined) return visto
       // El de 192 px pesa 15 KB; el icon.png de la app, medio mega, solo queda de respaldo.
-      const ruta = [join(process.resourcesPath, 'celu-icono.png'), join(__dirname, '../../src/celu-web/iconos/icono-192.png'), join(process.resourcesPath, 'icon.png'), join(__dirname, '../../build/icon-256.png')].find((p) => existsSync(p))
+      const respaldo = archivo === 'icono-192.png' ? [join(process.resourcesPath, 'icon.png'), join(__dirname, '../../build/icon-256.png')] : []
+      const ruta = [join(process.resourcesPath, 'celu-iconos', archivo), join(__dirname, '../../src/celu-web/iconos', archivo), ...respaldo].find((p) => existsSync(p))
+      let png: Buffer | null = null
       try {
-        icono = ruta ? readFileSync(ruta) : null
+        png = ruta ? readFileSync(ruta) : null
       } catch {
-        icono = null
+        png = null
       }
-      return icono
+      iconos.set(archivo, png)
+      return png
     }
 
     async function limites(): Promise<Record<string, ReturnType<typeof leerLimites>>> {
@@ -441,10 +463,32 @@ const feature: Feature = {
 
     async function detener(): Promise<void> {
       const f = fuente
+      const otras = extras
       fuente = null
       ipServida = null
+      extras = []
+      tsServida = null
       esperas.soltarTodas()
       if (f) await f.detener()
+      await Promise.all(otras.map((x) => x.f.detener()))
+    }
+
+    // Que Tailscale no abra no apaga lo del Wi-Fi: el error queda en su sección.
+    async function iniciarTailscale(): Promise<void> {
+      tsError = null
+      if (!cfg.tailscale.encendido || !fuente) return
+      const ip = ipTs()
+      for (const host of ip ? [ip, LOCAL] : [LOCAL]) {
+        const f = crearFuenteWifi({ host, puerto: cfg.puerto, proveedor, log: ctx.log })
+        try {
+          await f.iniciar()
+          extras.push({ host, f })
+          if (host === ip) tsServida = ip
+        } catch (e) {
+          tsError = `No pude abrir ${host}:${cfg.puerto}: ${(e as Error).message}`
+        }
+      }
+      if (!ip) tsError = 'No encontré Tailscale conectado en esta PC. Abrilo e iniciá sesión (en la PC y en el celu, con la misma cuenta).'
     }
 
     async function iniciar(): Promise<void> {
@@ -462,6 +506,7 @@ const feature: Feature = {
         await f.iniciar()
         fuente = f
         ipServida = ip
+        await iniciarTailscale()
       } catch (e) {
         const code = (e as NodeJS.ErrnoException).code
         errorDePuerto = code === 'EADDRINUSE' || code === 'EACCES'
@@ -478,7 +523,8 @@ const feature: Feature = {
     async function revisarIp(): Promise<void> {
       if (!cfg.encendido) return
       const ip = ipActual()
-      if (ip === ipServida && (fuente || !ip)) return
+      const tsCambio = cfg.tailscale.encendido && !!fuente && ipTs() !== tsServida
+      if (ip === ipServida && (fuente || !ip) && !tsCambio) return
       const habia = ipServida
       await iniciar()
       if (habia && ipServida && habia !== ipServida) {
@@ -608,6 +654,26 @@ const feature: Feature = {
       cfg.puerto = p
       guardar()
       return aplicarYApagarSiNoAbre()
+    })
+
+    ctx.handle('tailscale', async (on: unknown) => {
+      if (typeof on !== 'boolean') throw new Error('Valor inválido.')
+      cfg.tailscale.encendido = on
+      guardar()
+      ctx.log(on ? 'celular: también por Tailscale' : 'celular: Tailscale apagado')
+      return aplicar()
+    })
+
+    ctx.handle('tailscale-https', (url: unknown) => {
+      if (url === '') delete cfg.tailscale.https
+      else {
+        const https = httpsTailscale(url)
+        if (!https) throw new Error('Tiene que ser la dirección que da Tailscale: https://<tu-pc>.<tu-tailnet>.ts.net')
+        cfg.tailscale.https = https
+      }
+      guardar()
+      avisar()
+      return vista()
     })
 
     ctx.handle('regenerar', () => {

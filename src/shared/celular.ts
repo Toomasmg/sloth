@@ -98,6 +98,21 @@ export interface CelularVista {
   conAcceso: CeluConAcceso[]
   /** Celus que escanearon el QR y esperan que en la PC los dejen entrar. */
   entradas: PedidoEntrada[]
+  tailscale: TailscaleVista
+}
+
+/** La misma página, también por Tailscale: fuera de casa y, con `tailscale serve`, por HTTPS (se puede instalar como app). */
+export interface TailscaleVista {
+  encendido: boolean
+  /** La IP de Tailscale de la PC (100.x), o null si Tailscale no está conectado. */
+  ip: string | null
+  /** http://<ip de Tailscale>:<puerto>/#k=<clave del QR>, o null si no está escuchando ahí. */
+  enlace: string | null
+  /** La dirección de `tailscale serve` que cargó el usuario (https://<pc>.<tailnet>.ts.net). */
+  https: string | null
+  /** <https>/#k=<clave del QR>, si está escuchando en 127.0.0.1 (de donde lee `tailscale serve`). */
+  enlaceHttps: string | null
+  error: string | null
 }
 
 /** Ver: solo mira. Aprobar: también responde permisos. Controlar: también abre las terminales. Siempre dentro de lo que prenden los interruptores del panel. */

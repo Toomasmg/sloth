@@ -451,3 +451,17 @@ test('emparejar sin proveedor de entradas (como en v1): la clave del QR da acces
     assert.deepEqual([ya.status, ya.cuerpo], [200, { ya: true }])
   })
 })
+
+test('los íconos de 512 (para instalarla como app) se sirven si están; el manifiesto los pide', async () => {
+  const png = Buffer.from('png-512')
+  await conServidor({ icono: (a) => (a === 'icono-512.png' ? png : null) }, async (base) => {
+    const r = await fetch(`${base}/icono-512.png`)
+    assert.equal(r.status, 200)
+    assert.equal(r.headers.get('content-type'), 'image/png')
+    assert.deepEqual(Buffer.from(await r.arrayBuffer()), png)
+    assert.equal((await fetch(`${base}/icono-maskable.png`)).status, 404)
+    assert.equal((await fetch(`${base}/__proto__`)).status, 404)
+    const m = (await (await fetch(`${base}/manifest.webmanifest`)).json()) as { icons: { src: string; sizes: string; purpose: string }[] }
+    assert.deepEqual(m.icons.map((i) => `${i.src} ${i.sizes} ${i.purpose}`), ['/icono.png 192x192 any', '/icono-512.png 512x512 any', '/icono-maskable.png 512x512 maskable'])
+  })
+})
