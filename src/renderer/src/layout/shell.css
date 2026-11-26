@@ -406,6 +406,12 @@ body.is-resizing-side .panes {
   outline-offset: 2px;
 }
 /* Distribución 1‑2‑3‑4: segmentado compacto. */
+.sl-layout-aviso {
+  color: var(--waiting);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  white-space: nowrap;
+}
 .sl-layout {
   display: inline-flex;
   padding: 2px; /* ajuste óptico: el activo queda inscripto */

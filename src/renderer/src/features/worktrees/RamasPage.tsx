@@ -370,7 +370,7 @@ export function RamasPage(): React.JSX.Element | null {
       <div className="f-wt-body">
         <div className="f-wt-inner">
           <header className="f-wt-head">
-            <div className="f-wt-head-text">
+            <div className="f-wt-head-text ui-intro">
               <h1 id="f-wt-h">Ramas aparte</h1>
               <p className="f-wt-sub">Una rama aparte es una copia de trabajo del mismo repo en otra carpeta, para que dos Claude no se pisen.</p>
             </div>

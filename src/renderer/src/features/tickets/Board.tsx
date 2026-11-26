@@ -560,7 +560,7 @@ export function Board(): React.JSX.Element {
       }
     >
       <div className="f-tickets-main">
-        <div>
+        <div className="ui-intro">
           <h1 id="f-tickets-title" className="f-tickets-h1">
             {etiquetaTablero(snap)}
           </h1>

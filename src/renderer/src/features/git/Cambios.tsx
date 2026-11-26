@@ -141,105 +141,107 @@ export function Cambios({ g, st, sync, onOpenPr }: Props): React.JSX.Element {
 
   return (
     <div className="g-changes">
-      <div className="g-lists">
-        <section aria-label="Archivos preparados">
-          <div className="g-sec-h">
-            <span className="g-sec-t">Preparados · {staged.length}</span>
-            <span className="g-spacer" />
-            <button type="button" className="g-link" onClick={() => bulk(false)} disabled={staged.length === 0 || busy !== ''}>
-              Sacar todo
-            </button>
-          </div>
-          {staged.length === 0 && <div className="g-sec-hint">Nada preparado todavía. Marcá un archivo para confirmarlo.</div>}
-          <ul className="g-list" aria-label="Lista de preparados">
-            {staged.map((f) => (
-              <FileRow key={f.path} f={f} selected={sel?.path === f.path} onSelect={() => setSelPath(f.path)} onToggle={() => toggle(f)} disabled={busy !== ''} />
-            ))}
-          </ul>
-        </section>
-
-        <section aria-label="Archivos sin preparar">
-          <div className="g-sec-h">
-            <span className="g-sec-t">Sin preparar · {unstaged.length}</span>
-            <span className="g-spacer" />
-            <button type="button" className="g-link" onClick={() => bulk(true)} disabled={unstaged.length === 0 || busy !== ''}>
-              Preparar todo
-            </button>
-          </div>
-          {unstaged.length === 0 && <div className="g-sec-hint">Todo está preparado.</div>}
-          <ul className="g-list" aria-label="Lista de sin preparar">
-            {unstaged.map((f) => (
-              <FileRow key={f.path} f={f} selected={sel?.path === f.path} onSelect={() => setSelPath(f.path)} onToggle={() => toggle(f)} disabled={busy !== ''} />
-            ))}
-          </ul>
-        </section>
-      </div>
-
-      {sel && (
-        <div className="g-diffbox">
-          <div className="g-diffbar">
-            <span className="g-diffname mono">
-              <span className="g-dir">{splitPath(sel.path).dir}</span>
-              {askName}
-            </span>
-            <span className="g-stat mono">
-              <span className="f-git-plus">+{sel.add ?? 0}</span> <span className="f-git-minus">−{sel.del ?? 0}</span>
-            </span>
-            <span className="g-spacer" />
-            <div className="g-seg" role="group" aria-label="Forma del diff">
-              <button type="button" aria-pressed={view === 'uni'} onClick={() => setView('uni')}>
-                Unificado
-              </button>
-              <button type="button" aria-pressed={view === 'split'} onClick={() => setView('split')}>
-                Lado a lado
+      <div className="g-scroll">
+        <div className="g-lists">
+          <section aria-label="Archivos preparados">
+            <div className="g-sec-h">
+              <span className="g-sec-t">Preparados · {staged.length}</span>
+              <span className="g-spacer" />
+              <button type="button" className="g-link" onClick={() => bulk(false)} disabled={staged.length === 0 || busy !== ''}>
+                Sacar todo
               </button>
             </div>
-            <button type="button" className="g-danger-link" onClick={() => setDiscarding(true)} disabled={busy !== ''}>
-              Descartar cambios de este archivo
-            </button>
-          </div>
+            {staged.length === 0 && <div className="g-sec-hint">Nada preparado todavía. Marcá un archivo para confirmarlo.</div>}
+            <ul className="g-list" aria-label="Lista de preparados">
+              {staged.map((f) => (
+                <FileRow key={f.path} f={f} selected={sel?.path === f.path} onSelect={() => setSelPath(f.path)} onToggle={() => toggle(f)} disabled={busy !== ''} />
+              ))}
+            </ul>
+          </section>
 
-          {discarding && (
-            <div className="g-confirm" role="alertdialog" aria-label="Confirmar descarte">
-              {untracked ? (
-                <>
-                  <div className="g-confirm-t">
-                    Se va a borrar <span className="mono">{askName}</span>, que todavía no está en git. Se pierde y no se puede deshacer. Escribí su nombre para confirmar.
-                  </div>
-                  <input
-                    className="g-confirm-in mono"
-                    value={typed}
-                    onChange={(e) => setTyped(e.target.value)}
-                    aria-label={`Escribí ${askName} para confirmar`}
-                    placeholder={askName}
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                </>
-              ) : (
-                <span className="g-confirm-t">¿Descartar los cambios de {askName}? Se pierden y no se puede deshacer.</span>
-              )}
-              <Button look="git" variant="ghost" onClick={() => setDiscarding(false)}>
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                look="git"
-                variant="danger"
-                onClick={discard}
-                disabled={busy !== '' || (untracked && typed !== askName)}
-              >
-                {untracked ? 'Borrar archivo' : 'Sí, descartar'}
-              </Button>
+          <section aria-label="Archivos sin preparar">
+            <div className="g-sec-h">
+              <span className="g-sec-t">Sin preparar · {unstaged.length}</span>
+              <span className="g-spacer" />
+              <button type="button" className="g-link" onClick={() => bulk(true)} disabled={unstaged.length === 0 || busy !== ''}>
+                Preparar todo
+              </button>
             </div>
-          )}
-
-          <div className="g-diffscroll">
-            <DiffView key={sel.path} wsId={g.wsId} path={sel.path} view={view} onError={setDiffErr} />
-          </div>
-          {diffErr && <p className="form-error g-inline-err">{diffErr}</p>}
+            {unstaged.length === 0 && <div className="g-sec-hint">Todo está preparado.</div>}
+            <ul className="g-list" aria-label="Lista de sin preparar">
+              {unstaged.map((f) => (
+                <FileRow key={f.path} f={f} selected={sel?.path === f.path} onSelect={() => setSelPath(f.path)} onToggle={() => toggle(f)} disabled={busy !== ''} />
+              ))}
+            </ul>
+          </section>
         </div>
-      )}
+
+        {sel && (
+          <div className="g-diffbox">
+            <div className="g-diffbar">
+              <span className="g-diffname mono">
+                <span className="g-dir">{splitPath(sel.path).dir}</span>
+                {askName}
+              </span>
+              <span className="g-stat mono">
+                <span className="f-git-plus">+{sel.add ?? 0}</span> <span className="f-git-minus">−{sel.del ?? 0}</span>
+              </span>
+              <span className="g-spacer" />
+              <div className="g-seg" role="group" aria-label="Forma del diff">
+                <button type="button" aria-pressed={view === 'uni'} onClick={() => setView('uni')}>
+                  Unificado
+                </button>
+                <button type="button" aria-pressed={view === 'split'} onClick={() => setView('split')}>
+                  Lado a lado
+                </button>
+              </div>
+              <button type="button" className="g-danger-link" onClick={() => setDiscarding(true)} disabled={busy !== ''}>
+                Descartar cambios de este archivo
+              </button>
+            </div>
+
+            {discarding && (
+              <div className="g-confirm" role="alertdialog" aria-label="Confirmar descarte">
+                {untracked ? (
+                  <>
+                    <div className="g-confirm-t">
+                      Se va a borrar <span className="mono">{askName}</span>, que todavía no está en git. Se pierde y no se puede deshacer. Escribí su nombre para confirmar.
+                    </div>
+                    <input
+                      className="g-confirm-in mono"
+                      value={typed}
+                      onChange={(e) => setTyped(e.target.value)}
+                      aria-label={`Escribí ${askName} para confirmar`}
+                      placeholder={askName}
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                  </>
+                ) : (
+                  <span className="g-confirm-t">¿Descartar los cambios de {askName}? Se pierden y no se puede deshacer.</span>
+                )}
+                <Button look="git" variant="ghost" onClick={() => setDiscarding(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  look="git"
+                  variant="danger"
+                  onClick={discard}
+                  disabled={busy !== '' || (untracked && typed !== askName)}
+                >
+                  {untracked ? 'Borrar archivo' : 'Sí, descartar'}
+                </Button>
+              </div>
+            )}
+
+            <div className="g-diffscroll">
+              <DiffView key={sel.path} wsId={g.wsId} path={sel.path} view={view} onError={setDiffErr} />
+            </div>
+            {diffErr && <p className="form-error g-inline-err">{diffErr}</p>}
+          </div>
+        )}
+      </div>
 
       <form
         className="g-commit"
@@ -258,7 +260,7 @@ export function Cambios({ g, st, sync, onOpenPr }: Props): React.JSX.Element {
         <textarea
           id="g-commit-msg"
           className="g-textarea"
-          rows={3}
+          rows={2}
           value={msg}
           onChange={(e) => {
             setMsg(e.target.value)
