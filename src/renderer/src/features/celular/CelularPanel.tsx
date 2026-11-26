@@ -245,8 +245,12 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
               Avisarme por ntfy
             </Switch>
             <p className="f-cel-nota">
-              Cuando una sesión termina, te necesita o pide permiso, y Sloth no está en primer plano. El aviso (nombre del espacio y qué pasó) pasa por el servidor de ntfy que elijas. Respeta «No molestar».
+              Cuando una sesión termina, te necesita o pide permiso, y Sloth no está en primer plano. El aviso (nombre del espacio y qué pasó) pasa por el servidor de ntfy que elijas. Respeta «No molestar». Al tocarlo se abre la página del celu (la dirección va sin la clave).
             </p>
+            <Switch checked={v.ntfy.privado} onChange={(on) => void hacer('ntfy', { privado: on })}>
+              Avisos sin nombres
+            </Switch>
+            <p className="f-cel-nota">El aviso dice solo «Una sesión terminó» (o «te necesita», «pide permiso»): ni el nombre del espacio ni lo que dijo Claude pasan por ntfy.</p>
             <form
               className="f-cel-fila"
               onSubmit={(e) => {
@@ -295,6 +299,7 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
               />
             </div>
             {v.ntfy.conToken && <p className="f-cel-nota">El token guardado es de este servidor: si lo cambiás, se borra y hay que cargarlo de nuevo.</p>}
+            <p className="f-cel-nota">Para que los avisos no pasen por ntfy.sh, podés poner tu propio servidor de ntfy (se instala en una PC o un servidor tuyo; ver docs.ntfy.sh) y cargar su dirección acá.</p>
             <form
               className="f-cel-fila"
               onSubmit={(e) => {

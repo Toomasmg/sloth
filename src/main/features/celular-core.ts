@@ -193,6 +193,36 @@ export function textoAviso(tipo: TipoAviso, espacio: string, detalle?: string, a
   return { titulo: `${nombre} te necesita`, cuerpo: corto((detalle || `${agente} necesita tu atención.`).replace(/[\r\n]+/g, ' ')) }
 }
 
+const PRIVADO: Record<TipoAviso, string> = { termino: 'Una sesión terminó.', teNecesita: 'Una sesión te necesita.', permiso: 'Una sesión pide permiso.' }
+
+/** «Sin nombres»: el servidor de ntfy no se entera de cómo se llaman tus espacios ni de qué dijo Claude. */
+export const textoAvisoPrivado = (tipo: TipoAviso): { titulo: string; cuerpo: string } => ({ titulo: 'Sloth', cuerpo: PRIVADO[tipo] })
+
+/**
+ * El JSON que se publica en ntfy. Con `abrir`, tocar el aviso (o «Abrir Sloth») abre la página del celu: la
+ * dirección va sin la clave, que el celu ya tiene guardada desde que escaneó el QR.
+ */
+export function cuerpoNtfy(tema: string, tipo: TipoAviso, texto: { titulo: string; cuerpo: string }, abrir: string | null): Record<string, unknown> {
+  return {
+    topic: tema,
+    title: texto.titulo,
+    message: texto.cuerpo,
+    priority: tipo === 'termino' ? 3 : 4,
+    tags: [tipo === 'termino' ? 'white_check_mark' : 'warning'],
+    ...(abrir && { click: abrir, actions: [{ action: 'view', label: 'Abrir Sloth', url: abrir, clear: true }] })
+  }
+}
+
+/** Adónde lleva el aviso: la página del Wi-Fi si está abierta; si no, la de «desde cualquier red». Nunca con el `#`. */
+export function enlaceAviso(wifi: { ip: string; puerto: number } | null, remoto: string | null): string | null {
+  if (wifi) return `http://${wifi.ip}:${wifi.puerto}/`
+  if (!remoto) return null
+  const u = new URL(remoto)
+  u.hash = ''
+  u.search = ''
+  return u.toString()
+}
+
 /**
  * Evita mandar el mismo aviso dos veces seguidas (Claude a veces repite el hook). Devuelve true si
  * hay que mandarlo y anota el envío.

@@ -84,7 +84,7 @@ export interface CelularVista {
   enlace: string | null
   aprobar: boolean
   terminal: boolean
-  ntfy: { encendido: boolean; tema: string; servidor: string; conToken: boolean; temaRenovado?: boolean }
+  ntfy: { encendido: boolean; tema: string; servidor: string; conToken: boolean; temaRenovado?: boolean; privado: boolean }
   error: string | null
   /** La IP cambió desde que se abrió el servidor: el QR viejo ya no sirve. */
   ipCambio: boolean

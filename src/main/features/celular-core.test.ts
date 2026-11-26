@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { AccountUsage, AgentStatus } from '../../shared/types'
-import { aMs, claveValida, armarEstado, MAX_PEDIDO, pedidoParaCelu, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type Entrada } from './celular-core'
+import { aMs, claveValida, armarEstado, cuerpoNtfy, enlaceAviso, textoAvisoPrivado, MAX_PEDIDO, pedidoParaCelu, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type Entrada } from './celular-core'
 
 const v4 = (address: string, internal = false) => ({ address, family: 'IPv4', internal })
 
@@ -201,4 +201,35 @@ test('tokenNtfyTras: cambiar de servidor sin token nuevo borra el guardado', () 
   assert.equal(tokenNtfyTras(actual, 'https://ntfy.sh/', undefined), undefined)
   assert.equal(tokenNtfyTras(actual, 'https://ntfy.sh/', 'tk_b'), 'tk_b')
   assert.equal(tokenNtfyTras(actual, 'https://ntfy.miempresa.com/', null), undefined)
+})
+
+test('cuerpoNtfy: con enlace, tocar el aviso o «Abrir Sloth» abre la página; sin enlace, aviso solo', () => {
+  const t = { titulo: 'web terminó', cuerpo: 'Claude terminó.' }
+  const con = cuerpoNtfy('sloth-tema-largo-1234567', 'termino', t, 'http://192.168.0.10:47321/')
+  assert.deepEqual(con, {
+    topic: 'sloth-tema-largo-1234567',
+    title: 'web terminó',
+    message: 'Claude terminó.',
+    priority: 3,
+    tags: ['white_check_mark'],
+    click: 'http://192.168.0.10:47321/',
+    actions: [{ action: 'view', label: 'Abrir Sloth', url: 'http://192.168.0.10:47321/', clear: true }]
+  })
+  const sin = cuerpoNtfy('sloth-tema-largo-1234567', 'permiso', t, null)
+  assert.equal(sin.priority, 4)
+  assert.equal('click' in sin, false)
+  assert.equal('actions' in sin, false)
+})
+
+test('enlaceAviso nunca lleva la clave: Wi-Fi primero, si no la página remota sin # ni parámetros', () => {
+  assert.equal(enlaceAviso({ ip: '192.168.0.10', puerto: 47321 }, 'https://x.github.io/sloth/celu/'), 'http://192.168.0.10:47321/')
+  assert.equal(enlaceAviso(null, 'https://x.github.io/sloth/celu/#p=secreto?a=1'), 'https://x.github.io/sloth/celu/')
+  assert.equal(enlaceAviso(null, 'https://x.github.io/sloth/celu/?q=1#p=secreto'), 'https://x.github.io/sloth/celu/')
+  assert.equal(enlaceAviso(null, null), null)
+})
+
+test('textoAvisoPrivado no dice el espacio ni lo que dijo Claude', () => {
+  assert.deepEqual(textoAvisoPrivado('termino'), { titulo: 'Sloth', cuerpo: 'Una sesión terminó.' })
+  assert.deepEqual(textoAvisoPrivado('teNecesita'), { titulo: 'Sloth', cuerpo: 'Una sesión te necesita.' })
+  assert.deepEqual(textoAvisoPrivado('permiso'), { titulo: 'Sloth', cuerpo: 'Una sesión pide permiso.' })
 })

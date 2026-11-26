@@ -8,11 +8,11 @@ import type { Feature, FeatureContext } from './context'
 import type { PendingPermission } from '../daemon-client'
 import type { HookEventPayload } from '../hooks'
 import { PUERTO_POR_DEFECTO, type CelularVista, type RemotoVista } from '../../shared/celular'
-import { enlaceCelu, secretoValido } from '../../shared/celu-remoto'
+import { CELU_WEB_URL, enlaceCelu, secretoValido } from '../../shared/celu-remoto'
 import { LIMITES_ARCHIVO } from '../statusline-core'
 import { agenteDe, capacidadesDe } from '../../shared/proveedores'
 import { limitesDeCuenta } from '../codex-limites'
-import { armarEstado, claveValida, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type TipoAviso } from './celular-core'
+import { armarEstado, claveValida, cuerpoNtfy, enlaceAviso, textoAvisoPrivado, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type TipoAviso } from './celular-core'
 import { crearFuenteWifi, type FuenteDeEstado, type ProveedorDeEstado } from './celular-servidor'
 import { XTERM } from './celular-xterm'
 import { debeEsperar, nuevoVisor, ponerFoto, salidaDesde, sinSalida, sinAutomaticas, sumarSalida, tamanoActual, vencidos, type RespuestaTerminal, type Visor } from './celular-terminal-core'
@@ -43,7 +43,8 @@ interface Config {
   aprobar: boolean
   /** Ver y escribir en las terminales desde el celu (solo en el Wi-Fi). */
   terminal: boolean
-  ntfy: { encendido: boolean; tema: string; servidor: string; token?: string; temaRenovado?: boolean }
+  /** `privado`: los avisos no llevan el nombre del espacio ni el mensaje de Claude. */
+  ntfy: { encendido: boolean; tema: string; servidor: string; token?: string; temaRenovado?: boolean; privado?: boolean }
   remoto: { encendido: boolean; aprobar: boolean; secreto: string }
 }
 
@@ -76,7 +77,8 @@ function cargar(): { cfg: Config; claveNueva: boolean } {
       tema: temaOk ? temaGuardado : base.ntfy.tema,
       servidor: servidorNtfy(raw.ntfy?.servidor) ?? NTFY_POR_DEFECTO,
       ...(token !== undefined && { token }),
-      ...(renovado && { temaRenovado: true })
+      ...(renovado && { temaRenovado: true }),
+      ...(raw.ntfy?.privado === true && { privado: true })
     },
     remoto: {
       encendido: raw.remoto?.encendido === true,
@@ -189,6 +191,7 @@ const feature: Feature = {
         tema: cfg.ntfy.tema,
         servidor: cfg.ntfy.servidor,
         conToken: cfg.ntfy.token !== undefined,
+        privado: cfg.ntfy.privado === true,
         ...(cfg.ntfy.temaRenovado && { temaRenovado: true })
       },
       error,
@@ -480,12 +483,17 @@ const feature: Feature = {
       const espacio = prueba ? 'Sloth' : ws?.name
       if (!espacio) return
       if (!prueba && !debeAvisar(enviados, `${wsId}:${tipo}`, Date.now())) return
-      const { titulo, cuerpo } = prueba ? { titulo: 'Sloth', cuerpo: 'Así te van a llegar los avisos.' } : textoAviso(tipo, espacio, detalle, agenteDe(ws ? (ctx.store.account(ws.accountId) ?? {}) : {}))
+      const texto = prueba
+        ? { titulo: 'Sloth', cuerpo: 'Así te van a llegar los avisos.' }
+        : cfg.ntfy.privado
+          ? textoAvisoPrivado(tipo)
+          : textoAviso(tipo, espacio, detalle, agenteDe(ws ? (ctx.store.account(ws.accountId) ?? {}) : {}))
+      const abrir = enlaceAviso(fuente && ipServida ? { ip: ipServida, puerto: cfg.puerto } : null, cfg.remoto.encendido ? CELU_WEB_URL : null)
       const r = await fetch(cfg.ntfy.servidor, {
         method: 'POST',
         redirect: 'error',
         headers: { 'content-type': 'application/json', ...(cfg.ntfy.token !== undefined && { authorization: `Bearer ${cfg.ntfy.token}` }) },
-        body: JSON.stringify({ topic: cfg.ntfy.tema, title: titulo, message: cuerpo, priority: tipo === 'termino' ? 3 : 4, tags: [tipo === 'termino' ? 'white_check_mark' : 'warning'] }),
+        body: JSON.stringify(cuerpoNtfy(cfg.ntfy.tema, tipo, texto, abrir)),
         signal: AbortSignal.timeout(8000)
       })
       if (!r.ok) throw new Error(`ntfy respondió ${r.status}.`)
@@ -553,8 +561,9 @@ const feature: Feature = {
     })
 
     ctx.handle('ntfy', (p: unknown) => {
-      const { encendido, tema, servidor, token, generarTema } = (p ?? {}) as { encendido?: unknown; tema?: unknown; servidor?: unknown; token?: unknown; generarTema?: unknown }
+      const { encendido, tema, servidor, token, generarTema, privado } = (p ?? {}) as { encendido?: unknown; tema?: unknown; servidor?: unknown; token?: unknown; generarTema?: unknown; privado?: unknown }
       if (encendido !== undefined && typeof encendido !== 'boolean') throw new Error('Valor inválido.')
+      if (privado !== undefined && typeof privado !== 'boolean') throw new Error('Valor inválido.')
       if (tema !== undefined && !temaValido(tema)) throw new Error(`El tema va de ${TEMA_MIN} a 64 caracteres: letras, números, guion o guion bajo.`)
       if (generarTema !== undefined && generarTema !== true) throw new Error('Valor inválido.')
       const srv = servidor === undefined ? cfg.ntfy.servidor : servidorNtfy(servidor)
@@ -567,7 +576,8 @@ const feature: Feature = {
         tema: generarTema === true ? nuevoTema() : (tema ?? cfg.ntfy.tema),
         servidor: srv,
         ...(tokenFinal !== undefined && { token: tokenFinal }),
-        ...(!cambiaTema && encendido !== true && cfg.ntfy.temaRenovado && { temaRenovado: true })
+        ...(!cambiaTema && encendido !== true && cfg.ntfy.temaRenovado && { temaRenovado: true }),
+        ...((privado ?? cfg.ntfy.privado) === true && { privado: true })
       }
       guardar()
       avisar()
