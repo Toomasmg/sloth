@@ -159,7 +159,8 @@ interface Launcher {
   pipe: string
   key: string
   /** Lanza el daemon (detached). Tira si no hay node o faltan archivos. */
-  launch(): void
+  /** Devuelve cuál lanzó. Con `soloNode` ignora el daemon en Rust. */
+  launch(soloNode?: boolean): 'rust' | 'node'
 }
 
 function ensureKey(userDataDir: string): string {
@@ -292,10 +293,10 @@ function makeLauncher(opts: CreateBackendOptions): Launcher {
   return {
     pipe,
     key,
-    launch() {
+    launch(soloNode) {
       let exe: string | undefined
       try {
-        exe = rustExe(opts)
+        exe = soloNode ? undefined : rustExe(opts)
       } catch (e) {
         opts.log?.(`[daemon] no se pudo preparar el daemon en Rust, se usa el de Node: ${(e as Error).message}`)
       }
@@ -309,7 +310,7 @@ function makeLauncher(opts: CreateBackendOptions): Launcher {
         })
         hijo.on('error', () => {})
         hijo.unref()
-        return
+        return 'rust'
       }
       const nodePath = findNode(opts.nodePath)
       const { script, ptyDir } = runtimeFiles(opts)
@@ -331,6 +332,7 @@ function makeLauncher(opts: CreateBackendOptions): Launcher {
       )
       child.on('error', () => {})
       child.unref()
+      return 'node'
     }
   }
 }
@@ -451,20 +453,30 @@ async function connectOrLaunch(l: Launcher, appVersion: string, allowLaunch: boo
     if (code !== 'ENOENT' && code !== 'ECONNREFUSED') throw e
     if (!allowLaunch) throw e
   }
-  l.launch()
-  const deadline = Date.now() + CONNECT_TIMEOUT_MS
-  let last: unknown
-  while (Date.now() < deadline) {
-    await sleep(150)
-    try {
-      return await handshake(await connectPipe(l.pipe), l.key, appVersion)
-    } catch (e) {
-      last = e
-      const code = (e as NodeJS.ErrnoException).code
-      if (code !== 'ENOENT' && code !== 'ECONNREFUSED') throw e
+  const usado = l.launch()
+  const esperar = async (): Promise<Conn | Error> => {
+    const deadline = Date.now() + CONNECT_TIMEOUT_MS
+    let last: unknown
+    while (Date.now() < deadline) {
+      await sleep(150)
+      try {
+        return await handshake(await connectPipe(l.pipe), l.key, appVersion)
+      } catch (e) {
+        last = e
+        const code = (e as NodeJS.ErrnoException).code
+        if (code !== 'ENOENT' && code !== 'ECONNREFUSED') throw e
+      }
     }
+    return new Error(`El daemon no levantó en ${CONNECT_TIMEOUT_MS / 1000} s (${(last as Error)?.message ?? '?'}).`)
   }
-  throw new Error(`El daemon no levantó en ${CONNECT_TIMEOUT_MS / 1000} s (${(last as Error)?.message ?? '?'}).`)
+  const primero = await esperar()
+  if (!(primero instanceof Error)) return primero
+  if (usado !== 'rust') throw primero
+  // Un .exe que no arranca (antivirus, falta de permisos) no puede dejarnos sin terminales persistentes.
+  l.launch(true)
+  const segundo = await esperar()
+  if (segundo instanceof Error) throw segundo
+  return segundo
 }
 
 async function waitPipeGone(pipe: string, ms: number): Promise<boolean> {

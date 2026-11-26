@@ -48,7 +48,8 @@ type Master = Arc<Mutex<Option<Box<dyn MasterPty + Send>>>>;
 
 struct Session {
     gen: u64,
-    writer: std_mpsc::Sender<Vec<u8>>,
+    /// None cuando el proceso ya salió: así el hilo escritor termina.
+    writer: Option<std_mpsc::Sender<Vec<u8>>>,
     master: Master,
     killer: Box<dyn ChildKiller + Send + Sync>,
     buf: Buffer,
@@ -203,6 +204,10 @@ impl Core {
             }
         }
         if let Some(cwd) = spec.get("cwd").and_then(Value::as_str).filter(|c| !c.is_empty()) {
+            // portable-pty cae en silencio al directorio del usuario si no existe: acá es un error, como en node-pty.
+            if !std::path::Path::new(cwd).is_dir() {
+                return Err(format!("El directorio de trabajo no existe: {cwd}"));
+            }
             cmd.cwd(cwd);
         }
         cmd.env_clear();
@@ -242,15 +247,26 @@ impl Core {
             }
         });
 
-        let (core, sid) = (self.clone(), id.to_string());
+        let (core, sid, wtx_lector) = (self.clone(), id.to_string(), wtx.clone());
         std::thread::spawn(move || {
+            // ConPTY (de portable-pty) arranca pidiendo la posición del cursor y no sigue hasta recibirla.
+            // La contestamos acá, una vez, y la consulta no entra al buffer: si no, cada vez que un cliente
+            // reponga el buffer, xterm la contestaría de nuevo dentro del programa que corre.
+            let mut cursor_pendiente = true;
             let mut dec = Utf8Stream::default();
             let mut b = [0u8; 16 * 1024];
             loop {
                 match reader.read(&mut b) {
                     Ok(0) | Err(_) => break,
                     Ok(n) => {
-                        let s = dec.push(&b[..n]);
+                        let mut s = dec.push(&b[..n]);
+                        if cursor_pendiente {
+                            if let Some(i) = s.find("[6n") {
+                                s.replace_range(i..i + 4, "");
+                                cursor_pendiente = false;
+                                let _ = wtx_lector.send(b"[1;1R".to_vec());
+                            }
+                        }
                         if !s.is_empty() {
                             core.on_data(&sid, gen, s);
                         }
@@ -268,7 +284,9 @@ impl Core {
         std::thread::spawn(move || {
             let code = child.wait().map(|s| i64::from(s.exit_code())).unwrap_or(-1);
             // Cerrar la consola pseudo hace que la lectura vea el final y mata lo que haya quedado adentro.
-            drop(m.lock().unwrap_or_else(|e| e.into_inner()).take());
+            // En dos pasos: el candado no puede seguir tomado mientras se cierra la consola pseudo.
+            let consola = m.lock().unwrap_or_else(|e| e.into_inner()).take();
+            drop(consola);
             let _ = done_rx.recv_timeout(Duration::from_millis(DRAIN_MS));
             let _ = exit_tx.send(true);
             core.on_exit(&sid, gen, code);
@@ -277,7 +295,7 @@ impl Core {
         let seq = g.sessions.get(id).map(|p| p.buf.seq).unwrap_or(0);
         let s = Session {
             gen,
-            writer: wtx,
+            writer: Some(wtx),
             master,
             killer,
             buf: Buffer::new(seq),
@@ -338,6 +356,7 @@ impl Core {
                 Some(s) if s.gen == gen => {
                     s.running = false;
                     s.exit_code = Some(code);
+                    s.writer = None;
                     self.flush_session(id, s);
                     self.emit(Event::Exit { id: id.to_string(), code });
                 }
@@ -354,7 +373,9 @@ impl Core {
     pub fn write(&self, id: &str, data: &str) {
         let g = self.lock();
         if let Some(s) = g.sessions.get(id).filter(|s| s.running && !g.closing) {
-            let _ = s.writer.send(data.as_bytes().to_vec());
+            if let Some(w) = &s.writer {
+                let _ = w.send(data.as_bytes().to_vec());
+            }
         }
     }
 

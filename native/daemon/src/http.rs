@@ -19,7 +19,10 @@ pub async fn serve(core: Arc<Core>) -> std::io::Result<u16> {
     let port = listener.local_addr()?.port();
     tokio::spawn(async move {
         loop {
-            let Ok((stream, _)) = listener.accept().await else { continue };
+            let Ok((stream, _)) = listener.accept().await else {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                continue;
+            };
             let core = core.clone();
             tokio::spawn(async move { conexion(core, stream).await });
         }

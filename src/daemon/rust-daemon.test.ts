@@ -27,10 +27,6 @@ class Cliente {
       while ((i = this.buf.indexOf('\n')) >= 0) {
         const m = JSON.parse(this.buf.slice(0, i)) as Msg
         this.msgs.push(m)
-        // ConPTY pregunta la posición del cursor y espera la respuesta (en la app la da xterm.js).
-        if (m.t === 'data' && (m.chunks as { data: string }[]).some((x) => x.data.includes('[6n'))) {
-          this.send({ t: 'write', id: m.id, data: '[1;1R' })
-        }
         this.buf = this.buf.slice(i + 1)
       }
     })
@@ -99,6 +95,8 @@ test('el daemon en Rust habla el protocolo del cliente', { skip: exe ? false : '
     await c.esperar((m) => m.t === 'exit' && m.id === 'a')
     const texto = c.msgs.filter((m) => m.t === 'data').flatMap((m) => (m.chunks as { data: string }[]).map((x) => x.data)).join('')
     assert.match(texto, /hola-rust/)
+    // El daemon contesta solo la consulta de cursor de ConPTY y no la deja en el buffer.
+    assert.ok(!texto.includes('[6n'))
     c.send({ t: 'list', rid: 2 })
     const lista = await c.esperar((m) => m.t === 'reply' && m.rid === 2)
     assert.deepEqual((lista.result as { id: string; running: boolean }[]).map((s) => [s.id, s.running]), [['a', false]])
