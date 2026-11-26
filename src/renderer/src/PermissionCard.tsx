@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { PermissionAnswer, PermissionPrompt } from '../../shared/types'
-import { alwaysLabel, changesOf, filesOf, kindOf, otherName, titleOf } from '../../shared/permissions-core'
+import { alwaysLabel, changesOf, destructivoDe, filesOf, kindOf, otherName, titleOf } from '../../shared/permissions-core'
 import { PermissionIcon, WaitingIcon, CloseIcon } from './icons/SlothIcons'
 import { cleanError } from './format'
 import { openPermissionReview } from './features/permissions/store'
@@ -73,6 +73,7 @@ export function PermissionCard({ prompt, queued, now, spaceName, accountLabel, o
   const reasonRef = useRef<HTMLInputElement>(null)
   const titleId = useId()
   const kind = kindOf(prompt.tool)
+  const destructivo = useMemo(() => destructivoDe(kind, prompt.input), [kind, prompt.input])
   const secs = Math.max(0, Math.ceil((prompt.expiresAt - now) / 1000))
   const urgent = secs <= 15
 
@@ -118,6 +119,11 @@ export function PermissionCard({ prompt, queued, now, spaceName, accountLabel, o
         </span>
       </div>
 
+      {destructivo && (
+        <p className="pc-destructive" role="note">
+          <strong>Destructivo</strong> · {destructivo}. Solo se puede permitir una vez.
+        </p>
+      )}
       <Subject prompt={prompt} />
 
       {denying ? (
@@ -157,16 +163,18 @@ export function PermissionCard({ prompt, queued, now, spaceName, accountLabel, o
           <Button look="classic" size="sm" variant="primary" disabled={busy} onClick={() => void send('allow')} data-perm-primary>
             {sending === 'allow' ? 'Permitiendo…' : 'Permitir una vez'}
           </Button>
-          <Button
-            type="button"
-            look="classic"
-            size="sm"
-            disabled={busy}
-            onClick={() => void send('allowAlways')}
-            title="Guarda una regla para este espacio: los pedidos iguales se aprueban solos"
-          >
-            {sending === 'allowAlways' ? 'Guardando…' : alwaysLabel(kind)}
-          </Button>
+          {!destructivo && (
+            <Button
+              type="button"
+              look="classic"
+              size="sm"
+              disabled={busy}
+              onClick={() => void send('allowAlways')}
+              title="Guarda una regla para este espacio: los pedidos iguales se aprueban solos"
+            >
+              {sending === 'allowAlways' ? 'Guardando…' : alwaysLabel(kind)}
+            </Button>
+          )}
           <span className="spacer" />
           <Button look="classic" size="sm" variant="ghost" className="danger" disabled={busy} onClick={() => setDenying(true)}>
             <CloseIcon size={12} aria-hidden="true" />

@@ -182,6 +182,19 @@
   background: var(--waiting-soft);
   color: var(--warn-fg);
 }
+.pr-risk-pill.danger {
+  background: var(--danger-soft);
+  color: var(--danger-fg);
+  font-weight: 600;
+}
+.pc-destructive {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--r-md);
+  background: var(--danger-soft);
+  color: var(--danger-fg);
+  font-size: var(--fs-12);
+}
 .pr-head {
   display: flex;
   margin: 0;
