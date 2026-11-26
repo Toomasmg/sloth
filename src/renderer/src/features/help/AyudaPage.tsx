@@ -240,7 +240,7 @@ export function AyudaPage({ onClose }: { onClose: () => void }): React.JSX.Eleme
       }
     >
       <div className="ay-wrap">
-        <header className="ay-head">
+        <header className="ay-head ui-intro">
           <h1 id="ay-title">Ayuda y atajos</h1>
           <p>Cómo se usa Sloth, qué hace cada tecla y las dudas más comunes.</p>
         </header>

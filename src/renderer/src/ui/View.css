@@ -69,6 +69,19 @@
   gap: var(--s-2);
 }
 
+/* Poca altura: el título grande de cada página repite el de la cabecera de la Vista y se come una fila de lista.
+   Queda en el DOM (lo lee el lector de pantalla), solo se saca de la vista. */
+@media (max-height: 680px) {
+  .ui-view .ui-intro {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 .ui-view-body {
   flex: 1;
   min-height: 0;

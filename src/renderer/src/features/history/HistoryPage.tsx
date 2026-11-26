@@ -295,7 +295,7 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
       actions={<span className="hist-head-count">{rows ? plural(total, 'sesión guardada', 'sesiones guardadas') : ''}</span>}
     >
       <div className="hist-wrap">
-        <div className="hist-intro">
+        <div className="hist-intro ui-intro">
           <h1 id="hist-title">Historial de sesiones</h1>
           <p>Cada vez que trabajaste con Claude en un espacio queda una sesión. Retomala cuando quieras.</p>
         </div>
