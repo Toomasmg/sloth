@@ -1083,7 +1083,7 @@ export function App(): React.JSX.Element {
                 const loggedOut = st !== undefined && !st.loggedIn
                 // El resumen cuenta todos los espacios de la cuenta (el filtro no lo cambia) y se ve también plegada.
                 const sum = resumenCuenta(mine.map((w) => w.id), (id) => agents[id]?.state, (id) => permsByWs.get(id)?.length ?? 0)
-                const accLabel = [acc.label, loggedOut ? 'sin sesión' : plan ? `plan ${plan}` : '', sum.texto].filter(Boolean).join(', ')
+                const accLabel = [acc.label, loggedOut ? 'sin sesión: iniciá sesión' : plan ? `plan ${plan}` : '', sum.texto].filter(Boolean).join(', ')
                 return (
                   <section key={acc.id} className="sl-acc" data-account-id={acc.id} aria-label={`Cuenta ${acc.label}`} style={{ '--acc': colorOf(acc.id) } as CSSProperties}>
                     <div className="sl-acc-head">
@@ -1093,14 +1093,14 @@ export function App(): React.JSX.Element {
                         aria-expanded={open}
                         aria-controls={bodyId}
                         aria-label={accLabel}
-                        title={`${st?.email ? `${acc.label} · ${st.email}` : acc.label}\n${open ? 'Ocultar' : 'Mostrar'} sus espacios`}
+                        title={[st?.email ? `${acc.label} · ${st.email}` : acc.label, loggedOut ? 'Sin sesión: iniciá sesión' : '', `${open ? 'Ocultar' : 'Mostrar'} sus espacios`].filter(Boolean).join('\n')}
                         onClick={() => setCollapsed((c) => ({ ...c, [acc.id]: open }))}
                       >
                         <ChevronDownIcon size={14} className="sl-acc-chev" />
                         <span className={`sl-avatar${loggedOut ? ' is-off' : ''}`} aria-hidden="true">
                           {acc.label.slice(0, 1).toUpperCase()}
                         </span>
-                        <span className="sl-acc-id">
+                        <span className={`sl-acc-id${loggedOut ? ' is-off' : ''}`}>
                           <span className="sl-acc-name">{acc.label}</span>
                           {loggedOut ? <span className="sl-acc-warn">Sin sesión</span> : plan && <span className={`sl-acc-plan${plan.trim().toLowerCase() === 'team' ? ' is-team' : ''}`}>{plan}</span>}
                         </span>

@@ -450,18 +450,18 @@ html[data-theme='light'] .sl-acc {
   z-index: var(--z-pane);
   display: flex;
   align-items: center;
-  height: var(--h-md);
+  min-height: var(--h-md);
   background: var(--surface);
   container: sl-acc-head / inline-size;
 }
 .sl-acc-toggle {
   flex: 1;
   min-width: 0;
-  height: 100%;
+  align-self: stretch;
   display: flex;
   align-items: center;
   gap: var(--s-1);
-  padding: 0 var(--s-1);
+  padding: 2px var(--s-1);
   border: 0;
   border-radius: var(--r-md);
   background: transparent;
@@ -529,20 +529,36 @@ html[data-theme='light'] .sl-acc {
   background: var(--waiting);
   box-shadow: 0 0 0 2px var(--surface);
 }
-/* Nombre y plan comparten una línea que no se parte: si el plan no entra al lado del nombre completo,
-   baja a una segunda línea que queda recortada. Así el plan se esconde antes de que el nombre se corte. */
+/* Nombre y plan: si el plan no entra al lado del nombre completo, baja a una segunda línea chica en vez
+   de cortar el nombre o desaparecer. Con «Sin sesión» (estado accionable) pasa al revés: la pastilla nunca
+   baja ni se esconde y es el nombre el que se trunca. */
 .sl-acc-id {
   flex: 1;
   min-width: 0;
-  height: var(--s-5);
   display: flex;
   flex-wrap: wrap;
-  align-content: flex-start;
-  column-gap: var(--s-2);
+  align-content: center;
+  gap: 2px var(--s-2);
   overflow: hidden;
-  line-height: var(--s-5);
+  line-height: 20px;
+}
+.sl-acc-id.is-off {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+/* Solo se ve cuando el panel es tan angosto que la pastilla no entra: queda el punto, igual que en el avatar. */
+.sl-acc-id.is-off::before {
+  content: '';
+  display: none;
+  flex: none;
+  width: var(--s-2);
+  height: var(--s-2);
+  margin-right: var(--s-1);
+  border-radius: var(--r-full);
+  background: var(--waiting);
 }
 .sl-acc-name {
+  flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -582,7 +598,6 @@ html[data-theme='light'] .sl-acc {
   display: flex;
   align-items: center;
   gap: var(--s-2);
-  padding-left: var(--s-1);
 }
 .sl-acc-stat {
   display: inline-flex;
@@ -601,18 +616,22 @@ html[data-theme='light'] .sl-acc {
 /* Con el panel angosto se saca el avatar y se aprieta el resumen: el nombre y el resumen son lo que no puede faltar.
    En densidad cómoda los márgenes son más grandes y el avatar se va un poco antes. */
 @container sl-acc-head (max-width: 216px) {
-  .sl-avatar {
+  .sl-avatar,
+  .sl-acc-warn {
     display: none;
   }
+  .sl-acc-id.is-off::before {
+    display: block;
+  }
   .sl-acc-sum {
-    padding-left: 0;
     gap: var(--s-1);
   }
   .sl-acc-toggle {
     padding-inline: 0 var(--s-1);
+    gap: 2px;
   }
-  .sl-acc-head .sl-acc-add {
-    margin-left: 0;
+  .sl-acc-chev {
+    width: 14px;
   }
 }
 @container sl-acc-head (max-width: 252px) {
@@ -624,7 +643,6 @@ html[data-theme='light'] .sl-acc {
 .sl-acc-head .sl-acc-add {
   width: var(--h-xs);
   height: var(--h-xs);
-  margin-left: var(--s-1);
   color: var(--text-3);
 }
 .sl-acc-head:hover .sl-acc-add,
