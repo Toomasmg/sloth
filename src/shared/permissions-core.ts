@@ -171,6 +171,33 @@ export function permitirDesdeAviso(kind: PermissionKind, input: Record<string, u
   return c !== undefined && c.length <= 80 && !INVISIBLES.test(c)
 }
 
+// Cada patrón mira el texto crudo del comando: no hay parser de shell, así que busca el patrón donde esté.
+const DESTRUCTIVOS: ReadonlyArray<{ re: RegExp; motivo: string }> = [
+  { re: /(?:^|[\s;&|(`"'])rm\s+(?:-[a-z-]+\s+)*(?:-[a-z]*r[a-z]*|--recursive)(?![\w-])/i, motivo: 'borra carpetas enteras' },
+  { re: /(?:^|[\s;&|(`"'])(?:del|erase)\s+(?:[^;&|\n]*\s)?\/s(?![\w-])/i, motivo: 'borra archivos de forma recursiva' },
+  { re: /(?:^|[\s;&|(`"'])(?:rd|rmdir)\s+(?:[^;&|\n]*\s)?\/s(?![\w-])/i, motivo: 'borra carpetas enteras' },
+  { re: /\bRemove-Item\s[^;&|\n]*-Recurse/i, motivo: 'borra carpetas enteras' },
+  { re: /\bgit\s+push\b[^;&|\n]*\s(?:--force(?:-with-lease|-if-includes)?(?:=\S*)?|-[a-z]*f[a-z]*)(?![\w-])/i, motivo: 'pisa el historial del remoto' },
+  { re: /\bgit\s+reset\b[^;&|\n]*\s--hard(?![\w-])/i, motivo: 'descarta cambios sin commitear' },
+  { re: /\bgit\s+clean\b[^;&|\n]*\s-[a-z]*f/i, motivo: 'borra archivos sin seguimiento' },
+  { re: /\bdrop\s+(?:table|database|schema)\b/i, motivo: 'borra datos de una base' },
+  { re: /\btruncate\s+table\b/i, motivo: 'vacía una tabla' },
+  { re: /\bmkfs(?:\.\w+)?\s/i, motivo: 'formatea un disco' },
+  { re: /\bdd\s[^;&|\n]*\bof=\/dev\//i, motivo: 'escribe sobre un dispositivo' }
+]
+
+/**
+ * Por qué un comando se marca «Destructivo» (null si no). Solo cambia lo que se muestra: no decide ni
+ * bloquea nada. Es una lista corta a propósito: avisa ante lo conocido, y que un comando no figure
+ * no quiere decir que sea seguro (ver los límites en el test).
+ */
+export function destructivoDe(kind: PermissionKind, input: Record<string, unknown>): string | null {
+  if (kind !== 'cmd') return null
+  const c = str(input.command)
+  if (!c) return null
+  return DESTRUCTIVOS.find((d) => d.re.test(c))?.motivo ?? null
+}
+
 /** Texto del botón «Permitir siempre» según el tipo. */
 export function alwaysLabel(kind: PermissionKind): string {
   if (kind === 'cmd') return 'Permitir siempre aquí'

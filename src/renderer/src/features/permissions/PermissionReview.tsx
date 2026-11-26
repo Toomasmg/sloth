@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { Account, PermissionPrompt, Workspace } from '../../../../shared/types'
-import { alwaysLabel, changesOf, explanationOf, filesOf, kindOf, titleOf, type FileChange } from '../../../../shared/permissions-core'
+import { alwaysLabel, changesOf, destructivoDe, explanationOf, filesOf, kindOf, titleOf, type FileChange } from '../../../../shared/permissions-core'
 import { Modal } from '../../Modal'
 import { PermissionIcon } from '../../icons/SlothIcons'
 import { CheckGlyph } from '../git/glyphs'
@@ -127,6 +127,7 @@ export function PermissionReview({ prompts, workspaces, accounts, initialId, onC
   const explanation = p ? explanationOf(p.input) : undefined
   const domain = p && kind === 'net' ? String(p.input.url ?? p.input.query ?? '') : ''
   const cmd = p && kind === 'cmd' ? String(p.input.command ?? '') : ''
+  const destructivo = p ? destructivoDe(kind, p.input) : null
   const otherJson = useMemo(() => {
     if (!p || kind !== 'other') return ''
     try {
@@ -217,6 +218,7 @@ export function PermissionReview({ prompts, workspaces, accounts, initialId, onC
           {p && (
             <div className="pr-risk">
               <span className="pr-risk-label">Riesgo</span>
+              {destructivo && <span className="pr-risk-pill danger">Destructivo: {destructivo}</span>}
               <span className={`pr-risk-pill ${riskOf(kind, changes.length || files.length).cls}`}>
                 {riskOf(kind, changes.length || files.length).label}
               </span>
@@ -264,15 +266,17 @@ export function PermissionReview({ prompts, workspaces, accounts, initialId, onC
             >
               {sending === 'allow' ? 'Permitiendo…' : 'Permitir una vez'}
             </Button>
-            <Button
-              type="button"
-              look="classic"
-              disabled={sending !== null}
-              aria-describedby={`${titleId}-always`}
-              onClick={() => void run('always', () => decidePermission(p, 'allowAlways'))}
-            >
-              {alwaysLabel(kind)}
-            </Button>
+            {!destructivo && (
+              <Button
+                type="button"
+                look="classic"
+                disabled={sending !== null}
+                aria-describedby={`${titleId}-always`}
+                onClick={() => void run('always', () => decidePermission(p, 'allowAlways'))}
+              >
+                {alwaysLabel(kind)}
+              </Button>
+            )}
             <span className="spacer" />
             <Button look="classic" variant="ghost" className="danger" disabled={sending !== null} onClick={() => void run('deny', () => decidePermission(p, 'deny'))}>
               {sending === 'deny' ? 'Rechazando…' : 'Rechazar'}
@@ -288,9 +292,11 @@ export function PermissionReview({ prompts, workspaces, accounts, initialId, onC
               Rechazar y decirle algo a Claude
             </Button>
           </div>
-          <p id={`${titleId}-always`} className="pr-hint">
-            «{alwaysLabel(kind)}» crea una regla en este espacio: los pedidos iguales se aprueban solos. Se quita desde Decisiones.
-          </p>
+          {!destructivo && (
+            <p id={`${titleId}-always`} className="pr-hint">
+              «{alwaysLabel(kind)}» crea una regla en este espacio: los pedidos iguales se aprueban solos. Se quita desde Decisiones.
+            </p>
+          )}
           {error && (
             <p className="pr-error" role="alert">
               No se pudo enviar la respuesta: {error}
