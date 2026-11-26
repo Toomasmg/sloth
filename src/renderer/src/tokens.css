@@ -50,6 +50,9 @@
   /* Salir es más corto que entrar: lo que se cierra ya no le interesa a nadie. La lee useExit. */
   --t-exit: 140ms;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Esqueletos de carga: el brillo va de una a otra. */
+  --shimmer-a: var(--raised);
+  --shimmer-b: var(--overlay);
   /* Para salir: arranca lento y se va rápido, al revés que --ease. */
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
 
@@ -313,4 +316,13 @@ html[data-night='true']:not([data-theme='light']) {
   --surface: #0b0c10;
   --surface-2: #0b0c10;
   --raised: #101218;
+}
+
+/* Con «reducir movimiento» las duraciones valen 0: lo que lee estos tokens deja de animar sin un bloque propio. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-fast: 0ms;
+    --t-med: 0ms;
+    --t-exit: 0ms;
+  }
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { View } from '../../ui/View'
-import { Button, EmptyState, IconButton, InlineAlert, Menu, Segmented, Tag, toast } from '../../ui'
-import { MoreIcon, PullRequestIcon, RefreshIcon, SpinnerIcon } from '../../icons/SlothIcons'
+import { Button, EmptyState, IconButton, InlineAlert, Menu, Segmented, Skeleton, Tag, toast } from '../../ui'
+import { MoreIcon, PullRequestIcon, RefreshIcon } from '../../icons/SlothIcons'
 import { useAhora } from '../../lib/reloj'
 import { useVisiblePolling } from '../../visibility'
 import { useUi } from '../host'
@@ -122,9 +122,7 @@ export function PrsPage(): React.JSX.Element {
     <View labelId="f-prs-view-title" title="PRs" onClose={closePrs} actions={actions} className="f-prs-view">
       <div className="f-prs-body">
         {loading ? (
-          <div className="f-prs-loading" role="status">
-            <SpinnerIcon size={18} /> Buscando PRs abiertos…
-          </div>
+          <Skeleton rows={4} showLabel label="Buscando PRs abiertos…" />
         ) : snap.problem ? (
           <Problem problem={snap.problem} refreshing={snap.refreshing} onRefresh={() => void refresh()} />
         ) : (

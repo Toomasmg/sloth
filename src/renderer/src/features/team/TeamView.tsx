@@ -17,7 +17,7 @@ import {
 import { useUi } from '../host'
 import { PrChips } from '../PrChips'
 import { View } from '../../ui/View'
-import { Button, EmptyState } from '../../ui'
+import { Button, EmptyState, Skeleton } from '../../ui'
 import { TeamIcon } from '../../icons/SlothIcons'
 import { cleanError, fmtTok } from '../../format'
 import { pedirFiltroPersonas } from '../tickets/model'
@@ -150,7 +150,9 @@ export function TeamView(): React.JSX.Element {
               </Button>
             </p>
           ) : (
-            <p className="hint f-team-pad">Cargando…</p>
+            <div className="f-team-pad">
+              <Skeleton rows={5} label="Cargando…" />
+            </div>
           )}
         </div>
       </View>
@@ -190,7 +192,7 @@ export function TeamView(): React.JSX.Element {
         </button>
         {t.url && /^https?:\/\//.test(t.url) && (
           <a className="icon-btn f-team-ext" href={t.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${t.id} en ${n}`} title={`Abrir en ${n}`}>
-            <ArrowSquareOut size={13} aria-hidden="true" />
+            <ArrowSquareOut size={14} aria-hidden="true" />
           </a>
         )}
         {starting === t.id && (
@@ -199,7 +201,7 @@ export function TeamView(): React.JSX.Element {
               Crea el espacio <b className="mono">{t.id}</b> y arranca Claude ahí.
             </span>
             <Button look="classic" size="sm" variant="primary" autoFocus disabled={Boolean(busy)} onClick={() => void start(t.id)}>
-              {busy === `start:${t.id}` ? <CircleNotch size={13} className="spin" aria-hidden="true" /> : <Play size={13} weight="fill" aria-hidden="true" />}
+              {busy === `start:${t.id}` ? <CircleNotch size={14} className="spin" aria-hidden="true" /> : <Play size={14} weight="fill" aria-hidden="true" />}
               Empezar
             </Button>
             <Button look="classic" size="sm" variant="ghost" onClick={() => setStarting(null)}>
@@ -427,7 +429,7 @@ export function TeamView(): React.JSX.Element {
           {repoErrors.length > 0 && (
             <details className="f-team-repoerr">
               <summary>
-                <WarningCircle size={13} aria-hidden="true" /> {repoErrors.length} {repoErrors.length === 1 ? 'repo no se pudo leer' : 'repos no se pudieron leer'}
+                <WarningCircle size={14} aria-hidden="true" /> {repoErrors.length} {repoErrors.length === 1 ? 'repo no se pudo leer' : 'repos no se pudieron leer'}
               </summary>
               <ul>
                 {repoErrors.map(([repo, msg]) => (

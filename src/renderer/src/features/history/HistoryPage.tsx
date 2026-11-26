@@ -4,7 +4,7 @@ import { cleanError } from '../../format'
 import { getSettings } from '../settings/store'
 import { CheckIcon, DoneIcon, IdleIcon, PermissionIcon } from '../../icons/SlothIcons'
 import { View } from '../../ui/View'
-import { Button, EmptyState, PageHead } from '../../ui'
+import { Button, EmptyState, PageHead, Skeleton } from '../../ui'
 import { HistoryIcon } from '../../icons/SlothIcons'
 import { marks, wordsOf } from '../help/text'
 import { capacidadesDe, motivoSinCapacidad } from '../../../../shared/proveedores'
@@ -232,7 +232,7 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
   }
 
   const renderList = (): React.ReactNode => {
-    if (!rows) return <p className="hist-loading">Leyendo las conversaciones…</p>
+    if (!rows) return <Skeleton rows={5} showLabel label="Leyendo las conversaciones…" />
     if (visible.length === 0) {
       // Si la lectura falló, el error ya se muestra arriba: no decir «no hay sesiones».
       if (loadErr) return null
@@ -420,7 +420,7 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
 
       {toast && (
         <div className="hist-toast" role="status">
-          <CheckIcon size={15} strokeWidth={2.2} className="hist-toast-ico" />
+          <CheckIcon size={14} strokeWidth={2.2} className="hist-toast-ico" />
           {toast}
         </div>
       )}

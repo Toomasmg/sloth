@@ -22,7 +22,7 @@ function RamasSection(): React.JSX.Element {
     <section className="section f-wt-section">
       <button type="button" className="f-wt-toggle" onClick={() => openRamas()}>
         <span className="section-title f-wt-title">
-          <WorktreeIcon size={13} /> Ramas aparte
+          <WorktreeIcon size={14} /> Ramas aparte
         </span>
       </button>
     </section>

@@ -4,7 +4,7 @@ import { View } from '../../ui/View'
 import { cleanError } from '../../format'
 import { spaceStatus } from '../broadcast/state'
 import { CloseIcon, SearchIcon, SettingsIcon, TicketIcon } from '../../icons/SlothIcons'
-import { Button, EmptyState, PageHead } from '../../ui'
+import { Button, EmptyState, PageHead, Skeleton } from '../../ui'
 import { openSettings } from '../settings/bus'
 import type { Workspace } from '../../../../shared/types'
 import { categoriaDe, SIN_CONECTOR, type FiltroVista } from '../../../../shared/tickets'
@@ -540,7 +540,7 @@ export function Board(): React.JSX.Element {
           </span>
           {running ? (
             <button type="button" className="f-tickets-b f-tickets-b--sm" onClick={() => void ui.invoke('feat:tickets:cancel')}>
-              <CloseIcon size={13} /> Cancelar consulta
+              <CloseIcon size={14} /> Cancelar consulta
             </button>
           ) : null}
           <button
@@ -783,13 +783,7 @@ export function Board(): React.JSX.Element {
                 )}
 
                 {bodyLoading && (
-                  <div role="status" className="f-tickets-skel">
-                    <div />
-                    <div />
-                    <div />
-                    <div />
-                    <span>{snap ? `Cargando tickets de ${n}…` : 'Cargando tickets…'}</span>
-                  </div>
+                  <Skeleton variant="card" rows={4} showLabel label={snap ? `Cargando tickets de ${n}…` : 'Cargando tickets…'} />
                 )}
 
                 {showRows &&
@@ -824,7 +818,7 @@ export function Board(): React.JSX.Element {
             {/* DETALLE */}
             <section className="f-tickets-panel f-tickets-det" aria-labelledby="f-tickets-det-t">
               {!current || !snap ? (
-                <p className="f-tickets-muted">{snap ? 'Elegí un ticket de la lista.' : 'Cargando…'}</p>
+                snap ? <p className="f-tickets-muted">Elegí un ticket de la lista.</p> : <Skeleton rows={3} label="Cargando…" />
               ) : (
                 <Detail
                   t={current}
