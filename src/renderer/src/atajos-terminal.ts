@@ -1,46 +1,33 @@
-import type { ShortcutId } from '../../shared/settings-model'
-
 /**
- * Con la terminal enfocada, la tecla es de la shell salvo que acá se diga lo contrario.
- * - global: la app la atiende y la tecla no llega a la shell (se corta antes de xterm).
- * - terminal: la shell la conserva; el atajo anda solo con el foco afuera de la terminal.
- * Regla: son globales las combinaciones que la shell no usa (Ctrl+Shift, Ctrl+Alt, Ctrl+dígito, Ctrl+K,
- * Ctrl+N y Ctrl+, no son de readline en PowerShell/cmd). Siguen de la shell Ctrl+B (retroceder un
- * carácter), F1 y F2 (vim, less, mc): tomarlas rompe la línea de comandos sin forma de recuperarla.
+ * Con la terminal enfocada la tecla es de la shell salvo que el atajo sea de los que la shell no usa.
+ * Se decide por la combinación que llegó, no por la acción: así un atajo reasignado a Ctrl+C o Ctrl+R
+ * nunca le saca la tecla a la terminal.
+ * - Se atienden: Ctrl con Shift o Alt (Ctrl+Shift+M, Ctrl+Alt+1) y Ctrl con un número o la coma.
+ * - Quedan de la shell: Ctrl+letra suelta (Ctrl+B retrocede un carácter; Ctrl+N es «historial siguiente»
+ *   en readline y en Claude Code, y lo usa quien navega comandos), Alt+letra, F1/F2 (vim, less) y Enter/Tab.
+ * Por eso «Nuevo espacio» anda con Ctrl+N solo fuera de la terminal; con la terminal enfocada se usa la
+ * paleta (Ctrl+K) o se reasigna a una combinación con Shift en Configuración.
  */
-export type AlcanceEnTerminal = 'global' | 'terminal'
-
-export const ALCANCE_EN_TERMINAL: Readonly<Record<ShortcutId, AlcanceEnTerminal>> = {
-  palette: 'global',
-  new: 'global',
-  sidebar: 'terminal',
-  broadcast: 'global',
-  layout: 'global',
-  settings: 'global',
-  chat: 'global',
-  history: 'global',
-  rename: 'terminal',
-  help: 'terminal',
-  focus1: 'global',
-  focus2: 'global',
-  focus3: 'global',
-  focus4: 'global',
-  broadcastNow: 'global',
-  dictado: 'global'
+export interface TeclaEvento {
+  ctrlKey: boolean
+  altKey: boolean
+  shiftKey: boolean
+  /** AltGr llega como Ctrl+Alt en Windows: Ctrl+Alt+2 es la «@» de un teclado español. */
+  altGraph: boolean
+  isComposing: boolean
+  /** Tecla en el formato de los atajos («K», «3», «Enter»…). */
+  key: string | null
 }
 
-/** ¿La app atiende este atajo aunque el foco esté en una terminal? */
-export const esGlobalEnTerminal = (id: ShortcutId): boolean => ALCANCE_EN_TERMINAL[id] === 'global'
-
-/** Decide si un atajo se atiende dado dónde está el foco. */
-export function seAtiende(id: ShortcutId, foco: { enTerminal: boolean }): boolean {
-  return !foco.enTerminal || esGlobalEnTerminal(id)
+export function seAtiende(e: TeclaEvento, enTerminal: boolean): boolean {
+  if (e.altGraph || e.isComposing) return false
+  if (!enTerminal) return true
+  if (!e.ctrlKey) return false
+  if (e.shiftKey || e.altKey) return true
+  return e.key !== null && /^[0-9,]$/.test(e.key)
 }
 
-/**
- * Al cerrar una vista, ¿devolver el foco a quien la abrió? No si el foco ya está en otra capa
- * (la vista que la reemplazó): devolverlo lo dejaría en una terminal oculta detrás.
- */
-export function debeDevolverFoco(foco: { enOtraCapa: boolean }): boolean {
-  return !foco.enOtraCapa
+/** Al volver de una Vista: ¿el foco ya es de otra capa distinta de la que se cierra? */
+export function capaAjena(capaDelFoco: unknown, propia: unknown): boolean {
+  return !!capaDelFoco && capaDelFoco !== propia
 }

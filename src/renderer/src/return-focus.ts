@@ -1,4 +1,4 @@
-import { debeDevolverFoco } from './atajos-terminal'
+import { capaAjena } from './atajos-terminal'
 
 /**
  * Guarda quién tenía el foco y devuelve la función que lo restaura al cerrar. Si quien abrió ya no
@@ -17,17 +17,13 @@ export function captureOpener(propia?: () => Element | null): () => void {
   }
   // Con otra capa ya en primer plano (la vista que reemplazó a esta) el foco es suyo: devolverlo a quien
   // abrió esta lo dejaría en una terminal oculta detrás.
-  const otraCapa = (): boolean => {
-    if (!propia) return false
-    const capa = document.activeElement?.closest('[role="dialog"][aria-modal="true"]')
-    return !!capa && capa !== propia?.()
-  }
+  const otraCapa = (): boolean => !!propia && capaAjena(document.activeElement?.closest('[role="dialog"][aria-modal="true"]'), propia())
   return () => {
-    if (!debeDevolverFoco({ enOtraCapa: otraCapa() })) return
+    if (otraCapa()) return
     target()?.focus()
     // Al desmontar el diálogo el navegador puede soltar el foco al body: se reintenta una vez ya desmontado.
     setTimeout(() => {
-      if (!debeDevolverFoco({ enOtraCapa: otraCapa() })) return
+      if (otraCapa()) return
       if (document.activeElement === document.body || !document.activeElement) target()?.focus()
     }, 0)
   }

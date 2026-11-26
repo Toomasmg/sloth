@@ -23,7 +23,7 @@ import { Badge } from './ui'
 import { openSettings } from './features/settings/bus'
 import { openHelp } from './features/help/bus'
 import { seAtiende } from './atajos-terminal'
-import { comboLabel, isCapturingShortcut, matchShortcut } from './shortcuts'
+import { comboLabel, isCapturingShortcut, keyTokenOf, matchShortcut } from './shortcuts'
 import type { ShortcutId } from '../../main/features/settings-model'
 import { GlobalSlot, PaneBannerSlot, PaneHeaderSlot, TitlebarOnly } from './features/slots'
 import { openPermissionReview } from './features/permissions/store'
@@ -624,8 +624,8 @@ export function App(): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKey, true)
   }, [])
 
-  // Atajos de la ventana, todos configurables (matchShortcut). Dentro de una terminal, esas teclas son de la
-  // shell: solo funcionan fuera de ella (como antes). Ctrl+K y Ctrl+, están en su propio componente.
+  // Atajos de la ventana, todos configurables (matchShortcut). Con una terminal enfocada solo andan las que
+  // la shell no usa (ver atajos-terminal.ts). Ctrl+K y Ctrl+, están en su propio componente.
   const toggleSide = (): void => {
     const next = !sideShown
     setSideShown(next)
@@ -662,48 +662,42 @@ export function App(): React.JSX.Element {
       if (e.metaKey || isCapturingShortcut()) return
       const k = winKeys.current
       const ae = document.activeElement
-      const foco = { enTerminal: !!ae?.closest('.terminal-host') }
-      // Atajo global: se atiende y no llega a la terminal (sin esto la shell recibiría ^N, ^M…).
+      const enTerminal = !!ae?.closest('.terminal-host')
+      // Qué atajos andan con la terminal enfocada (y que AltGr o una composición no los disparen) lo decide atajos-terminal.ts.
+      if (!seAtiende({ ctrlKey: e.ctrlKey, altKey: e.altKey, shiftKey: e.shiftKey, altGraph: e.getModifierState('AltGraph'), isComposing: e.isComposing, key: keyTokenOf(e) }, enTerminal)) return
+      // Con la terminal enfocada la tecla no tiene que llegar a xterm (la shell recibiría ^N, un CR…); afuera no se corta
+      // la propagación para no pisar los onKeyDown de React de los diálogos (p. ej. Ctrl+Shift+Enter en Enviar a varios).
       const swallow = (ev: KeyboardEvent): void => {
         ev.preventDefault()
-        ev.stopPropagation()
+        if (enTerminal) ev.stopPropagation()
       }
       const typing = !!ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || (ae as HTMLElement).isContentEditable)
-      // Qué atajos andan con la terminal enfocada lo decide atajos-terminal.ts.
       const focusN = FOCUS_IDS.findIndex((id) => matchShortcut(id, e))
       if (focusN >= 0) {
-        e.preventDefault()
-        e.stopPropagation()
+        swallow(e)
         focusVisiblePane(focusN + 1)
       } else if (matchShortcut('help', e)) {
-        // F1 es de la terminal cuando está enfocada (p. ej. vim o less): solo fuera de ella.
-        if (!seAtiende('help', foco)) return
         e.preventDefault()
         openHelp('ayuda')
       } else if (matchShortcut('broadcastNow', e)) {
-        if (!seAtiende('broadcastNow', foco)) return
         swallow(e)
         k.broadcastNow()
       } else if (matchShortcut('sidebar', e)) {
-        // Ctrl+B es «retroceder un carácter» en la shell: con la terminal enfocada queda para ella.
-        if (!seAtiende('sidebar', foco)) return
         e.preventDefault()
         k.side()
       } else if (matchShortcut('new', e)) {
-        if (!seAtiende('new', foco) || accountsRef.current.length === 0) return
+        if (accountsRef.current.length === 0) return
         swallow(e)
         k.newWs()
       } else if (matchShortcut('rename', e)) {
         // En la lista de espacios, F2 lo maneja la fila (su propio botón). Escribiendo, no se toca.
-        if (!seAtiende('rename', foco) || typing || ae?.closest('.sl-side')) return
+        if (typing || ae?.closest('.sl-side')) return
         if (k.rename()) e.preventDefault()
       } else if (matchShortcut('chat', e)) {
-        if (!seAtiende('chat', foco)) return
         swallow(e)
         k.chat()
       } else if (e.ctrlKey && e.altKey && !e.shiftKey && LAYOUT_BY_DIGIT[e.code]) {
         // Distribución fija (Ctrl+Alt+1–4): no se graba en Configuración.
-        if (!seAtiende('layout', foco)) return
         swallow(e)
         k.layout(LAYOUT_BY_DIGIT[e.code])
       }
@@ -1116,7 +1110,7 @@ export function App(): React.JSX.Element {
                     {agents[paneId]?.state === 'sleeping' ? (
                       <SleepingCard paneId={paneId} name={title} onError={onTermError} />
                     ) : (
-                      <TerminalView id={paneId} generation={generations[paneId] ?? 0} onError={onTermError} />
+                      <TerminalView id={paneId} label={isLoginPane(paneId) ? 'Terminal de cuenta' : (wsById.get(paneId)?.name ?? 'Panel')} generation={generations[paneId] ?? 0} onError={onTermError} />
                     )}
                   </section>
                 )

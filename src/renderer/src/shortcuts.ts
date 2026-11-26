@@ -47,7 +47,8 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: [['Ctrl', 'Alt', '↓']], what: 'Mover el panel a la fila de abajo', group: 'Paneles' },
   { keys: [['Ctrl', 'Shift', 'C']], what: 'Copiar la selección de la terminal', group: 'Terminal' },
   { keys: [['Ctrl', 'Shift', 'V']], what: 'Pegar en la terminal', group: 'Terminal' },
-  { keys: [['Tab']], what: 'Con la terminal enfocada, Tab y las teclas de la shell son de ella: Ctrl+B, F1 y F2 no se atienden ahí (F6 saca el foco). Los demás atajos de esta hoja andan también dentro de la terminal', group: 'Terminal' },
+  { keys: [['Ctrl', 'Shift'], ['Ctrl', 'Alt']], what: 'Con la terminal enfocada andan los atajos con Ctrl+Shift, Ctrl+Alt, Ctrl+número y Ctrl+K. Ctrl+letra suelta (Ctrl+N, Ctrl+B), F1, F2 y Alt+letra son de la shell: salí con F6', group: 'Terminal' },
+  { keys: [['Tab']], what: 'En la terminal completa comandos y no cambia de panel: para salir usá F6 o Ctrl+1–4', group: 'Terminal' },
   { keys: [['Clic derecho']], what: 'En la terminal: copia si hay selección, si no pega', group: 'Terminal' }
 ]
 
