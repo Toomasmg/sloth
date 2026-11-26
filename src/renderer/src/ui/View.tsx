@@ -43,6 +43,8 @@ export function View({ labelId, title, onClose, actions, backLabel = 'Espacios',
   const requestRef = useRef(request)
   requestRef.current = request
   const rootRef = useRef<HTMLDivElement>(null)
+  // En la limpieza al desmontar React ya soltó rootRef: se guarda el nodo para saber cuál era la capa propia.
+  const lastRoot = useRef<HTMLDivElement | null>(null)
   const backRef = useRef<HTMLButtonElement>(null)
 
   const trapTab = (e: React.KeyboardEvent<HTMLDivElement>): void => {
@@ -62,9 +64,10 @@ export function View({ labelId, title, onClose, actions, backLabel = 'Espacios',
   }, [labelId])
 
   // Se toma en el render: en los efectos el contenido (Ajustes, Historial) ya movió el foco adentro.
-  const [restore] = useState(captureOpener)
+  const [restore] = useState(() => captureOpener(() => rootRef.current ?? lastRoot.current))
   useEffect(() => {
     // Si el contenido ya tomó el foco al montarse (p. ej. el título de Ajustes), se respeta.
+    lastRoot.current = rootRef.current
     if (!rootRef.current?.contains(document.activeElement)) backRef.current?.focus()
     const onKey = (e: KeyboardEvent): void => {
       // Con Vistas apiladas cada una escucha, pero solo cierra la de arriba (la que se ve).

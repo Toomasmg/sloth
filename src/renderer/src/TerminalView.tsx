@@ -17,15 +17,22 @@ function abrirLink(uri: string): void {
 
 interface Props {
   id: string
+  /** Nombre del panel: el lector de pantalla distingue una terminal de otra. */
+  label: string
   /** Cambia para forzar un reinicio de la terminal. */
   generation: number
   onError: (message: string) => void
 }
 
 /** Memo: los cambios de estado de agentes o permisos en App no re-renderizan las terminales. */
-export const TerminalView = memo(function TerminalView({ id, generation, onError }: Props): React.JSX.Element {
+export const TerminalView = memo(function TerminalView({ id, label, generation, onError }: Props): React.JSX.Element {
   const host = useRef<HTMLDivElement>(null)
   // onError por ref: la terminal solo se recrea si cambian id o generation.
+  const labelRef = useRef(label)
+  labelRef.current = label
+  useEffect(() => {
+    live.current?.term.textarea?.setAttribute('aria-label', `Entrada de la terminal ${label}`)
+  }, [label])
   const onErrorRef = useRef(onError)
   onErrorRef.current = onError
   // Terminal y ajuste vivos (para cuando el panel vuelve a verse).
@@ -80,6 +87,7 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
     // URLs sueltas en el texto, sin OSC 8.
     term.loadAddon(new WebLinksAddon((_e, uri) => abrirLink(uri)))
     term.open(el)
+    term.textarea?.setAttribute('aria-label', `Entrada de la terminal ${labelRef.current}`)
     try {
       fit.fit()
     } catch {

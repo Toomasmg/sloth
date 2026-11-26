@@ -17,12 +17,13 @@ import { api } from './api'
 import { UiContext, type NewWorkspacePreset, type PaneGuard, type UiCtx } from './features/host'
 import { FEATURE_UIS } from './features/registry'
 import { resolveAccountColor, useSettings } from './features/settings/store'
-import { openChat, useChatAttach, useChatSnapshot } from './features/chat/store'
+import { openChat, useChatAttach, useChatSnapshot, useDrawer } from './features/chat/store'
 import { chatButtonLabel } from './features/chat/alerts'
 import { Badge } from './ui'
 import { openSettings } from './features/settings/bus'
 import { openHelp } from './features/help/bus'
-import { comboLabel, isCapturingShortcut, matchShortcut } from './shortcuts'
+import { seAtiende } from './atajos-terminal'
+import { comboLabel, isCapturingShortcut, keyTokenOf, matchShortcut } from './shortcuts'
 import type { ShortcutId } from '../../main/features/settings-model'
 import { GlobalSlot, PaneBannerSlot, PaneHeaderSlot, TitlebarOnly } from './features/slots'
 import { openPermissionReview } from './features/permissions/store'
@@ -623,8 +624,8 @@ export function App(): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKey, true)
   }, [])
 
-  // Atajos de la ventana, todos configurables (matchShortcut). Dentro de una terminal, esas teclas son de la
-  // shell: solo funcionan fuera de ella (como antes). Ctrl+K y Ctrl+, están en su propio componente.
+  // Atajos de la ventana, todos configurables (matchShortcut). Con una terminal enfocada solo andan las que
+  // la shell no usa (ver atajos-terminal.ts). Ctrl+K y Ctrl+, están en su propio componente.
   const toggleSide = (): void => {
     const next = !sideShown
     setSideShown(next)
@@ -661,43 +662,43 @@ export function App(): React.JSX.Element {
       if (e.metaKey || isCapturingShortcut()) return
       const k = winKeys.current
       const ae = document.activeElement
-      const inTerm = !!ae?.closest('.terminal-host')
+      const enTerminal = !!ae?.closest('.terminal-host')
+      // Qué atajos andan con la terminal enfocada (y que AltGr o una composición no los disparen) lo decide atajos-terminal.ts.
+      if (!seAtiende({ ctrlKey: e.ctrlKey, altKey: e.altKey, shiftKey: e.shiftKey, altGraph: e.getModifierState('AltGraph'), isComposing: e.isComposing, key: keyTokenOf(e) }, enTerminal)) return
+      // Con la terminal enfocada la tecla no tiene que llegar a xterm (la shell recibiría ^N, un CR…); afuera no se corta
+      // la propagación para no pisar los onKeyDown de React de los diálogos (p. ej. Ctrl+Shift+Enter en Enviar a varios).
+      const swallow = (ev: KeyboardEvent): void => {
+        ev.preventDefault()
+        if (enTerminal) ev.stopPropagation()
+      }
       const typing = !!ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || (ae as HTMLElement).isContentEditable)
-      // Ctrl+1–4 van también desde la terminal (como Ctrl+Tab y Ctrl+Alt+flechas): no son teclas de la shell.
       const focusN = FOCUS_IDS.findIndex((id) => matchShortcut(id, e))
       if (focusN >= 0) {
-        e.preventDefault()
-        e.stopPropagation()
+        swallow(e)
         focusVisiblePane(focusN + 1)
       } else if (matchShortcut('help', e)) {
-        // F1 es de la terminal cuando está enfocada (p. ej. vim o less): solo fuera de ella.
-        if (inTerm) return
         e.preventDefault()
         openHelp('ayuda')
       } else if (matchShortcut('broadcastNow', e)) {
-        if (inTerm) return
-        e.preventDefault()
+        swallow(e)
         k.broadcastNow()
       } else if (matchShortcut('sidebar', e)) {
-        if (inTerm) return
         e.preventDefault()
         k.side()
       } else if (matchShortcut('new', e)) {
-        if (inTerm || accountsRef.current.length === 0) return
-        e.preventDefault()
+        if (accountsRef.current.length === 0) return
+        swallow(e)
         k.newWs()
       } else if (matchShortcut('rename', e)) {
         // En la lista de espacios, F2 lo maneja la fila (su propio botón). Escribiendo, no se toca.
-        if (inTerm || typing || ae?.closest('.sl-side')) return
+        if (typing || ae?.closest('.sl-side')) return
         if (k.rename()) e.preventDefault()
       } else if (matchShortcut('chat', e)) {
-        if (inTerm) return
-        e.preventDefault()
+        swallow(e)
         k.chat()
       } else if (e.ctrlKey && e.altKey && !e.shiftKey && LAYOUT_BY_DIGIT[e.code]) {
         // Distribución fija (Ctrl+Alt+1–4): no se graba en Configuración.
-        if (inTerm) return
-        e.preventDefault()
+        swallow(e)
         k.layout(LAYOUT_BY_DIGIT[e.code])
       }
     }
@@ -832,6 +833,7 @@ export function App(): React.JSX.Element {
   // Chat del equipo: el botón de la barra muestra los no leídos (useChatAttach conecta la función).
   useChatAttach(uiCtx)
   const chatUnread = useChatSnapshot()?.unreadTotal ?? 0
+  const chatOpen = useDrawer().open
 
   // Distribución elegida (se guarda en esta PC). Uno = 1 a la vista; Dos = 2; Tres = 3; Cuatro = 4.
   const pickLayout = (k: ViewMode): void => {
@@ -918,7 +920,7 @@ export function App(): React.JSX.Element {
               <TitlebarOnly name="updater" />
             </div>
             <Tooltip text="Chat del equipo" shortcut={comboLabel('chat')}>
-              <button type="button" className="sl-chat" onClick={() => openChat()} aria-label={chatButtonLabel(chatUnread)}>
+              <button type="button" className="sl-chat" onClick={() => openChat()} aria-expanded={chatOpen} aria-label={chatButtonLabel(chatUnread)}>
                 <ChatIcon size={17} aria-hidden="true" />
                 {chatUnread > 0 && (
                   <span className="sl-chat-badge" aria-hidden="true">
@@ -1108,7 +1110,7 @@ export function App(): React.JSX.Element {
                     {agents[paneId]?.state === 'sleeping' ? (
                       <SleepingCard paneId={paneId} name={title} onError={onTermError} />
                     ) : (
-                      <TerminalView id={paneId} generation={generations[paneId] ?? 0} onError={onTermError} />
+                      <TerminalView id={paneId} label={isLoginPane(paneId) ? 'Terminal de cuenta' : (wsById.get(paneId)?.name ?? 'Panel')} generation={generations[paneId] ?? 0} onError={onTermError} />
                     )}
                   </section>
                 )
