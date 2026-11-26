@@ -356,7 +356,7 @@ html[data-theme='light'] .sl-acc {
   min-width: 0;
 }
 /* Espacio: una línea de 32 px. Nada cambia de ancho entre estados: la columna del ícono (20 px, alineada
-   con el avatar) y la del estado (16 px) son fijas. La ruta y la rama van en el tooltip. */
+   con el avatar) y la del estado (16 px) son fijas. La ruta va en el tooltip. */
 .sl-row {
   position: relative;
   width: 100%;
@@ -433,6 +433,39 @@ html[data-theme='light'] .sl-ico:not(.has-emoji)::before {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
+}
+/* La rama es lo que distingue a dos espacios del mismo repo. Ocupa solo lo que sobra después del nombre y
+   del ticket (base 0 y sin ancho propio: no les quita lugar), así que se recorta primero, con elipsis, y
+   desaparece entera si queda menos de 64 px. El margen negativo se come el hueco del gap cuando no se ve. */
+.sl-branch {
+  flex: 1000 1 0;
+  min-width: 0;
+  margin-left: calc(var(--s-2) * -1);
+  overflow: hidden;
+  container: sl-branch / inline-size;
+}
+.sl-branch-in {
+  display: flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding-left: var(--s-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-11);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.sl-branch-in svg {
+  flex: none;
+}
+.sl-branch-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@container sl-branch (max-width: 63px) {
+  .sl-branch-in {
+    display: none;
+  }
 }
 /* El ticket se recorta antes de comerse el nombre. */
 .sl-row .ui-tag {

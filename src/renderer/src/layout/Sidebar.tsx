@@ -3,7 +3,7 @@ import type { Account, AccountStatus, AgentStatus, Workspace } from '../../../sh
 import { openSettings } from '../features/settings/bus'
 import { colorHex } from '../features/templates/catalog'
 import { STATE_LABEL, shortPath } from '../format'
-import { ChevronDownIcon, PermissionIcon, PlusIcon, SearchIcon, WaitingIcon, WorkingIcon } from '../icons/SlothIcons'
+import { BranchIcon, ChevronDownIcon, PermissionIcon, PlusIcon, SearchIcon, WaitingIcon, WorkingIcon } from '../icons/SlothIcons'
 import { comboLabel } from '../shortcuts'
 import { StateIcon } from '../StateIcon'
 import { IconButton, Tag } from '../ui'
@@ -240,13 +240,21 @@ function FilaEspacio({ ws, cuenta, agente, abierto, enfocado, editando, permisos
               p.onMenu(ws, r.left + 24, r.bottom + 2)
             }
           }}
-          aria-label={`${ws.icon ? `${ws.icon} ` : ''}${ws.name}, ${cuenta ?? 'cuenta borrada'}, ${agente ? STATE_LABEL[agente.state] : 'sin abrir'}${abierto ? ', abierto' : ''}${permisos ? `, ${permisos === 1 ? 'permiso pendiente' : `${permisos} permisos pendientes`}` : ''}`}
+          aria-label={`${ws.icon ? `${ws.icon} ` : ''}${ws.name}, ${cuenta ?? 'cuenta borrada'}${ws.branch ? `, rama ${ws.branch}` : ''}, ${agente ? STATE_LABEL[agente.state] : 'sin abrir'}${abierto ? ', abierto' : ''}${permisos ? `, ${permisos === 1 ? 'permiso pendiente' : `${permisos} permisos pendientes`}` : ''}`}
           title={`${ws.name} · ${where}\nDoble clic o F2 para renombrar · clic derecho para más opciones`}
         >
           <span className={`sl-ico${ws.icon ? ' has-emoji' : ''}`} aria-hidden="true" style={ws.color ? ({ '--ws': colorHex(ws.color) } as CSSProperties) : undefined}>
             {ws.icon ?? null}
           </span>
           <span className="sl-name">{ws.name}</span>
+          {ws.branch && (
+            <span className="sl-branch" aria-hidden="true">
+              <span className="sl-branch-in">
+                <BranchIcon size={11} />
+                <span className="sl-branch-text">{ws.branch}</span>
+              </span>
+            </span>
+          )}
           {ws.ticket && <Tag title={ws.ticket}>{ws.ticket}</Tag>}
           <span className="sl-glyph" aria-hidden="true">
             {glyph}
