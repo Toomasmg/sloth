@@ -110,6 +110,8 @@ export interface OpcionesWifi {
   ociosoMs?: number
   /** Compartido entre los servidores de la misma PC (Wi-Fi, Tailscale, 127.0.0.1): un sobre visto en uno no vale en otro. */
   repetidos?: Repetidos
+  /** Cómo se muestra en la PC quien llega por este servidor, en vez de su IP (por `tailscale serve` todos llegan desde 127.0.0.1). */
+  etiqueta?: string
   log?: (...args: unknown[]) => void
 }
 
@@ -178,12 +180,14 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
       if (!sobre || typeof sobre !== 'object') return enviar(res, 401, null)
       if (!fechaValida(sobre.t, Date.now())) return sellado(409, { error: 'reloj' })
       if (repetidos.vistoAntes(ab.iv, Date.now())) return sellado(409, { error: 'repetido' })
-      const quien: Quien = { ip: req.socket.remoteAddress ?? '?', ua: String(req.headers['user-agent'] ?? '').slice(0, 400), ...(celu !== undefined && { celu }) }
+      // Con clave de celu, el cupo es de ese celu: por `tailscale serve` todos comparten 127.0.0.1 y uno no le gasta el cupo a otro.
+      const cupo = celu !== undefined ? `celu:${celu}` : (req.socket.remoteAddress ?? '?')
+      const quien: Quien = { ip: o.etiqueta ?? req.socket.remoteAddress ?? '?', ua: String(req.headers['user-agent'] ?? '').slice(0, 400), ...(celu !== undefined && { celu }) }
 
       if (ruta === '/api/emparejar') {
         // Ya tiene acceso: la página usa esa clave tal cual (un enlace guardado con la clave del celu, no la del QR).
         if (!conQr || !o.proveedor.entrar) return sellado(200, { ya: true })
-        if (!limite.permitir(req.socket.remoteAddress ?? '?', Date.now())) return enviar(res, 429, null)
+        if (!limite.permitir(cupo, Date.now())) return enviar(res, 429, null)
         const r = o.proveedor.entrar(sobre.b, quien)
         return sellado(r.status, r.data)
       }
@@ -193,7 +197,7 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
       if (ruta === '/api/estado') return sellado(200, await o.proveedor.estado(quien))
       if (ruta === '/api/terminal') {
         // Después del MAC y del anti-replay: quien no tiene la clave no le gasta el cupo al celu de verdad.
-        if (!limite.permitir(req.socket.remoteAddress ?? '?', Date.now())) return enviar(res, 429, null)
+        if (!limite.permitir(cupo, Date.now())) return enviar(res, 429, null)
         const p = leerPedidoTerminal(sobre.b)
         if (!p) return sellado(400, { error: 'Pedido inválido.' })
         const corte = new AbortController()

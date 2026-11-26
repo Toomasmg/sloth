@@ -55,6 +55,8 @@ export interface PedidoCelular {
   titulo?: string
   /** Por qué se marca «Destructivo» («borra archivos sin papelera»…), o null. */
   destructivo?: string | null
+  /** Más largo que MAX_PEDIDO: el celu no lo ve entero, así que solo puede rechazarlo. */
+  cortado?: boolean
   desde: number
   vence: number
 }

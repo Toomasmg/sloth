@@ -34,9 +34,13 @@ export function elegirIp(redes: Record<string, InterfazRed[] | undefined>): stri
   return (candidatas.find((c) => WIFI.test(c.nombre)) ?? candidatas[0])?.ip ?? null
 }
 
-/** La IP de Tailscale de la PC (100.64.0.0/10), o null si Tailscale no está conectado. */
+/**
+ * La IP de Tailscale de la PC (100.64.0.0/10), o null si Tailscale no está conectado. Solo de la interfaz de Tailscale:
+ * ese rango también lo usan los datos móviles y algunos hoteles (CGNAT), y abrir ahí sería abrirle la página a esa red.
+ */
 export function ipTailscale(redes: Record<string, InterfazRed[] | undefined>): string | null {
-  for (const lista of Object.values(redes)) {
+  for (const [nombre, lista] of Object.entries(redes)) {
+    if (!/tailscale/i.test(nombre)) continue
     for (const r of lista ?? []) {
       const v4 = r.family === 'IPv4' || r.family === 4
       const [a, b] = r.address.split('.').map(Number)
@@ -150,9 +154,11 @@ export const MAX_PEDIDO = 4000
 const INVISIBLES = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\p{Cf}\p{Zl}\p{Zp}]/gu
 
 /** Qué pide un permiso, como lo ve el celu. */
-export function pedidoParaCelu(tool: string, input: Record<string, unknown>): { texto: string; titulo: string; destructivo: string | null } {
+export function pedidoParaCelu(tool: string, input: Record<string, unknown>): { texto: string; titulo: string; destructivo: string | null; cortado?: true } {
   const kind = kindOf(tool)
-  return { texto: corto(labelOf(kind, tool, input).replace(INVISIBLES, '\uFFFD'), MAX_PEDIDO), titulo: titleOf(kind, tool, input), destructivo: destructivoDe(kind, input) }
+  const entero = labelOf(kind, tool, input).replace(INVISIBLES, '\uFFFD')
+  // Lo que no entra no se ve entero, y lo que no se vio entero no se aprueba desde el celu.
+  return { texto: corto(entero, MAX_PEDIDO), titulo: titleOf(kind, tool, input), destructivo: destructivoDe(kind, input), ...(entero.length > MAX_PEDIDO && { cortado: true as const }) }
 }
 
 const agenteDe = (a: Entrada['agentes'], id: string): AgentStatus | undefined =>
@@ -232,14 +238,20 @@ export function cuerpoNtfy(tema: string, tipo: TipoAviso, texto: { titulo: strin
   }
 }
 
-/** Adónde lleva el aviso: la página del Wi-Fi si está abierta; si no, la de «desde cualquier red». Nunca con el `#`. */
-export function enlaceAviso(wifi: { ip: string; puerto: number } | null, remoto: string | null): string | null {
-  if (wifi) return `http://${wifi.ip}:${wifi.puerto}/`
-  if (!remoto) return null
-  const u = new URL(remoto)
-  u.hash = ''
-  u.search = ''
-  return u.toString()
+/**
+ * A dónde lleva tocar el aviso, sin clave nunca. Primero lo que anda también fuera de casa (la dirección https de
+ * Tailscale, la página remota); el Wi-Fi solo sirve en casa. Con avisos privados no va nada que diga cómo se llama
+ * la PC ni su IP: solo la página remota, que es pública.
+ */
+export function enlaceAviso(o: { wifi: { ip: string; puerto: number } | null; remoto: string | null; https?: string | null; privado?: boolean }): string | null {
+  if (o.https && !o.privado) return `${o.https}/`
+  if (o.remoto) {
+    const u = new URL(o.remoto)
+    u.hash = ''
+    u.search = ''
+    return u.toString()
+  }
+  return o.wifi && !o.privado ? `http://${o.wifi.ip}:${o.wifi.puerto}/` : null
 }
 
 /**

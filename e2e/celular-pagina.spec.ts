@@ -273,6 +273,23 @@ test('Celu: un pedido destructivo se marca y se aprueba con dos toques; uno larg
   }
 })
 
+test('Celu: un pedido que no entra entero no se aprueba desde el celu, ni con «Ver todo»: se rechaza o se responde en la PC', async () => {
+  estado = { ...BASE, sesiones: [sesion('api', 'waiting')], pedidos: [pedido('p1', 'api', 'echo ' + 'x'.repeat(5000) + ' && rm -rf /')] }
+  const navegador = await chromium.launch()
+  try {
+    const { page } = await abrir(navegador, MOTORES[0].ficha)
+    const li = page.locator('#pedidos li').first()
+    await expect(li.getByText('Es demasiado largo para verlo entero en el celu: para aprobarlo, respondelo en la PC.')).toBeVisible()
+    await expect(li.getByRole('button', { name: 'Aprobar' })).toBeDisabled()
+    await li.getByRole('button', { name: /Ver todo/ }).click()
+    await expect(li.getByRole('button', { name: 'Aprobar' })).toBeDisabled()
+    await li.getByRole('button', { name: 'Rechazar' }).click()
+    await expect.poll(() => decisiones).toEqual(['p1:deny'])
+  } finally {
+    await navegador.close()
+  }
+})
+
 test('Celu: con «Aprobar desde el celu» apagado, los pedidos se ven sin botones y con la nota una sola vez', async () => {
   estado = { ...BASE, aprobar: false, sesiones: [sesion('api', 'waiting'), sesion('web', 'waiting')], pedidos: [pedido('p1', 'api', 'ls'), pedido('p2', 'web', 'pwd')] }
   const navegador = await chromium.launch()

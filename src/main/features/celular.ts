@@ -14,7 +14,7 @@ import { CELU_WEB_URL, enlaceCelu, secretoValido } from '../../shared/celu-remot
 import { LIMITES_ARCHIVO } from '../statusline-core'
 import { agenteDe, capacidadesDe } from '../../shared/proveedores'
 import { limitesDeCuenta } from '../codex-limites'
-import { armarEstado, claveValida, httpsTailscale, ipTailscale, cuerpoNtfy, enlaceAviso, textoAvisoPrivado, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type TipoAviso } from './celular-core'
+import { armarEstado, claveValida, pedidoParaCelu, httpsTailscale, ipTailscale, cuerpoNtfy, enlaceAviso, textoAvisoPrivado, NTFY_POR_DEFECTO, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, TEMA_MIN, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type TipoAviso } from './celular-core'
 import { crearRepetidos } from './celular-sello'
 import { crearFuenteWifi, type FuenteDeEstado, type ProveedorDeEstado } from './celular-servidor'
 import { XTERM } from './celular-xterm'
@@ -148,6 +148,8 @@ const feature: Feature = {
     // Por Tailscale: la IP 100.x (directo, http) y 127.0.0.1 (lo que `tailscale serve` pasa a HTTPS). Mismo proveedor y mismas claves.
     let extras: { host: string; f: FuenteDeEstado }[] = []
     let tsServida: string | null = null
+    // La IP de Tailscale con la que se probó abrir, haya abierto o no: si falla, no se reintenta cada 15 s tirando lo del Wi-Fi.
+    let tsIntentada: string | null = null
     let tsError: string | null = null
     let ipServida: string | null = null
     let ipCambio = false
@@ -366,7 +368,10 @@ const feature: Feature = {
       decidir(id, decision, quien) {
         if (!cfg.aprobar) throw new Error('Aprobar desde el celu está apagado en Sloth.')
         if (!permisos(quien).aprobar) throw new Error('Este celu solo puede mirar. En la PC, panel «Celular», podés darle permiso para aprobar.')
-        const ws = pedidos().find((p) => p.id === id)?.ws
+        const pedido = pedidos().find((p) => p.id === id)
+        const ws = pedido?.ws
+        // Una página vieja no sabe de `cortado`: la PC no acepta aprobar algo que el celu no pudo mostrar entero.
+        if (decision === 'allow' && pedido && pedidoParaCelu(pedido.tool, pedido.input).cortado) throw new Error('Es demasiado largo para verlo entero en el celu: respondelo en la PC.')
         responderPermiso(id, decision)
         if (ws) anotarCelu(quien, decision === 'allow' ? 'aprobo' : 'rechazo', ws)
         ctx.log(`permiso ${decision === 'allow' ? 'aprobado' : 'rechazado'} desde el celu`)
@@ -470,6 +475,7 @@ const feature: Feature = {
       ipServida = null
       extras = []
       tsServida = null
+      tsIntentada = null
       esperas.soltarTodas()
       if (f) await f.detener()
       await Promise.all(otras.map((x) => x.f.detener()))
@@ -480,8 +486,11 @@ const feature: Feature = {
       tsError = null
       if (!cfg.tailscale.encendido || !fuente) return
       const ip = ipTs()
+      tsIntentada = ip
       for (const host of ip ? [ip, LOCAL] : [LOCAL]) {
-        const f = crearFuenteWifi({ host, puerto: cfg.puerto, proveedor, repetidos, log: ctx.log })
+        // Por 127.0.0.1 entran todos los celus que usan la dirección https: más conexiones, y en el panel se ven como «Tailscale (HTTPS)».
+        const local = host === LOCAL
+        const f = crearFuenteWifi({ host, puerto: cfg.puerto, proveedor, repetidos, log: ctx.log, ...(local && { maxConexionesPorIp: 64, etiqueta: 'Tailscale (HTTPS)' }) })
         try {
           await f.iniciar()
           extras.push({ host, f })
@@ -525,7 +534,7 @@ const feature: Feature = {
     async function revisarIp(): Promise<void> {
       if (!cfg.encendido) return
       const ip = ipActual()
-      const tsCambio = cfg.tailscale.encendido && !!fuente && ipTs() !== tsServida
+      const tsCambio = cfg.tailscale.encendido && !!fuente && ipTs() !== tsIntentada
       if (ip === ipServida && (fuente || !ip) && !tsCambio) return
       const habia = ipServida
       await iniciar()
@@ -616,7 +625,12 @@ const feature: Feature = {
         : cfg.ntfy.privado
           ? textoAvisoPrivado(tipo)
           : textoAviso(tipo, espacio, detalle, agenteDe(ws ? (ctx.store.account(ws.accountId) ?? {}) : {}))
-      const abrir = enlaceAviso(fuente && ipServida ? { ip: ipServida, puerto: cfg.puerto } : null, cfg.remoto.encendido ? CELU_WEB_URL : null)
+      const abrir = enlaceAviso({
+        wifi: fuente && ipServida ? { ip: ipServida, puerto: cfg.puerto } : null,
+        remoto: cfg.remoto.encendido ? CELU_WEB_URL : null,
+        https: cfg.tailscale.encendido && extras.some((x) => x.host === LOCAL) ? cfg.tailscale.https : null,
+        privado: cfg.ntfy.privado === true
+      })
       const r = await fetch(cfg.ntfy.servidor, {
         method: 'POST',
         redirect: 'error',
@@ -695,10 +709,11 @@ const feature: Feature = {
       const b = p as { id?: unknown; si?: unknown } | null
       if (!b || typeof b !== 'object' || typeof b.id !== 'string' || typeof b.si !== 'boolean') throw new Error('Valor inválido.')
       const ahora = Date.now()
+      // El tope se mira antes de responder: si no, el celu leería «listo» sin haber quedado en la lista.
+      if (b.si && cfg.celus.length >= MAX_CELUS) throw new Error('Esta PC ya tiene demasiados celus con acceso. Sacá alguno primero.')
       const r = entradas.responder(b.id, b.si, ahora)
       if (!r) throw new Error('Ese pedido ya venció o se respondió. Que escaneen el QR de nuevo.')
       if (b.si) {
-        if (cfg.celus.length >= MAX_CELUS) throw new Error('Esta PC ya tiene demasiados celus con acceso. Sacá alguno primero.')
         const id = randomBytes(6).toString('hex')
         cfg.celus.push({ id, nombre: r.nombre, clave: r.clave, nivel: 'controlar', creado: ahora, ultimo: ahora })
         guardar()

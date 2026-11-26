@@ -444,6 +444,31 @@ test('emparejar: con la clave del QR solo se pide entrar; los datos abren con la
   )
 })
 
+test('por la misma IP (como por `tailscale serve`), cada celu tiene su cupo; la PC lo ve con la etiqueta, no 127.0.0.1', async () => {
+  const A = Buffer.alloc(32, 10).toString('base64url')
+  const B = Buffer.alloc(32, 11).toString('base64url')
+  const ips: string[] = []
+  await conServidor(
+    {
+      celus: () => [{ id: 'a', clave: A }, { id: 'b', clave: B }],
+      entrar: () => ({ status: 200, data: {} }),
+      estado: async (q) => {
+        if (q) ips.push(q.ip)
+        return ESTADO
+      },
+      terminal: async () => SIN_SALIDA
+    },
+    async (base) => {
+      for (let i = 0; i < 200; i++) assert.equal((await postSellado(base, '/api/terminal', { id: 'ws', desde: 0 }, { con: A })).status, 200)
+      assert.equal((await postSellado(base, '/api/terminal', { id: 'ws', desde: 0 }, { con: A })).status, 429)
+      assert.equal((await postSellado(base, '/api/terminal', { id: 'ws', desde: 0 }, { con: B })).status, 200, 'el otro celu no paga lo que gastó el primero')
+      await postSellado(base, '/api/estado', {}, { con: B })
+      assert.deepEqual(ips, ['Tailscale (HTTPS)'])
+    },
+    { etiqueta: 'Tailscale (HTTPS)' }
+  )
+})
+
 test('emparejar sin proveedor de entradas (como en v1): la clave del QR da acceso y emparejar contesta que ya está', async () => {
   await conServidor({}, async (base) => {
     assert.equal((await postSellado(base, '/api/estado', {})).status, 200)

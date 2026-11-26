@@ -32,8 +32,10 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
   const srvRef = useRef<HTMLHeadingElement>(null)
   const accesoRef = useRef<HTMLHeadingElement>(null)
   const responder = async (id: string, si: boolean): Promise<void> => {
-    await hacer('entrar', { id, si })
-    requestAnimationFrame(() => (si ? accesoRef.current : null)?.focus() ?? srvRef.current?.focus())
+    // Antes de responder: el pedido puede irse (por el aviso de la PC) antes de que vuelva `hacer`.
+    srvRef.current?.focus()
+    const ok = await hacer('entrar', { id, si })
+    if (si && ok) requestAnimationFrame(() => accesoRef.current?.focus())
   }
 
   useEffect(() => {

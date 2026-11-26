@@ -166,7 +166,10 @@ test('pedidoParaCelu: el comando entero (no 160), marcado si es destructivo y si
   // Un override bidi da vuelta lo que se lee; el salto de línea de un comando de varias líneas sí queda.
   const bidi = pedidoParaCelu('Bash', { command: 'echo hola\u202E fdsa && rm\nls\tx' })
   assert.equal(bidi.texto, 'echo hola\uFFFD fdsa && rm\nls\tx')
-  assert.equal(pedidoParaCelu('Bash', { command: 'a'.repeat(MAX_PEDIDO + 50) }).texto.length, MAX_PEDIDO)
+  const cortado = pedidoParaCelu('Bash', { command: 'a'.repeat(MAX_PEDIDO + 50) })
+  assert.equal(cortado.texto.length, MAX_PEDIDO)
+  assert.equal(cortado.cortado, true, 'lo que no entra se marca: desde el celu solo se puede rechazar')
+  assert.equal(pedidoParaCelu('Bash', { command: 'a'.repeat(MAX_PEDIDO) }).cortado, undefined)
   assert.deepEqual(pedidoParaCelu('Edit', { file_path: 'src/a.ts' }), { texto: 'Editar src/a.ts', titulo: 'Claude quiere editar un archivo', destructivo: null })
   assert.equal(pedidoParaCelu('WebFetch', { url: 'https://ejemplo.com/x' }).texto, 'Acceder a ejemplo.com')
 })
@@ -221,11 +224,18 @@ test('cuerpoNtfy: con enlace, tocar el aviso o «Abrir Sloth» abre la página; 
   assert.equal('actions' in sin, false)
 })
 
-test('enlaceAviso nunca lleva la clave: Wi-Fi primero, si no la página remota sin # ni parámetros', () => {
-  assert.equal(enlaceAviso({ ip: '192.168.0.10', puerto: 47321 }, 'https://x.github.io/sloth/celu/'), 'http://192.168.0.10:47321/')
-  assert.equal(enlaceAviso(null, 'https://x.github.io/sloth/celu/#p=secreto?a=1'), 'https://x.github.io/sloth/celu/')
-  assert.equal(enlaceAviso(null, 'https://x.github.io/sloth/celu/?q=1#p=secreto'), 'https://x.github.io/sloth/celu/')
-  assert.equal(enlaceAviso(null, null), null)
+test('enlaceAviso nunca lleva la clave y prefiere lo que anda fuera de casa; privado, nada que diga la IP o el nombre de la PC', () => {
+  const wifi = { ip: '192.168.0.10', puerto: 47321 }
+  const remoto = 'https://x.github.io/sloth/celu/'
+  const https = 'https://mi-pc.tail.ts.net'
+  assert.equal(enlaceAviso({ wifi, remoto: null }), 'http://192.168.0.10:47321/')
+  assert.equal(enlaceAviso({ wifi, remoto }), 'https://x.github.io/sloth/celu/', 'con la remota prendida, la que anda afuera')
+  assert.equal(enlaceAviso({ wifi, remoto, https }), 'https://mi-pc.tail.ts.net/')
+  assert.equal(enlaceAviso({ wifi: null, remoto: 'https://x.github.io/sloth/celu/#p=secreto?a=1' }), 'https://x.github.io/sloth/celu/')
+  assert.equal(enlaceAviso({ wifi: null, remoto: 'https://x.github.io/sloth/celu/?q=1#p=secreto' }), 'https://x.github.io/sloth/celu/')
+  assert.equal(enlaceAviso({ wifi: null, remoto: null }), null)
+  assert.equal(enlaceAviso({ wifi, remoto: null, https, privado: true }), null, 'privado: ni la IP de casa ni el nombre de la PC')
+  assert.equal(enlaceAviso({ wifi, remoto, https, privado: true }), 'https://x.github.io/sloth/celu/')
 })
 
 test('textoAvisoPrivado no dice el espacio ni lo que dijo Claude', () => {
@@ -237,9 +247,11 @@ test('textoAvisoPrivado no dice el espacio ni lo que dijo Claude', () => {
 test('ipTailscale: la IPv4 del rango de Tailscale (100.64/10), no otra', () => {
   const v4 = (address: string, internal = false) => ({ address, family: 'IPv4', internal })
   assert.equal(ipTailscale({ 'Wi-Fi': [v4('192.168.1.5')], Tailscale: [v4('100.101.102.103')] }), '100.101.102.103')
+  assert.equal(ipTailscale({ 'Wi-Fi': [v4('100.72.1.2')], Tailscale: [v4('100.101.102.103')] }), '100.101.102.103', 'un hotspot con CGNAT no es Tailscale')
+  assert.equal(ipTailscale({ 'Wi-Fi': [v4('100.72.1.2')] }), null)
   assert.equal(ipTailscale({ 'Wi-Fi': [v4('192.168.1.5')] }), null)
-  assert.equal(ipTailscale({ x: [v4('100.63.0.1'), v4('100.128.0.1')] }), null, 'fuera del rango no es Tailscale')
-  assert.equal(ipTailscale({ x: [{ address: 'fd7a:115c:a1e0::1', family: 'IPv6', internal: false }] }), null)
+  assert.equal(ipTailscale({ Tailscale: [v4('100.63.0.1'), v4('100.128.0.1')] }), null, 'fuera del rango no es Tailscale')
+  assert.equal(ipTailscale({ Tailscale: [{ address: 'fd7a:115c:a1e0::1', family: 'IPv6', internal: false }] }), null)
 })
 
 test('httpsTailscale: solo direcciones https de ts.net, normalizadas', () => {

@@ -672,7 +672,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       no.type = si.type = 'button';
       no.disabled = !!enviandoId;
       // Lo que no se vio entero no se aprueba: primero «Ver todo».
-      si.disabled = !!enviandoId || (largo && !abierto);
+      si.disabled = !!enviandoId || (largo && !abierto) || !!p.cortado;
       no.addEventListener('click', function () { decidir(p, 'deny'); });
       si.addEventListener('click', function () {
         if (p.destructivo && !confirmando(p)) {
@@ -686,7 +686,8 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       botones.appendChild(no);
       botones.appendChild(si);
       li.appendChild(botones);
-      if (largo && !abierto) li.appendChild(el('span', 'p-nota', 'Para aprobar, mirá el pedido entero con «Ver todo».'));
+      if (p.cortado) li.appendChild(el('span', 'p-nota', 'Es demasiado largo para verlo entero en el celu: para aprobarlo, respondelo en la PC.'));
+      else if (largo && !abierto) li.appendChild(el('span', 'p-nota', 'Para aprobar, mirá el pedido entero con «Ver todo».'));
       else if (dos) li.appendChild(el('span', 'p-nota', 'Es destructivo: tocá «Aprobar» otra vez en 5 s para confirmarlo.'));
     } else if (i === 0) {
       li.appendChild(el('span', 'p-nota', 'Respondelo en la PC. Para hacerlo desde acá, prendé «Aprobar desde el celu» en Sloth.'));
