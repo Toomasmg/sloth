@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Sloth",
+  "version": "0.8.0",
+  "identifier": "com.tomy.sloth",
+  "build": {
+    "frontendDist": "../out/renderer",
+    "devUrl": "http://localhost:5173"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Sloth",
+        "width": 1500,
+        "height": 920,
+        "minWidth": 900,
+        "minHeight": 560,
+        "backgroundColor": "#0e0f12"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.ico"]
+  }
+}
