@@ -127,7 +127,8 @@ export function PermissionReview({ prompts, workspaces, accounts, initialId, onC
   const explanation = p ? explanationOf(p.input) : undefined
   const domain = p && kind === 'net' ? String(p.input.url ?? p.input.query ?? '') : ''
   const cmd = p && kind === 'cmd' ? String(p.input.command ?? '') : ''
-  const destructivo = p ? destructivoDe(kind, p.input) : null
+  const input = p?.input
+  const destructivo = useMemo(() => (input ? destructivoDe(kind, input) : null), [kind, input])
   const otherJson = useMemo(() => {
     if (!p || kind !== 'other') return ''
     try {

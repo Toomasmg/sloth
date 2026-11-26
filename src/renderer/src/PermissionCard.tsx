@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { PermissionAnswer, PermissionPrompt } from '../../shared/types'
 import { alwaysLabel, changesOf, destructivoDe, filesOf, kindOf, otherName, titleOf } from '../../shared/permissions-core'
 import { PermissionIcon, WaitingIcon, CloseIcon } from './icons/SlothIcons'
@@ -73,7 +73,7 @@ export function PermissionCard({ prompt, queued, now, spaceName, accountLabel, o
   const reasonRef = useRef<HTMLInputElement>(null)
   const titleId = useId()
   const kind = kindOf(prompt.tool)
-  const destructivo = destructivoDe(kind, prompt.input)
+  const destructivo = useMemo(() => destructivoDe(kind, prompt.input), [kind, prompt.input])
   const secs = Math.max(0, Math.ceil((prompt.expiresAt - now) / 1000))
   const urgent = secs <= 15
 

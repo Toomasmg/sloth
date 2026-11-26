@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { dentroDelRepo, destructivoDe, findRule, permitirDesdeAviso, ruleFor, ruleMatches, type PermissionRequestLike, type PermissionRule } from './permissions-core'
+import { checkRule, dentroDelRepo, destructivoDe, findRule, permitirDesdeAviso, respuestaEfectiva, ruleFor, ruleMatches, type PermissionRequestLike, type PermissionRule } from './permissions-core'
 
 const CWD = 'C:\\dev\\repo'
 const pedido = (tool: string, input: Record<string, unknown>): PermissionRequestLike => ({ id: 'p1', ws: 'w1', tool, input, at: 0, expiresAt: 0 })
@@ -91,7 +91,18 @@ test('destructivoDe marca los comandos destructivos conocidos', () => {
     'git push origin main --force-if-includes',
     'git reset --hard HEAD~3',
     'git clean -fdx',
-    'git clean -n -f',
+    'git -C ../x push --force',
+    'git -C x reset --hard',
+    'git -c core.x=1 push origin main -f',
+    'git clean --force -d',
+    '/bin/rm -rf x',
+    '\\rm -rf x',
+    'rm x -rf',
+    'rm${IFS}-rf x',
+    'find . -name a -exec rm -rf {} \\;',
+    'rmdir -Recurse x',
+    'Remove-Item -r x',
+    'git push origin +main',
     'psql -c "DROP TABLE usuarios"',
     'sqlite3 a.db "drop database x"',
     'psql -c "TRUNCATE TABLE logs"',
@@ -114,6 +125,12 @@ test('destructivoDe no marca comandos comunes ni parecidos', () => {
     'git reset --soft HEAD~1',
     'git reset HEAD archivo',
     'git clean -n',
+    'git clean -n -f',
+    'git clean -fn',
+    'git clean --dry-run -fd',
+    'dd if=a of=/dev/null bs=1M',
+    'git -C x push origin feat/y',
+    'git -C x reset --soft HEAD~1',
     'git status',
     'npm run format',
     'npm run build -- --force',
@@ -146,6 +163,31 @@ test('destructivoDe, límites conocidos: busca texto, no entiende el shell', () 
   assert.equal(cmd('find . -delete'), null)
   assert.equal(cmd('bash borrar.sh'), null)
   assert.equal(cmd('psql -c "DELETE FROM usuarios"'), null)
-  assert.equal(cmd('git push origin +main'), null)
   assert.equal(cmd('git checkout -- .'), null)
+})
+
+test('destructivoDe es lineal: comandos enormes no traban y los muy largos se tratan como destructivos', () => {
+  const casos = ['rm -' + 'r'.repeat(250000) + '1', 'del '.repeat(60000), 'git push '.repeat(28000), 'Remove-Item '.repeat(20000), 'a '.repeat(2000) + ' rm -' + 'r'.repeat(1500) + '1']
+  for (const c of casos) {
+    const t0 = performance.now()
+    destructivoDe('cmd', { command: c })
+    assert.ok(performance.now() - t0 < 100, `tardó ${performance.now() - t0} ms`)
+  }
+  assert.notEqual(cmd('x'.repeat(5000)), null)
+  assert.equal(cmd('x'.repeat(3000)), null)
+})
+
+test('un comando destructivo no se aprueba desde el aviso, ni con regla, ni con «siempre»', () => {
+  const rm = pedido('Bash', { command: 'rm -rf x' })
+  const ok = pedido('Bash', { command: 'npm test' })
+  assert.equal(permitirDesdeAviso('cmd', rm.input), false)
+  assert.equal(respuestaEfectiva('allowAlways', rm), 'allow')
+  assert.equal(respuestaEfectiva('allowAlways', ok), 'allowAlways')
+  assert.equal(respuestaEfectiva('deny', rm), 'deny')
+  assert.equal(respuestaEfectiva('terminal', rm), 'terminal')
+  assert.equal(checkRule({ kind: 'cmd', tool: 'Bash', match: 'rm -rf x' }).ok, false)
+  assert.equal(checkRule({ kind: 'cmd', tool: 'Bash', match: 'npm test' }).ok, true)
+  // Una regla vieja sobre un destructivo ya no aprueba sola: vuelve a preguntar.
+  assert.equal(findRule([regla(rm)], rm), undefined)
+  assert.notEqual(findRule([regla(ok)], ok), undefined)
 })

@@ -17,6 +17,7 @@ import {
   kindOf,
   labelOf,
   permitirDesdeAviso,
+  respuestaEfectiva,
   ruleFor,
   shouldNotify,
   type DecisionEntry,
@@ -105,9 +106,10 @@ const feature: Feature = {
     }
 
     /** Responde un pedido que sigue pendiente. Lanza si ya no lo está (venció o se respondió en la terminal). */
-    function answer(b: TerminalBackend, id: string, choice: PermissionChoice, message?: string): void {
+    function answer(b: TerminalBackend, id: string, pedida: PermissionChoice, message?: string): void {
       const req = b.pendingPermissions().find((r) => r.id === id)
       if (!req) throw new Error('Ese permiso ya no está pendiente (venció o se respondió en la terminal).')
+      const choice = respuestaEfectiva(pedida, req)
       const kind = kindOf(req.tool)
       const label = labelOf(kind, req.tool, req.input)
       const base = { workspaceId: req.ws, spaceName: spaceName(req.ws), tool: req.tool, kind, label }

@@ -168,34 +168,71 @@ const INVISIBLES = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u
 export function permitirDesdeAviso(kind: PermissionKind, input: Record<string, unknown>): boolean {
   if (kind !== 'cmd') return false
   const c = str(input.command)
-  return c !== undefined && c.length <= 80 && !INVISIBLES.test(c)
+  return c !== undefined && c.length <= 80 && !INVISIBLES.test(c) && destructivoDe(kind, input) === null
 }
 
-// Cada patrón mira el texto crudo del comando: no hay parser de shell, así que busca el patrón donde esté.
-const DESTRUCTIVOS: ReadonlyArray<{ re: RegExp; motivo: string }> = [
-  { re: /(?:^|[\s;&|(`"'])rm\s+(?:-[a-z-]+\s+)*(?:-[a-z]*r[a-z]*|--recursive)(?![\w-])/i, motivo: 'borra carpetas enteras' },
-  { re: /(?:^|[\s;&|(`"'])(?:del|erase)\s+(?:[^;&|\n]*\s)?\/s(?![\w-])/i, motivo: 'borra archivos de forma recursiva' },
-  { re: /(?:^|[\s;&|(`"'])(?:rd|rmdir)\s+(?:[^;&|\n]*\s)?\/s(?![\w-])/i, motivo: 'borra carpetas enteras' },
-  { re: /\bRemove-Item\s[^;&|\n]*-Recurse/i, motivo: 'borra carpetas enteras' },
-  { re: /\bgit\s+push\b[^;&|\n]*\s(?:--force(?:-with-lease|-if-includes)?(?:=\S*)?|-[a-z]*f[a-z]*)(?![\w-])/i, motivo: 'pisa el historial del remoto' },
-  { re: /\bgit\s+reset\b[^;&|\n]*\s--hard(?![\w-])/i, motivo: 'descarta cambios sin commitear' },
-  { re: /\bgit\s+clean\b[^;&|\n]*\s-[a-z]*f/i, motivo: 'borra archivos sin seguimiento' },
-  { re: /\bdrop\s+(?:table|database|schema)\b/i, motivo: 'borra datos de una base' },
-  { re: /\btruncate\s+table\b/i, motivo: 'vacía una tabla' },
-  { re: /\bmkfs(?:\.\w+)?\s/i, motivo: 'formatea un disco' },
-  { re: /\bdd\s[^;&|\n]*\bof=\/dev\//i, motivo: 'escribe sobre un dispositivo' }
-]
+const MAX_ANALISIS = 4000
+const MAX_ALCANCE = 40
+const SQL_DESTRUCTIVO = /\b(?:drop\s+(?:table|database|schema)|truncate\s+table)\b/i
+
+const limpiar = (t: string): string => t.replace(/^["'{]+|["'}]+$/g, '')
+const comandoDe = (t: string): string => limpiar(t).replace(/^.*[\\/]/, '').toLowerCase().replace(/\.(?:exe|cmd|bat)$/, '')
+const esRecursivoPs = (t: string): boolean => /^-r(?:e(?:c(?:u(?:r(?:s(?:e)?)?)?)?)?)?$/i.test(t)
+
+/** Subcomando de git (saltando -C <ruta>, -c <clave> y otras opciones globales) y dónde empiezan sus argumentos. */
+function subcomandoGit(toks: string[]): { sub: string; args: string[] } | null {
+  let i = 1
+  while (i < toks.length && toks[i].startsWith('-')) i += toks[i] === '-C' || toks[i] === '-c' ? 2 : 1
+  return i < toks.length ? { sub: toks[i], args: toks.slice(i + 1) } : null
+}
+
+/** Motivo si el comando que arranca en toks[0] es destructivo. toks es un tramo corto y sin separadores. */
+function motivoDeTramo(toks: string[]): string | null {
+  const cmd = comandoDe(toks[0])
+  const resto = toks.slice(1).map(limpiar)
+  if (cmd === 'rm' && resto.some((t) => /^-[a-z]*r[a-z]*$/i.test(t) || t === '--recursive')) return 'borra carpetas enteras'
+  if ((cmd === 'del' || cmd === 'erase') && resto.some((t) => t.toLowerCase() === '/s')) return 'borra archivos de forma recursiva'
+  if ((cmd === 'rd' || cmd === 'rmdir') && resto.some((t) => t.toLowerCase() === '/s' || esRecursivoPs(t))) return 'borra carpetas enteras'
+  if ((cmd === 'remove-item' || cmd === 'ri' || cmd === 'del' || cmd === 'rm') && resto.some(esRecursivoPs)) return 'borra carpetas enteras'
+  if (cmd === 'git') {
+    const g = subcomandoGit(toks)
+    if (!g) return null
+    const args = g.args.map(limpiar)
+    if (g.sub === 'push' && args.some((t) => /^--force(?:-with-lease|-if-includes)?(?:=.*)?$/.test(t) || /^-[a-z]*f[a-z]*$/.test(t) || /^\+\S/.test(t))) return 'pisa el historial del remoto'
+    if (g.sub === 'reset' && args.includes('--hard')) return 'descarta cambios sin commitear'
+    if (g.sub === 'clean') {
+      const fuerza = args.some((t) => t === '--force' || /^-[a-z]*f[a-z]*$/.test(t))
+      const simula = args.some((t) => t === '--dry-run' || /^-[a-z]*n[a-z]*$/.test(t))
+      if (fuerza && !simula) return 'borra archivos sin seguimiento'
+    }
+  }
+  if (/^mkfs(?:\.\w+)?$/.test(cmd)) return 'formatea un disco'
+  if (cmd === 'dd' && resto.some((t) => t.startsWith('of=/dev/') && t !== 'of=/dev/null')) return 'escribe sobre un dispositivo'
+  return null
+}
 
 /**
- * Por qué un comando se marca «Destructivo» (null si no). Solo cambia lo que se muestra: no decide ni
- * bloquea nada. Es una lista corta a propósito: avisa ante lo conocido, y que un comando no figure
- * no quiere decir que sea seguro (ver los límites en el test).
+ * Por qué un comando se marca «Destructivo» (null si no). Solo cambia lo que se muestra y qué reglas
+ * «siempre» se aceptan: nunca ejecuta ni bloquea el pedido. Es una lista corta a propósito: avisa ante
+ * lo conocido, y que un comando no figure no quiere decir que sea seguro (ver los límites en el test).
+ * Costo lineal: parte el texto en tramos por ; & | y saltos, y mira cada palabra como posible comando
+ * con un alcance acotado (así también cubre sudo, xargs, find -exec y rutas como /bin/rm). Lo que pasa
+ * de MAX_ANALISIS no se analiza y se trata como destructivo.
  */
 export function destructivoDe(kind: PermissionKind, input: Record<string, unknown>): string | null {
   if (kind !== 'cmd') return null
   const c = str(input.command)
   if (!c) return null
-  return DESTRUCTIVOS.find((d) => d.re.test(c))?.motivo ?? null
+  if (c.length > MAX_ANALISIS) return 'comando demasiado largo para revisarlo'
+  if (SQL_DESTRUCTIVO.test(c)) return 'borra datos de una base'
+  for (const tramo of c.replace(/\$\{IFS\}|\$IFS/g, ' ').split(/[;&|\n\r`()]+/)) {
+    const toks = tramo.split(/\s+/).filter(Boolean)
+    for (let i = 0; i < toks.length; i++) {
+      const m = motivoDeTramo(toks.slice(i, i + MAX_ALCANCE))
+      if (m) return m
+    }
+  }
+  return null
 }
 
 /** Texto del botón «Permitir siempre» según el tipo. */
@@ -204,6 +241,11 @@ export function alwaysLabel(kind: PermissionKind): string {
   if (kind === 'edit') return 'Permitir siempre ediciones en este repo'
   if (kind === 'net') return 'Permitir siempre este dominio aquí'
   return 'Permitir siempre aquí'
+}
+
+/** «Permitir siempre» sobre un comando destructivo se degrada a «una vez»: nunca queda una regla que lo apruebe solo. */
+export function respuestaEfectiva(choice: PermissionChoice, req: PermissionRequestLike): PermissionChoice {
+  return choice === 'allowAlways' && destructivoDe(kindOf(req.tool), req.input) !== null ? 'allow' : choice
 }
 
 /** Regla que se guarda al elegir «Permitir siempre» para este pedido. */
@@ -264,7 +306,7 @@ export function ruleMatches(rule: PermissionRule, req: PermissionRequestLike, cw
   if (!rule.on || rule.workspaceId !== req.ws) return false
   const kind = kindOf(req.tool)
   if (rule.kind !== kind) return false
-  if (kind === 'cmd') return rule.match !== '' && (str(req.input.command) ?? '') === rule.match
+  if (kind === 'cmd') return rule.match !== '' && (str(req.input.command) ?? '') === rule.match && destructivoDe(kind, req.input) === null
   if (kind === 'net') return rule.match !== '' && hostOf(req.input) === rule.match
   if (kind === 'edit') {
     if (!FILE_EDIT_TOOLS.has(req.tool) || rule.match !== '*' || !cwd) return false
@@ -311,6 +353,7 @@ export function checkRule(raw: unknown): { ok: true; rule: RuleDraft } | { ok: f
     if (!match) return fail('falta el comando')
     if (match.length > MAX_RULE_MATCH || CONTROL.test(match)) return fail('comando demasiado largo o con caracteres de control')
     if (match.includes('*')) return fail('Sloth solo guarda comandos exactos, sin comodines')
+    if (destructivoDe('cmd', { command: match }) !== null) return fail('un comando destructivo solo se permite una vez')
     return { ok: true, rule: { kind, tool, match, label: match } }
   }
   if (kind === 'net') {
