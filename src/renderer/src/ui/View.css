@@ -1,5 +1,8 @@
 /* Vista: ocupa el lugar de la barra lateral y los paneles; quedan a la vista la barra superior, el riel y la de estado. */
+/* Contenedor «ui-view»: las páginas miden su ancho real (la ventana menos el riel y el panel lateral abierto),
+   no el de la ventana. Los @container de cada página usan el umbral de antes menos 48 px del riel. */
 .ui-view {
+  container: ui-view / inline-size;
   position: fixed;
   inset: var(--top-h) var(--side-panel-w, 0px) var(--status-h) var(--rail-w);
   z-index: var(--z-panel);

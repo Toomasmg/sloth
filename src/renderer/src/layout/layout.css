@@ -20,6 +20,8 @@
 .pane-head.draggable :is(button, a, input, [role='status']) {
   cursor: pointer;
 }
+/* Mientras se arrastra, el cursor y la selección de texto no pueden depender de lo que haya debajo del mouse:
+   la prioridad forzada le gana a los cursor y user-select de cualquier componente. */
 body.is-reordering,
 body.is-reordering * {
   cursor: grabbing !important;

@@ -49,24 +49,24 @@ function contraste(a: string, b: string): number {
 }
 
 // [texto o borde, fondo, mínimo]: 4,5 para texto y 3 para bordes de controles y foco (WCAG 1.4.3 y 1.4.11).
-const TEXTO_SOBRE = ['--bg', '--surface', '--raised', '--overlay', '--sunken']
+// Los fondos son todos los que de verdad llevan texto: superficies, hover de filas, botones, buscadores y paneles.
+const TEXTO_SOBRE = ['--bg', '--sunken', '--surface', '--raised', '--overlay', '--surface-hover', '--card-hover', '--surface-2', '--input-bg', '--btn-2', '--search-bg', '--pane-bg', '--panes-bg', '--perm-bg']
+const PLACEHOLDER_SOBRE = ['--bg', '--sunken', '--surface', '--raised', '--overlay', '--input-bg', '--search-bg', '--pane-bg']
+const ESTADO_SOBRE = ['--bg', '--sunken', '--surface', '--raised', '--surface-hover']
+const BORDE_SOBRE = ['--bg', '--sunken', '--surface', '--raised', '--input-bg', '--surface-hover']
 const PARES: [string, string, number][] = [
   ...TEXTO_SOBRE.flatMap((f): [string, string, number][] => [['--text', f, 4.5], ['--text-2', f, 4.5], ['--text-3', f, 4.5]]),
-  ['--placeholder', '--raised', 4.5],
-  ['--placeholder', '--bg', 4.5],
-  ['--placeholder', '--input-bg', 4.5],
+  ...PLACEHOLDER_SOBRE.map((f): [string, string, number] => ['--placeholder', f, 4.5]),
   ['--on-accent', '--accent', 4.5],
   ['--accent', '--bg', 4.5],
   ['--accent', '--raised', 4.5],
-  ...['--waiting', '--done', '--danger', '--team'].flatMap((t): [string, string, number][] => [[t, '--bg', 4.5], [t, '--raised', 4.5]]),
-  ['--control-border', '--raised', 3],
-  ['--control-border', '--bg', 3],
-  ['--control-border', '--input-bg', 3],
-  ['--focus', '--bg', 3],
-  ['--focus', '--raised', 3]
+  ...['--accent', '--waiting', '--done', '--danger', '--team', '--info'].flatMap((t): [string, string, number][] => ESTADO_SOBRE.map((f) => [t, f, 4.5])),
+  ...BORDE_SOBRE.flatMap((f): [string, string, number][] => [['--control-border', f, 3], ['--focus', f, 3]])
 ]
 
-for (const [nombre, tema] of [['oscuro', OSCURO], ['claro', CLARO]] as const) {
+const NOCHE = new Map([...OSCURO, ...bloque("html[data-night='true']:not([data-theme='light'])")])
+
+for (const [nombre, tema] of [['oscuro', OSCURO], ['claro', CLARO], ['más oscuro', NOCHE]] as const) {
   test(`contraste AA de los tokens (${nombre})`, () => {
     const fallas: string[] = []
     for (const [f, b, min] of PARES) {
@@ -88,6 +88,8 @@ for (const [tema, base, prefijo] of [
       const a = resolver(t, '--accent')
       assert.ok(contraste(resolver(t, '--accent-fg'), a) >= 4.5, `texto sobre ${nombre}`)
       assert.ok(contraste(a, resolver(t, '--bg')) >= 4.5, `${nombre} como texto sobre --bg`)
+      assert.ok(contraste(a, resolver(t, '--surface')) >= 4.5, `${nombre} como texto sobre --surface`)
+      assert.ok(contraste(a, resolver(t, '--surface-hover')) >= 4.5, `${nombre} como texto sobre --surface-hover`)
     })
   }
 }

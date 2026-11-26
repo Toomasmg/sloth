@@ -114,7 +114,7 @@
 @media (prefers-reduced-motion: reduce) {
   .dictado-btn,
   .dictado-dot {
-    animation: none !important;
+    animation: none;
   }
 }
 

@@ -428,7 +428,7 @@
   color: var(--success-fg);
 }
 
-@media (max-width: 760px) {
+@container ui-view (max-width: 712px) {
   .ay-nav {
     position: static;
     flex-direction: row;
