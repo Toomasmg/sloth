@@ -666,7 +666,7 @@
   color: var(--success-fg);
 }
 
-@media (max-width: 760px) {
+@container ui-view (max-width: 712px) {
   .hist-aside,
   .hist-list,
   .hist-detail {

@@ -631,7 +631,7 @@
 }
 /* ---------- Pantallas angostas ---------- */
 
-@media (max-width: 900px) {
+@container ui-view (max-width: 852px) {
   .f-wt-row {
     grid-template-columns: minmax(0, 1fr);
   }

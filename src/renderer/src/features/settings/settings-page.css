@@ -826,7 +826,7 @@ button.f-set-toggle:disabled {
 }
 
 /* ---------- Pantalla angosta: la barra lateral va arriba ---------- */
-@media (max-width: 640px) {
+@container ui-view (max-width: 592px) {
   .f-set-nav {
     flex: 0 0 auto;
     height: auto;

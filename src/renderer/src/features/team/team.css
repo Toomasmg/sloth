@@ -209,7 +209,7 @@
   gap: var(--s-3);
   align-items: start;
 }
-@media (max-width: 1100px) {
+@container ui-view (max-width: 1052px) {
   .f-team-grid {
     grid-template-columns: 1fr;
   }
