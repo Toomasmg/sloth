@@ -1,0 +1,44 @@
+.pr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-11);
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--hover);
+  color: var(--text-3);
+}
+.pr-chip.ok {
+  background: var(--done-soft);
+  color: var(--done);
+}
+.pr-chip.bad {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.pr-chip.warn {
+  background: var(--waiting-soft);
+  color: var(--waiting);
+}
+.pr-chip.run {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.pr-chip-check {
+  min-width: 0;
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-11);
+  color: var(--danger);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pr-chip .spin {
+    animation: none;
+  }
+}
