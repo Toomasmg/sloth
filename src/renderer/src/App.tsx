@@ -17,11 +17,12 @@ import { api } from './api'
 import { UiContext, type NewWorkspacePreset, type PaneGuard, type UiCtx } from './features/host'
 import { FEATURE_UIS } from './features/registry'
 import { resolveAccountColor, useSettings } from './features/settings/store'
-import { openChat, useChatAttach, useChatSnapshot } from './features/chat/store'
+import { openChat, useChatAttach, useChatSnapshot, useDrawer } from './features/chat/store'
 import { chatButtonLabel } from './features/chat/alerts'
 import { Badge } from './ui'
 import { openSettings } from './features/settings/bus'
 import { openHelp } from './features/help/bus'
+import { seAtiende } from './atajos-terminal'
 import { comboLabel, isCapturingShortcut, matchShortcut } from './shortcuts'
 import type { ShortcutId } from '../../main/features/settings-model'
 import { GlobalSlot, PaneBannerSlot, PaneHeaderSlot, TitlebarOnly } from './features/slots'
@@ -661,9 +662,14 @@ export function App(): React.JSX.Element {
       if (e.metaKey || isCapturingShortcut()) return
       const k = winKeys.current
       const ae = document.activeElement
-      const inTerm = !!ae?.closest('.terminal-host')
+      const foco = { enTerminal: !!ae?.closest('.terminal-host') }
+      // Atajo global: se atiende y no llega a la terminal (sin esto la shell recibiría ^N, ^M…).
+      const swallow = (ev: KeyboardEvent): void => {
+        ev.preventDefault()
+        ev.stopPropagation()
+      }
       const typing = !!ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || (ae as HTMLElement).isContentEditable)
-      // Ctrl+1–4 van también desde la terminal (como Ctrl+Tab y Ctrl+Alt+flechas): no son teclas de la shell.
+      // Qué atajos andan con la terminal enfocada lo decide atajos-terminal.ts.
       const focusN = FOCUS_IDS.findIndex((id) => matchShortcut(id, e))
       if (focusN >= 0) {
         e.preventDefault()
@@ -671,33 +677,34 @@ export function App(): React.JSX.Element {
         focusVisiblePane(focusN + 1)
       } else if (matchShortcut('help', e)) {
         // F1 es de la terminal cuando está enfocada (p. ej. vim o less): solo fuera de ella.
-        if (inTerm) return
+        if (!seAtiende('help', foco)) return
         e.preventDefault()
         openHelp('ayuda')
       } else if (matchShortcut('broadcastNow', e)) {
-        if (inTerm) return
-        e.preventDefault()
+        if (!seAtiende('broadcastNow', foco)) return
+        swallow(e)
         k.broadcastNow()
       } else if (matchShortcut('sidebar', e)) {
-        if (inTerm) return
+        // Ctrl+B es «retroceder un carácter» en la shell: con la terminal enfocada queda para ella.
+        if (!seAtiende('sidebar', foco)) return
         e.preventDefault()
         k.side()
       } else if (matchShortcut('new', e)) {
-        if (inTerm || accountsRef.current.length === 0) return
-        e.preventDefault()
+        if (!seAtiende('new', foco) || accountsRef.current.length === 0) return
+        swallow(e)
         k.newWs()
       } else if (matchShortcut('rename', e)) {
         // En la lista de espacios, F2 lo maneja la fila (su propio botón). Escribiendo, no se toca.
-        if (inTerm || typing || ae?.closest('.sl-side')) return
+        if (!seAtiende('rename', foco) || typing || ae?.closest('.sl-side')) return
         if (k.rename()) e.preventDefault()
       } else if (matchShortcut('chat', e)) {
-        if (inTerm) return
-        e.preventDefault()
+        if (!seAtiende('chat', foco)) return
+        swallow(e)
         k.chat()
       } else if (e.ctrlKey && e.altKey && !e.shiftKey && LAYOUT_BY_DIGIT[e.code]) {
         // Distribución fija (Ctrl+Alt+1–4): no se graba en Configuración.
-        if (inTerm) return
-        e.preventDefault()
+        if (!seAtiende('layout', foco)) return
+        swallow(e)
         k.layout(LAYOUT_BY_DIGIT[e.code])
       }
     }
@@ -832,6 +839,7 @@ export function App(): React.JSX.Element {
   // Chat del equipo: el botón de la barra muestra los no leídos (useChatAttach conecta la función).
   useChatAttach(uiCtx)
   const chatUnread = useChatSnapshot()?.unreadTotal ?? 0
+  const chatOpen = useDrawer().open
 
   // Distribución elegida (se guarda en esta PC). Uno = 1 a la vista; Dos = 2; Tres = 3; Cuatro = 4.
   const pickLayout = (k: ViewMode): void => {
@@ -918,7 +926,7 @@ export function App(): React.JSX.Element {
               <TitlebarOnly name="updater" />
             </div>
             <Tooltip text="Chat del equipo" shortcut={comboLabel('chat')}>
-              <button type="button" className="sl-chat" onClick={() => openChat()} aria-label={chatButtonLabel(chatUnread)}>
+              <button type="button" className="sl-chat" onClick={() => openChat()} aria-expanded={chatOpen} aria-label={chatButtonLabel(chatUnread)}>
                 <ChatIcon size={17} aria-hidden="true" />
                 {chatUnread > 0 && (
                   <span className="sl-chat-badge" aria-hidden="true">

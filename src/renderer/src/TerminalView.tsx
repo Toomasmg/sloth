@@ -80,6 +80,7 @@ export const TerminalView = memo(function TerminalView({ id, generation, onError
     // URLs sueltas en el texto, sin OSC 8.
     term.loadAddon(new WebLinksAddon((_e, uri) => abrirLink(uri)))
     term.open(el)
+    term.textarea?.setAttribute('aria-label', 'Entrada de la terminal')
     try {
       fit.fit()
     } catch {

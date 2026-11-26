@@ -28,7 +28,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: [['Ctrl', 'N']], what: 'Nuevo espacio', group: 'General', id: 'new' },
   { keys: [['Ctrl', 'B']], what: 'Mostrar u ocultar la barra lateral', group: 'General', id: 'sidebar' },
   { keys: [['F6'], ['Shift', 'F6']], what: 'Saltar entre la barra superior, el riel, la barra lateral y los paneles (sirve también dentro de la terminal)', group: 'General' },
-  { keys: [['Ctrl', 'Shift', '1–5']], what: 'Ir a Espacios (1), Tickets (2), Equipo (3), Historial (4) o Ramas aparte (5)', group: 'General' },
+  { keys: [['Ctrl', 'Shift', '1–6']], what: 'Ir a Espacios (1), Tickets (2), Equipo (3), Historial (4), Ramas aparte (5) o PRs (6)', group: 'General' },
   { keys: [['Ctrl', 'Shift', 'M']], what: 'Abrir el chat del equipo', group: 'Chat', id: 'chat' },
   { keys: [['Esc']], what: 'Cerrar ventanas y paletas', group: 'General' },
   { keys: [['F2']], what: 'Renombrar el panel activo (o el espacio enfocado en la lista)', group: 'Paneles', id: 'rename' },
@@ -47,6 +47,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: [['Ctrl', 'Alt', '↓']], what: 'Mover el panel a la fila de abajo', group: 'Paneles' },
   { keys: [['Ctrl', 'Shift', 'C']], what: 'Copiar la selección de la terminal', group: 'Terminal' },
   { keys: [['Ctrl', 'Shift', 'V']], what: 'Pegar en la terminal', group: 'Terminal' },
+  { keys: [['Tab']], what: 'Con la terminal enfocada, Tab y las teclas de la shell son de ella: Ctrl+B, F1 y F2 no se atienden ahí (F6 saca el foco). Los demás atajos de esta hoja andan también dentro de la terminal', group: 'Terminal' },
   { keys: [['Clic derecho']], what: 'En la terminal: copia si hay selección, si no pega', group: 'Terminal' }
 ]
 
@@ -141,7 +142,7 @@ export function comboFromEvent(e: KeyboardEvent): string | null {
 
 const norm = (s: string): string => canonicalCombo(s) ?? s
 
-/** «Ctrl Shift 1–5» son cinco combinaciones: así un atajo propio no puede pisar ninguna. */
+/** «Ctrl Shift 1–6» son seis combinaciones: así un atajo propio no puede pisar ninguna. */
 function expandRange(keys: string[]): string[][] {
   const last = keys[keys.length - 1] ?? ''
   const m = /^(\d)–(\d)$/.exec(last)
