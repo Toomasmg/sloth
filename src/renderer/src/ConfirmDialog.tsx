@@ -1,4 +1,5 @@
 import { Modal } from './Modal'
+import { Button } from './ui'
 
 export interface ConfirmRequest {
   title: string
@@ -14,12 +15,12 @@ export function ConfirmDialog({ req, onDone }: { req: ConfirmRequest; onDone: (o
     <Modal title={req.title} onClose={() => onDone(false)} className="confirm-dialog">
       <p className="confirm-body">{req.body}</p>
       <div className="modal-actions">
-        <button type="button" className="btn ghost" onClick={() => onDone(false)} data-autofocus>
+        <Button look="classic" variant="ghost" onClick={() => onDone(false)} data-autofocus>
           {req.no ?? 'Cancelar'}
-        </button>
-        <button type="button" className="btn primary" onClick={() => onDone(true)}>
+        </Button>
+        <Button look="classic" variant="primary" onClick={() => onDone(true)}>
           {req.yes}
-        </button>
+        </Button>
       </div>
     </Modal>
   )

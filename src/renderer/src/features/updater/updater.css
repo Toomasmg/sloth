@@ -328,7 +328,7 @@
 }
 
 /* Poco lugar: queda solo el ícono (el detalle está en el tooltip y en el aria-label) para no tapar los resúmenes de estado. */
-@container sl-right (max-width: 460px) {
+@container sl-top (max-width: 1359px) {
   .f-updater-banner:not(.is-flash) {
     padding: 0;
     width: 28px;

@@ -4,6 +4,7 @@ import { openDrawer } from '../git/store'
 import { BranchIcon, DoneIcon, PlusIcon, SearchIcon } from '../../icons/SlothIcons'
 import { Modal } from '../../Modal'
 import { View } from '../../ui/View'
+import { EmptyState, PageHead } from '../../ui'
 import { closeRamas, setRamasCandidates, setRamasDialog, useRamas } from './store'
 
 // ---------- Tipos (los mismos que devuelve main) ----------
@@ -369,20 +370,21 @@ export function RamasPage(): React.JSX.Element | null {
     <View labelId="f-wt-view-title" title="Ramas aparte" onClose={() => !rmBusy && closeRamas()} className="f-wt-view">
       <div className="f-wt-body">
         <div className="f-wt-inner">
-          <header className="f-wt-head">
-            <div className="f-wt-head-text">
-              <h1 id="f-wt-h">Ramas aparte</h1>
-              <p className="f-wt-sub">Una rama aparte es una copia de trabajo del mismo repo en otra carpeta, para que dos Claude no se pisen.</p>
-            </div>
-            <div className="f-wt-head-actions">
-              <button type="button" className="f-wt-btn lg solid" onClick={() => setRamasDialog('limpiar')}>
-                Limpiar ramas que ya no se usan
-              </button>
-              <button type="button" className="f-wt-btn lg primary" onClick={() => setRamasDialog('nueva')} disabled={scanning || !repos?.length} title={scanning ? 'Esperá a que termine el escaneo' : !repos?.length ? 'Hace falta un espacio con un repo git' : undefined}>
-                <PlusIcon size={14} /> Nueva rama aparte
-              </button>
-            </div>
-          </header>
+          <PageHead
+            titleId="f-wt-h"
+            title="Ramas aparte"
+            description="Una rama aparte es una copia de trabajo del mismo repo en otra carpeta, para que dos Claude no se pisen."
+            actions={
+              <>
+                <button type="button" className="f-wt-btn lg solid" onClick={() => setRamasDialog('limpiar')}>
+                  Limpiar ramas que ya no se usan
+                </button>
+                <button type="button" className="f-wt-btn lg primary" onClick={() => setRamasDialog('nueva')} disabled={scanning || !repos?.length} title={scanning ? 'Esperá a que termine el escaneo' : !repos?.length ? 'Hace falta un espacio con un repo git' : undefined}>
+                  <PlusIcon size={14} /> Nueva rama aparte
+                </button>
+              </>
+            }
+          />
 
           <div className="f-wt-tiles" role="group" aria-label="Resumen">
             <div className="f-wt-tile">
@@ -423,19 +425,25 @@ export function RamasPage(): React.JSX.Element | null {
 
           {scanErr && <p className="form-error" role="alert">{scanErr}</p>}
           {repos?.length === 0 && !scanErr && (
-            <p className="hint f-wt-empty">
-              Ningún espacio apunta a un repo git. Abrí un espacio con un repo para ver sus ramas aparte.{' '}
-              <button
-                type="button"
-                className="f-wt-btn lg solid"
-                onClick={() => {
-                  closeRamas()
-                  ui.openNewWorkspace('normal')
-                }}
-              >
-                Nuevo espacio
-              </button>
-            </p>
+            <div className="f-wt-empty f-wt-empty--ui">
+              <EmptyState
+                icon={<BranchIcon size={20} />}
+                title="Todavía no hay ramas aparte"
+                description="Ningún espacio apunta a un repo git. Abrí un espacio con un repo para ver sus ramas aparte."
+                action={
+                  <button
+                    type="button"
+                    className="f-wt-btn lg solid"
+                    onClick={() => {
+                      closeRamas()
+                      ui.openNewWorkspace('normal')
+                    }}
+                  >
+                    Nuevo espacio
+                  </button>
+                }
+              />
+            </div>
           )}
 
           {groups.map(({ repo, rows }) => (

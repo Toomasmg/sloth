@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   ArrowClockwise,
   ArrowSquareOut,
-  CheckCircle,
-  ChatCircleDots,
   CircleDashed,
   CircleNotch,
   GitPullRequest,
@@ -17,8 +15,9 @@ import {
   XCircle
 } from '@phosphor-icons/react'
 import { useUi } from '../host'
+import { PrChips } from '../PrChips'
 import { View } from '../../ui/View'
-import { Button, EmptyState } from '../../ui'
+import { Button, EmptyState, Skeleton } from '../../ui'
 import { TeamIcon } from '../../icons/SlothIcons'
 import { cleanError, fmtTok } from '../../format'
 import { pedirFiltroPersonas } from '../tickets/model'
@@ -40,17 +39,6 @@ import {
   type TeamTicket
 } from './model'
 
-const CI = {
-  pass: { label: 'pasa', Icon: CheckCircle, cls: 'ok' },
-  fail: { label: 'falla', Icon: XCircle, cls: 'bad' },
-  running: { label: 'corriendo', Icon: CircleNotch, cls: 'run' },
-  none: { label: 'sin CI', Icon: CircleDashed, cls: 'mute' }
-} as const
-const REVIEW = {
-  approved: { label: 'aprobado', Icon: CheckCircle, cls: 'ok' },
-  changes: { label: 'cambios pedidos', Icon: ChatCircleDots, cls: 'warn' },
-  pending: { label: 'review pendiente', Icon: CircleDashed, cls: 'mute' }
-} as const
 const ESTADO_CLS: Record<TeamTicket['categoria'], string> = { en_curso: 'run', revision: 'info', bloqueado: 'bad' }
 
 export function TeamView(): React.JSX.Element {
@@ -157,12 +145,14 @@ export function TeamView(): React.JSX.Element {
           {tarde ? (
             <p className="form-error f-team-pad" role="alert">
               No se pudo leer el equipo.{' '}
-              <button type="button" className="btn sm" onClick={reintentar}>
+              <Button look="classic" size="sm" onClick={reintentar}>
                 Reintentar
-              </button>
+              </Button>
             </p>
           ) : (
-            <p className="hint f-team-pad">Cargando…</p>
+            <div className="f-team-pad">
+              <Skeleton rows={5} label="Cargando…" />
+            </div>
           )}
         </div>
       </View>
@@ -202,7 +192,7 @@ export function TeamView(): React.JSX.Element {
         </button>
         {t.url && /^https?:\/\//.test(t.url) && (
           <a className="icon-btn f-team-ext" href={t.url} target="_blank" rel="noreferrer" aria-label={`Abrir ${t.id} en ${n}`} title={`Abrir en ${n}`}>
-            <ArrowSquareOut size={13} aria-hidden="true" />
+            <ArrowSquareOut size={14} aria-hidden="true" />
           </a>
         )}
         {starting === t.id && (
@@ -210,13 +200,13 @@ export function TeamView(): React.JSX.Element {
             <span>
               Crea el espacio <b className="mono">{t.id}</b> y arranca Claude ahí.
             </span>
-            <button type="button" className="btn sm primary" autoFocus disabled={Boolean(busy)} onClick={() => void start(t.id)}>
-              {busy === `start:${t.id}` ? <CircleNotch size={13} className="spin" aria-hidden="true" /> : <Play size={13} weight="fill" aria-hidden="true" />}
+            <Button look="classic" size="sm" variant="primary" autoFocus disabled={Boolean(busy)} onClick={() => void start(t.id)}>
+              {busy === `start:${t.id}` ? <CircleNotch size={14} className="spin" aria-hidden="true" /> : <Play size={14} weight="fill" aria-hidden="true" />}
               Empezar
-            </button>
-            <button type="button" className="btn sm ghost" onClick={() => setStarting(null)}>
+            </Button>
+            <Button look="classic" size="sm" variant="ghost" onClick={() => setStarting(null)}>
               Cancelar
-            </button>
+            </Button>
           </div>
         )}
       </li>
@@ -224,27 +214,10 @@ export function TeamView(): React.JSX.Element {
   }
 
   const prRow = (p: TeamPr): React.JSX.Element => {
-    const c = CI[p.ci]
-    const r = REVIEW[p.review]
-    const ciTitle =
-      p.ci === 'none'
-        ? 'Sin checks'
-        : `${p.checks.pass} pasan · ${p.checks.fail} fallan · ${p.checks.running} corriendo${p.failing?.length ? `\nFallan: ${p.failing.join(', ')}` : ''}`
     return (
       <li key={p.url} className="f-team-row">
         <button type="button" className="f-team-rowbtn" onClick={() => openPr(p)} title={`Abrir en GitHub: ${p.url}`}>
-          <span className={`f-team-chip ${c.cls}`} title={ciTitle}>
-            <c.Icon size={11} weight="bold" aria-hidden="true" className={p.ci === 'running' ? 'spin' : undefined} />
-            CI {c.label}
-          </span>
-          {p.isDraft ? (
-            <span className="f-team-chip mute">borrador</span>
-          ) : (
-            <span className={`f-team-chip ${r.cls}`}>
-              <r.Icon size={11} weight="bold" aria-hidden="true" />
-              {r.label}
-            </span>
-          )}
+          <PrChips estado={{ ci: p.ci, review: p.review, isDraft: p.isDraft, conflicto: false, failing: p.failing ?? [] }} />
           <span className="f-team-title">{p.title}</span>
           <span className="mono f-team-repo">
             {p.repo.split('/')[1]}#{p.number}
@@ -335,29 +308,30 @@ export function TeamView(): React.JSX.Element {
               ))}
           </span>
           <div className="f-team-actions">
-            <button type="button" className="btn sm" disabled={ghRunning} onClick={() => void refreshGithub()} title="Vuelve a leer los PRs abiertos con gh (no usa tokens)">
+            <Button look="classic" size="sm" disabled={ghRunning} onClick={() => void refreshGithub()} title="Vuelve a leer los PRs abiertos con gh (no usa tokens)">
               <ArrowClockwise size={14} aria-hidden="true" className={ghRunning ? 'spin' : undefined} /> Actualizar
-            </button>
+            </Button>
             {conector &&
               (ticketsRunning ? (
-                <button type="button" className="btn sm" onClick={() => void ui.invoke('feat:tickets:cancel')}>
+                <Button look="classic" size="sm" onClick={() => void ui.invoke('feat:tickets:cancel')}>
                   <X size={14} aria-hidden="true" /> Cancelar
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button
                   type="button"
-                  className="btn sm"
+                  look="classic"
+                  size="sm"
                   onClick={pedirTraer}
                   title={conector.via === 'mcp' ? 'Usa tokens de la cuenta de Tickets' : 'Lee con GitHub CLI (no usa tokens)'}
                 >
                   <Ticket size={14} aria-hidden="true" /> Traer de {n}
                   {conector.via === 'mcp' && <span className="f-team-subbtn">usa tokens</span>}
-                </button>
+                </Button>
               ))}
             {conector && (
-              <button type="button" className="btn sm ghost" aria-expanded={panel === 'link'} onClick={() => setPanel(panel === 'link' ? 'none' : 'link')}>
+              <Button look="classic" size="sm" variant="ghost" aria-expanded={panel === 'link'} onClick={() => setPanel(panel === 'link' ? 'none' : 'link')}>
                 <LinkSimple size={14} aria-hidden="true" /> Vincular
-              </button>
+              </Button>
             )}
           </div>
         </>
@@ -376,12 +350,12 @@ export function TeamView(): React.JSX.Element {
               <input type="checkbox" onChange={(e) => noPreguntar(e.target.checked)} />
               No volver a preguntar (también en Tickets)
             </label>
-            <button type="button" className="btn sm primary" autoFocus onClick={() => void traer()}>
+            <Button look="classic" size="sm" variant="primary" autoFocus onClick={() => void traer()}>
               Consultar
-            </button>
-            <button type="button" className="btn sm ghost" onClick={() => setConfirmar(false)}>
+            </Button>
+            <Button look="classic" size="sm" variant="ghost" onClick={() => setConfirmar(false)}>
               Cancelar
-            </button>
+            </Button>
           </div>
         )}
 
@@ -424,9 +398,9 @@ export function TeamView(): React.JSX.Element {
               {snap.tickets.filtro.personasElegidas > 0 &&
                 ` y los de ${snap.tickets.filtro.personasElegidas === 1 ? '1 persona elegida' : `${snap.tickets.filtro.personasElegidas} personas elegidas`}`}
               {snap.tickets.filtro.incluirSinAsignar && ', más los sin asignar'}. Se ve todo lo que tienen en curso, en revisión o bloqueado, sin importar cuándo se creó.{' '}
-              <button type="button" className="btn sm ghost" onClick={elegirPersonas}>
+              <Button look="classic" size="sm" variant="ghost" onClick={elegirPersonas}>
                 Elegir personas
-              </button>
+              </Button>
             </p>
           )}
 
@@ -455,7 +429,7 @@ export function TeamView(): React.JSX.Element {
           {repoErrors.length > 0 && (
             <details className="f-team-repoerr">
               <summary>
-                <WarningCircle size={13} aria-hidden="true" /> {repoErrors.length} {repoErrors.length === 1 ? 'repo no se pudo leer' : 'repos no se pudieron leer'}
+                <WarningCircle size={14} aria-hidden="true" /> {repoErrors.length} {repoErrors.length === 1 ? 'repo no se pudo leer' : 'repos no se pudieron leer'}
               </summary>
               <ul>
                 {repoErrors.map(([repo, msg]) => (

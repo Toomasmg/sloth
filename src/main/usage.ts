@@ -1,5 +1,6 @@
 import { open, readdir, stat } from 'node:fs/promises'
 import { join } from 'node:path'
+import { tokensCupo, ventanaActiva } from '../shared/cupo'
 import type { Account, AccountUsage, UsageTotals } from '../shared/types'
 import { proveedorDe } from './proveedores'
 
@@ -179,6 +180,7 @@ export class UsageScanner {
           if (!usage.windowStart || e.ts < usage.windowStart) usage.windowStart = e.ts
         }
       }
+      usage.ventana = ventanaActiva([...seen.values()].map((e) => ({ ts: e.ts, tokens: tokensCupo(e) })), now)
       result[acc.id] = usage
     }
     this.last = result

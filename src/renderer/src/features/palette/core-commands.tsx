@@ -36,28 +36,29 @@ export function coreCommands(ctx: UiCtx): Command[] {
     })
   }
 
-  if (ctx.accounts.length) {
-    cmds.push(
-      {
-        id: 'palette:new-ws',
-        title: 'Nuevo espacio',
-        subtitle: 'Un repo, una cuenta y una PowerShell',
-        group: 'General',
-        icon: <PlusIcon size={16} />,
-        keywords: 'crear agregar workspace',
-        run: () => ctx.openNewWorkspace('normal')
-      },
-      {
-        id: 'palette:new-ws-ticket',
-        title: 'Espacio desde ticket',
-        subtitle: 'Un espacio con el id del ticket',
-        group: 'General',
-        icon: <TagIcon size={16} />,
-        keywords: 'crear ticket issue',
-        run: () => ctx.openNewWorkspace('ticket')
-      }
-    )
-  }
+  const sinCuentas = ctx.accounts.length === 0 ? 'Primero agregá una cuenta de Claude' : undefined
+  cmds.push(
+    {
+      id: 'palette:new-ws',
+      title: 'Nuevo espacio',
+      subtitle: sinCuentas ?? 'Un repo, una cuenta y una PowerShell',
+      disabledReason: sinCuentas,
+      group: 'General',
+      icon: <PlusIcon size={16} />,
+      keywords: 'crear agregar workspace',
+      run: () => ctx.openNewWorkspace('normal')
+    },
+    {
+      id: 'palette:new-ws-ticket',
+      title: 'Espacio desde ticket',
+      subtitle: sinCuentas ?? 'Un espacio con el id del ticket',
+      disabledReason: sinCuentas,
+      group: 'General',
+      icon: <TagIcon size={16} />,
+      keywords: 'crear ticket issue',
+      run: () => ctx.openNewWorkspace('ticket')
+    }
+  )
 
   const f = ctx.focused && ctx.openPanes.includes(ctx.focused) ? ctx.focused : null
   if (f) {

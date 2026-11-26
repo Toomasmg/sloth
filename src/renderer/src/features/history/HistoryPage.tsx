@@ -4,7 +4,7 @@ import { cleanError } from '../../format'
 import { getSettings } from '../settings/store'
 import { CheckIcon, DoneIcon, IdleIcon, PermissionIcon } from '../../icons/SlothIcons'
 import { View } from '../../ui/View'
-import { Button, EmptyState } from '../../ui'
+import { Button, EmptyState, PageHead, Skeleton } from '../../ui'
 import { HistoryIcon } from '../../icons/SlothIcons'
 import { marks, wordsOf } from '../help/text'
 import { capacidadesDe, motivoSinCapacidad } from '../../../../shared/proveedores'
@@ -232,7 +232,7 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
   }
 
   const renderList = (): React.ReactNode => {
-    if (!rows) return <p className="hist-loading">Leyendo las conversaciones…</p>
+    if (!rows) return <Skeleton rows={5} showLabel label="Leyendo las conversaciones…" />
     if (visible.length === 0) {
       // Si la lectura falló, el error ya se muestra arriba: no decir «no hay sesiones».
       if (loadErr) return null
@@ -295,10 +295,7 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
       actions={<span className="hist-head-count">{rows ? plural(total, 'sesión guardada', 'sesiones guardadas') : ''}</span>}
     >
       <div className="hist-wrap">
-        <div className="hist-intro">
-          <h1 id="hist-title">Historial de sesiones</h1>
-          <p>Cada vez que trabajaste con Claude en un espacio queda una sesión. Retomala cuando quieras.</p>
-        </div>
+        <PageHead titleId="hist-title" title="Historial de sesiones" description="Cada vez que trabajaste con Claude en un espacio queda una sesión. Retomala cuando quieras." />
 
         <div className="hist-cols">
           <aside className="hist-aside" aria-label="Filtros">
@@ -368,9 +365,9 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
             </div>
 
             {filtersOn && (
-              <button type="button" className="btn hist-clear" onClick={clearFilters}>
+              <Button look="classic" className="hist-clear" onClick={clearFilters}>
                 Limpiar filtros
-              </button>
+              </Button>
             )}
           </aside>
 
@@ -379,13 +376,13 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
               <span className="hist-list-count">{countLabel}</span>
               <span className="hist-grow" />
               {hidden.size > 0 && (
-                <button type="button" className="btn sm ghost" aria-pressed={showHidden} onClick={() => setShowHidden((v) => !v)}>
+                <Button look="classic" size="sm" variant="ghost" aria-pressed={showHidden} onClick={() => setShowHidden((v) => !v)}>
                   {showHidden ? 'Ocultar las ocultas' : `Mostrar ocultas (${hidden.size})`}
-                </button>
+                </Button>
               )}
-              <button type="button" className="btn sm ghost" onClick={() => void load()}>
+              <Button look="classic" size="sm" variant="ghost" onClick={() => void load()}>
                 Actualizar
-              </button>
+              </Button>
             </div>
             {loadErr && (
               <p className="form-error" role="alert">
@@ -415,10 +412,7 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
                 say={say}
               />
             ) : (
-              <div className="hist-nosel">
-                  <span className="hist-empty-title">Elegí una sesión</span>
-                <span className="hint">Vas a ver la conversación y los archivos que tocó.</span>
-              </div>
+              <EmptyState size="sm" icon={<HistoryIcon size={20} />} title="Elegí una sesión" description="Vas a ver la conversación y los archivos que tocó." as="p" />
             )}
           </section>
         </div>
@@ -426,7 +420,7 @@ export function HistoryPage({ onClose, initialSpace }: { onClose: () => void; in
 
       {toast && (
         <div className="hist-toast" role="status">
-          <CheckIcon size={15} strokeWidth={2.2} className="hist-toast-ico" />
+          <CheckIcon size={14} strokeWidth={2.2} className="hist-toast-ico" />
           {toast}
         </div>
       )}

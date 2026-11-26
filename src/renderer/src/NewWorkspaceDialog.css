@@ -180,6 +180,13 @@
   font-size: var(--fs-12);
   color: var(--text-2);
 }
+.nw-acc-cupo {
+  margin-top: 2px;
+  min-width: 0;
+}
+.nw-acc-cupo .cupo-txt {
+  white-space: normal;
+}
 .nw-acc-warn {
   font-size: var(--fs-12);
   color: var(--waiting);

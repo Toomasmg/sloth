@@ -103,10 +103,11 @@ export async function initSettings(): Promise<void> {
 }
 
 /** Cambio parcial. Los mapas (terminal, notify) se fusionan; accountColors y shortcuts: null quita. */
-export type SettingsPatch = Partial<Omit<SlothSettings, 'terminal' | 'accountColors' | 'accountPlans' | 'notify' | 'shortcuts'>> & {
+export type SettingsPatch = Partial<Omit<SlothSettings, 'terminal' | 'accountColors' | 'accountPlans' | 'accountCupos' | 'notify' | 'shortcuts'>> & {
   terminal?: Partial<TerminalSettings>
   notify?: Partial<NotifySettings>
   accountPlans?: Record<string, string | null>
+  accountCupos?: Record<string, number | null>
   accountColors?: Record<string, string | null>
   shortcuts?: Partial<Record<ShortcutId, string | null>>
 }
@@ -115,7 +116,7 @@ export type SettingsPatch = Partial<Omit<SlothSettings, 'terminal' | 'accountCol
 export async function updateSettings(patch: SettingsPatch): Promise<void> {
   const prev = state
   const s = cloneSettings(prev.settings)
-  const { terminal, accountColors, accountPlans, notify, shortcuts, ...rest } = patch
+  const { terminal, accountColors, accountPlans, accountCupos, notify, shortcuts, ...rest } = patch
   Object.assign(s, rest)
   if (terminal) Object.assign(s.terminal, terminal)
   if (notify) Object.assign(s.notify, notify)
@@ -128,6 +129,11 @@ export async function updateSettings(patch: SettingsPatch): Promise<void> {
     for (const [id, c] of Object.entries(accountPlans)) {
       if (c === null) delete s.accountPlans[id]
       else s.accountPlans[id] = c
+    }
+  if (accountCupos)
+    for (const [id, c] of Object.entries(accountCupos)) {
+      if (c === null || c === 0) delete s.accountCupos[id]
+      else s.accountCupos[id] = c
     }
   if (shortcuts)
     for (const [id, c] of Object.entries(shortcuts)) {
@@ -165,10 +171,27 @@ export const projectsDirOf = (p: SettingsPayload = state): string => p.settings.
 
 /* ---------- Terminal ---------- */
 
+// Fuentes con íconos Powerline/Nerd que ya pueden estar en la PC; Sloth no descarga ninguna. Van antes del monospace genérico.
+export const NERD_FONTS: readonly string[] = ['Symbols Nerd Font Mono', 'Symbols Nerd Font', 'CaskaydiaCove Nerd Font Mono', 'MesloLGS NF', 'JetBrainsMono Nerd Font Mono']
+const NERD_STACK = NERD_FONTS.map((f) => `"${f}"`).join(', ')
+
 const FONT_STACK: Record<TerminalSettings['fontFamily'], string> = {
-  'JetBrains Mono': '"JetBrains Mono Variable", "Cascadia Code", Consolas, monospace',
-  'Cascadia Code': '"Cascadia Code", "Cascadia Mono", Consolas, monospace',
-  Consolas: 'Consolas, "Cascadia Mono", monospace'
+  'JetBrains Mono': `"JetBrains Mono Variable", "Cascadia Code", Consolas, ${NERD_STACK}, monospace`,
+  'Cascadia Code': `"Cascadia Code", "Cascadia Mono", Consolas, ${NERD_STACK}, monospace`,
+  Consolas: `Consolas, "Cascadia Mono", ${NERD_STACK}, monospace`
+}
+
+/** Si alguna fuente con símbolos Nerd está instalada: compara el ancho de un glifo del área privada contra dos bases. */
+export function hayFuenteNerd(): boolean {
+  const ctx = document.createElement('canvas').getContext('2d')
+  if (!ctx) return true
+  const muestra = ''
+  const ancho = (fam: string): number => {
+    ctx.font = `32px ${fam}`
+    return ctx.measureText(muestra).width
+  }
+  const bases = ['monospace', 'serif'].map((b) => ancho(b))
+  return NERD_FONTS.some((f) => ['monospace', 'serif'].some((b, i) => ancho(`"${f}", ${b}`) !== bases[i]))
 }
 export const termFontStack = (f: TerminalSettings['fontFamily']): string => FONT_STACK[f]
 

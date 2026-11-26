@@ -2,16 +2,9 @@
    Medidas en px literales del artboard. Colores por tokens de themes.css / styles.css;
    los tonos intermedios del artboard se derivan con color-mix() de esos tokens (tema claro incluido). */
 
-/* Chip en la barra de título */
+/* Chip en la barra de título: el color y el fondo (sin pastilla) los da .tb-chip en themes.css */
 .f-tickets-chip-tb {
-  color: var(--text-2);
-  background: var(--hover);
   cursor: pointer;
-}
-.f-tickets-chip-tb:hover,
-.f-tickets-chip-tb[aria-pressed='true'] {
-  background: var(--press);
-  color: var(--text);
 }
 .f-tickets-chip-tb:focus-visible {
   outline: 2px solid var(--accent);
@@ -153,17 +146,6 @@
   flex-direction: column;
   gap: 18px;
 }
-.f-tickets-h1 {
-  margin: 0;
-  font-size: var(--fs-24);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-.f-tickets-lead {
-  margin: 6px 0 0;
-  color: var(--text-2);
-  line-height: 1.5;
-}
 
 /* ---------- Avisos ---------- */
 .f-tickets-alert {
@@ -297,11 +279,23 @@
 }
 
 /* Filtros */
+/* Una sola fila: búsqueda, chips de estado, prioridad y «Limpiar». Si no entra, baja la última pieza, no cada una. */
 .f-tickets-filters {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px 14px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 10px 14px;
+}
+.f-tickets-filters > .f-tickets-search {
+  flex: 1 1 200px;
+  min-width: 160px;
+}
+.f-tickets-filters .f-tickets-filter-row {
+  display: contents;
+}
+.f-tickets-filters .f-tickets-grow {
+  display: none;
 }
 .f-tickets-search {
   display: flex;
@@ -391,7 +385,7 @@
 }
 .f-tickets-prio-field select:not(.ui-input) {
   height: 30px;
-  min-width: 150px;
+  min-width: 110px;
   padding-left: 10px;
   border: 0;
   border-radius: var(--r-md);
@@ -427,23 +421,6 @@
   min-height: 120px;
   padding: 8px 8px 10px;
 }
-.f-tickets-skel {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.f-tickets-skel > div {
-  height: 66px;
-  border-radius: var(--r-lg);
-  background: var(--card-hover);
-  /* Esqueleto de carga: unas pocas pasadas y queda quieto (nada de animación infinita en listas). */
-  animation: fade var(--t-med) var(--ease) 2 alternate both;
-}
-.f-tickets-skel span {
-  padding: 0 6px;
-  font-size: var(--fs-12);
-  color: var(--text-3);
-}
 .f-tickets-muted {
   font-size: var(--fs-12);
   color: var(--text-3);
@@ -475,6 +452,7 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background var(--t-fast) var(--ease);
 }
 .f-tickets-row:hover {
   background: var(--card-hover);
@@ -866,12 +844,6 @@
 .f-tickets-input:disabled {
   opacity: 0.7;
   cursor: not-allowed;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .f-tickets-skel > div {
-    animation: none;
-  }
 }
 
 /* ---------- Escrituras (0.6.2): toast, comentarios ---------- */

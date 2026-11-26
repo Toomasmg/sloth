@@ -17,13 +17,13 @@ import { api } from './api'
 import { UiContext, type NewWorkspacePreset, type PaneGuard, type UiCtx } from './features/host'
 import { FEATURE_UIS } from './features/registry'
 import { resolveAccountColor, useSettings } from './features/settings/store'
-import { openChat, useChatAttach, useChatSnapshot } from './features/chat/store'
+import { openChat, useChatAttach, useChatSnapshot, useDrawer } from './features/chat/store'
 import { chatButtonLabel } from './features/chat/alerts'
 import { Badge } from './ui'
 import { openSettings } from './features/settings/bus'
 import { openHelp } from './features/help/bus'
-import { colorHex } from './features/templates/catalog'
-import { comboLabel, isCapturingShortcut, matchShortcut } from './shortcuts'
+import { seAtiende } from './atajos-terminal'
+import { comboLabel, isCapturingShortcut, keyTokenOf, matchShortcut } from './shortcuts'
 import type { ShortcutId } from '../../main/features/settings-model'
 import { GlobalSlot, PaneBannerSlot, PaneHeaderSlot, TitlebarOnly } from './features/slots'
 import { openPermissionReview } from './features/permissions/store'
@@ -37,6 +37,7 @@ import { StateIcon } from './StateIcon'
 import { PermissionCard, toolLabel } from './PermissionCard'
 import { LogoMark } from './Logo'
 import { decidePermission } from './features/permissions/api'
+import { useCupos } from './use-cupos'
 import { setPaneVisible, useDocumentVisible, useVisiblePolling } from './visibility'
 import {
   LAYOUT_CAP,
@@ -47,6 +48,7 @@ import {
   defaultSizes,
   shapeFor,
   loadSizes,
+  modoReal,
   locatePane,
   movePane,
   sameOrder,
@@ -64,6 +66,7 @@ import { onEqualize, safeStorage, setViewMode, useViewMode } from './layout/stor
 import { useReorderDrag } from './layout/useReorderDrag'
 import { Separators } from './layout/Separators'
 import { SIDE_DEFAULT, SideResizer, clampSide, sideMax } from './layout/SideResizer'
+import { SIDE_AUTO_BELOW_PX, avisoAncho, capForWidth, sideVisible } from './layout/ancho-minimo'
 import { SleepingCard } from './SleepingCard'
 import { openRamas } from './features/worktrees/store'
 import { openHistory } from './features/history/index'
@@ -72,6 +75,9 @@ import { useNavDest } from './layout/nav'
 import { NAV_LABEL } from './layout/nav-model'
 import { sortPaneActions, type PaneAction } from './layout/pane-actions'
 import { WorkspaceContextMenu, WorkspaceMenuButton } from './layout/WorkspaceMenu'
+import { RenameInput } from './layout/RenameInput'
+import { Sidebar } from './layout/Sidebar'
+import { readStorage, writeStorage } from './layout/storage'
 import { TabBar, type TabInfo } from './layout/TabBar'
 import { SOLTAR_MS, direccionDe, pasoSwipe, swipeInicial } from './layout/swipe'
 import { IconButton, Tag, ToastHost, Tooltip, toast } from './ui'
@@ -80,7 +86,7 @@ import './layout/shell.css'
 import { WorkspaceIconPicker } from './WorkspaceIconPicker'
 import { useFolderDrop } from './useFolderDrop'
 import './workspace.css'
-import { cleanError, shortPath, STATE_LABEL } from './format'
+import { cleanError, STATE_LABEL } from './format'
 import {
   BroadcastIcon,
   BranchIcon,
@@ -93,8 +99,6 @@ import {
   MaximizeIcon,
   PencilIcon,
   PermissionIcon,
-  PlusIcon,
-  SearchIcon,
   SidebarIcon,
   TrashIcon,
   UpdateIcon,
@@ -118,25 +122,9 @@ const Smiley = (p: GlyphProps): React.JSX.Element => <Glyph {...p}><circle cx="1
 /** Distribución por tecla de Ctrl+Alt+1–4. */
 const LAYOUT_BY_DIGIT: Record<string, ViewMode> = { Digit1: 'uno', Digit2: 'dos', Digit3: 'tres', Digit4: 'cuatro' }
 
-/** Estado de la barra lateral y de las cuentas plegadas (preferencias de esta PC). */
+/** Barra lateral visible y su ancho (preferencias de esta PC). */
 const SIDEBAR_KEY = 'sloth.sidebar.shown'
-const COLLAPSED_KEY = 'sloth.sidebar.collapsed'
 const SIDE_W_KEY = 'sloth.sidebar.width'
-function readStorage(key: string): string | null {
-  try {
-    return window.localStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
-function writeStorage(key: string, value: string): void {
-  try {
-    window.localStorage.setItem(key, value)
-  } catch {
-    /* sin espacio o bloqueado: la preferencia se pierde, nada más */
-  }
-}
-
 export function App(): React.JSX.Element {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [statuses, setStatuses] = useState<Record<string, AccountStatus>>({})
@@ -160,18 +148,10 @@ export function App(): React.JSX.Element {
   // Picker de ícono y menú del espacio en un punto (clic derecho): `back` devuelve el foco a quien los abrió.
   const [iconPick, setIconPick] = useState<{ wsId: string; x: number; y: number; back: () => void } | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ paneId: string; from: 'side' | 'pane'; x: number; y: number; back: () => void } | null>(null)
-  // Barra lateral: visible o no, cuentas plegadas y filtro de espacios.
-  const [sideShown, setSideShown] = useState(() => readStorage(SIDEBAR_KEY) !== '0')
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
-    try {
-      const v = JSON.parse(readStorage(COLLAPSED_KEY) ?? '{}') as unknown
-      return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, boolean>) : {}
-    } catch {
-      return {}
-    }
-  })
-  const [wsQuery, setWsQuery] = useState('')
-  const [filterOpen, setFilterOpen] = useState(false)
+  // Barra lateral: visible o no.
+  const [sideShownPref, setSideShown] = useState(() => readStorage(SIDEBAR_KEY) !== '0')
+  // En ventana angosta el panel arranca plegado: abrirlo vale para esta sesión y no pisa la preferencia.
+  const [sideNarrowOpen, setSideNarrowOpen] = useState(false)
   // Ancho de la barra lateral (tirador): lo guardado o el por defecto; se acota a la ventana al mostrarlo.
   const [sideW, setSideW] = useState(() => {
     const n = Number.parseInt(readStorage(SIDE_W_KEY) ?? '', 10)
@@ -184,6 +164,7 @@ export function App(): React.JSX.Element {
     return () => window.removeEventListener('resize', onResize)
   }, [])
   const sideWidth = clampSide(sideW, winW)
+  const sideShown = sideVisible(sideShownPref, sideNarrowOpen, winW)
   const sideBodyRef = useRef<HTMLDivElement>(null)
   const setSideWidth = (w: number): void => {
     const v = clampSide(w, window.innerWidth)
@@ -194,8 +175,6 @@ export function App(): React.JSX.Element {
   const navDest = useNavDest()
   // Un solo lugar para los avisos de error: la cola de ui/Toast (se quedan hasta que se cierran).
   const notifyError = useCallback((m: string): void => void toast({ tone: 'danger', message: m, duration: 0 }), [])
-
-  useEffect(() => writeStorage(COLLAPSED_KEY, JSON.stringify(collapsed)), [collapsed])
 
   const refreshStatuses = useCallback(() => void api.accountStatuses().then(setStatuses), [])
 
@@ -332,6 +311,7 @@ export function App(): React.JSX.Element {
 
   // Color de cuenta: el elegido en Configuración o el automático (se re-renderiza al cambiarlo).
   const appSettings = useSettings()
+  const { cupos, ahora } = useCupos(accounts, usage, appSettings.settings.accountPlans, appSettings.settings.accountCupos)
   const colorOf = (accountId?: string): string =>
     resolveAccountColor(accountId, accountId ? (accountIndex.get(accountId) ?? 0) : 0, appSettings)
 
@@ -444,8 +424,19 @@ export function App(): React.JSX.Element {
 
   // ---------- Layout de paneles: distribución (Uno/Dos/Cuatro), proporciones y orden ----------
   const viewMode = useViewMode()
-  const cap = LAYOUT_CAP[viewMode]
   const areaRef = useRef<HTMLDivElement>(null)
+  const [areaW, setAreaW] = useState(0)
+  // El ancho real de la grilla (ya sin el panel lateral ni el cajón de Git) decide cuántos paneles entran.
+  useEffect(() => {
+    const el = areaRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setAreaW(el.clientWidth))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const cap = capForWidth(LAYOUT_CAP[viewMode], areaW)
+  const modoVisto = modoReal(viewMode, cap, openPanes.length)
+  const anchoAviso = avisoAncho(LAYOUT_CAP[viewMode], cap, openPanes.length)
   const tabsRef = useRef<HTMLDivElement>(null)
   const ghostRef = useRef<HTMLDivElement>(null)
   const [layoutMsg, setLayoutMsg] = useState('')
@@ -651,10 +642,11 @@ export function App(): React.JSX.Element {
     return () => window.removeEventListener('keydown', onKey, true)
   }, [])
 
-  // Atajos de la ventana, todos configurables (matchShortcut). Dentro de una terminal, esas teclas son de la
-  // shell: solo funcionan fuera de ella (como antes). Ctrl+K y Ctrl+, están en su propio componente.
+  // Atajos de la ventana, todos configurables (matchShortcut). Con una terminal enfocada solo andan las que
+  // la shell no usa (ver atajos-terminal.ts). Ctrl+K y Ctrl+, están en su propio componente.
   const toggleSide = (): void => {
     const next = !sideShown
+    if (window.innerWidth < SIDE_AUTO_BELOW_PX) return setSideNarrowOpen(next)
     setSideShown(next)
     writeStorage(SIDEBAR_KEY, next ? '1' : '0')
   }
@@ -689,43 +681,43 @@ export function App(): React.JSX.Element {
       if (e.metaKey || isCapturingShortcut()) return
       const k = winKeys.current
       const ae = document.activeElement
-      const inTerm = !!ae?.closest('.terminal-host')
+      const enTerminal = !!ae?.closest('.terminal-host')
+      // Qué atajos andan con la terminal enfocada (y que AltGr o una composición no los disparen) lo decide atajos-terminal.ts.
+      if (!seAtiende({ ctrlKey: e.ctrlKey, altKey: e.altKey, shiftKey: e.shiftKey, altGraph: e.getModifierState('AltGraph'), isComposing: e.isComposing, key: keyTokenOf(e) }, enTerminal)) return
+      // Con la terminal enfocada la tecla no tiene que llegar a xterm (la shell recibiría ^N, un CR…); afuera no se corta
+      // la propagación para no pisar los onKeyDown de React de los diálogos (p. ej. Ctrl+Shift+Enter en Enviar a varios).
+      const swallow = (ev: KeyboardEvent): void => {
+        ev.preventDefault()
+        if (enTerminal) ev.stopPropagation()
+      }
       const typing = !!ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || (ae as HTMLElement).isContentEditable)
-      // Ctrl+1–4 van también desde la terminal (como Ctrl+Tab y Ctrl+Alt+flechas): no son teclas de la shell.
       const focusN = FOCUS_IDS.findIndex((id) => matchShortcut(id, e))
       if (focusN >= 0) {
-        e.preventDefault()
-        e.stopPropagation()
+        swallow(e)
         focusVisiblePane(focusN + 1)
       } else if (matchShortcut('help', e)) {
-        // F1 es de la terminal cuando está enfocada (p. ej. vim o less): solo fuera de ella.
-        if (inTerm) return
         e.preventDefault()
         openHelp('ayuda')
       } else if (matchShortcut('broadcastNow', e)) {
-        if (inTerm) return
-        e.preventDefault()
+        swallow(e)
         k.broadcastNow()
       } else if (matchShortcut('sidebar', e)) {
-        if (inTerm) return
         e.preventDefault()
         k.side()
       } else if (matchShortcut('new', e)) {
-        if (inTerm || accountsRef.current.length === 0) return
-        e.preventDefault()
+        if (accountsRef.current.length === 0) return
+        swallow(e)
         k.newWs()
       } else if (matchShortcut('rename', e)) {
         // En la lista de espacios, F2 lo maneja la fila (su propio botón). Escribiendo, no se toca.
-        if (inTerm || typing || ae?.closest('.sl-side')) return
+        if (typing || ae?.closest('.sl-side')) return
         if (k.rename()) e.preventDefault()
       } else if (matchShortcut('chat', e)) {
-        if (inTerm) return
-        e.preventDefault()
+        swallow(e)
         k.chat()
       } else if (e.ctrlKey && e.altKey && !e.shiftKey && LAYOUT_BY_DIGIT[e.code]) {
         // Distribución fija (Ctrl+Alt+1–4): no se graba en Configuración.
-        if (inTerm) return
-        e.preventDefault()
+        swallow(e)
         k.layout(LAYOUT_BY_DIGIT[e.code])
       }
     }
@@ -752,6 +744,10 @@ export function App(): React.JSX.Element {
   const done = countBy('done')
   /** Pedidos de permiso vivos (uno o más por espacio). El chip del resumen los cuenta; no se repiten en otro lado. */
   const pendingPerms = [...permsByWs.values()].reduce((n, q) => n + q.length, 0)
+  const permsLabel = pendingPerms === 1 ? '1 pide permiso' : `${pendingPerms} piden permiso`
+  const waitingLabel = `${needsYou} te ${needsYou === 1 ? 'espera' : 'esperan'}`
+  const workingLabel = `${working} trabajando`
+  const doneLabel = `${done} ${done === 1 ? 'terminó' : 'terminaron'}`
   const activeTerms = workspaces.filter((w) => agents[w.id] && agents[w.id].state !== 'exited' && agents[w.id].state !== 'sleeping').length
   /** Primer espacio con ese estado (para ir al tocar un resumen). */
   const firstWs = (s: AgentStatus['state']): Workspace | undefined => workspaces.find((w) => agents[w.id]?.state === s)
@@ -834,6 +830,7 @@ export function App(): React.JSX.Element {
       setNewWsMode(mode)
     },
     onBeforeClosePane,
+    askConfirm,
     notifyError,
     paneActions: (paneId) => actionsFor(paneId, 'pane'),
     invoke: (channel, ...args) => api.feat.invoke(channel, ...args),
@@ -855,6 +852,7 @@ export function App(): React.JSX.Element {
   // Chat del equipo: el botón de la barra muestra los no leídos (useChatAttach conecta la función).
   useChatAttach(uiCtx)
   const chatUnread = useChatSnapshot()?.unreadTotal ?? 0
+  const chatOpen = useDrawer().open
 
   // Distribución elegida (se guarda en esta PC). Uno = 1 a la vista; Dos = 2; Tres = 3; Cuatro = 4.
   const pickLayout = (k: ViewMode): void => {
@@ -872,65 +870,6 @@ export function App(): React.JSX.Element {
   const openSideMenu = (ws: Workspace, x: number, y: number): void =>
     setCtxMenu({ paneId: ws.id, from: 'side', x, y, back: () => document.querySelector<HTMLElement>(`[data-ws-btn="${CSS.escape(ws.id)}"]`)?.focus() })
 
-  const renderWs = (ws: Workspace): React.JSX.Element => {
-    const ag = agents[ws.id]
-    const acc = accountById.get(ws.accountId)
-    const open = openPanes.includes(ws.id)
-    const nPerm = permsByWs.get(ws.id)?.length ?? 0
-    const editing = renaming?.id === ws.id && renaming.from === 'side'
-    // En reposo no hay glifo: solo se marca lo que pide mirar (trabaja, espera, terminó, permiso).
-    const glyph = nPerm > 0 ? <PermissionIcon size={13} className="ic ic-waiting" /> : ag && ag.state !== 'idle' ? <StateIcon state={ag.state} size={12} /> : null
-    const where = ws.branch ?? shortPath(ws.cwd)
-    return (
-      <li
-        key={ws.id}
-        className="sl-li"
-        data-account-id={ws.accountId}
-        onContextMenu={(e) => {
-          e.preventDefault()
-          openSideMenu(ws, e.clientX, e.clientY)
-        }}
-      >
-        {editing ? (
-          <div className="ws-edit">
-            <RenameInput className="ws-rename" initial={ws.name} label={`Nuevo nombre del espacio ${ws.name}`} onDone={(next) => endRename(ws, 'side', next)} />
-          </div>
-        ) : (
-          <button
-            type="button"
-            className={`sl-row ${open ? 'open' : ''} ${focused === ws.id && open ? 'focused' : ''}`}
-            data-ws-btn={ws.id}
-            onClick={() => openPane(ws.id)}
-            onDoubleClick={() => setRenaming({ id: ws.id, from: 'side' })}
-            onKeyDown={(e) => {
-              if (e.key === 'F2') {
-                e.preventDefault()
-                setRenaming({ id: ws.id, from: 'side' })
-              } else if ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu') {
-                e.preventDefault()
-                const r = e.currentTarget.getBoundingClientRect()
-                openSideMenu(ws, r.left + 24, r.bottom + 2)
-              }
-            }}
-            aria-label={`${ws.icon ? `${ws.icon} ` : ''}${ws.name}, ${acc?.label ?? 'cuenta borrada'}, ${ag ? STATE_LABEL[ag.state] : 'sin abrir'}${nPerm ? `, ${nPerm === 1 ? 'permiso pendiente' : `${nPerm} permisos pendientes`}` : ''}`}
-            title={`${ws.name} · ${where}\nDoble clic o F2 para renombrar · clic derecho para más opciones`}
-          >
-            <span className={`sl-ico${ws.icon ? ' has-emoji' : ''}`} aria-hidden="true" style={ws.color ? ({ '--ws': colorHex(ws.color) } as CSSProperties) : undefined}>
-              {ws.icon ?? null}
-            </span>
-            <span className="sl-name">{ws.name}</span>
-            {ws.ticket && <Tag>{ws.ticket}</Tag>}
-            {glyph && <span className="sl-glyph">{glyph}</span>}
-            {nPerm > 1 && <span className="sl-perm-n">{nPerm}</span>}
-          </button>
-        )}
-      </li>
-    )
-  }
-
-  const q = wsQuery.trim().toLowerCase()
-  const matchWs = (ws: Workspace): boolean => !q || (ws.name + ' ' + (ws.branch ?? '') + ' ' + (ws.ticket ?? '')).toLowerCase().includes(q)
-  const orphans = workspaces.filter((w) => !accountById.has(w.accountId))
   const menuWs = ctxMenu ? wsById.get(ctxMenu.paneId) : undefined
 
   return (
@@ -940,7 +879,7 @@ export function App(): React.JSX.Element {
           <h1 className="sr-only">Sloth</h1>
           <div className="sl-top-left">
             <IconButton
-              label={sideShown ? 'Ocultar la barra lateral' : 'Mostrar la barra lateral'}
+              label={sideShown ? 'Ocultar la barra lateral' : winW < SIDE_AUTO_BELOW_PX ? 'Mostrar la barra lateral (bajo 1000 px de ancho arranca plegada)' : 'Mostrar la barra lateral'}
               shortcut={comboLabel('sidebar')}
               icon={<SidebarIcon size={17} />}
               pressed={sideShown}
@@ -968,35 +907,40 @@ export function App(): React.JSX.Element {
           <div className="sl-top-right">
             <div className="sl-top-status" role="status" aria-live="polite">
               {pendingPerms > 0 && (
-                <button type="button" className="sl-sum is-waiting" onClick={() => openPermissionReview()} title="Revisar los pedidos de permiso">
+                <button type="button" className="sl-sum is-waiting" onClick={() => openPermissionReview()} aria-label={permsLabel} title={`${permsLabel}. Revisar los pedidos de permiso`}>
                   <PermissionIcon size={12} />
-                  {pendingPerms === 1 ? '1 pide permiso' : `${pendingPerms} piden permiso`}
+                  <span>{pendingPerms}</span>
+                  <span className="sl-sum-t">{pendingPerms === 1 ? 'pide permiso' : 'piden permiso'}</span>
                 </button>
               )}
               {needsYou > 0 && (
-                <button type="button" className="sl-sum is-waiting" onClick={() => { const w = firstWs('waiting'); if (w) openPane(w.id) }} title="Ir al que te espera">
+                <button type="button" className="sl-sum is-waiting" onClick={() => { const w = firstWs('waiting'); if (w) openPane(w.id) }} aria-label={waitingLabel} title={`${waitingLabel}. Ir al que te espera`}>
                   <StateIcon state="waiting" size={12} />
-                  {needsYou} te {needsYou === 1 ? 'espera' : 'esperan'}
+                  <span>{needsYou}</span>
+                  <span className="sl-sum-t">te {needsYou === 1 ? 'espera' : 'esperan'}</span>
                 </button>
               )}
               {working > 0 && (
-                <button type="button" className="sl-sum is-working" onClick={() => { const w = firstWs('working'); if (w) openPane(w.id) }} title="Ir al primero que está trabajando">
+                <button type="button" className="sl-sum is-working" onClick={() => { const w = firstWs('working'); if (w) openPane(w.id) }} aria-label={workingLabel} title={`${workingLabel}. Ir al primero que está trabajando`}>
                   <StateIcon state="working" size={12} />
-                  {working} trabajando
+                  <span>{working}</span>
+                  <span className="sl-sum-t">trabajando</span>
                 </button>
               )}
               {done > 0 && (
-                <button type="button" className="sl-sum is-done" onClick={() => { const w = firstWs('done'); if (w) openPane(w.id) }} title="Ir al que terminó">
+                <button type="button" className="sl-sum is-done" onClick={() => { const w = firstWs('done'); if (w) openPane(w.id) }} aria-label={doneLabel} title={`${doneLabel}. Ir al que terminó`}>
                   <StateIcon state="done" size={12} />
-                  {done} {done === 1 ? 'listo' : 'listos'}
+                  <span>{done}</span>
+                  <span className="sl-sum-t">{done === 1 ? 'terminó' : 'terminaron'}</span>
                 </button>
               )}
+              <TitlebarOnly name="prs" />
             </div>
             <div className="sl-upd">
               <TitlebarOnly name="updater" />
             </div>
             <Tooltip text="Chat del equipo" shortcut={comboLabel('chat')}>
-              <button type="button" className="sl-chat" onClick={() => openChat()} aria-label={chatButtonLabel(chatUnread)}>
+              <button type="button" className="sl-chat" onClick={() => openChat()} aria-expanded={chatOpen} aria-label={chatButtonLabel(chatUnread)}>
                 <ChatIcon size={17} aria-hidden="true" />
                 {chatUnread > 0 && (
                   <span className="sl-chat-badge" aria-hidden="true">
@@ -1016,121 +960,28 @@ export function App(): React.JSX.Element {
         <NavRail />
 
         <div ref={sideBodyRef} className={`sl-body ${sideShown ? '' : 'no-side'}`} style={{ '--side-w': `${sideWidth}px` } as CSSProperties}>
-          <aside className="sl-side" aria-label="Cuentas y espacios">
-            <div className="sl-side-head">
-              <h2 className="sl-side-title">Espacios</h2>
-              <IconButton
-                label="Buscar un espacio"
-                icon={<SearchIcon size={15} />}
-                size="sm"
-                pressed={filterOpen}
-                onClick={() => {
-                  if (filterOpen) setWsQuery('')
-                  setFilterOpen(!filterOpen)
-                }}
-              />
-            </div>
-            {filterOpen && (
-              <input
-                className="sl-filter"
-                type="search"
-                autoFocus
-                value={wsQuery}
-                onChange={(e) => setWsQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key !== 'Escape') return
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setWsQuery('')
-                  setFilterOpen(false)
-                }}
-                placeholder="Filtrar por nombre, rama o ticket"
-                aria-label="Filtrar espacios"
-                spellCheck={false}
-              />
-            )}
-
-            <div className="sl-groups">
-              {accounts.length === 0 && (
-                <section className="sl-acc-none" aria-label="Sin cuentas">
-                  <p className="sl-hint">Agregá una cuenta de Claude para crear tu primer espacio.</p>
-                  <button type="button" className="sl-newbtn" onClick={() => openSettings('cuentas')}>
-                    <PlusIcon size={15} />
-                    Agregar cuenta
-                  </button>
-                </section>
-              )}
-
-              {accounts.map((acc) => {
-                const st = statuses[acc.id]
-                const mine = workspaces.filter((w) => w.accountId === acc.id)
-                const shown = mine.filter(matchWs)
-                if (q && shown.length === 0) return null
-                const open = !collapsed[acc.id] || !!q
-                const bodyId = `acc-body-${acc.id}`
-                const plan = appSettings.settings.accountPlans[acc.id]
-                return (
-                  <section key={acc.id} className="sl-acc" data-account-id={acc.id} aria-label={`Cuenta ${acc.label}`} style={{ '--acc': colorOf(acc.id) } as CSSProperties}>
-                    <div className="sl-acc-head">
-                      <button
-                        type="button"
-                        className="sl-acc-toggle"
-                        aria-expanded={open}
-                        aria-controls={bodyId}
-                        aria-label={`Mostrar u ocultar los espacios de ${acc.label}`}
-                        title={st?.email ? `${acc.label} · ${st.email}` : acc.label}
-                        onClick={() => setCollapsed((c) => ({ ...c, [acc.id]: open }))}
-                      >
-                        <span className="sl-avatar" aria-hidden="true">
-                          {acc.label.slice(0, 1).toUpperCase()}
-                        </span>
-                        <span className="sl-acc-name">{acc.label}</span>
-                        {st?.loggedIn ? plan && <span className="sl-acc-plan">{plan}</span> : <span className="sl-acc-warn">Sin sesión</span>}
-                      </button>
-                      <IconButton
-                        label={`Nuevo espacio en ${acc.label}`}
-                        icon={<PlusIcon size={14} />}
-                        size="sm"
-                        className="sl-acc-add"
-                        onClick={() => {
-                          setNewWsPreset({ accountId: acc.id })
-                          setNewWsMode('normal')
-                        }}
-                      />
-                    </div>
-                    {open && (
-                      <div id={bodyId}>
-                        {shown.length > 0 ? <ul className="sl-list">{shown.map(renderWs)}</ul> : <p className="sl-acc-empty">Sin espacios. Usá el + de la cuenta para crear uno.</p>}
-                      </div>
-                    )}
-                  </section>
-                )
-              })}
-
-              {orphans.length > 0 && (
-                <section className="sl-acc" aria-label="Espacios de una cuenta borrada">
-                  <div className="sl-acc-head">
-                    <span className="sl-acc-toggle is-static">
-                      <span className="sl-acc-name">Cuenta borrada</span>
-                    </span>
-                  </div>
-                  <ul className="sl-list">{orphans.filter(matchWs).map(renderWs)}</ul>
-                </section>
-              )}
-
-              {q && accounts.every((acc) => !workspaces.some((w) => w.accountId === acc.id && matchWs(w))) && !orphans.some(matchWs) && (
-                <p className="sl-hint">Ningún espacio coincide con «{wsQuery.trim()}».</p>
-              )}
-            </div>
-
-            <div className="sl-foot">
-              <button type="button" className="sl-newbtn" onClick={() => (accounts.length ? setNewWsMode('normal') : openSettings('cuentas'))} title={accounts.length ? undefined : 'Primero agregá una cuenta de Claude'}>
-                <PlusIcon size={15} />
-                Nuevo espacio
-                <kbd>{comboLabel('new')}</kbd>
-              </button>
-            </div>
-          </aside>
+          <Sidebar
+            accounts={accounts}
+            workspaces={workspaces}
+            statuses={statuses}
+            agents={agents}
+            plans={appSettings.settings.accountPlans}
+            cupos={cupos}
+            ahora={ahora}
+            openIds={openPanes}
+            focusedId={focused}
+            editingId={renaming?.from === 'side' ? renaming.id : null}
+            permisos={(id) => permsByWs.get(id)?.length ?? 0}
+            colorOf={colorOf}
+            onOpen={openPane}
+            onStartRename={(id) => setRenaming({ id, from: 'side' })}
+            onRenameDone={(ws, next) => endRename(ws, 'side', next)}
+            onMenu={openSideMenu}
+            onNewWorkspace={(accountId) => {
+              if (accountId) setNewWsPreset({ accountId })
+              setNewWsMode('normal')
+            }}
+          />
 
           <main className={`panes sl-main view-${viewMode} ${openPanes.length === 0 ? 'is-empty' : ''}`} aria-label="Paneles">
             {loaded && openPanes.length === 0 && (workspaces.length === 0 ? <FirstRun /> : <EmptyState onCreate={() => (accounts.length ? setNewWsMode('normal') : openSettings('cuentas'))} />)}
@@ -1164,10 +1015,15 @@ export function App(): React.JSX.Element {
                     <BroadcastIcon size={14} aria-hidden="true" />
                     Enviar a varios
                   </button>
+                  {anchoAviso && (
+                    <span className="sl-layout-aviso" role="status" title={anchoAviso}>
+                      {anchoAviso.split(':')[0]}
+                    </span>
+                  )}
                   <div className="sl-layout" role="group" aria-label="Distribución de paneles">
                     {(['uno', 'dos', 'tres', 'cuatro'] as const).map((k, i) => (
-                      <Tooltip key={k} text={`${LAYOUT_LABEL[k]}: ${LAYOUT_CAP[k] === 1 ? '1 panel' : `hasta ${LAYOUT_CAP[k]} paneles`} a la vista`} shortcut={`Ctrl+Alt+${i + 1}`}>
-                        <button type="button" aria-pressed={viewMode === k} aria-label={`${LAYOUT_LABEL[k]}: ${LAYOUT_CAP[k] === 1 ? '1 panel' : `hasta ${LAYOUT_CAP[k]} paneles`} a la vista`} onClick={() => pickLayout(k)}>
+                      <Tooltip key={k} text={`${LAYOUT_LABEL[k]}: ${LAYOUT_CAP[k] === 1 ? '1 panel' : `hasta ${LAYOUT_CAP[k]} paneles`} a la vista${viewMode === k && modoVisto !== k ? ` (elegida; ahora se ven ${LAYOUT_CAP[modoVisto]})` : ''}${viewMode === k && anchoAviso ? `. ${anchoAviso}` : ''}`} shortcut={`Ctrl+Alt+${i + 1}`}>
+                        <button type="button" aria-pressed={modoVisto === k} aria-label={`${LAYOUT_LABEL[k]}: ${LAYOUT_CAP[k] === 1 ? '1 panel' : `hasta ${LAYOUT_CAP[k]} paneles`} a la vista`} onClick={() => pickLayout(k)}>
                           {i + 1}
                         </button>
                       </Tooltip>
@@ -1281,7 +1137,7 @@ export function App(): React.JSX.Element {
                     {agents[paneId]?.state === 'sleeping' ? (
                       <SleepingCard paneId={paneId} name={title} onError={onTermError} />
                     ) : (
-                      <TerminalView id={paneId} generation={generations[paneId] ?? 0} onError={onTermError} />
+                      <TerminalView id={paneId} label={isLoginPane(paneId) ? 'Terminal de cuenta' : (wsById.get(paneId)?.name ?? 'Panel')} generation={generations[paneId] ?? 0} onError={onTermError} />
                     )}
                   </section>
                 )
@@ -1330,6 +1186,8 @@ export function App(): React.JSX.Element {
             accounts={accounts}
             statuses={statuses}
             usage={usage}
+            cupos={cupos}
+            ahora={ahora}
             defaultRepo={newWsPreset?.repoPath ?? workspaces[workspaces.length - 1]?.repoPath ?? ''}
             preset={newWsPreset}
             onClose={() => {
@@ -1439,54 +1297,4 @@ function focusTerminal(id: string, tries = 8): void {
   const ta = document.querySelector<HTMLElement>(`[data-pane-id="${CSS.escape(id)}"] .xterm-helper-textarea`)
   if (ta && ta.closest<HTMLElement>('.pane')?.offsetParent !== null) ta.focus()
   else if (tries > 0) requestAnimationFrame(() => focusTerminal(id, tries - 1))
-}
-
-/** Input para renombrar. Enter o salir guardan (si hay texto); Escape cancela. Responde una sola vez. */
-function RenameInput({
-  initial,
-  label,
-  className,
-  onDone
-}: {
-  initial: string
-  label: string
-  className: string
-  onDone(next: string | null): void
-}): React.JSX.Element {
-  const [text, setText] = useState(initial)
-  const ref = useRef<HTMLInputElement>(null)
-  const done = useRef(false)
-  useEffect(() => {
-    ref.current?.focus()
-    ref.current?.select()
-  }, [])
-  const finish = (next: string | null): void => {
-    if (done.current) return
-    done.current = true
-    onDone(next)
-  }
-  const value = (): string | null => text.trim() || null
-  return (
-    <input
-      ref={ref}
-      className={className}
-      value={text}
-      maxLength={80}
-      aria-label={label}
-      spellCheck={false}
-      autoComplete="off"
-      onChange={(e) => setText(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault()
-          finish(value())
-        } else if (e.key === 'Escape') {
-          e.preventDefault()
-          e.stopPropagation()
-          finish(null)
-        }
-      }}
-      onBlur={() => finish(value())}
-    />
-  )
 }

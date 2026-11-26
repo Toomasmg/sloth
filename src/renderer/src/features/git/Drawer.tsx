@@ -14,8 +14,19 @@ import { errText, type BranchesRes, type GitShared, type SessionPr, type StashRe
 
 type Tab = 'cambios' | 'historial' | 'ramas'
 
+/** 600 px de siempre; en ventana angosta cede para que la terminal conserve ~400 px (unas 50 columnas) junto al riel. */
+function drawerWidth(winW: number): number {
+  return Math.max(440, Math.min(600, winW - 48 - 400))
+}
+
 export function Drawer(): React.JSX.Element | null {
   const ui = useUi()
+  const [winW, setWinW] = useState(() => window.innerWidth)
+  useEffect(() => {
+    const onResize = (): void => setWinW(window.innerWidth)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
   const { wsId, view, nonce } = useDrawer()
   const ws = wsId ? ui.workspaces.find((w) => w.id === wsId) : undefined
   const [tab, setTab] = useState<Tab>('cambios')
@@ -127,7 +138,7 @@ export function Drawer(): React.JSX.Element | null {
   ]
 
   return (
-    <SidePanel labelId="f-git-title" title={`Git de ${ws?.name ?? 'espacio'}`} onClose={close} width={600}>
+    <SidePanel labelId="f-git-title" title={`Git de ${ws?.name ?? 'espacio'}`} onClose={close} width={drawerWidth(winW)}>
       <div ref={panelRef} className="f-git-drawer" tabIndex={-1}>
         <header className="f-git-head">
           <div role="tablist" aria-label="Vista de Git" className="g-tabs">

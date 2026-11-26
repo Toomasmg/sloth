@@ -2,6 +2,7 @@ import { useLayoutEffect } from 'react'
 import { useSettings } from '../../settings/store'
 import { X } from '@phosphor-icons/react'
 import type { ChatProfile, ChatRole } from '../../../../../shared/chat'
+import { Button } from '../../../ui'
 
 /** Solo avatares de GitHub (la CSP también lo fuerza). */
 const AVATAR_HOST = /^https:\/\/avatars\.githubusercontent\.com\//
@@ -102,12 +103,12 @@ export function ConfirmInline({
     >
       <p id={id}>{message}</p>
       <div className="f-chat-team-actions">
-        <button type="button" className="btn sm" onClick={onCancel} disabled={busy} autoFocus>
+        <Button look="classic" size="sm" onClick={onCancel} disabled={busy} autoFocus>
           Cancelar
-        </button>
-        <button type="button" className="btn sm danger" onClick={onConfirm} disabled={busy}>
+        </Button>
+        <Button look="classic" size="sm" variant="danger" onClick={onConfirm} disabled={busy}>
           {confirmLabel}
-        </button>
+        </Button>
       </div>
     </div>
   )

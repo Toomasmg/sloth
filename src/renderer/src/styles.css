@@ -723,9 +723,9 @@ kbd,
   min-height: 0;
   container-type: inline-size;
   background: var(--term-bg);
-  border-radius: var(--r-md);
-  /* Contorno de 1px como sombra interior: separa del fondo sin "caja dentro de caja". */
-  box-shadow: inset 0 0 0 1px var(--divider);
+  border-radius: var(--r-lg);
+  /* Contorno de 1px por fuera: el hueco de 8 px entre paneles queda igual con y sin foco. */
+  box-shadow: 0 0 0 1px var(--divider);
   /* clip y no hidden: hidden se deja desplazar por código (el dictado de Windows corría la terminal). */
   overflow: clip;
   transition: box-shadow var(--t-med) var(--ease);
@@ -733,8 +733,9 @@ kbd,
 .pane.hidden {
   display: none;
 }
+/* Foco: el mismo aro de 1px, en acento. Sin halo: se cortaba contra el vecino a 8 px. */
 .pane.focused {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--acc) 38%, transparent);
+  box-shadow: var(--pane-ring-focus);
 }
 /* «Te necesita»: una línea ámbar arriba, nada de marco grueso ni brillo. */
 .pane::after {
@@ -793,7 +794,8 @@ kbd,
   overflow: clip;
 }
 /* Barra de desplazamiento de xterm: una línea fina al borde en vez del bloque gris de 14 px
-   (que además quedaba debajo del micrófono). Más marcada solo al pasarle el mouse. */
+   (que además quedaba debajo del micrófono). Más marcada solo al pasarle el mouse.
+   La prioridad forzada es porque xterm le pone style en línea a la barra y al tirador. */
 .terminal-host .xterm .xterm-scrollable-element > .scrollbar.vertical {
   width: 10px !important;
 }
@@ -802,12 +804,12 @@ kbd,
   right: 2px;
   width: 4px !important;
   border-radius: var(--r-full);
-  background: color-mix(in srgb, var(--text) 18%, transparent) !important;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
 }
 .terminal-host .xterm .xterm-scrollable-element > .scrollbar.vertical:hover > .slider,
 .terminal-host .xterm .xterm-scrollable-element > .scrollbar.vertical > .slider.active {
   width: 6px !important;
-  background: color-mix(in srgb, var(--text) 35%, transparent) !important;
+  background: color-mix(in srgb, var(--text) 35%, transparent);
 }
 /* Claude Code, vim o nano desplazan por su cuenta: la barra de xterm no se movería (TerminalView). */
 .terminal-host.sin-barra .xterm .xterm-scrollable-element > .scrollbar {
@@ -1103,15 +1105,6 @@ kbd,
   background: transparent;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation: none !important;
-    transition: none !important;
-  }
-}
-
 /* ---------- Permisos de Claude ---------- */
 /* Tarjeta de permiso: una franja bajo el header (sin marco), con tinte ámbar suave. */
 @keyframes perm-in {
@@ -1146,27 +1139,21 @@ kbd,
   animation-play-state: paused;
 }
 
-/* Movimiento reducido (Windows: «Efectos de animación» apagado): sin transiciones ni animaciones
-   decorativas. Los indicadores de carga (spin, ring) siguen girando, más lento. */
+/* Movimiento reducido (Windows: «Efectos de animación» apagado): sin transiciones ni animaciones.
+   Con prioridad forzada a propósito: tiene que ganarle a cualquier regla de componente. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    transition-duration: 0.01ms !important;
-    transition-delay: 0ms !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
+    animation: none !important;
+    transition: none !important;
     scroll-behavior: auto !important;
-  }
-  .spin,
-  .ring {
-    animation-duration: 1.6s !important;
-    animation-iteration-count: infinite !important;
   }
 }
 
 /* Modo liviano (Configuración › Rendimiento): sin animaciones, transiciones ni sombras. El foco
-   del teclado conserva su marca (es accesibilidad, no decoración). Los spinners de carga siguen girando. */
+   del teclado conserva su marca (es accesibilidad, no decoración). Los spinners de carga siguen girando.
+   Con prioridad forzada a propósito: es un interruptor global que tiene que ganarle a cualquier regla de componente. */
 html[data-lite='true'] *,
 html[data-lite='true'] *::before,
 html[data-lite='true'] *::after {
@@ -1185,12 +1172,6 @@ html[data-lite='true'] .spin {
 [tabindex="-1"]:focus,
 [tabindex="-1"]:focus-visible {
   outline: none;
-}
-
-/* Los campos dentro de buscadores toman el fondo del buscador (en claro se veía un recuadro blanco adentro). */
-.pal-input {
-  background: transparent !important;
-  box-shadow: none !important;
 }
 
 .modal-titles {

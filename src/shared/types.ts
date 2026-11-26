@@ -49,6 +49,8 @@ export interface AccountUsage {
   last7d: UsageTotals
   /** Hora del primer mensaje dentro de las últimas 5 h (aprox. inicio de la ventana de límite). */
   windowStart?: number
+  /** Ventana de 5 h en curso (primer mensaje + 5 h) con lo que cuenta para el cupo. Ausente si no hubo uso en las últimas 5 h. */
+  ventana?: { inicio: number; fin: number; tokens: number }
   scannedAt: number
 }
 

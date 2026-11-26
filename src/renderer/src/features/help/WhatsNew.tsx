@@ -1,6 +1,7 @@
 import { UpdateIcon } from '../../icons/SlothIcons'
 import type { ChangelogEntry } from '../../../../shared/changelog'
 import { Dialog } from './Dialog'
+import { Button } from '../../ui'
 
 /** Novedades: entradas de la versión (o versiones) que el usuario todavía no vio. */
 export function WhatsNewModal({
@@ -16,9 +17,9 @@ export function WhatsNewModal({
       icon={<UpdateIcon size={18} />}
       onClose={onClose}
       footer={
-        <button type="button" className="btn primary" onClick={onClose}>
+        <Button look="classic" variant="primary" onClick={onClose}>
           Listo
-        </button>
+        </Button>
       }
     >
       {entries.length === 0 ? (

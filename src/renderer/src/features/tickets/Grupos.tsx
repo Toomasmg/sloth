@@ -34,9 +34,9 @@ export function Grupos({ grupos, total, sel, onSel, trayendo, errPorPersona }: P
           >
             <span className="f-tickets-grupo-n">{g.nombre}</span>
             {err ? (
-              <WarningCircle size={13} weight="fill" aria-hidden="true" />
+              <WarningCircle size={14} weight="fill" aria-hidden="true" />
             ) : g.sinTraer && trayendo ? (
-              <CircleNotch size={13} className="spin" aria-hidden="true" />
+              <CircleNotch size={14} className="spin" aria-hidden="true" />
             ) : g.sinTraer ? (
               <span className="f-tickets-grupo-sin" aria-hidden="true">
                 sin traer

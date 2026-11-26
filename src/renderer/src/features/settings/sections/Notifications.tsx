@@ -22,7 +22,7 @@ export function NotificationsSection({ onClose }: { onClose(): void }): React.JS
   return (
     <>
       <Group id="g-av" title="Avisarme cuando…">
-        <ToggleRow title="Claude termina una tarea" hint="Aviso de Windows y el estado «Listo» en la barra." checked={s.notify.done} onChange={(done) => save({ notify: { done } })} />
+        <ToggleRow title="Claude termina una tarea" hint="Aviso de Windows y el aviso «terminó» en la barra." checked={s.notify.done} onChange={(done) => save({ notify: { done } })} />
         <ToggleRow title="Claude pide permiso" hint="Te recomendamos dejarlo prendido: si no, Claude queda esperando." checked={s.notify.perm} onChange={(perm) => save({ notify: { perm } })} />
         <ToggleRow title="Avisos del chat" hint="Un aviso cuando te escriben en el chat del equipo y no lo estás mirando." checked={s.notify.team} onChange={(team) => save({ notify: { team } })} />
         <ToggleRow title="No molestar" hint="Silencia todo hasta que lo apagues." checked={s.noMolestar} onChange={(noMolestar) => save({ noMolestar })} />

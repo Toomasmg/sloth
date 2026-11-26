@@ -23,6 +23,7 @@ import {
   useDrawer
 } from './store'
 import { Av } from './view-utils'
+import { Button } from '../../ui'
 
 type Modal = 'newTeam' | 'join' | ChatModalKind | null
 
@@ -182,10 +183,10 @@ function ListView({ snap, onModal, ui }: { snap: ChatSnapshot | null; onModal(k:
             <ConnIcon c={snap.connection} />
             {CONN[snap.connection]}
           </span>
-          <button type="button" className="btn sm ghost" onClick={() => run(ui, 'feat:chat:signOut')}>
+          <Button look="classic" size="sm" variant="ghost" onClick={() => run(ui, 'feat:chat:signOut')}>
             <SignOut size={14} aria-hidden="true" />
             Cerrar sesión
-          </button>
+          </Button>
         </footer>
       )}
     </>
@@ -198,21 +199,23 @@ function ListBody({ snap, onModal, ui }: { snap: ChatSnapshot; onModal(k: Modal)
     return (
       <div className="f-chat-block">
         <p>¿Te mandaron una invitación? Pegala y entrás al equipo en un paso.</p>
-        <button type="button" className="btn primary sm" onClick={() => openJoinInvite()}>
+        <Button look="classic" size="sm" variant="primary" onClick={() => openJoinInvite()}>
           <Ticket size={14} aria-hidden="true" />
           Unirme con una invitación
-        </button>
-        <p className="hint">Si armás el chat de tu equipo, cargá la URL y la clave publicable del proyecto de Supabase.</p>
-        <button
+        </Button>
+        <p className="hint">Si armás el chat de tu equipo, cargá la dirección y la clave de acceso del proyecto del chat.</p>
+        <Button
           type="button"
-          className="btn sm ghost"
+          look="classic"
+          size="sm"
+          variant="ghost"
           onClick={() => {
             closeChat()
             openSettings('equipo')
           }}
         >
           Configurar a mano
-        </button>
+        </Button>
       </div>
     )
   }
@@ -220,14 +223,14 @@ function ListBody({ snap, onModal, ui }: { snap: ChatSnapshot; onModal(k: Modal)
     return (
       <div className="f-chat-block">
         <p>Entrá con tu cuenta de GitHub para leer y escribir en los equipos.</p>
-        <button type="button" className="btn primary" onClick={() => run(ui, 'feat:chat:signIn')}>
+        <Button look="classic" variant="primary" onClick={() => run(ui, 'feat:chat:signIn')}>
           <SignIn size={14} aria-hidden="true" />
           Iniciar sesión con GitHub
-        </button>
-        <button type="button" className="btn sm ghost" onClick={() => openJoinInvite()}>
+        </Button>
+        <Button look="classic" size="sm" variant="ghost" onClick={() => openJoinInvite()}>
           <Ticket size={14} aria-hidden="true" />
           Unirme con una invitación
-        </button>
+        </Button>
       </div>
     )
   }
@@ -242,9 +245,9 @@ function ListBody({ snap, onModal, ui }: { snap: ChatSnapshot; onModal(k: Modal)
             {a.aviso}
           </p>
         )}
-        <button type="button" className="btn sm ghost" onClick={() => run(ui, 'feat:chat:cancelSignIn')}>
+        <Button look="classic" size="sm" variant="ghost" onClick={() => run(ui, 'feat:chat:cancelSignIn')}>
           Cancelar
-        </button>
+        </Button>
       </div>
     )
   }
@@ -254,9 +257,9 @@ function ListBody({ snap, onModal, ui }: { snap: ChatSnapshot; onModal(k: Modal)
         <p className="f-chat-err" role="alert">
           {a.message}
         </p>
-        <button type="button" className="btn sm" onClick={() => run(ui, 'feat:chat:signIn')}>
+        <Button look="classic" size="sm" onClick={() => run(ui, 'feat:chat:signIn')}>
           Reintentar
-        </button>
+        </Button>
       </div>
     )
   }
@@ -288,14 +291,14 @@ function ListBody({ snap, onModal, ui }: { snap: ChatSnapshot; onModal(k: Modal)
           </ul>
         )}
         <div className="f-chat-actions">
-          <button type="button" className="btn sm" onClick={() => onModal('newTeam')}>
+          <Button look="classic" size="sm" onClick={() => onModal('newTeam')}>
             <Plus size={14} aria-hidden="true" />
             Nuevo equipo
-          </button>
-          <button type="button" className="btn sm ghost" onClick={() => onModal('join')}>
+          </Button>
+          <Button look="classic" size="sm" variant="ghost" onClick={() => onModal('join')}>
             <Key size={14} aria-hidden="true" />
             Entrar con código
-          </button>
+          </Button>
         </div>
       </section>
 

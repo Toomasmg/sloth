@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { MoonIcon } from '@phosphor-icons/react'
 import { cleanError } from './format'
+import { Button } from './ui'
 
 /**
  * Panel de un espacio dormido: Sloth cerró su Claude por inactividad para liberar memoria.
@@ -29,9 +30,9 @@ export function SleepingCard({ paneId, name, onError }: { paneId: string; name: 
           No se pudo despertar a {name}: {err}
         </p>
       )}
-      <button type="button" className="btn primary" onClick={wake} disabled={waking} aria-label={waking || err ? undefined : `Despertar ${name}`}>
+      <Button look="classic" variant="primary" onClick={wake} disabled={waking} aria-label={waking || err ? undefined : `Despertar ${name}`}>
         {waking ? 'Despertando…' : err ? 'Reintentar' : 'Despertar'}
-      </button>
+      </Button>
     </div>
   )
 }

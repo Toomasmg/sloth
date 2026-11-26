@@ -114,26 +114,24 @@
 @media (prefers-reduced-motion: reduce) {
   .dictado-btn,
   .dictado-dot {
-    animation: none !important;
+    animation: none;
   }
 }
 
-/* Insignia de «Nuevo» junto al micrófono, la primera vez. */
+/* Aviso de novedad: va en el flujo del panel, no en el header, para que «Nuevo» no se lea como estado del agente. */
 .dictado-nuevo {
-  flex: none;
-  margin-right: var(--s-1);
-  padding: 1px 6px;
-  border: 0;
+  font: inherit;
+  font-size: var(--fs-12);
+  cursor: pointer;
+}
+.dictado-nuevo:hover {
+  background: var(--hover);
+}
+.dictado-nuevo-tag {
+  padding: 0 6px;
   border-radius: var(--r-full);
   background: var(--accent);
   color: var(--accent-fg);
-  font: inherit;
   font-size: var(--fs-11);
   font-weight: 700;
-  cursor: pointer;
-}
-@container (max-width: 520px) {
-  .dictado-nuevo {
-    display: none;
-  }
 }

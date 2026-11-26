@@ -1,5 +1,5 @@
-/* Ventana principal: barra superior, riel de navegación, barra lateral de espacios, barra de pestañas,
-   paneles y barra de estado. Clases propias (sl-*) para no pelear con los estilos viejos. */
+/* Ventana principal: barra superior, riel de navegación, grilla de paneles, barra de pestañas y barra de
+   estado. El panel lateral de espacios vive en sidebar.css. Clases propias (sl-*) para no pelear con las viejas. */
 
 .sl-shell {
   display: grid;
@@ -17,9 +17,11 @@
   /* La lista de la paleta vive acá adentro: tiene que tapar Vistas y paneles laterales (--z-panel). */
   z-index: var(--z-menu);
   min-width: 0;
-  /* Tres columnas: el buscador queda centrado en la ventana. */
+  /* Los estados son lo más importante: la derecha nunca baja de su contenido, el buscador cede ancho
+     (200 a 520 px) y la ubicación de la izquierda se trunca antes que cualquiera de los dos. */
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 520px) minmax(0, 1fr);
+  grid-template-columns: minmax(160px, 1fr) minmax(200px, 520px) minmax(max-content, 1fr);
+  container: sl-top / inline-size;
   align-items: center;
   gap: var(--s-2);
   background: var(--surface);
@@ -75,7 +77,6 @@
   gap: var(--s-2);
   min-width: 0;
   padding-right: 148px;
-  container: sl-right / inline-size;
 }
 .sl-top-search {
   min-width: 0;
@@ -86,9 +87,7 @@
   display: flex;
   align-items: center;
   gap: var(--s-1);
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
+  flex: none;
 }
 /* Resumen de estados: lleva al primer espacio en ese estado. Forma + color + texto. */
 .sl-sum {
@@ -118,6 +117,10 @@
   background: var(--done-soft);
   color: var(--done);
 }
+.sl-sum.is-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
 .sl-sum .ic {
   color: currentColor;
 }
@@ -141,9 +144,15 @@
 .sl-upd:has(.is-flash) {
   flex: 0 1 auto;
 }
-/* Con el aviso a la vista, el buscador cede ancho (hasta su mínimo) antes de que el aviso pise el chat. */
-.sl-top:has(.sl-upd:not(:empty)) {
-  grid-template-columns: minmax(0, 1fr) clamp(240px, calc(100vw - 700px), 520px) minmax(0, 1fr);
+/* Sin lugar para el texto, el resumen queda en ícono + número (el texto completo va en aria-label y title). */
+@container sl-top (max-width: 1099px) {
+  .sl-sum-t {
+    display: none;
+  }
+  .sl-sum {
+    padding: 0 var(--s-2);
+    font-variant-numeric: tabular-nums;
+  }
 }
 .sl-chat {
   position: relative;
@@ -248,6 +257,10 @@
   background: var(--waiting);
   color: var(--on-accent);
 }
+.sl-rail-badge.is-danger {
+  background: var(--danger);
+  color: var(--on-accent);
+}
 
 /* ---------- Cuerpo: barra lateral + paneles ---------- */
 .sl-body {
@@ -310,275 +323,6 @@ body.is-resizing-side .panes {
   pointer-events: none;
 }
 
-/* ---------- Barra lateral ---------- */
-.sl-side {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  min-width: 0;
-  background: var(--surface);
-  box-shadow: inset -1px 0 0 var(--divider);
-}
-.sl-side-head {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--s-1);
-  height: 40px;
-  padding: 0 var(--s-2) 0 var(--s-4);
-}
-.sl-side-title {
-  flex: 1;
-  margin: 0;
-  font-size: var(--fs-13);
-  font-weight: 600;
-  color: var(--text);
-}
-.sl-filter {
-  flex: none;
-  height: var(--h-md);
-  margin: 0 var(--s-2) var(--s-2);
-  padding: 0 var(--s-3);
-  border: 1px solid var(--control-border);
-  border-radius: var(--r-md);
-  background: var(--sunken);
-  color: var(--text);
-  font: inherit;
-}
-.sl-filter::placeholder {
-  color: var(--placeholder);
-}
-.sl-filter:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 0;
-}
-.sl-groups {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 0 var(--s-2) var(--s-2);
-}
-
-/* Cuenta: encabezado de grupo de 28 px, sin caja. El color de la cuenta queda en el avatar. */
-.sl-acc {
-  --acc: var(--accent);
-}
-.sl-acc + .sl-acc {
-  margin-top: var(--s-2);
-}
-.sl-acc-head {
-  display: flex;
-  align-items: center;
-  height: 28px;
-}
-.sl-acc-toggle {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  padding: 0 var(--s-2);
-  border: 0;
-  border-radius: var(--r-md);
-  background: transparent;
-  color: var(--text-2);
-  font: inherit;
-  font-size: var(--fs-12);
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-}
-.sl-acc-toggle:hover {
-  background: var(--hover);
-  color: var(--text);
-}
-.sl-acc-toggle.is-static {
-  cursor: default;
-}
-.sl-acc-toggle.is-static:hover {
-  background: transparent;
-}
-.sl-acc-toggle:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: -2px;
-}
-/* Plegada: el avatar queda atenuado y el grupo no muestra filas (aria-expanded lo dice). */
-.sl-acc-toggle[aria-expanded='false'] .sl-avatar {
-  opacity: 0.6;
-}
-.sl-avatar {
-  width: 16px;
-  height: 16px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: var(--r-full);
-  font-size: var(--fs-11);
-  font-weight: 700;
-  color: var(--bg);
-  background: var(--acc);
-}
-.sl-acc-name {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sl-acc-plan {
-  flex: none;
-  color: var(--text-3);
-  font-size: var(--fs-11);
-}
-.sl-acc-warn {
-  flex: none;
-  color: var(--waiting);
-  font-size: var(--fs-11);
-  font-weight: 600;
-}
-/* «+» de la cuenta: aparece al pasar o con el foco en el grupo (con teclado siempre se llega). */
-.sl-acc-add {
-  opacity: 0;
-}
-.sl-acc-head:hover .sl-acc-add,
-.sl-acc-head:focus-within .sl-acc-add {
-  opacity: 1;
-}
-.sl-acc-empty {
-  margin: 0;
-  padding: var(--s-1) var(--s-2) var(--s-2) 32px; /* alineado con el nombre, después del avatar */
-  font-size: var(--fs-12);
-  color: var(--text-3);
-}
-
-.sl-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.sl-li {
-  position: relative;
-  min-width: 0;
-}
-/* Espacio: una línea de 32 px (nombre, ticket y glifo de estado). La ruta y la rama van en el tooltip. */
-.sl-row {
-  width: 100%;
-  height: 32px;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--s-2);
-  padding: 0 var(--s-2);
-  border: 0;
-  border-radius: var(--r-md);
-  background: transparent;
-  color: var(--text-2);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.sl-row:hover {
-  background: var(--hover);
-  color: var(--text);
-}
-.sl-row.open {
-  color: var(--text);
-}
-.sl-row.focused {
-  background: var(--accent-soft);
-  color: var(--text);
-}
-.sl-row:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: -2px;
-}
-/* Ícono del espacio: el emoji, o un punto con su color (gris si no tiene). */
-.sl-ico {
-  --ws: var(--text-3);
-  width: 16px;
-  height: 16px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  font-size: var(--fs-12);
-  line-height: 1;
-}
-.sl-ico:not(.has-emoji)::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: var(--r-full);
-  background: var(--ws);
-}
-.sl-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 500;
-}
-.sl-glyph {
-  flex: none;
-  display: inline-flex;
-}
-.sl-perm-n {
-  flex: none;
-  margin-left: calc(-1 * var(--s-1));
-  color: var(--waiting);
-  font-size: var(--fs-11);
-  font-weight: 700;
-}
-.sl-hint {
-  margin: 0;
-  padding: var(--s-2);
-  font-size: var(--fs-12);
-  color: var(--text-3);
-}
-.sl-acc-none {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
-  padding: var(--s-1) 0;
-}
-
-.sl-foot {
-  flex: none;
-  padding: var(--s-2);
-  box-shadow: inset 0 1px 0 var(--divider);
-}
-/* «Nuevo espacio»: botón neutro con el atajo como texto (no de acento). */
-.sl-newbtn {
-  width: 100%;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--s-2);
-  padding: 0 var(--s-3);
-  border: 1px solid var(--control-border);
-  border-radius: var(--r-md);
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  font-weight: 500;
-  cursor: pointer;
-}
-.sl-newbtn:hover:not(:disabled) {
-  background: var(--hover);
-}
-.sl-newbtn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.sl-newbtn kbd {
-  font-family: var(--font-ui);
-  font-size: var(--fs-11);
-  color: var(--text-3);
-}
-
 /* Clases que viven acá pero usa Configuración → Cuentas. */
 .sl-usage {
   display: grid;
@@ -638,6 +382,13 @@ body.is-resizing-side .panes {
   align-items: center;
   gap: var(--s-2);
 }
+/* Un separador entre las pestañas y las herramientas de la grilla. */
+.sl-tabbar-tools::before {
+  content: '';
+  width: 1px;
+  height: var(--s-4);
+  background: var(--divider-strong);
+}
 .sl-bcast {
   height: var(--h-sm);
   display: inline-flex;
@@ -651,6 +402,7 @@ body.is-resizing-side .panes {
   font: inherit;
   font-size: var(--fs-12);
   cursor: pointer;
+  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
 }
 .sl-bcast:hover {
   background: var(--hover);
@@ -662,9 +414,18 @@ body.is-resizing-side .panes {
   outline-offset: 2px;
 }
 /* Distribución 1‑2‑3‑4: segmentado compacto. */
+.sl-layout-aviso {
+  color: var(--waiting);
+  font-size: var(--fs-12);
+  font-weight: 600;
+  white-space: nowrap;
+}
 .sl-layout {
   display: inline-flex;
-  padding: 2px; /* ajuste óptico: el activo queda inscripto */
+  align-items: center;
+  height: var(--h-sm);
+  box-sizing: border-box;
+  padding: 0 var(--s-1); /* ajuste óptico: el activo queda inscripto */
   border-radius: var(--r-md);
   background: var(--sunken);
   box-shadow: inset 0 0 0 1px var(--divider);
@@ -672,6 +433,7 @@ body.is-resizing-side .panes {
 .sl-layout > button {
   min-width: var(--h-xs);
   height: 22px;
+  transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
   padding: 0 var(--s-1);
   border: 0;
   border-radius: var(--r-sm);
@@ -686,7 +448,7 @@ body.is-resizing-side .panes {
   color: var(--text);
 }
 .sl-layout > button[aria-pressed='true'] {
-  background: var(--raised);
+  background: var(--seg-on);
   color: var(--text);
   font-weight: 600;
   box-shadow: var(--e-1);
@@ -736,7 +498,7 @@ body.is-resizing-side .panes {
   height: var(--pane-head-h);
   gap: var(--s-2);
   padding: 0 var(--s-1) 0 var(--s-3);
-  background: transparent;
+  background: var(--surface);
   border-bottom: 1px solid var(--divider);
 }
 .sl-main .pane-head::before {
@@ -748,6 +510,11 @@ body.is-resizing-side .panes {
   width: 3px;
   border-radius: 0 var(--r-full) var(--r-full) 0;
   background: var(--acc);
+  transition: opacity var(--t-med) var(--ease);
+}
+/* El color de la cuenta sigue a la vista en todos, pero el panel con foco es el que se lee primero. */
+.pane:not(.focused) > .pane-head::before {
+  opacity: 0.55;
 }
 .sl-main .pane-id {
   align-items: center;
@@ -793,6 +560,10 @@ body.is-resizing-side .panes {
   display: inline-flex;
   align-items: center;
   gap: var(--s-1);
+  height: 20px;
+  padding: 0 var(--s-2);
+  border-radius: var(--r-full);
+  background: var(--chip-bg);
   font-size: var(--fs-12);
   font-weight: 500;
   white-space: nowrap;
@@ -801,15 +572,19 @@ body.is-resizing-side .panes {
   color: currentColor;
 }
 .pane-state.is-working {
+  background: var(--working-soft);
   color: var(--working);
 }
 .pane-state.is-waiting {
+  background: var(--waiting-soft);
   color: var(--waiting);
 }
 .pane-state.is-done {
+  background: var(--done-soft);
   color: var(--done);
 }
 .pane-state.is-exited {
+  background: var(--danger-soft);
   color: var(--danger);
 }
 .pane-state.is-sleeping {
@@ -817,6 +592,18 @@ body.is-resizing-side .panes {
 }
 .sl-main .pane-actions {
   gap: 2px;
+}
+/* Maximizar y «…» más discretos en reposo; plenos con el mouse en la cabecera, con foco adentro o en el panel enfocado. */
+@media (hover: hover) {
+  .pane-actions {
+    opacity: 0.7;
+    transition: opacity var(--t-fast) var(--ease);
+  }
+  .pane-head:hover .pane-actions,
+  .pane-actions:focus-within,
+  .pane.focused .pane-actions {
+    opacity: 1;
+  }
 }
 @container (max-width: 480px) {
   .pane-state-detail,
@@ -829,11 +616,6 @@ body.is-resizing-side .panes {
   .pane-id .ui-tag {
     display: none;
   }
-}
-
-/* Foco: el panel activo lleva un anillo de acento (no el color de la cuenta). */
-.pane.focused {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent), 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 /* ---------- Barra de estado ---------- */
@@ -874,10 +656,6 @@ body.is-resizing-side .panes {
   .sl-body.no-side {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
-  }
-  .sl-side {
-    max-height: 36vh;
-    box-shadow: inset 0 -1px 0 var(--divider);
   }
   .sl-resize,
   .sl-status-keys,

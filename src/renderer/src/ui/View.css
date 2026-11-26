@@ -1,5 +1,8 @@
 /* Vista: ocupa el lugar de la barra lateral y los paneles; quedan a la vista la barra superior, el riel y la de estado. */
+/* Contenedor «ui-view»: las páginas miden su ancho real (la ventana menos el riel y el panel lateral abierto),
+   no el de la ventana. Los @container de cada página usan el umbral de antes menos 48 px del riel. */
 .ui-view {
+  container: ui-view / inline-size;
   position: fixed;
   inset: var(--top-h) var(--side-panel-w, 0px) var(--status-h) var(--rail-w);
   z-index: var(--z-panel);
@@ -10,6 +13,13 @@
   font-family: var(--font-ui);
   font-size: var(--fs-13);
   animation: fade var(--t-fast) var(--ease);
+  /* Un solo ancho y margen para todas las páginas: angosto para lectura y formularios, ancho para listas y tableros. */
+  --view-max: 1040px;
+  --view-max-narrow: 760px;
+  /* Maestro-detalle (Historial): tres columnas piden más aire que una lista. */
+  --view-max-wide: 1400px;
+  --view-pad-x: clamp(16px, 4vw, 40px);
+  --view-pad-top: clamp(20px, 4vw, 36px);
 }
 
 .ui-view-head {
@@ -64,6 +74,19 @@
   display: flex;
   align-items: center;
   gap: var(--s-2);
+}
+
+/* Poca altura: el título grande de cada página repite el de la cabecera de la Vista y se come una fila de lista.
+   Queda en el DOM (lo lee el lector de pantalla), solo se saca de la vista. */
+@media (max-height: 680px) {
+  .ui-view .ui-intro {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 .ui-view-body {

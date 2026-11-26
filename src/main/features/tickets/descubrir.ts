@@ -5,6 +5,7 @@
  * Módulo puro (lo corre `node --test` con type stripping).
  */
 import { CORTO_RE, PREFIJO_RE } from './conector'
+import { servidoresDeSalida } from './cuentas'
 
 const MAX = 150
 
@@ -75,6 +76,25 @@ function cortos(prefijo: string, nombres: readonly string[]): string[] {
   return [...new Set(xs.filter((x) => CORTO_RE.test(x)))].sort().slice(0, MAX)
 }
 
+/** Por qué no aparecen herramientas con ese prefijo, según el estado que el system/init le vio al servidor. */
+function motivoSinHerramientas(prefijo: string, stdout: string): { causaDelServidor: boolean; texto: string } {
+  const s = servidoresDeSalida(stdout)?.find((x) => x.prefijo === prefijo)
+  const nombre = s?.nombre ?? prefijo.replace(/^mcp__/, '').replace(/__$/, '')
+  if (s?.estado === 'needs-auth')
+    return { causaDelServidor: true, texto: `El servidor «${nombre}» pide iniciar sesión: abrí una terminal con esta cuenta, corré /mcp, elegí «${nombre}», autenticalo y volvé a buscar.` }
+  if (s?.estado === 'failed')
+    return { causaDelServidor: true, texto: `El servidor «${nombre}» no arrancó o no conectó. Corré /mcp en una terminal con esta cuenta para ver el error y volvé a buscar.` }
+  if (s?.estado === 'pending') return { causaDelServidor: true, texto: `El servidor «${nombre}» no terminó de conectar a tiempo. Probá de nuevo.` }
+  if (s) return { causaDelServidor: false, texto: `El servidor «${nombre}» está en la cuenta, pero no mostró ninguna herramienta.` }
+  const deClaudeAi = prefijo.startsWith('mcp__claude_ai_')
+  return {
+    causaDelServidor: false,
+    texto: deClaudeAi
+      ? `No encontré herramientas que empiecen con «${prefijo}» en esta cuenta. ¿Está conectado en claude.ai?`
+      : `Esta cuenta no tiene un servidor MCP «${nombre}». Agregalo con alcance usuario (claude mcp add --scope user): uno de alcance local o de proyecto solo anda dentro de su carpeta y Sloth consulta desde otra.`
+  }
+}
+
 export function parseDescubrir(prefijo: string, stdout: string): Descubiertas {
   prefijoValido(prefijo)
   let raw: unknown
@@ -93,6 +113,8 @@ export function parseDescubrir(prefijo: string, stdout: string): Descubiertas {
   // La lista de la sesión vale aunque el resultado sea un error (p. ej. error_max_turns).
   if (deSesion.length) return { herramientas: deSesion, fuente: 'sesion', bloqueadas }
 
+  const motivo = motivoSinHerramientas(prefijo, stdout)
+  if (motivo.causaDelServidor) throw new Error(motivo.texto)
   if (!result) throw new Error('La respuesta de Claude no tiene resultado.')
   if (result.is_error === true || (typeof result.subtype === 'string' && result.subtype !== 'success')) {
     const why = typeof result.result === 'string' && result.result ? result.result : String(result.subtype ?? 'error')
@@ -100,6 +122,6 @@ export function parseDescubrir(prefijo: string, stdout: string): Descubiertas {
   }
   const so = result.structured_output
   const deClaude = cortos(prefijo, textos(esMsg(so) ? so.herramientas : undefined))
-  if (!deClaude.length) throw new Error(`No encontré herramientas que empiecen con «${prefijo}» en esta cuenta. ¿Está conectado en claude.ai?`)
+  if (!deClaude.length) throw new Error(motivo.texto)
   return { herramientas: deClaude, fuente: 'claude', bloqueadas }
 }

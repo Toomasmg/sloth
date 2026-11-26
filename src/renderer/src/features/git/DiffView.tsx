@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useUi } from '../host'
 import { WarnGlyph } from './glyphs'
 import { errText, fmtSize, lineClass, pairRows, type DiffLine, type DiffRes } from './util'
+import { Button } from '../../ui'
 
 const PAGE = 2000
 
@@ -61,9 +62,9 @@ export function DiffView({
   const more = res.truncated && (
     <div className="f-git-more">
       <span className="hint">Mostrando {res.lines.length} líneas.</span>
-      <button className="btn sm" onClick={() => setLimit((n) => n + PAGE)} disabled={loading}>
+      <Button look="classic" size="sm" onClick={() => setLimit((n) => n + PAGE)} disabled={loading}>
         {loading ? 'Cargando…' : `Ver ${PAGE} más`}
-      </button>
+      </Button>
     </div>
   )
 

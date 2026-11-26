@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useUi } from '../host'
 import { cleanError } from '../../format'
 import { EyeIcon, HideIcon, MoreIcon, PencilIcon, TerminalIcon } from '../../icons/SlothIcons'
-import { IconButton, Menu, type MenuItem } from '../../ui'
+import { Button, IconButton, Menu, Skeleton, type MenuItem } from '../../ui'
 import { dayLabel, durLabel, fmtTime, plainSummary, plural, spaceColor, STATUS_LABEL } from './model'
 import type { DetailItem, OpenResult, PrefsReply, SessionInfo, SessionRow } from './types'
 
@@ -120,12 +120,12 @@ export function SessionDetail({
 
   const menuItems: MenuItem[] = [
     isHidden
-      ? { id: 'show', label: 'Volver a mostrar', icon: <EyeIcon size={15} />, onSelect: () => void setHidden(false) }
+      ? { id: 'show', label: 'Volver a mostrar', icon: <EyeIcon size={14} />, onSelect: () => void setHidden(false) }
       : {
           id: 'hide',
           label: 'Quitar de la lista',
           hint: 'La conversación no se toca',
-          icon: <HideIcon size={15} />,
+          icon: <HideIcon size={14} />,
           onSelect: () => setAskHide(true)
         }
   ]
@@ -178,22 +178,22 @@ export function SessionDetail({
       </div>
 
       <div className="hd-actions">
-        <button type="button" className="btn primary" onClick={() => void resume(false)} disabled={busy}>
+        <Button look="classic" variant="primary" onClick={() => void resume(false)} disabled={busy}>
           {busy ? 'Abriendo…' : 'Retomar esta sesión'}
-        </button>
-        <button type="button" className="btn" aria-pressed={isPinned} onClick={() => void togglePin()}>
+        </Button>
+        <Button look="classic" aria-pressed={isPinned} onClick={() => void togglePin()}>
           {isPinned ? 'Quitar de fijadas' : 'Fijar'}
-        </button>
-        <button type="button" className="btn" onClick={copy} disabled={!info}>
+        </Button>
+        <Button look="classic" onClick={copy} disabled={!info}>
           Copiar resumen
-        </button>
-        <button type="button" className="btn" onClick={() => void exportMd()} disabled={!info}>
+        </Button>
+        <Button look="classic" onClick={() => void exportMd()} disabled={!info}>
           Exportar como Markdown
-        </button>
+        </Button>
         <span className="hist-grow" />
-        <button type="button" className="btn ghost hd-del" onClick={() => setAskDel(true)} disabled={deleting}>
+        <Button look="classic" variant="ghost" className="hd-del" onClick={() => setAskDel(true)} disabled={deleting}>
           Borrar
-        </button>
+        </Button>
         <Menu
           aria-label="Acciones de la conversación"
           items={menuItems}
@@ -206,24 +206,24 @@ export function SessionDetail({
           <span className="hd-box-text">
             ¿Borrar «{row.title}»? Va a la Papelera de Windows; podés recuperarla desde ahí.
           </span>
-          <button type="button" className="btn ghost" onClick={() => setAskDel(false)} disabled={deleting}>
+          <Button look="classic" variant="ghost" onClick={() => setAskDel(false)} disabled={deleting}>
             Cancelar
-          </button>
-          <button type="button" className="btn danger" onClick={() => void removeConv()} disabled={deleting} autoFocus>
+          </Button>
+          <Button look="classic" variant="danger" onClick={() => void removeConv()} disabled={deleting} autoFocus>
             {deleting ? 'Borrando…' : 'Sí, borrar'}
-          </button>
+          </Button>
         </div>
       )}
 
       {wsConfirm && (
         <div className="hd-box" role="group" aria-label="Confirmar retomar">
           <span className="hd-box-text">«{wsConfirm}» tiene la terminal abierta: se cierra y Claude retoma esta conversación ahí.</span>
-          <button type="button" className="btn ghost" onClick={() => setWsConfirm(null)}>
+          <Button look="classic" variant="ghost" onClick={() => setWsConfirm(null)}>
             Cancelar
-          </button>
-          <button type="button" className="btn primary" disabled={busy} onClick={() => void resume(true)} autoFocus>
+          </Button>
+          <Button look="classic" variant="primary" disabled={busy} onClick={() => void resume(true)} autoFocus>
             Retomar ahí
-          </button>
+          </Button>
         </div>
       )}
 
@@ -233,12 +233,12 @@ export function SessionDetail({
             ¿Quitar «{row.title}» de la lista de Sloth? La conversación de Claude no se borra: sigue en tu carpeta de Claude. Podés volver a
             mostrarla desde el historial.
           </span>
-          <button type="button" className="btn ghost" onClick={() => setAskHide(false)}>
+          <Button look="classic" variant="ghost" onClick={() => setAskHide(false)}>
             Cancelar
-          </button>
-          <button type="button" className="btn danger" onClick={() => void setHidden(true)} autoFocus>
+          </Button>
+          <Button look="classic" variant="danger" onClick={() => void setHidden(true)} autoFocus>
             Quitar de la lista
-          </button>
+          </Button>
         </div>
       )}
 
@@ -253,7 +253,7 @@ export function SessionDetail({
         {info ? (
           <p className="hd-summary">{info.lastAnswer || 'Esta sesión no tiene respuestas de texto de Claude.'}</p>
         ) : (
-          <p className="hint">Cargando la conversación…</p>
+          <Skeleton rows={2} showLabel label="Cargando la conversación…" />
         )}
       </section>
 

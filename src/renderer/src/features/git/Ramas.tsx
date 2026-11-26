@@ -3,6 +3,7 @@ import { useUi } from '../host'
 import { BranchIcon } from '../../icons/SlothIcons'
 import { ArrowDownGlyph, ArrowUpGlyph, CheckGlyph, SpinGlyph } from './glyphs'
 import { errText, plural, type BranchesRes, type GitShared, type StashRes, type StatusRes, type SyncRes } from './util'
+import { Button } from '../../ui'
 
 interface Props {
   g: GitShared
@@ -143,9 +144,9 @@ export function Ramas({ g, st, sync, stash, branches, onGoCambios }: Props): Rea
               {p.from} → {p.to} · esperando revisión
             </div>
           </div>
-          <button type="button" className="g-btn-plain" onClick={() => void ui.invoke('feat:git:openUrl', p.url).catch((e) => g.fail(errText(e)))}>
+          <Button look="git" onClick={() => void ui.invoke('feat:git:openUrl', p.url).catch((e) => g.fail(errText(e)))}>
             Ver PR
-          </button>
+          </Button>
         </div>
       ))}
 
@@ -162,16 +163,16 @@ export function Ramas({ g, st, sync, stash, branches, onGoCambios }: Props): Rea
               </div>
             )}
             <div className="g-banner-actions">
-              <button type="button" className="g-btn-solid" onClick={() => void stashAndSwitch()} disabled={bsy}>
+              <Button look="git" variant="primary" onClick={() => void stashAndSwitch()} disabled={bsy}>
                 {busy === 'stash' ? <SpinGlyph /> : null}
                 Guardar aparte (stash) y cambiar
-              </button>
-              <button type="button" className="g-btn-plain" onClick={onGoCambios} disabled={bsy}>
+              </Button>
+              <Button look="git" onClick={onGoCambios} disabled={bsy}>
                 Ir a Cambios
-              </button>
-              <button type="button" className="g-btn-ghost" onClick={() => setAsk(null)} disabled={bsy}>
+              </Button>
+              <Button look="git" variant="ghost" onClick={() => setAsk(null)} disabled={bsy}>
                 Cancelar
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -185,10 +186,10 @@ export function Ramas({ g, st, sync, stash, branches, onGoCambios }: Props): Rea
               {plural(stash.files, 'archivo', 'archivos')} de {stash.branch}
             </div>
           </div>
-          <button type="button" className="g-btn-plain" onClick={restore} disabled={bsy}>
+          <Button look="git" onClick={restore} disabled={bsy}>
             {busy === 'restore' ? <SpinGlyph /> : null}
             Restaurar
-          </button>
+          </Button>
         </div>
       )}
 
@@ -210,14 +211,14 @@ export function Ramas({ g, st, sync, stash, branches, onGoCambios }: Props): Rea
             </div>
           </div>
           <div className="g-current-actions">
-            <button type="button" className="g-btn-plain" onClick={push} disabled={bsy || !curName}>
+            <Button look="git" onClick={push} disabled={bsy || !curName}>
               {busy === 'push' ? <SpinGlyph /> : <ArrowUpGlyph />}
               Subir
-            </button>
-            <button type="button" className="g-btn-plain" onClick={pull} disabled={bsy || !curName}>
+            </Button>
+            <Button look="git" onClick={pull} disabled={bsy || !curName}>
               {busy === 'pull' ? <SpinGlyph /> : <ArrowDownGlyph />}
               Traer
-            </button>
+            </Button>
           </div>
         </div>
       </section>
@@ -235,9 +236,9 @@ export function Ramas({ g, st, sync, stash, branches, onGoCambios }: Props): Rea
                   <div className="g-trow-sub">{b.subject}</div>
                 </div>
                 <span className="g-trow-meta">{b.upstream ? `sigue a ${b.upstream}` : 'sin remoto'}</span>
-                <button type="button" className="g-btn-plain" onClick={() => goBranch(b.name, false)} aria-label={`Cambiar a ${b.name}`} disabled={bsy}>
+                <Button look="git" onClick={() => goBranch(b.name, false)} aria-label={`Cambiar a ${b.name}`} disabled={bsy}>
                   Cambiar
-                </button>
+                </Button>
               </div>
             ))}
           </div>
@@ -259,15 +260,15 @@ export function Ramas({ g, st, sync, stash, branches, onGoCambios }: Props): Rea
                   <div className="g-trow-sub">{r.subject}</div>
                 </div>
                 <span className="g-trow-meta">{isCur ? 'es la actual' : r.hasLocal ? 'con copia local' : 'solo en remoto'}</span>
-                <button
+                <Button
                   type="button"
-                  className="g-btn-plain"
+                  look="git"
                   onClick={() => goBranch(r.name, true)}
                   aria-label={`Cambiar a origin/${r.name}`}
                   disabled={bsy || isCur}
                 >
                   Cambiar
-                </button>
+                </Button>
               </div>
             )
           })}
@@ -298,10 +299,10 @@ export function Ramas({ g, st, sync, stash, branches, onGoCambios }: Props): Rea
           </div>
         )}
         <div className="g-newbranch-actions">
-          <button type="submit" className="g-btn-solid" disabled={bsy || locals.length === 0}>
+          <Button type="submit" look="git" variant="primary" disabled={bsy || locals.length === 0}>
             {busy === 'new' ? <SpinGlyph /> : null}
             Crear y cambiar
-          </button>
+          </Button>
         </div>
       </form>
     </div>

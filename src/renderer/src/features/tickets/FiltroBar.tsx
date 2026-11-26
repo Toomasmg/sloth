@@ -161,7 +161,7 @@ function Personas({ snap, filtro, grupos, running, aplicar, onPersonas, personas
       )}
       {(nota || errPersonas) && (
         <p className="f-tickets-fb-aviso" role="alert">
-          <WarningCircle size={13} weight="fill" aria-hidden="true" /> {nota || errPersonas}
+          <WarningCircle size={14} weight="fill" aria-hidden="true" /> {nota || errPersonas}
         </p>
       )}
     </div>
@@ -217,7 +217,7 @@ function Estados({ snap, filtro, aplicar }: Pick<Props, 'snap' | 'filtro' | 'apl
       </p>
       {nota && (
         <p className="f-tickets-fb-aviso" role="alert">
-          <WarningCircle size={13} weight="fill" aria-hidden="true" /> {nota}
+          <WarningCircle size={14} weight="fill" aria-hidden="true" /> {nota}
         </p>
       )}
     </div>
@@ -265,7 +265,7 @@ export function FiltroBar(props: Props): React.JSX.Element {
     <section className="f-tickets-fb" aria-label="Filtro de tickets">
       <div className="f-tickets-fb-head">
         <button type="button" className="f-tickets-fb-toggle" aria-expanded={abierto} aria-controls={abierto ? cuerpoId : undefined} onClick={() => onAbierto(!abierto)}>
-          {abierto ? <CaretDown size={13} weight="bold" aria-hidden="true" /> : <CaretRight size={13} weight="bold" aria-hidden="true" />}
+          {abierto ? <CaretDown size={14} weight="bold" aria-hidden="true" /> : <CaretRight size={14} weight="bold" aria-hidden="true" />}
           <Funnel size={14} aria-hidden="true" />
           <span className="f-tickets-fb-tit">Filtro</span>
           <span className="f-tickets-fb-res" title={resumen}>
@@ -283,7 +283,7 @@ export function FiltroBar(props: Props): React.JSX.Element {
         <p className="f-tickets-fb-falta" role="status">
           {trayendo ? (
             <>
-              <CircleNotch size={13} className="spin" aria-hidden="true" /> Trayendo lo que falta de {nombreConector}…
+              <CircleNotch size={14} className="spin" aria-hidden="true" /> Trayendo lo que falta de {nombreConector}…
             </>
           ) : (
             <>
@@ -297,12 +297,12 @@ export function FiltroBar(props: Props): React.JSX.Element {
       )}
       {snap.conteos?.noLeidos ? (
         <p className="f-tickets-fb-aviso" role="status">
-          <WarningCircle size={13} weight="fill" aria-hidden="true" /> <span>{textoNoLeidos(snap.conteos.noLeidos, snap.tickets.length)}</span>
+          <WarningCircle size={14} weight="fill" aria-hidden="true" /> <span>{textoNoLeidos(snap.conteos.noLeidos, snap.tickets.length)}</span>
         </p>
       ) : null}
       {errores.length > 0 && !running && (
         <p className="f-tickets-fb-aviso f-tickets-fb-errpers" role="alert">
-          <WarningCircle size={13} weight="fill" aria-hidden="true" />
+          <WarningCircle size={14} weight="fill" aria-hidden="true" />
           <span>
             No se pudo traer lo de{' '}
             {errores

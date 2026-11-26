@@ -4,6 +4,7 @@ import type { ChatInviteSent, ChatTeam } from '../../../../../shared/chat'
 import { useUi } from '../../host'
 import { cleanError } from '../../../format'
 import { canManage, ConfirmInline, TeamModal } from './shared'
+import { Button } from '../../../ui'
 
 const LOGIN_RE = /^[A-Za-z0-9-]{1,39}$/
 
@@ -140,9 +141,9 @@ ${token}`)
                   aria-describedby={`${errId} ${loginId}-hint`}
                   aria-invalid={err ? true : undefined}
                 />
-                <button type="submit" className="btn primary" disabled={busy !== null || login.trim() === ''}>
+                <Button type="submit" look="classic" variant="primary" disabled={busy !== null || login.trim() === ''}>
                   {busy === 'invite' ? 'Invitando…' : 'Invitar'}
-                </button>
+                </Button>
               </div>
               <p id={`${loginId}-hint`} className="field-help">
                 Sin @. Solo letras, números y guiones.
@@ -160,23 +161,23 @@ ${token}`)
                 <span className="field-help">Todavía no hay código.</span>
               )}
               <div className="f-chat-team-actions">
-                <button type="button" className="btn sm" onClick={copyCode} disabled={!code || busy !== null}>
+                <Button look="classic" size="sm" onClick={copyCode} disabled={!code || busy !== null}>
                   {copied === 'code' ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
                   {copied === 'code' ? 'Copiado' : 'Copiar'}
-                </button>
-                <button type="button" className="btn sm" onClick={askRegenerate} disabled={busy !== null || confirmCode}>
+                </Button>
+                <Button look="classic" size="sm" onClick={askRegenerate} disabled={busy !== null || confirmCode}>
                   <ArrowsClockwise size={14} aria-hidden="true" />
                   {busy === 'code' ? 'Cambiando…' : code ? 'Cambiar código' : 'Generar código'}
-                </button>
+                </Button>
               </div>
             </div>
             {expiryNote && <p className="field-help">{expiryNote}</p>}
             <div className="f-chat-team-full">
               <p className="field-help">Para alguien que todavía no tiene el chat: trae el servidor y el código, y entra en un solo paso.</p>
-              <button type="button" className="btn sm primary" onClick={() => void copyFull()} disabled={!code || busy !== null || confirmCode}>
+              <Button look="classic" size="sm" variant="primary" onClick={() => void copyFull()} disabled={!code || busy !== null || confirmCode}>
                 {copied === 'full' ? <Check size={14} aria-hidden="true" /> : <Ticket size={14} aria-hidden="true" />}
                 {busy === 'full' ? 'Copiando…' : copied === 'full' ? 'Copiado' : 'Copiar invitación completa'}
-              </button>
+              </Button>
             </div>
             {confirmCode && (
               <ConfirmInline
@@ -204,9 +205,9 @@ ${token}`)
       )}
 
       <div className="modal-actions">
-        <button type="button" className="btn" onClick={onClose} disabled={busy !== null}>
+        <Button look="classic" onClick={onClose} disabled={busy !== null}>
           Cerrar
-        </button>
+        </Button>
       </div>
     </TeamModal>
   )

@@ -9,6 +9,7 @@ import { cancelQueued, startBatch, useBatches, type Batch } from './store'
 import { canReceive, isReady, SPACE_CHIP, SPACE_LABEL, spaceStatus, type SpaceStatus } from './state'
 import { Modal } from '../../Modal'
 import { colorHex } from '../templates/catalog'
+import { Button } from '../../ui'
 
 const CONFIRM_OVER = 3
 /** Lo mismo que el diseño: se corta en 2000 caracteres. */
@@ -248,6 +249,20 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
       subtitle={batch ? 'Sloth lo manda espacio por espacio.' : `El mismo mensaje llega a ${agente ? `cada ${agente}` : 'cada agente'} que elijas, cada uno en su propia terminal.`}
       dirty={!batch && trimmed !== ''}
       onClose={onClose}
+      footer={
+        batch ? undefined : (
+          <>
+            <Button look="classic" variant="ghost" onClick={onClose}>
+              Cancelar
+            </Button>
+            <span className="f-broadcast-grow" />
+            <Button type="submit" look="classic" variant="primary">
+              <PaperPlane size={14} />
+              {sendLabel}
+            </Button>
+          </>
+        )
+      }
       onSubmit={(e) => {
         e.preventDefault()
         if (batch) return
@@ -279,9 +294,9 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
               </div>
               <div role="group" aria-label="Atajos de selección" className="f-broadcast-shorts">
                 {shorts.map((s) => (
-                  <button key={s.label} type="button" className="btn sm" onClick={() => pick(s.ids)} disabled={!s.ids.length && s.label !== 'Ninguno'}>
+                  <Button key={s.label} type="button" look="classic" size="sm" onClick={() => pick(s.ids)} disabled={!s.ids.length && s.label !== 'Ninguno'}>
                     {s.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
 
@@ -459,17 +474,6 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
               </div>
             </section>
 
-            <footer className="f-broadcast-foot">
-              <button type="button" className="btn ghost" onClick={onClose}>
-                Cancelar
-              </button>
-              <span className="f-broadcast-grow" />
-              <button type="submit" className="btn primary">
-                <PaperPlane size={14} />
-                {sendLabel}
-              </button>
-            </footer>
-
             {hist.length > 0 && (
               <section className="f-broadcast-hist" aria-labelledby="f-broadcast-hist-t">
                 <h3 id="f-broadcast-hist-t">Últimos envíos</h3>
@@ -483,14 +487,15 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
                           a {h.ids.length} {plural(h.ids.length, 'espacio', 'espacios')} · {h.names.join(', ')}
                         </span>
                       </span>
-                      <button
+                      <Button
                         type="button"
-                        className="btn sm"
+                        look="classic"
+                        size="sm"
                         aria-label={`Repetir el envío de las ${new Date(h.time).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}`}
                         onClick={() => repeat(h)}
                       >
                         Repetir
-                      </button>
+                      </Button>
                     </li>
                   ))}
                 </ul>
@@ -538,9 +543,9 @@ function Progress({ batch, onAgain, onRetry, onClose }: { batch: Batch; onAgain:
                 {label}
               </span>
               {t.status === 'queued' && (
-                <button type="button" className="btn sm ghost" onClick={() => cancelQueued(batch.id, t.wsId)} aria-label={`Quitar a ${t.name} de la cola`}>
+                <Button look="classic" size="sm" variant="ghost" onClick={() => cancelQueued(batch.id, t.wsId)} aria-label={`Quitar a ${t.name} de la cola`}>
                   Quitar
-                </button>
+                </Button>
               )}
             </li>
           )
@@ -548,17 +553,17 @@ function Progress({ batch, onAgain, onRetry, onClose }: { batch: Batch; onAgain:
       </ul>
       <footer className="f-broadcast-foot">
         {failed > 0 && (
-          <button type="button" className="btn" onClick={() => onRetry(batch.targets.filter((t) => t.status === 'failed').map((t) => t.wsId))}>
+          <Button look="classic" onClick={() => onRetry(batch.targets.filter((t) => t.status === 'failed').map((t) => t.wsId))}>
             Reintentar con los {failed === 1 ? 'que falló' : 'que fallaron'}
-          </button>
+          </Button>
         )}
-        <button type="button" className="btn" onClick={onAgain}>
+        <Button look="classic" onClick={onAgain}>
           Enviar otro
-        </button>
+        </Button>
         <span className="f-broadcast-grow" />
-        <button type="button" className="btn primary" onClick={onClose}>
+        <Button look="classic" variant="primary" onClick={onClose}>
           Volver a los espacios
-        </button>
+        </Button>
       </footer>
     </div>
   )

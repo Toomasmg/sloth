@@ -3,7 +3,10 @@ import { HelpIcon, HistoryIcon, SettingsIcon, TeamIcon, TerminalIcon, PullReques
 import { Tooltip } from '../ui'
 import { comboLabel, isCapturingShortcut } from '../shortcuts'
 import { isMine, useSnapshot } from '../features/tickets/model'
+import { useTeamSnapshot } from '../features/team/model'
+import { usePrsPendientes } from '../features/prs/store'
 import { goTo, useNavDest } from './nav'
+import { insigniaEquipo, insigniaPrs, resumenParaRiel, type Insignia } from './pendientes'
 import { NAV_FOOT, NAV_LABEL, NAV_MAIN, navDestForKey, type NavDest } from './nav-model'
 
 const ICON: Record<NavDest, ReactNode> = {
@@ -17,7 +20,7 @@ const ICON: Record<NavDest, ReactNode> = {
   ajustes: <SettingsIcon size={18} />
 }
 
-function RailButton({ dest, active, shortcut, badge }: { dest: NavDest; active: boolean; shortcut?: string; badge?: { n: number; label: string } }): React.JSX.Element {
+function RailButton({ dest, active, shortcut, badge }: { dest: NavDest; active: boolean; shortcut?: string; badge?: { n: number; label: string; tono?: Insignia['tono'] } }): React.JSX.Element {
   const label = NAV_LABEL[dest]
   const n = badge?.n ?? 0
   return (
@@ -32,7 +35,7 @@ function RailButton({ dest, active, shortcut, badge }: { dest: NavDest; active: 
       >
         {ICON[dest]}
         {n > 0 && (
-          <span className="sl-rail-badge" aria-hidden="true">
+          <span className={`sl-rail-badge${badge?.tono === 'danger' ? ' is-danger' : ''}`} aria-hidden="true">
             {n > 99 ? '99+' : n}
           </span>
         )}
@@ -48,6 +51,10 @@ function RailButton({ dest, active, shortcut, badge }: { dest: NavDest; active: 
 export function NavRail(): React.JSX.Element {
   const current = useNavDest()
   const snap = useSnapshot()
+  const team = useTeamSnapshot()
+  const pend = usePrsPendientes()
+  const equipo = insigniaEquipo(resumenParaRiel(team ? { ...team.summary, leyoGithub: Boolean(team.github.fetchedAt) } : null, pend))
+  const prs = insigniaPrs(pend)
   const mine = snap ? snap.tickets.filter((t) => isMine(t, snap.me)).length : 0
 
   useEffect(() => {
@@ -72,7 +79,7 @@ export function NavRail(): React.JSX.Element {
           dest={d}
           active={current === d}
           shortcut={`Ctrl+Shift+${i + 1}`}
-          badge={d === 'tickets' ? { n: mine, label: `${mine} ${mine === 1 ? 'ticket tuyo' : 'tickets tuyos'}` } : undefined}
+          badge={d === 'tickets' ? { n: mine, label: `${mine} ${mine === 1 ? 'ticket tuyo' : 'tickets tuyos'}` } : d === 'equipo' ? equipo ?? undefined : d === 'prs' ? prs ?? undefined : undefined}
         />
       ))}
       <span className="sl-rail-grow" />

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Account, AccountStatus, AccountUsage, NewWorkspaceInput, Workspace } from '../../shared/types'
 import { api } from './api'
 import { agenteComun, agenteDe } from '../../shared/proveedores'
+import type { Cupo } from '../../shared/cupo'
+import { CupoMedidor } from './CupoMedidor'
 import { Modal } from './Modal'
 import { Button, Chip, Input, Select, Tabs, Textarea, tabPanelProps } from './ui'
 import { FolderIcon, TemplatesIcon, TicketIcon } from './icons/SlothIcons'
@@ -22,6 +24,8 @@ interface Props {
   accounts: Account[]
   statuses: Record<string, AccountStatus>
   usage: Record<string, AccountUsage>
+  cupos: Record<string, Cupo>
+  ahora: number
   defaultRepo: string
   /** Valores iniciales (p. ej. carpeta soltada sobre la ventana). */
   preset?: NewWorkspacePreset
@@ -65,13 +69,17 @@ function branchError(raw: string, resolved: string, values: VarValues): string {
 export function NewWorkspaceDialog(props: Props): React.JSX.Element {
   const ctx = useUi()
   const tk = useSnapshot()
-  const { accounts, statuses, usage, mode, onClose } = props
+  const { accounts, statuses, usage, cupos, ahora, mode, onClose } = props
   const tplState = useTemplates()
 
-  // Sugerida: con sesión y la que menos usó en las últimas 5 h.
+  // Sugerida: con sesión y la que menos usó en las últimas 5 h. Si todas tienen tope se compara el porcentaje
+  // (un 40 % de un plan chico pesa más que 40 % de uno grande en tokens); si no, los tokens crudos.
   const suggested = useMemo(() => {
-    return cuentaSugerida(accounts, (id) => statuses[id]?.loggedIn === true, (id) => totalTok(usage[id]?.last5h ?? emptyTotals)) ?? ''
-  }, [accounts, statuses, usage])
+    const conCupo = Object.values(cupos)
+    const porPct = conCupo.length > 0 && conCupo.every((c) => c.pct !== undefined)
+    const usado = (id: string): number => (porPct ? (cupos[id]?.pct ?? 0) : totalTok(usage[id]?.last5h ?? emptyTotals))
+    return cuentaSugerida(accounts, (id) => statuses[id]?.loggedIn === true, usado) ?? ''
+  }, [accounts, statuses, usage, cupos])
 
   // Plantilla inicial: la que pidió la barra o la predeterminada. Se lee una vez.
   const [origin, setOrigin] = useState<Origin>(() => (mode === 'ticket' ? 'ticket' : peekPreselect() || tplState.defaultId ? 'plantilla' : 'carpeta'))
@@ -351,7 +359,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
   const gitHint = !carpetaTrim
     ? 'Escribí la ruta, elegí una reciente o soltá una carpeta en la ventana.'
     : cur && !cur.exists
-      ? 'No encontramos esa carpeta en esta PC.'
+      ? showErr('carpeta') ? '' : 'No encontramos esa carpeta en esta PC.'
       : cur?.isGit
         ? `Repo git · rama ${cur.branch ?? 'sin rama (HEAD suelto)'}`
         : cur
@@ -620,6 +628,7 @@ export function NewWorkspaceDialog(props: Props): React.JSX.Element {
                     <span className="nw-acc-text">
                       <span className="nw-acc-name">{a.label}</span>
                       <span className="nw-acc-sub">{n === null ? '…' : n === 1 ? '1 espacio abierto' : `${n} espacios abiertos`}</span>
+                      {cupos[a.id] && st?.loggedIn !== false && <CupoMedidor cupo={cupos[a.id]} ahora={ahora} className="nw-acc-cupo" />}
                       {st && !st.loggedIn && <span className="nw-acc-warn">Sin sesión: vas a iniciarla en la terminal</span>}
                     </span>
                   </button>

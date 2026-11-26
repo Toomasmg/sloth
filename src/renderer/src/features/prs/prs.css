@@ -1,19 +1,11 @@
 .f-prs-body {
-  max-width: 960px;
+  max-width: var(--view-max);
   margin: 0 auto;
-  padding: var(--s-4) var(--s-5) var(--s-6);
+  padding: var(--view-pad-top) var(--view-pad-x) 56px;
 }
 .f-prs-updated {
   color: var(--text-3);
   font-size: var(--fs-12);
-}
-.f-prs-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--s-2);
-  padding: var(--s-7) 0;
-  color: var(--text-2);
 }
 .f-prs-filter {
   margin-bottom: var(--s-4);

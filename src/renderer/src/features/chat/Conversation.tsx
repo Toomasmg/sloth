@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { ArrowLeft, Broom, ChatsCircle, DotsThree, MagnifyingGlass, PencilSimple, Timer, UserPlus, UsersThree } from '@phosphor-icons/react'
 import { type ChatConvRef, type ChatMessage, type ChatRetentionHours, type ChatRole } from '../../../../shared/chat'
 import { canManageConv, dropExpired, noticeText, retentionLabel } from '../../../../shared/chat-retention'
-import { EmptyState, IconButton, Menu, type MenuItem } from '../../ui'
+import { Button, EmptyState, IconButton, Menu, type MenuItem } from '../../ui'
 import { Composer, type ComposerHandle } from './Composer'
 import { MessageItem } from './MessageItem'
 import { activeReduce, scrolledFar } from './active-msg'
@@ -319,21 +319,21 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
       </header>
       {isTeam && (
         <div className="f-chat-subbar">
-          <button type="button" className="btn sm ghost" onClick={() => onModal('members')}>
+          <Button look="classic" size="sm" variant="ghost" onClick={() => onModal('members')}>
             <UsersThree size={14} aria-hidden="true" />
             Miembros
-          </button>
+          </Button>
           {canManage && (
-            <button type="button" className="btn sm ghost" onClick={() => onModal('invite')}>
+            <Button look="classic" size="sm" variant="ghost" onClick={() => onModal('invite')}>
               <UserPlus size={14} aria-hidden="true" />
               Invitar
-            </button>
+            </Button>
           )}
           {canManage && (
-            <button type="button" className="btn sm ghost" onClick={() => onModal('editTeam')}>
+            <Button look="classic" size="sm" variant="ghost" onClick={() => onModal('editTeam')}>
               <PencilSimple size={14} aria-hidden="true" />
               Editar
-            </button>
+            </Button>
           )}
           {extras && retentionHours !== undefined && (
             <span className="f-chat-retention">
@@ -360,9 +360,9 @@ export function Conversation({ conv, title, photo, initial, role, me, otherReadA
       <div className="f-chat-scroll" ref={scrollRef} onScroll={onScroll} tabIndex={0} role="region" aria-label="Mensajes">
         {info?.more && (
           <div className="f-chat-more">
-            <button type="button" className="btn sm ghost" onClick={() => void older()} disabled={loadingOlder}>
+            <Button look="classic" size="sm" variant="ghost" onClick={() => void older()} disabled={loadingOlder}>
               {loadingOlder ? 'Cargando…' : 'Cargar anteriores'}
-            </button>
+            </Button>
           </div>
         )}
         {!info && <p className="hint f-chat-empty">Cargando mensajes…</p>}
