@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { AccountUsage, AgentStatus } from '../../shared/types'
-import { aMs, claveValida, armarEstado, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type Entrada } from './celular-core'
+import { aMs, claveValida, armarEstado, MAX_PEDIDO, pedidoParaCelu, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type Entrada } from './celular-core'
 
 const v4 = (address: string, internal = false) => ({ address, family: 'IPv4', internal })
 
@@ -123,7 +123,7 @@ function entrada(): Entrada {
     agentes,
     uso: { a: uso(1500, 12) },
     limites: { a: { cincoHoras: { pct: 50, reiniciaEn: null }, semana: null, at: 900 } },
-    pedidos: [{ id: 'p1', ws: 'w1', texto: 'Bash: npm test', at: 950, expiresAt: 5000 }]
+    pedidos: [{ id: 'p1', ws: 'w1', tool: 'Bash', input: { command: 'npm test' }, at: 950, expiresAt: 5000 }]
   }
 }
 
@@ -137,7 +137,7 @@ test('armarEstado: un pedido pendiente pone al espacio en «te necesita» y orde
       ['w3', 'idle']
     ]
   )
-  assert.deepEqual(e.pedidos, [{ id: 'p1', sesionId: 'w1', sesion: 'web', texto: 'Bash: npm test', desde: 950, vence: 5000 }])
+  assert.deepEqual(e.pedidos, [{ id: 'p1', sesionId: 'w1', sesion: 'web', texto: 'npm test', titulo: 'Claude quiere ejecutar un comando', destructivo: null, desde: 950, vence: 5000 }])
 })
 
 test('armarEstado: una cuenta sin datos de límites ni uso queda en null, nunca en 0', () => {
@@ -149,10 +149,26 @@ test('armarEstado: una cuenta sin datos de límites ni uso queda en null, nunca 
 
 test('armarEstado: no expone carpetas y descarta pedidos de espacios borrados', () => {
   const ent = entrada()
-  ent.pedidos.push({ id: 'p2', ws: 'borrado', texto: 'x', at: 1, expiresAt: 2 })
+  ent.pedidos.push({ id: 'p2', ws: 'borrado', tool: 'Bash', input: { command: 'x' }, at: 1, expiresAt: 2 })
   const e = armarEstado(ent)
   assert.equal(e.pedidos.length, 1)
   assert.ok(!JSON.stringify(e).includes('cwd'))
+})
+
+test('pedidoParaCelu: el comando entero (no 160), marcado si es destructivo y sin caracteres que escondan lo que corre', () => {
+  const largo = 'npm run build && ' + 'x'.repeat(600) + ' && git push --force origin main'
+  const p = pedidoParaCelu('Bash', { command: largo })
+  assert.equal(p.texto, largo)
+  assert.equal(p.titulo, 'Claude quiere ejecutar un comando')
+  assert.ok(p.destructivo, 'push --force es destructivo')
+  assert.equal(pedidoParaCelu('Bash', { command: 'rm -rf node_modules' }).destructivo !== null, true)
+  assert.equal(pedidoParaCelu('Bash', { command: 'ls -la' }).destructivo, null)
+  // Un override bidi da vuelta lo que se lee; el salto de línea de un comando de varias líneas sí queda.
+  const bidi = pedidoParaCelu('Bash', { command: 'echo hola\u202E fdsa && rm\nls\tx' })
+  assert.equal(bidi.texto, 'echo hola\uFFFD fdsa && rm\nls\tx')
+  assert.equal(pedidoParaCelu('Bash', { command: 'a'.repeat(MAX_PEDIDO + 50) }).texto.length, MAX_PEDIDO)
+  assert.deepEqual(pedidoParaCelu('Edit', { file_path: 'src/a.ts' }), { texto: 'Editar src/a.ts', titulo: 'Claude quiere editar un archivo', destructivo: null })
+  assert.equal(pedidoParaCelu('WebFetch', { url: 'https://ejemplo.com/x' }).texto, 'Acceder a ejemplo.com')
 })
 
 test('textoAviso no deja saltos de línea y corta lo largo', () => {

@@ -1,5 +1,6 @@
 import { derivarClaves } from './celular-sello'
 import type { AccountUsage, AgentStatus } from '../../shared/types'
+import { destructivoDe, kindOf, labelOf, titleOf } from '../../shared/permissions-core'
 import type { CuentaCelular, EstadoCelular, EstadoSesion, PedidoCelular, SesionCelular, VentanaLimite } from '../../shared/celular'
 
 /** Lo que importa de una interfaz de red (la forma de os.networkInterfaces()). */
@@ -120,7 +121,19 @@ export interface Entrada {
   agentes: ReadonlyMap<string, AgentStatus> | Record<string, AgentStatus>
   uso: Record<string, AccountUsage>
   limites: Record<string, ReturnType<typeof leerLimites>>
-  pedidos: { id: string; ws: string; texto: string; at: number; expiresAt: number }[]
+  pedidos: { id: string; ws: string; tool: string; input: Record<string, unknown>; at: number; expiresAt: number }[]
+}
+
+/** Lo que se aprueba desde el celu se tiene que ver entero: el corte es solo un tope de tamaño. */
+export const MAX_PEDIDO = 4000
+
+// Controles (salvo salto y tabulación), bidi y ancho cero: harían que el celu muestre algo distinto de lo que corre.
+const INVISIBLES = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\p{Cf}\p{Zl}\p{Zp}]/gu
+
+/** Qué pide un permiso, como lo ve el celu. */
+export function pedidoParaCelu(tool: string, input: Record<string, unknown>): { texto: string; titulo: string; destructivo: string | null } {
+  const kind = kindOf(tool)
+  return { texto: corto(labelOf(kind, tool, input).replace(INVISIBLES, '\uFFFD'), MAX_PEDIDO), titulo: titleOf(kind, tool, input), destructivo: destructivoDe(kind, input) }
 }
 
 const agenteDe = (a: Entrada['agentes'], id: string): AgentStatus | undefined =>
@@ -157,7 +170,7 @@ export function armarEstado(e: Entrada): EstadoCelular {
   const pedidos: PedidoCelular[] = e.pedidos
     .filter((p) => nombres.has(p.ws))
     .sort((a, b) => a.at - b.at)
-    .map((p) => ({ id: p.id, sesionId: p.ws, sesion: corto(nombres.get(p.ws) as string, 60), texto: corto(p.texto), desde: p.at, vence: p.expiresAt }))
+    .map((p) => ({ id: p.id, sesionId: p.ws, sesion: corto(nombres.get(p.ws) as string, 60), ...pedidoParaCelu(p.tool, p.input), desde: p.at, vence: p.expiresAt }))
   return { ahora: e.ahora, aprobar: e.aprobar, terminal: e.terminal, cuentas, sesiones, pedidos }
 }
 

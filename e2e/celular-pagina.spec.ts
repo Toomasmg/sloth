@@ -1,6 +1,7 @@
 import { chromium, devices, expect, test, webkit, type Browser, type BrowserContextOptions, type Page } from '@playwright/test'
 import type { EstadoCelular, SesionCelular } from '../src/shared/celular'
 import { crearFuenteWifi } from '../src/main/features/celular-servidor'
+import { pedidoParaCelu } from '../src/main/features/celular-core'
 
 /**
  * La página del celu sola, sin Sloth: el servidor del Wi-Fi con un estado armado a mano, abierto en un celu
@@ -57,6 +58,15 @@ const cuenta = (id: string, nombre: string, pct5: number | null, pctSem: number 
 
 const BASE: EstadoCelular = { ahora: 0, aprobar: true, terminal: false, cuentas: [cuenta('a', 'Personal', 72, 31)], sesiones: [], pedidos: [] }
 
+const pedido = (id: string, ses: string, command: string): EstadoCelular['pedidos'][number] => ({
+  id,
+  sesionId: ses,
+  sesion: ses,
+  ...pedidoParaCelu('Bash', { command }),
+  desde: Date.now() - MIN,
+  vence: Date.now() + 10 * MIN
+})
+
 const MENSAJE = 'Claude necesita que elijas: ¿migro la tabla de usuarios ahora o espero a que termine la importación de la noche? Respondé 1 o 2.'
 
 const MOTORES = [
@@ -110,7 +120,7 @@ test('Celu: el pedido de permiso queda en la primera pantalla de 360×740, con l
   estado = {
     ...BASE,
     sesiones: Array.from({ length: 18 }, (_, i) => sesion(`espacio-${i}`, i === 0 ? 'waiting' : i % 3 ? 'working' : 'idle')),
-    pedidos: [{ id: 'p1', sesionId: 'espacio-0', sesion: 'espacio-0', texto: 'Bash: npm test', desde: Date.now() - MIN, vence: Date.now() + 10 * MIN }]
+    pedidos: [pedido('p1', 'espacio-0', 'npm test')]
   }
   const navegador = await chromium.launch()
   try {
@@ -121,7 +131,8 @@ test('Celu: el pedido de permiso queda en la primera pantalla de 360×740, con l
     await expect(page.locator('#esperan li')).toHaveCount(0)
     await aprobar.click()
     await expect.poll(() => decisiones).toEqual(['p1:allow'])
-    await expect(page.locator('#pedido')).toBeHidden()
+    await expect(page.locator('#pedidos li')).toHaveCount(0)
+    await expect(page.locator('#respondidos')).toContainText(/✓ Aprobaste a las \d\d:\d\d · espacio-0 · npm test/)
   } finally {
     await navegador.close()
   }
@@ -195,6 +206,79 @@ test('Celu: acostado vuelven los relojes (de la cuenta más cerca del límite) y
     const pct = await page.locator('#g5 svg text').nth(1).boundingBox()
     expect(rotulo && pct && rotulo.y).toBeGreaterThan((pct?.y ?? 0) + (pct?.height ?? 0) - 4)
     await page.screenshot({ path: test.info().outputPath('acostado.png') })
+  } finally {
+    await navegador.close()
+  }
+})
+
+test('Celu: varios pedidos se ven todos y se responde cualquiera, no solo el primero', async () => {
+  estado = {
+    ...BASE,
+    sesiones: ['a', 'b', 'c', 'd', 'e'].map((x) => sesion(`ws-${x}`, 'waiting')),
+    pedidos: ['a', 'b', 'c', 'd', 'e'].map((x, i) => pedido(`p-${x}`, `ws-${x}`, `npm run tarea-${i}`))
+  }
+  const navegador = await chromium.launch()
+  try {
+    const { page } = await abrir(navegador, MOTORES[0].ficha)
+    const tarjetas = page.locator('#pedidos li')
+    await expect(tarjetas).toHaveCount(5)
+    await expect(tarjetas.nth(2)).toContainText('3 de 5')
+    await expect(page.locator('#aviso-nuevo')).toHaveText('5 pedidos de permiso nuevos.')
+    await tarjetas.nth(2).getByRole('button', { name: 'Rechazar' }).click()
+    await expect.poll(() => decisiones).toEqual(['p-c:deny'])
+    await expect(tarjetas).toHaveCount(4)
+    await expect(page.locator('#respondidos li')).toHaveText([/✕ Rechazaste a las .* · ws-c · npm run tarea-2/])
+    await page.screenshot({ path: test.info().outputPath('varios.png'), fullPage: true })
+  } finally {
+    await navegador.close()
+  }
+})
+
+test('Celu: un pedido destructivo se marca y se aprueba con dos toques; uno largo se mira entero antes', async () => {
+  const largo = 'npm ci && ' + 'echo paso-intermedio && '.repeat(20) + 'git push --force origin main'
+  estado = { ...BASE, sesiones: [sesion('api', 'waiting'), sesion('web', 'waiting')], pedidos: [pedido('p1', 'api', 'rm -rf node_modules'), pedido('p2', 'web', largo)] }
+  const navegador = await chromium.launch()
+  try {
+    const { page } = await abrir(navegador, MOTORES[0].ficha)
+    const rm = page.locator('#pedidos li').first()
+    await expect(rm.getByText(/^Destructivo: /)).toBeVisible()
+    await expect(rm.locator('pre')).toHaveText('rm -rf node_modules')
+    await rm.getByRole('button', { name: 'Aprobar' }).click()
+    await expect(rm.getByRole('button', { name: 'Tocá de nuevo para aprobar' })).toBeVisible()
+    await page.waitForTimeout(500)
+    expect(decisiones, 'el primer toque no aprueba').toEqual([])
+    await page.screenshot({ path: test.info().outputPath('destructivo.png') })
+    await rm.getByRole('button', { name: 'Tocá de nuevo para aprobar' }).click()
+    await expect.poll(() => decisiones).toEqual(['p1:allow'])
+
+    const push = page.locator('#pedidos li').first()
+    await expect(push).toContainText('web')
+    await expect(push.getByText(/^Destructivo: /)).toBeVisible()
+    await expect(push.getByRole('button', { name: 'Aprobar' })).toBeDisabled()
+    await expect(push.locator('pre')).toHaveText(largo)
+    await expect(push.locator('pre')).toHaveClass(/corto/)
+    await push.getByRole('button', { name: /Ver todo/ }).click()
+    await expect(push.locator('pre')).not.toHaveClass(/corto/)
+    await expect(push.getByText('git push --force origin main', { exact: false })).toBeInViewport()
+    await expect(push.getByRole('button', { name: 'Aprobar' })).toBeEnabled()
+    // A los 5 s sin el segundo toque vuelve a «Aprobar».
+    await push.getByRole('button', { name: 'Aprobar' }).click()
+    await expect(push.getByRole('button', { name: 'Tocá de nuevo para aprobar' })).toBeVisible()
+    await expect(push.getByRole('button', { name: 'Aprobar', exact: true })).toBeVisible({ timeout: 7000 })
+    expect(decisiones).toEqual(['p1:allow'])
+  } finally {
+    await navegador.close()
+  }
+})
+
+test('Celu: con «Aprobar desde el celu» apagado, los pedidos se ven sin botones y con la nota una sola vez', async () => {
+  estado = { ...BASE, aprobar: false, sesiones: [sesion('api', 'waiting'), sesion('web', 'waiting')], pedidos: [pedido('p1', 'api', 'ls'), pedido('p2', 'web', 'pwd')] }
+  const navegador = await chromium.launch()
+  try {
+    const { page } = await abrir(navegador, MOTORES[0].ficha)
+    await expect(page.locator('#pedidos li')).toHaveCount(2)
+    await expect(page.getByRole('button', { name: 'Aprobar' })).toHaveCount(0)
+    await expect(page.getByText('Respondelo en la PC.', { exact: false })).toHaveCount(1)
   } finally {
     await navegador.close()
   }

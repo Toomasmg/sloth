@@ -36,9 +36,11 @@ export const PAGINA_HTML = `<!doctype html>
     <button type="button" id="pista-ok">Entendido</button>
   </div>
   <section class="atencion" id="atencion" aria-label="Lo que te espera">
-    <div class="pedido" id="pedido" hidden></div>
+    <ul class="pedidos" id="pedidos" aria-label="Pedidos de permiso"></ul>
     <ul class="esperan" id="esperan"></ul>
     <div class="calma" id="calma"><span class="calma-t">Nada te espera</span><span class="calma-s" id="calma-s">Ningún permiso ni pregunta pendiente.</span></div>
+    <ul class="respondidos" id="respondidos" aria-label="Respondidos desde este celu"></ul>
+    <div class="solo-lector" id="aviso-nuevo" aria-live="assertive" aria-atomic="true"></div>
   </section>
   <div class="relojes">
     <section class="reloj" id="g5" aria-label="Límite de 5 horas"></section>
@@ -156,8 +158,22 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .c-trabaja { background: rgba(90,169,255,0.12); border-color: rgba(140,194,255,0.3); color: var(--trabaja); }
 .c-espera.hay .num { animation: alerta 1.4s ease-in-out infinite; }
 @keyframes alerta { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.pedidos, .respondidos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.pedidos:empty, .respondidos:empty { display: none; }
 .pedido { border-radius: 16px; padding: 12px 14px; background: var(--panel); border: 1px solid rgba(255,176,103,0.45); display: flex; flex-direction: column; gap: 10px; }
-.pedido .p-nombre { font-size: 15px; font-weight: 600; color: var(--fuerte); overflow-wrap: anywhere; }
+.pedido.destructivo { border-color: rgba(255,107,91,0.7); }
+.p-cab { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.pedido .p-nombre { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; color: var(--fuerte); overflow-wrap: anywhere; }
+.p-hace { flex: none; font: 500 11px var(--mono); color: var(--suave); }
+.p-titulo { font-size: 13px; color: var(--suave); }
+.p-marca { align-self: flex-start; padding: 3px 10px; border-radius: 999px; background: var(--rojo); color: #1A0A08; font-size: 12px; font-weight: 700; }
+.p-cmd { margin: 0; padding: 8px 10px; border-radius: 10px; background: #0B0D10; border: 1px solid var(--borde); font: 500 13px/1.45 var(--mono); color: var(--fuerte); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto; }
+.p-cmd.corto { max-height: 7.5em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 65%, transparent); mask-image: linear-gradient(#000 65%, transparent); }
+.p-ver { align-self: flex-start; min-height: 44px; padding: 0 4px; border: 0; background: none; color: var(--celeste); font-size: 14px; font-weight: 600; }
+.b-aprobar-peligro { border: 1px solid rgba(255,107,91,0.75); background: transparent; color: var(--rojo); font-weight: 700; }
+.respondidos li { font-size: 12px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.respondidos .r-si { color: var(--listo); }
+.solo-lector { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .pedido .p-texto { font-size: 13px; color: var(--suave); overflow-wrap: anywhere; }
 .pedido .p-botones { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .pedido button { min-height: 44px; border-radius: 12px; font-size: 15px; font-weight: 600; }
@@ -198,7 +214,10 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
   .reloj { display: flex; background: none; border: 0; padding: 0; }
   .limites { display: none; }
   .atencion { align-self: stretch; }
-  .pedido:not([hidden]) ~ .esperan, .esperan li:nth-child(n+2) { display: none; }
+  .pedidos:not(:empty) ~ .esperan, .esperan li:nth-child(n+2), .pedidos li:nth-child(n+2), .respondidos { display: none; }
+  .p-titulo { display: none; }
+  .p-cmd { padding: 4px 8px; }
+  .p-cmd.corto { max-height: 3em; }
   .esperan li { padding: 10px 12px; gap: 4px; }
   .e-cuenta { display: none; }
   .e-msj { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
@@ -323,7 +342,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   var token = viejo === 'remoto' ? viejo : (enlaceMalo ? null : enlace || leer('sloth-clave'));
   if (viejo && viejo !== 'remoto') guardar('sloth-token', null);
   var cuentaElegida = leer('sloth-cuenta');
-  var ultimo = null, desfase = 0, ultimoOk = 0, timer = null, enviando = false, errorPedido = '', avisoHora = false;
+  var ultimo = null, desfase = 0, ultimoOk = 0, timer = null, avisoHora = false;
 
   function el(tag, clase, texto) {
     var n = document.createElement(tag);
@@ -520,47 +539,106 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     return error;
   }
 
-  function decidir(id, decision) {
-    if (enviando) return;
-    enviando = true;
-    errorPedido = '';
+  // Cada pedido con su tarjeta y sus botones: se puede responder cualquiera, no solo el primero.
+  var enviandoId = null, errores = {}, expandidos = {}, confirmar = { id: null, hasta: 0 }, respondidos = [], vistos = {}, firmaPedidos = '';
+  var CONFIRMAR_MS = 5000, LARGO_MAX = 300, LINEAS_MAX = 6;
+  var confirmando = function (p) { return confirmar.id === p.id && Date.now() < confirmar.hasta; };
+  var esLargo = function (p) { return p.texto.length > LARGO_MAX || p.texto.split(String.fromCharCode(10)).length > LINEAS_MAX; };
+
+  function anunciar(texto) {
+    var a = $('aviso-nuevo');
+    a.textContent = '';
+    setTimeout(function () { a.textContent = texto; }, 50);
+  }
+
+  function decidir(p, decision) {
+    if (enviandoId) return;
+    enviandoId = p.id;
+    delete errores[p.id];
     pintar();
-    pedirApi('/api/permiso', { id: id, decision: decision })
+    pedirApi('/api/permiso', { id: p.id, decision: decision })
       .then(function (r) {
         if (r.ok) return null;
         return r.json().then(function (j) { return j && j.error ? textoError(j.error) : 'No se pudo responder.'; }, function () { return 'No se pudo responder.'; });
       })
-      .then(function (err) { errorPedido = err || ''; }, function () { errorPedido = 'Sin conexión con la PC. Probá de nuevo.'; })
-      .then(function () { enviando = false; consultar(); });
+      .then(function (err) {
+        if (err) { errores[p.id] = err; return; }
+        respondidos.unshift({ aprobado: decision === 'allow', sesion: p.sesion, texto: p.texto, hora: Date.now() });
+        respondidos = respondidos.slice(0, 3);
+        anunciar((decision === 'allow' ? 'Aprobado: ' : 'Rechazado: ') + p.sesion);
+      }, function () { errores[p.id] = 'Sin conexión con la PC. Probá de nuevo.'; })
+      .then(function () { enviandoId = null; confirmar.id = null; consultar(); });
   }
 
-  function pintarPedido(e) {
-    var p = e.pedidos[0];
-    var caja = $('pedido');
-    caja.hidden = !p;
-    if (!p) return;
-    caja.textContent = '';
-    var cab = el('div');
+  function tarjetaPedido(e, p, i) {
+    var li = el('li', 'pedido' + (p.destructivo ? ' destructivo' : ''));
+    var cab = el('div', 'p-cab');
     var ses = e.sesiones.filter(function (s) { return s.id === p.sesionId; })[0];
     var cuenta = e.cuentas.length > 1 && ses ? '  ·  ' + nombreCuenta(e, ses.cuentaId) : '';
-    cab.appendChild(el('div', 'p-nombre', p.sesion + cuenta + (e.pedidos.length > 1 ? '  ·  1 de ' + e.pedidos.length : '')));
-    cab.appendChild(el('div', 'p-texto', 'Pide permiso: ' + p.texto + ' · hace ' + hace(ahoraPc() - p.desde)));
-    caja.appendChild(cab);
+    cab.appendChild(el('span', 'p-nombre', p.sesion + cuenta));
+    cab.appendChild(el('span', 'p-hace', hace(ahoraPc() - p.desde)));
+    li.appendChild(cab);
+    li.appendChild(el('span', 'p-titulo', (p.titulo || 'Claude pide permiso') + (e.pedidos.length > 1 ? '  ·  ' + (i + 1) + ' de ' + e.pedidos.length : '')));
+    if (p.destructivo) li.appendChild(el('span', 'p-marca', 'Destructivo: ' + p.destructivo));
+    var largo = esLargo(p), abierto = !!expandidos[p.id];
+    li.appendChild(el('pre', 'p-cmd' + (largo && !abierto ? ' corto' : ''), p.texto));
+    if (largo) {
+      var ver = el('button', 'p-ver', abierto ? 'Ver menos' : 'Ver todo (' + p.texto.length + ' caracteres)');
+      ver.type = 'button';
+      ver.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+      ver.addEventListener('click', function () { expandidos[p.id] = !abierto; pintar(); });
+      li.appendChild(ver);
+    }
     if (e.aprobar) {
       var botones = el('div', 'p-botones');
       var no = el('button', 'b-rechazar', 'Rechazar');
-      var si = el('button', 'b-aprobar', enviando ? 'Enviando…' : 'Aprobar');
+      var dos = confirmando(p);
+      var si = el('button', p.destructivo ? 'b-aprobar-peligro' : 'b-aprobar', enviandoId === p.id ? 'Enviando…' : dos ? 'Tocá de nuevo para aprobar' : 'Aprobar');
       no.type = si.type = 'button';
-      no.disabled = si.disabled = enviando;
-      no.addEventListener('click', function () { decidir(p.id, 'deny'); });
-      si.addEventListener('click', function () { decidir(p.id, 'allow'); });
+      no.disabled = !!enviandoId;
+      // Lo que no se vio entero no se aprueba: primero «Ver todo».
+      si.disabled = !!enviandoId || (largo && !abierto);
+      no.addEventListener('click', function () { decidir(p, 'deny'); });
+      si.addEventListener('click', function () {
+        if (p.destructivo && !confirmando(p)) {
+          confirmar = { id: p.id, hasta: Date.now() + CONFIRMAR_MS };
+          pintar();
+          setTimeout(pintar, CONFIRMAR_MS + 50);
+          return;
+        }
+        decidir(p, 'allow');
+      });
       botones.appendChild(no);
       botones.appendChild(si);
-      caja.appendChild(botones);
-    } else {
-      caja.appendChild(el('div', 'p-nota', 'Respondelo en la PC. Para hacerlo desde acá, prendé «Aprobar desde el celu» en Sloth.'));
+      li.appendChild(botones);
+      if (largo && !abierto) li.appendChild(el('span', 'p-nota', 'Para aprobar, mirá el pedido entero con «Ver todo».'));
+      else if (dos) li.appendChild(el('span', 'p-nota', 'Es destructivo: tocá «Aprobar» otra vez en 5 s para confirmarlo.'));
+    } else if (i === 0) {
+      li.appendChild(el('span', 'p-nota', 'Respondelo en la PC. Para hacerlo desde acá, prendé «Aprobar desde el celu» en Sloth.'));
     }
-    if (errorPedido) caja.appendChild(el('div', 'p-error', errorPedido));
+    if (errores[p.id]) li.appendChild(el('span', 'p-error', errores[p.id]));
+    return li;
+  }
+
+  function pintarPedidos(e) {
+    var nuevos = e.pedidos.filter(function (p) { return !vistos[p.id]; });
+    e.pedidos.forEach(function (p) { vistos[p.id] = true; });
+    if (nuevos.length) anunciar(nuevos.length === 1 ? 'Pedido de permiso en ' + nuevos[0].sesion + ': ' + (nuevos[0].titulo || nuevos[0].texto) + (nuevos[0].destructivo ? '. Destructivo.' : '.') : nuevos.length + ' pedidos de permiso nuevos.');
+    // Se rearma solo si cambió algo: rearmar cada 1,5 s le saca el foco al botón que se está por tocar.
+    var firma = JSON.stringify([e.aprobar, e.cuentas.length, enviandoId, confirmar.id && confirmando({ id: confirmar.id }) ? confirmar.id : null, expandidos, errores, e.pedidos.map(function (p) { return [p.id, p.texto, p.destructivo, hace(ahoraPc() - p.desde)]; })]);
+    if (firma !== firmaPedidos) {
+      firmaPedidos = firma;
+      var cont = $('pedidos');
+      cont.textContent = '';
+      e.pedidos.forEach(function (p, i) { cont.appendChild(tarjetaPedido(e, p, i)); });
+    }
+    var lista = $('respondidos');
+    lista.textContent = '';
+    respondidos.filter(function (r) { return Date.now() - r.hora < 15 * 60000; }).forEach(function (r) {
+      var hora = new Date(r.hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+      var li = el('li', r.aprobado ? 'r-si' : 'r-no', (r.aprobado ? '✓ Aprobaste' : '✕ Rechazaste') + ' a las ' + hora + ' · ' + r.sesion + ' · ' + r.texto);
+      lista.appendChild(li);
+    });
   }
 
   // «Te necesita» sin pedido de permiso: Claude preguntó algo o espera que sigas. Va arriba, con el mensaje entero.
@@ -570,6 +648,9 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     var conPedido = {};
     e.pedidos.forEach(function (p) { conPedido[p.sesionId] = true; });
     var esperan = e.sesiones.filter(function (s) { return s.estado === 'waiting' && !conPedido[s.id]; });
+    var nuevas = esperan.filter(function (s) { return !vistos[s.id + ':' + s.desde]; });
+    esperan.forEach(function (s) { vistos[s.id + ':' + s.desde] = true; });
+    if (nuevas.length) anunciar(nuevas.map(function (s) { return s.nombre + ' te necesita'; }).join('. ') + '.');
     esperan.forEach(function (s) {
       var li = el('li');
       var cab = el('div', 'e-cab');
@@ -656,7 +737,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     if (!ultimo) return;
     pintarCuentas(ultimo);
     pintarLimites(ultimo);
-    pintarPedido(ultimo);
+    pintarPedidos(ultimo);
     pintarEsperan(ultimo);
     pintarLista(ultimo);
   }

@@ -49,8 +49,12 @@ export interface PedidoCelular {
   id: string
   sesionId: string
   sesion: string
-  /** Qué pide, en una línea («Bash: npm test»). */
+  /** Qué pide: el comando entero, el archivo o el host (hasta MAX_PEDIDO caracteres, sin caracteres invisibles). */
   texto: string
+  /** «Claude quiere ejecutar un comando»… (falta en una PC vieja). */
+  titulo?: string
+  /** Por qué se marca «Destructivo» («borra archivos sin papelera»…), o null. */
+  destructivo?: string | null
   desde: number
   vence: number
 }

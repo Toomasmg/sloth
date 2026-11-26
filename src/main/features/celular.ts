@@ -20,7 +20,7 @@ import { crearEsperas } from './celular-espera'
 import { crearEscrituras } from './celular-escrituras'
 import { crearFuenteRemota, type CambioRemoto } from './celular-remoto'
 import { sesionChat } from './chat'
-import { kindOf, labelOf } from '../../shared/permissions-core'
+import { kindOf } from '../../shared/permissions-core'
 import { responderPermiso } from './permissions'
 import { currentSettings } from './settings'
 import { carpetaFeatures } from '../perfil'
@@ -219,7 +219,7 @@ const feature: Feature = {
           agentes: ctx.agents(),
           uso,
           limites: await limites(),
-          pedidos: pedidos().map((p) => ({ id: p.id, ws: p.ws, texto: labelOf(kindOf(p.tool), p.tool, p.input), at: p.at, expiresAt: p.expiresAt }))
+          pedidos: pedidos().map((p) => ({ id: p.id, ws: p.ws, tool: p.tool, input: p.input, at: p.at, expiresAt: p.expiresAt }))
         })
       },
       decidir(id, decision) {
