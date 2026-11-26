@@ -249,6 +249,20 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
       subtitle={batch ? 'Sloth lo manda espacio por espacio.' : `El mismo mensaje llega a ${agente ? `cada ${agente}` : 'cada agente'} que elijas, cada uno en su propia terminal.`}
       dirty={!batch && trimmed !== ''}
       onClose={onClose}
+      footer={
+        batch ? undefined : (
+          <>
+            <Button look="classic" variant="ghost" onClick={onClose}>
+              Cancelar
+            </Button>
+            <span className="f-broadcast-grow" />
+            <Button type="submit" look="classic" variant="primary" kbd="Ctrl+Enter">
+              <PaperPlane size={14} />
+              {sendLabel}
+            </Button>
+          </>
+        )
+      }
       onSubmit={(e) => {
         e.preventDefault()
         if (batch) return
@@ -459,17 +473,6 @@ export function BroadcastDialog({ onClose }: { onClose: () => void }): React.JSX
                 )}
               </div>
             </section>
-
-            <footer className="f-broadcast-foot">
-              <Button look="classic" variant="ghost" onClick={onClose}>
-                Cancelar
-              </Button>
-              <span className="f-broadcast-grow" />
-              <Button type="submit" look="classic" variant="primary">
-                <PaperPlane size={14} />
-                {sendLabel}
-              </Button>
-            </footer>
 
             {hist.length > 0 && (
               <section className="f-broadcast-hist" aria-labelledby="f-broadcast-hist-t">

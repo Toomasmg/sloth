@@ -126,6 +126,7 @@ interface Item {
   meta?: Meta
   shortcut?: string
   danger?: boolean
+  disabled?: boolean
   /** Si es un espacio: Tab abre sus acciones. */
   spaceId?: string
   run(): void
@@ -202,6 +203,7 @@ function buildItems(ctx: UiCtx, colorOf: (accountId: string) => string): Item[] 
       keywords: c.keywords,
       icon: c.icon ?? groupIcon(c.group),
       shortcut: c.shortcut,
+      disabled: !!c.disabledReason,
       run: () => {
         void Promise.resolve()
           .then(() => c.run())
@@ -375,7 +377,7 @@ export function PaletteBar(): React.JSX.Element {
   }, [safeActive])
 
   const run = (item: Item | undefined): void => {
-    if (!item) return
+    if (!item || item.disabled) return
     pushRecent(item.id)
     close(true)
     setTimeout(() => {
@@ -501,7 +503,8 @@ export function PaletteBar(): React.JSX.Element {
                       id={`pal-opt-${index}`}
                       role="option"
                       aria-selected={on}
-                      className={`pal-item ${on ? 'on' : ''} ${it.danger ? 'danger' : ''}`}
+                      className={`pal-item ${on ? 'on' : ''} ${it.danger ? 'danger' : ''} ${it.disabled ? 'is-disabled' : ''}`}
+                      aria-disabled={it.disabled || undefined}
                       onMouseMove={() => !on && setActive(index)}
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => run(it)}
@@ -523,7 +526,7 @@ export function PaletteBar(): React.JSX.Element {
                       {it.shortcut && !on && <Keys shortcut={it.shortcut} />}
                       {on && (
                         <span className="pal-enter">
-                          {it.spaceId && !scoped ? 'Abrir · Tab acciones' : 'Ejecutar'}
+                          {it.disabled ? 'No disponible' : it.spaceId && !scoped ? 'Abrir · Tab acciones' : 'Ejecutar'}
                         </span>
                       )}
                     </div>

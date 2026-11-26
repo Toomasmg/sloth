@@ -25,7 +25,7 @@ function GearButton(): React.JSX.Element {
 
 /**
  * «Confirmar al cerrar paneles con agentes trabajando»: guarda del núcleo (UiCtx.onBeforeClosePane),
- * se consulta antes de ocultar o reiniciar desde el header o la pestaña.
+ * se consulta antes de reiniciar desde el header o la pestaña (ocultar no pregunta).
  */
 function useCloseGuard(): void {
   const ui = useUi()
@@ -35,14 +35,17 @@ function useCloseGuard(): void {
   useEffect(
     () =>
       onBeforeClosePane((id, action) => {
+        // Ocultar no destruye nada (la terminal sigue y el panel vuelve con «Mostrar»): no se pregunta.
+        if (action !== 'restart') return true
         if (!getSettings().settings.confirmClosePanes) return true
         if (ref.current.agents[id]?.state !== 'working') return true
         const name = ref.current.workspaces.find((w) => w.id === id)?.name ?? 'Este espacio'
-        return window.confirm(
-          action === 'restart'
-            ? `«${name}» tiene a Claude trabajando. Reiniciar corta lo que está haciendo.\n\n¿Reiniciar igual?`
-            : `«${name}» tiene a Claude trabajando. El panel se oculta y la terminal sigue corriendo.\n\n¿Ocultarlo?`
-        )
+        return ref.current.askConfirm({
+          title: '¿Reiniciar la terminal?',
+          body: `«${name}» tiene a Claude trabajando. Reiniciar corta lo que está haciendo.`,
+          yes: 'Reiniciar',
+          no: 'Seguir trabajando'
+        })
       }),
     [onBeforeClosePane]
   )

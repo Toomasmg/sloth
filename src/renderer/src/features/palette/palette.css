@@ -228,6 +228,13 @@
 .pal-item.danger .pal-title {
   color: var(--danger-fg);
 }
+.pal-item.is-disabled {
+  cursor: not-allowed;
+}
+.pal-item.is-disabled .pal-title,
+.pal-item.is-disabled .pal-ico {
+  opacity: 0.6;
+}
 .pal-hl {
   background: transparent;
   color: var(--text);

@@ -387,6 +387,12 @@
   gap: var(--s-2);
   flex-wrap: wrap;
 }
+.f-broadcast-modal .modal-footer {
+  bottom: -22px;
+  margin: 0 -22px -22px;
+  padding: var(--s-3) 22px;
+  background: var(--raised);
+}
 .f-broadcast-grow {
   flex: 1;
 }

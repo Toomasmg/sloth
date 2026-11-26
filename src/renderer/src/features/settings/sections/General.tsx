@@ -80,7 +80,7 @@ export function GeneralSection(): React.JSX.Element {
         />
         <ToggleRow
           title="Confirmar al cerrar paneles con Claude trabajando"
-          hint="Pregunta antes de ocultar o reiniciar un panel mientras Claude está trabajando."
+          hint="Pregunta antes de reiniciar un panel mientras Claude está trabajando."
           checked={s.confirmClosePanes}
           onChange={(confirmClosePanes) => save({ confirmClosePanes })}
         />
