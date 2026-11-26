@@ -50,6 +50,18 @@ test('Celular: prende el servidor del Wi-Fi, muestra el QR y la API solo habla c
   expect(estado.cuentas.map((c) => c.id)).toContain('acc-e2e')
   expect(estado.cuentas[0].cincoHoras).toBeNull()
 
+  // Con alguien adentro, la PC lo dice: aviso, chip en la barra y la lista del panel.
+  await expect(page.getByText(/^Se conectó un celu \(.+, .+\)\. Si no fuiste vos, regenerá el código\.$/)).toBeVisible()
+  await expect(panel.getByRole('heading', { name: 'Celus conectados' })).toBeVisible()
+  await expect(panel.getByRole('list', { name: 'Lo que hicieron los celus' })).toContainText('Se conectó')
+  await page.keyboard.press('Escape')
+  await expect(panel).toBeHidden()
+  const chip = page.getByRole('button', { name: 'Celular: abierto en el Wi-Fi, 1 celu conectado' })
+  await expect(chip).toBeVisible()
+  await page.screenshot({ path: test.info().outputPath('barra-con-celu.png'), clip: { x: 0, y: 0, width: page.viewportSize()?.width ?? 1280, height: 60 } })
+  await chip.click()
+  await expect(panel).toBeVisible()
+
   expect((await llamar('/api/permiso', viejo, { id: 'x', decision: 'allow' })).status).toBe(403)
 
   await panel.getByRole('button', { name: 'Regenerar código…' }).click()
@@ -66,4 +78,5 @@ test('Celular: prende el servidor del Wi-Fi, muestra el QR y la API solo habla c
 
   await page.keyboard.press('Escape')
   await expect(panel).toBeHidden()
+  await expect(page.getByRole('button', { name: /^Celular: / }), 'apagado, el chip se va').toBeHidden()
 })

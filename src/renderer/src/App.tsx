@@ -939,6 +939,7 @@ export function App(): React.JSX.Element {
             <div className="sl-upd">
               <TitlebarOnly name="updater" />
             </div>
+            <TitlebarOnly name="celular" />
             <Tooltip text="Chat del equipo" shortcut={comboLabel('chat')}>
               <button type="button" className="sl-chat" onClick={() => openChat()} aria-expanded={chatOpen} aria-label={chatButtonLabel(chatUnread)}>
                 <ChatIcon size={17} aria-hidden="true" />

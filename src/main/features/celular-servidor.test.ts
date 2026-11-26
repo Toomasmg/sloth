@@ -66,6 +66,31 @@ test('sin cuerpo, con el MAC roto o con otra ruta: 401 sin cuerpo', async () => 
   })
 })
 
+test('la PC sabe quién pidió (IP y navegador) solo cuando la clave es buena', async () => {
+  const vistos: unknown[] = []
+  await conServidor(
+    {
+      estado: async (q) => {
+        vistos.push(['estado', q])
+        return ESTADO
+      },
+      puedeAprobar: () => true,
+      decidir: (id, d, q) => void vistos.push(['decidir', id, d, q])
+    },
+    async (base) => {
+      const ua = 'Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile'
+      const iv = randomBytes(16)
+      await fetch(base + '/api/estado', { method: 'POST', headers: { 'user-agent': ua }, body: sellarPedido(claves, '/api/estado', JSON.stringify({ t: Date.now(), b: {} }), iv) })
+      await fetch(base + '/api/estado', { method: 'POST', headers: { 'user-agent': ua }, body: 'roto' })
+      await postSellado(base, '/api/permiso', { id: 'p1', decision: 'deny' })
+      assert.equal(vistos.length, 2, 'el pedido con la clave mala no llega a la PC')
+      assert.deepEqual(vistos[0], ['estado', { ip: '127.0.0.1', ua }])
+      const [tipo, id, d, q] = vistos[1] as [string, string, string, { ip: string; ua: string }]
+      assert.deepEqual([tipo, id, d, q.ip], ['decidir', 'p1', 'deny', '127.0.0.1'])
+    }
+  )
+})
+
 test('con el sobre bien sellado devuelve el estado sellado, sin caché', async () => {
   await conServidor({}, async (base) => {
     const iv = randomBytes(16)

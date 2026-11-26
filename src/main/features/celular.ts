@@ -18,6 +18,7 @@ import { XTERM } from './celular-xterm'
 import { debeEsperar, nuevoVisor, ponerFoto, salidaDesde, sinSalida, sinAutomaticas, sumarSalida, tamanoActual, vencidos, type RespuestaTerminal, type Visor } from './celular-terminal-core'
 import { crearEsperas } from './celular-espera'
 import { crearEscrituras } from './celular-escrituras'
+import { crearActividad, type Quien } from './celular-actividad'
 import { crearFuenteRemota, type CambioRemoto } from './celular-remoto'
 import { sesionChat } from './chat'
 import { kindOf } from '../../shared/permissions-core'
@@ -144,6 +145,37 @@ const feature: Feature = {
       }
     }
 
+    // Qué celus entraron y qué hicieron, para que la PC no tenga a alguien adentro sin que se vea.
+    const actividad = crearActividad()
+    let conectadosAntes = 0
+    let vigia: NodeJS.Timeout | null = null
+    let avisoPendiente: NodeJS.Timeout | null = null
+    const avisarPronto = (): void => {
+      if (avisoPendiente) return
+      avisoPendiente = setTimeout(() => {
+        avisoPendiente = null
+        avisar()
+      }, 1000)
+      avisoPendiente.unref()
+    }
+    const revisarConectados = (): void => {
+      const n = actividad.conectados(Date.now()).length
+      if (n !== conectadosAntes) avisarPronto()
+      conectadosAntes = n
+      if (!n && vigia) {
+        clearInterval(vigia)
+        vigia = null
+      } else if (n && !vigia) {
+        vigia = setInterval(revisarConectados, 5000)
+        vigia.unref()
+      }
+    }
+    const nombreEspacio = (id: string): string => ctx.store.workspace(id)?.name ?? 'un espacio'
+    function anotarCelu(quien: Quien | undefined, tipo: 'aprobo' | 'rechazo' | 'abrio' | 'escribio', ws: string): void {
+      if (!quien) return
+      if (actividad.anotar(quien, tipo, nombreEspacio(ws), Date.now())) avisarPronto()
+    }
+
     const vista = (): CelularVista => ({
       encendido: cfg.encendido,
       escuchando: !!fuente,
@@ -161,7 +193,9 @@ const feature: Feature = {
       },
       error,
       ipCambio,
-      remoto: vistaRemota()
+      remoto: vistaRemota(),
+      celus: actividad.conectados(Date.now()),
+      actividad: actividad.eventos().slice(0, 30)
     })
     const avisar = (): void => ctx.emit('changed', vista())
 
@@ -202,7 +236,14 @@ const feature: Feature = {
     const pedidos = (): PendingPermission[] => ctx.terminal()?.pendingPermissions() ?? []
 
     const proveedor: ProveedorDeEstado = {
-      async estado() {
+      async estado(quien) {
+        if (quien && actividad.visto(quien, Date.now())) {
+          const c = actividad.conectados(Date.now()).find((x) => x.ip === quien.ip)
+          ctx.log('celu conectado:', c?.dispositivo ?? '?', quien.ip)
+          ctx.emit('celu-nuevo', { dispositivo: c?.dispositivo ?? 'Un celu', ip: quien.ip })
+          avisarPronto()
+        }
+        if (quien) revisarConectados()
         const cuentas = ctx.store.accounts
         let uso = ctx.usage.latest
         try {
@@ -222,17 +263,20 @@ const feature: Feature = {
           pedidos: pedidos().map((p) => ({ id: p.id, ws: p.ws, tool: p.tool, input: p.input, at: p.at, expiresAt: p.expiresAt }))
         })
       },
-      decidir(id, decision) {
+      decidir(id, decision, quien) {
         if (!cfg.aprobar) throw new Error('Aprobar desde el celu está apagado en Sloth.')
+        const ws = pedidos().find((p) => p.id === id)?.ws
         responderPermiso(id, decision)
+        if (ws) anotarCelu(quien, decision === 'allow' ? 'aprobo' : 'rechazo', ws)
         ctx.log(`permiso ${decision === 'allow' ? 'aprobado' : 'rechazado'} desde el celu`)
       },
       puedeAprobar: () => cfg.aprobar,
       clave: () => cfg.clave,
       icono: leerIcono,
-      async terminal(p, cancelar) {
+      async terminal(p, cancelar, quien) {
         if (!cfg.terminal) return { status: 403, error: 'La terminal desde el celu está apagada en Sloth.' }
         if (!ctx.store.workspace(p.id)) return { status: 404, error: 'Ese espacio ya no está en la PC.' }
+        if (p.desde === -1 && !p.soloEscribir) anotarCelu(quien, 'abrio', p.id)
         const b = await ctx.backend()
         const viva = b.isRunning(p.id)
         let v = visores.get(p.id)
@@ -255,7 +299,10 @@ const feature: Feature = {
         if (v && viva && !repetida) {
           // Lo que el xterm del celu contesta solo (posición, foco, mouse) no es entrada del usuario; `tam` de una página vieja se ignora.
           const texto = p.escribir ? sinAutomaticas(p.escribir) : ''
-          if (texto) ctx.writePty(p.id, texto)
+          if (texto) {
+            ctx.writePty(p.id, texto)
+            anotarCelu(quien, 'escribio', p.id)
+          }
         }
         const respuesta = (visor: Visor | undefined, sigueViva: boolean, salida: ReturnType<typeof salidaDesde>): RespuestaTerminal => {
           const tam = tamanoActual(ctx.ptySize(p.id))
@@ -477,6 +524,8 @@ const feature: Feature = {
 
     ctx.handle('regenerar', () => {
       soltarVisores()
+      actividad.olvidarCelus()
+      conectadosAntes = 0
       cfg.clave = nuevoToken()
       guardar()
       ctx.log('clave regenerada: los celus anteriores quedan afuera')

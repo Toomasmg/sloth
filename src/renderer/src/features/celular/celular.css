@@ -131,3 +131,69 @@
   align-items: flex-start;
   gap: var(--s-2);
 }
+
+/* Botón de la barra (como el del chat): aparece solo con el servidor abierto; el número, si hay celus adentro. */
+.f-cel-chip {
+  position: relative;
+  width: var(--h-md);
+  height: var(--h-md);
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--ok-fg);
+  cursor: pointer;
+}
+.f-cel-chip:hover {
+  background: var(--hover);
+}
+.f-cel-chip:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.f-cel-chip-n {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  min-width: var(--s-4);
+  height: var(--s-4);
+  padding: 0 var(--s-1);
+  border-radius: var(--r-full);
+  display: grid;
+  place-items: center;
+  background: var(--ok-fg);
+  color: var(--bg);
+  font-size: var(--fs-11);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.f-cel-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  align-self: stretch;
+}
+.f-cel-lista li {
+  display: flex;
+  gap: var(--s-2);
+  align-items: baseline;
+  font-size: var(--fs-12);
+  color: var(--text-2);
+  min-width: 0;
+}
+.f-cel-lista .f-cel-hora {
+  flex: none;
+  font-family: var(--font-mono);
+  color: var(--text-3);
+}
+.f-cel-lista .f-cel-quien {
+  flex: none;
+  color: var(--text);
+  font-weight: 600;
+}

@@ -6,17 +6,19 @@ import { manifiesto, PAGINA_CSS, PAGINA_HTML, PAGINA_JS } from './celular-pagina
 import { crearConexiones } from './celular-conexiones'
 import { crearLimite } from './celular-limite'
 import { leerPedidoTerminal, type PedidoTerminal, type RespuestaTerminal } from './celular-terminal-core'
+import type { Quien } from './celular-actividad'
 
 /** Lo que la PC le da a cualquier fuente: el estado y cómo responder un permiso. */
 export interface ProveedorDeEstado {
-  estado(): Promise<EstadoCelular>
+  /** `quien` llega solo por el Wi-Fi: la IP y el user-agent del pedido, ya con la clave verificada. */
+  estado(quien?: Quien): Promise<EstadoCelular>
   /** Lanza con un mensaje para el celu si no se pudo (venció, ya se respondió). */
-  decidir(id: string, decision: 'allow' | 'deny'): void
+  decidir(id: string, decision: 'allow' | 'deny', quien?: Quien): void
   puedeAprobar(): boolean
   clave(): string
   icono(): Buffer | null
   /** La terminal de un espacio, vista desde el celu. Con `error`, no se pudo (apagado, no existe, demasiadas esperas). `cancelar` salta si el celu cortó la conexión con el pedido abierto. */
-  terminal(p: PedidoTerminal, cancelar?: AbortSignal): Promise<RespuestaTerminal | { status: 403 | 404 | 429; error: string }>
+  terminal(p: PedidoTerminal, cancelar?: AbortSignal, quien?: Quien): Promise<RespuestaTerminal | { status: 403 | 404 | 429; error: string }>
   /** xterm.js y su css, para que la página del celu dibuje la terminal. */
   xterm(): { js: string; css: string } | null
 }
@@ -133,8 +135,9 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
       if (!sobre || typeof sobre !== 'object') return enviar(res, 401, null)
       if (!fechaValida(sobre.t, Date.now())) return sellado(409, { error: 'reloj' })
       if (repetidos.vistoAntes(ab.iv, Date.now())) return sellado(409, { error: 'repetido' })
+      const quien: Quien = { ip: req.socket.remoteAddress ?? '?', ua: String(req.headers['user-agent'] ?? '').slice(0, 400) }
 
-      if (ruta === '/api/estado') return sellado(200, await o.proveedor.estado())
+      if (ruta === '/api/estado') return sellado(200, await o.proveedor.estado(quien))
       if (ruta === '/api/terminal') {
         // Después del MAC y del anti-replay: quien no tiene la clave no le gasta el cupo al celu de verdad.
         if (!limite.permitir(req.socket.remoteAddress ?? '?', Date.now())) return enviar(res, 429, null)
@@ -142,7 +145,7 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
         if (!p) return sellado(400, { error: 'Pedido inválido.' })
         const corte = new AbortController()
         res.once('close', () => corte.abort())
-        const r = await o.proveedor.terminal(p, corte.signal)
+        const r = await o.proveedor.terminal(p, corte.signal, quien)
         if (res.destroyed) return
         return 'error' in r ? sellado(r.status, { error: r.error }) : sellado(200, r)
       }
@@ -150,7 +153,7 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
       const p = sobre.b as { id?: unknown; decision?: unknown } | null
       if (!p || typeof p !== 'object' || typeof p.id !== 'string' || p.id.length > 100 || (p.decision !== 'allow' && p.decision !== 'deny')) return sellado(400, { error: 'Pedido inválido.' })
       try {
-        o.proveedor.decidir(p.id, p.decision)
+        o.proveedor.decidir(p.id, p.decision, quien)
       } catch (e) {
         return sellado(409, { error: (e as Error).message })
       }

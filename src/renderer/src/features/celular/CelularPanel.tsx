@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { CelularVista } from '../../../../shared/celular'
+import { textoEvento, type CelularVista } from '../../../../shared/celular'
 import { cleanError } from '../../format'
 import { SidePanel } from '../../ui/SidePanel'
 import { Button, InlineAlert, Input, Switch, toast } from '../../ui'
@@ -8,6 +8,7 @@ import { Qr } from './Qr'
 import { RemotoSeccion } from './RemotoSeccion'
 
 const canal = (op: string): string => `feat:celular:${op}`
+const hora = (ms: number): string => new Date(ms).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
 
 /** Panel «Celular»: prender el servidor del Wi-Fi, el QR para el celu y lo que el celu puede hacer. */
 export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.Element {
@@ -177,6 +178,40 @@ export function CelularPanel({ onClose }: { onClose: () => void }): React.JSX.El
               </Button>
             )}
           </section>
+
+          {(v.escuchando || v.actividad.length > 0) && (
+            <section className="f-cel-sec" aria-labelledby="f-cel-quien">
+              <h3 id="f-cel-quien" className="f-cel-h">Celus conectados</h3>
+              {v.celus.length ? (
+                <ul className="f-cel-lista">
+                  {v.celus.map((c) => (
+                    <li key={`${c.ip}|${c.dispositivo}`}>
+                      <span className="f-cel-quien">{c.dispositivo}</span>
+                      <span className="f-cel-mono">{c.ip}</span>
+                      <span>desde las {hora(c.desde)}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="f-cel-nota">Ninguno ahora.</p>
+              )}
+              {v.actividad.length > 0 && (
+                <>
+                  <h4 className="f-cel-h">Actividad</h4>
+                  <ul className="f-cel-lista" aria-label="Lo que hicieron los celus">
+                    {v.actividad.map((e, i) => (
+                      <li key={`${e.at}-${i}`}>
+                        <span className="f-cel-hora">{hora(e.at)}</span>
+                        <span className="f-cel-quien">{e.celu}</span>
+                        <span>{textoEvento(e)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              <p className="f-cel-nota">Desde que abriste Sloth. No guarda lo que se escribió ni los comandos. Si ves un celu que no es tuyo, regenerá el código.</p>
+            </section>
+          )}
 
           <RemotoSeccion v={v} hacer={hacer} copiar={copiar} ocupado={ocupado} />
 

@@ -90,6 +90,31 @@ export interface CelularVista {
   ipCambio: boolean
   /** «Desde cualquier red»: el canal remoto por el Supabase del chat. */
   remoto?: RemotoVista
+  /** Celus que consultaron por el Wi-Fi en los últimos segundos. */
+  celus: CeluConectado[]
+  /** Lo que hicieron los celus desde que se abrió Sloth, lo más nuevo primero (sin contenidos). */
+  actividad: EventoCelu[]
+}
+
+export interface CeluConectado {
+  /** «Android · Chrome»: sale del user-agent, que se puede falsear. */
+  dispositivo: string
+  ip: string
+  desde: number
+  ultimo: number
+}
+
+export type TipoEventoCelu = 'conecto' | 'aprobo' | 'rechazo' | 'abrio' | 'escribio'
+
+export interface EventoCelu {
+  at: number
+  tipo: TipoEventoCelu
+  celu: string
+  ip: string
+  /** Nombre del espacio (no en «conecto»). */
+  espacio?: string
+  /** Escrituras o aperturas seguidas juntadas en un solo evento. */
+  veces?: number
 }
 
 export interface RemotoVista {
@@ -105,3 +130,13 @@ export interface RemotoVista {
 }
 
 export const PUERTO_POR_DEFECTO = 47321
+
+/** Cómo se lee un evento en el panel: «Aprobó un permiso en api», «Escribió en la terminal de web (12 veces)». */
+export function textoEvento(e: EventoCelu): string {
+  const donde = e.espacio ?? 'un espacio'
+  if (e.tipo === 'conecto') return 'Se conectó'
+  if (e.tipo === 'aprobo') return `Aprobó un permiso en ${donde}`
+  if (e.tipo === 'rechazo') return `Rechazó un permiso en ${donde}`
+  if (e.tipo === 'abrio') return `Abrió la terminal de ${donde}`
+  return `Escribió en la terminal de ${donde}${e.veces && e.veces > 1 ? ` (${e.veces} veces)` : ''}`
+}
