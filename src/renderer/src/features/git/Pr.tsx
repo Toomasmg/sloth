@@ -3,6 +3,7 @@ import { PullRequestIcon, DoneIcon, CloseIcon, ExportIcon } from '../../icons/Sl
 import { WarnGlyph, SpinGlyph } from './glyphs'
 import { useUi } from '../host'
 import { errText, type PrPrep, type SessionPr } from './util'
+import { Button } from '../../ui'
 
 interface GhRes {
   installed: boolean
@@ -127,9 +128,9 @@ export function PrPanel({
               <span className="grow-min">
                 Ya hay un PR abierto para <span className="mono">{prep.branch}</span>: <strong>#{existingOpen.number}</strong> {existingOpen.title}
               </span>
-              <button className="btn sm primary" onClick={() => open(existingOpen.url)}>
+              <Button look="classic" size="sm" variant="primary" onClick={() => open(existingOpen.url)}>
                 <ExportIcon size={13} /> Abrir en GitHub
-              </button>
+              </Button>
             </div>
           ) : (
             <>
@@ -152,9 +153,9 @@ export function PrPanel({
                   <span className="grow-min">
                     {prep.upstream ? `Hay ${prep.unpushed} commit${prep.unpushed === 1 ? '' : 's'} sin subir.` : 'La rama todavía no está en origin.'} Subila antes de abrir el PR.
                   </span>
-                  <button className="btn sm" onClick={() => void pushThenReload()} disabled={running}>
+                  <Button look="classic" size="sm" onClick={() => void pushThenReload()} disabled={running}>
                     {running ? <SpinGlyph size={13} /> : null} Subir
-                  </button>
+                  </Button>
                 </div>
               )}
               {prep.ghError && <p className="form-error">{prep.ghError}</p>}
@@ -204,32 +205,32 @@ export function PrPanel({
         <div className="f-git-existing">
           <DoneIcon size={16} />
           <span className="grow-min mono">{url}</span>
-          <button className="btn sm primary" onClick={() => open(url)}>
+          <Button look="classic" size="sm" variant="primary" onClick={() => open(url)}>
             <ExportIcon size={13} /> Abrir en GitHub
-          </button>
+          </Button>
         </div>
       )}
       {err && <p className="form-error">{err}</p>}
       <div className="f-git-sub-actions">
         {step === 'confirm' ? (
           <>
-            <button className="btn ghost" onClick={() => setStep('form')} disabled={running}>
+            <Button look="classic" variant="ghost" onClick={() => setStep('form')} disabled={running}>
               Volver
-            </button>
-            <button className="btn primary" onClick={() => void create()} disabled={running}>
+            </Button>
+            <Button look="classic" variant="primary" onClick={() => void create()} disabled={running}>
               {running ? <SpinGlyph size={14} /> : <PullRequestIcon size={14} />}
               {running ? 'Creando…' : 'Crear PR'}
-            </button>
+            </Button>
           </>
         ) : (
           <>
-            <button className="btn ghost" onClick={onClose}>
+            <Button look="classic" variant="ghost" onClick={onClose}>
               {step === 'done' || existingOpen ? 'Cerrar' : 'Cancelar'}
-            </button>
+            </Button>
             {step === 'form' && !existingOpen && (
-              <button className="btn primary" onClick={() => void review()} disabled={blocked || !title.trim() || !prBase.trim()}>
+              <Button look="classic" variant="primary" onClick={() => void review()} disabled={blocked || !title.trim() || !prBase.trim()}>
                 Revisar…
-              </button>
+              </Button>
             )}
           </>
         )}
