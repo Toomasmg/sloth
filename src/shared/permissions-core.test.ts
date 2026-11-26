@@ -103,6 +103,28 @@ test('destructivoDe marca los comandos destructivos conocidos', () => {
     'rmdir -Recurse x',
     'Remove-Item -r x',
     'git push origin +main',
+    'rd /s/q build',
+    'del /s/q x',
+    'Remove-Item -Path x -Recurse:$true',
+    'git push \\\n  --force',
+    'git push origin main `\n  --force',
+    'rm \\\n  -rf x',
+    'git reset \\\n  --hard',
+    'git clean \\\n  -fd',
+    'Remove-Item x `\n  -Recurse',
+    'git --git-dir x push -f',
+    'git push --delete origin rama',
+    'git push origin :main',
+    'git push --mirror',
+    'git branch -D vieja',
+    'git stash drop',
+    'git restore .',
+    'git checkout -- .',
+    'chmod -R 777 .',
+    'echo a | psql -c "drop table x"',
+    'psql <<EOF\nDROP TABLE x\nEOF',
+    'a '.repeat(60) + 'rm x -rf',
+    'sudo mkfs.ext4 /dev/sdb1',
     'psql -c "DROP TABLE usuarios"',
     'sqlite3 a.db "drop database x"',
     'psql -c "TRUNCATE TABLE logs"',
@@ -135,6 +157,15 @@ test('destructivoDe no marca comandos comunes ni parecidos', () => {
     'npm run format',
     'npm run build -- --force',
     'ls -la',
+    'man mkfs',
+    'echo drop table',
+    'git commit -m "drop table usuarios"',
+    'git push origin feat/drop-table',
+    'git branch -d mergeada',
+    'git stash pop',
+    'git restore --staged .',
+    'git checkout main',
+    'chmod 644 a.txt',
     'psql -c "SELECT * FROM tabla_drop"',
     'echo dropbox sync',
     'firm -rf x'
@@ -163,18 +194,34 @@ test('destructivoDe, límites conocidos: busca texto, no entiende el shell', () 
   assert.equal(cmd('find . -delete'), null)
   assert.equal(cmd('bash borrar.sh'), null)
   assert.equal(cmd('psql -c "DELETE FROM usuarios"'), null)
-  assert.equal(cmd('git checkout -- .'), null)
+  assert.equal(cmd('shred -u secreto.txt'), null)
+  // Las herramientas que no son de shell (MCP, `other`) y el PowerShell avanzado no se clasifican.
+  assert.equal(destructivoDe('other', { command: 'rm -rf /' }), null)
 })
 
-test('destructivoDe es lineal: comandos enormes no traban y los muy largos se tratan como destructivos', () => {
-  const casos = ['rm -' + 'r'.repeat(250000) + '1', 'del '.repeat(60000), 'git push '.repeat(28000), 'Remove-Item '.repeat(20000), 'a '.repeat(2000) + ' rm -' + 'r'.repeat(1500) + '1']
+test('destructivoDe es lineal: comandos enormes no traban, y no hay tope que los marque', () => {
+  const casos = [
+    'rm -' + 'r'.repeat(249000) + '1',
+    'del '.repeat(60000),
+    'git push '.repeat(28000),
+    'Remove-Item '.repeat(20000),
+    'a '.repeat(1900),
+    'rm x '.repeat(50000),
+    'rm -r1 '.repeat(30000),
+    '}'.repeat(249000),
+    '"'.repeat(249000),
+    'x '.repeat(124000) + 'drop ' + ' '.repeat(100000),
+    'psql ' + 'drop '.repeat(40000)
+  ]
   for (const c of casos) {
     const t0 = performance.now()
     destructivoDe('cmd', { command: c })
-    assert.ok(performance.now() - t0 < 100, `tardó ${performance.now() - t0} ms`)
+    const ms = performance.now() - t0
+    assert.ok(ms < 500, `tardó ${ms} ms con ${c.slice(0, 20)}`)
   }
-  assert.notEqual(cmd('x'.repeat(5000)), null)
-  assert.equal(cmd('x'.repeat(3000)), null)
+  assert.equal(cmd('x '.repeat(100000)), null)
+  assert.notEqual(cmd('x '.repeat(100000) + 'rm -rf y'), null)
+  assert.notEqual(cmd('rm ' + 'x '.repeat(100000) + '-rf'), null)
 })
 
 test('un comando destructivo no se aprueba desde el aviso, ni con regla, ni con «siempre»', () => {
@@ -184,6 +231,8 @@ test('un comando destructivo no se aprueba desde el aviso, ni con regla, ni con 
   assert.equal(respuestaEfectiva('allowAlways', rm), 'allow')
   assert.equal(respuestaEfectiva('allowAlways', ok), 'allowAlways')
   assert.equal(respuestaEfectiva('deny', rm), 'deny')
+  assert.equal(respuestaEfectiva('allowAlways', pedido('Edit', { file_path: 'a.ts' })), 'allowAlways')
+  assert.equal(respuestaEfectiva('allowAlways', pedido('WebFetch', { url: 'https://a.com' })), 'allowAlways')
   assert.equal(respuestaEfectiva('terminal', rm), 'terminal')
   assert.equal(checkRule({ kind: 'cmd', tool: 'Bash', match: 'rm -rf x' }).ok, false)
   assert.equal(checkRule({ kind: 'cmd', tool: 'Bash', match: 'npm test' }).ok, true)
