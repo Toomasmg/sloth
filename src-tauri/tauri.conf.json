@@ -1,0 +1,66 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Sloth",
+  "version": "0.8.0",
+  "identifier": "com.tomy.sloth",
+  "build": {
+    "frontendDist": "../out/renderer",
+    "devUrl": "http://localhost:5173"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Sloth",
+        "width": 1500,
+        "height": 920,
+        "minWidth": 900,
+        "minHeight": 560,
+        "decorations": false,
+        "center": true,
+        "backgroundColor": "#0e0f12"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/icon.ico"
+    ],
+    "createUpdaterArtifacts": true,
+    "externalBin": [
+      "binaries/node"
+    ],
+    "resources": {
+      "stage/": "./"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "installer-hooks.nsh",
+        "languages": [
+          "Spanish"
+        ],
+        "displayLanguageSelector": false
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY0NTZBQzU4NDEzQkYzMjEKUldRaDh6dEJXS3hXOU04cHI0NUdaczhDZVprM2dMVXZNK2NNZGVkbEVBNC9KMGpYNTJORmtDcjAK",
+      "endpoints": [
+        "https://github.com/Toomasmg/sloth/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

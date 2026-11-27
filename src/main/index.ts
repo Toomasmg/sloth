@@ -42,7 +42,7 @@ import { currentSettings, initialChrome } from './features/settings'
 import { validateWorkspacePatch } from './workspace-patch'
 import { loadWindowState, trackWindowState } from './window-state'
 import { dimValida, idValido, origenConfiable, permisoChromium } from './ipc-guard'
-import { zoomFor } from './zoom-keys'
+import { zoomFor } from '../shared/zoom-keys'
 import type { FeatureContext } from './features/context'
 import type { UiCommand } from '../shared/features'
 import {
