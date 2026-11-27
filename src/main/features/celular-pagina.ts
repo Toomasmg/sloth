@@ -21,13 +21,12 @@ export const PAGINA_HTML = `<!doctype html>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icono.png">
 <link rel="icon" href="/icono.png">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600;700&amp;display=swap">
 <link rel="stylesheet" href="/app.css">
 </head>
 <body>
 <main class="app" id="app">
   <header class="top">
-    <span class="marca">Sloth</span>
+    <h1 class="marca">Sloth</h1>
     <div class="cuentas" role="group" aria-label="Cuenta" id="cuentas"></div>
     <span class="conexion" id="conexion" role="status"><span class="punto"></span><span id="conexion-texto">Conectando…</span></span>
     <button type="button" class="completa" id="completa" aria-label="Pantalla completa" title="Pantalla completa" hidden><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg></button>
@@ -36,21 +35,28 @@ export const PAGINA_HTML = `<!doctype html>
     <span>Para verlo sin la barra del navegador: tocá Compartir y «Agregar a inicio», y abrilo desde ese ícono.</span>
     <button type="button" id="pista-ok">Entendido</button>
   </div>
+  <section class="atencion" id="atencion" aria-label="Lo que te espera">
+    <ul class="pedidos" id="pedidos" aria-label="Pedidos de permiso"></ul>
+    <ul class="esperan" id="esperan"></ul>
+    <div class="calma" id="calma"><span class="calma-t">Nada te espera</span><span class="calma-s" id="calma-s">Ningún permiso ni pregunta pendiente.</span></div>
+    <ul class="respondidos" id="respondidos" aria-label="Respondidos desde este celu"></ul>
+    <div class="solo-lector" id="aviso-nuevo" aria-live="assertive" aria-atomic="true"></div>
+  </section>
   <div class="relojes">
     <section class="reloj" id="g5" aria-label="Límite de 5 horas"></section>
     <section class="reloj" id="g7" aria-label="Límite semanal"></section>
+    <section class="limites" id="limites" aria-label="Límites"></section>
   </div>
   <section class="centro">
-    <div class="contadores">
-      <div class="contador c-espera"><span class="num" id="n-espera">0</span><span class="etq">Te necesita</span></div>
-      <div class="contador c-listo"><span class="num" id="n-listo">0</span><span class="etq">Terminaron</span></div>
-      <div class="contador c-trabaja"><span class="num" id="n-trabaja">0</span><span class="etq">Trabajando</span></div>
+    <div class="contadores" role="group" aria-label="Filtrar las sesiones por estado">
+      <button type="button" class="contador c-espera" id="f-waiting" aria-pressed="false"><span class="num" id="n-espera">0</span><span class="etq">Te necesita</span></button>
+      <button type="button" class="contador c-listo" id="f-done" aria-pressed="false"><span class="num" id="n-listo">0</span><span class="etq">Terminaron</span></button>
+      <button type="button" class="contador c-trabaja" id="f-working" aria-pressed="false"><span class="num" id="n-trabaja">0</span><span class="etq">Trabajando</span></button>
     </div>
-    <div class="pedido" id="pedido" hidden></div>
-    <div class="calma" id="calma"><span class="calma-t">Nada te espera</span><span class="calma-s" id="calma-s">Ningún permiso pendiente.</span></div>
-    <h2 class="titulo-lista">Sesiones <span id="resumen"></span></h2>
+    <h2 class="titulo-lista"><span id="titulo-lista">Sesiones</span> <span class="resumen" id="resumen"></span></h2>
     <p class="term-nota" id="term-nota" hidden>La terminal de cada sesión no se abre desde «Desde cualquier red». Escaneá el QR del Wi-Fi de casa (en Sloth, panel Celular, el de arriba) con el celu conectado a ese Wi-Fi.</p>
     <ul class="lista" id="lista"></ul>
+    <p class="lista-mas" id="lista-mas" hidden></p>
     <p class="hoy" id="hoy">Hoy: sin datos</p>
   </section>
 </main>
@@ -62,20 +68,46 @@ export const PAGINA_HTML = `<!doctype html>
   </header>
   <div class="term-aviso" id="term-aviso" role="status" hidden></div>
   <div class="term-pantalla" id="term-pantalla"></div>
+  <div class="term-cola" id="term-cola" role="status" hidden><span class="term-cola-texto" id="term-cola-texto"></span><button type="button" id="term-descartar">Descartar</button></div>
+  <form class="term-escribir" id="term-escribir" autocomplete="off">
+    <input id="term-texto" type="text" enterkeyhint="send" maxlength="4000" placeholder="Escribí o dictá un mensaje" aria-label="Mensaje para la terminal">
+    <button type="button" class="term-hist" id="term-hist" aria-label="Lo último que mandaste" disabled>↺</button>
+    <button type="submit" class="term-mandar" id="term-mandar">Mandar</button>
+  </form>
   <div class="term-teclas" role="group" aria-label="Teclas">
+    <button type="button" class="term-a-texto" id="term-a-texto" aria-label="Escribir un mensaje">Aa</button>
     <button type="button" data-tecla="esc">Esc</button>
-    <button type="button" data-tecla="tab">Tab</button>
     <button type="button" data-tecla="arriba" aria-label="Flecha arriba">↑</button>
     <button type="button" data-tecla="abajo" aria-label="Flecha abajo">↓</button>
+    <button type="button" data-tecla="enter" aria-label="Enter">⏎</button>
+    <button type="button" data-tecla="ctrlc" aria-label="Control C">Ctrl C</button>
+    <button type="button" data-tecla="tab">Tab</button>
+    <button type="button" data-tecla="shifttab" aria-label="Shift Tab">⇧Tab</button>
+    <button type="button" data-tecla="escesc" aria-label="Doble Esc">Esc Esc</button>
+    <button type="button" data-tecla="barra" aria-label="Barra">/</button>
     <button type="button" data-tecla="izq" aria-label="Flecha izquierda">←</button>
     <button type="button" data-tecla="der" aria-label="Flecha derecha">→</button>
-    <button type="button" data-tecla="ctrlc" aria-label="Control C">Ctrl C</button>
-    <button type="button" data-tecla="enter" aria-label="Enter">⏎</button>
+    <button type="button" data-tecla="inicio" aria-label="Inicio">Inicio</button>
+    <button type="button" data-tecla="fin" aria-label="Fin">Fin</button>
+    <button type="button" data-tecla="repag" aria-label="Página arriba">RePág</button>
+    <button type="button" data-tecla="avpag" aria-label="Página abajo">AvPág</button>
+    <button type="button" data-tecla="ctrld" aria-label="Control D">Ctrl D</button>
   </div>
 </section>
+<section class="aviso-pantalla" id="emparejando" hidden>
+  <h1>Confirmá en la PC</h1>
+  <p>En Sloth, en el panel «Celular», tocá «Dejar entrar» si ves este código:</p>
+  <p class="par-codigo" id="par-codigo"></p>
+  <p id="par-estado" role="status">Esperando la respuesta de la PC…</p>
+</section>
 <section class="aviso-pantalla" id="sin-token" hidden>
-  <h1>Este celu no está conectado</h1>
-  <p id="sin-token-texto">Abrí Sloth en la PC, entrá a «Celular» y escaneá el QR.</p>
+  <h1 id="sin-token-titulo">Conectá este celu</h1>
+  <p id="sin-token-texto">Escaneá el QR de Sloth con la cámara.</p>
+  <ol class="pasos">
+    <li>En la PC, abrí Sloth y buscá «Celular» con Ctrl K.</li>
+    <li>Prendé «Ver Sloth en el celu» (o «Desde cualquier red»).</li>
+    <li>Escaneá el QR con la cámara de este celu. Para el de «En tu Wi-Fi», el celu tiene que estar en el mismo Wi-Fi que la PC.</li>
+  </ol>
 </section>
 <script src="/app.js"></script>
 </body>
@@ -102,11 +134,14 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
   display: grid; gap: 14px;
   padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "top" "pista" "relojes" "centro";
+  grid-template-areas: "top" "pista" "atencion" "relojes" "centro";
   align-content: start;
 }
 .top { grid-area: top; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.marca { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; margin-right: auto; }
+.marca { margin: 0 auto 0 0; font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
+.cuentas.desliza { -webkit-mask-image: linear-gradient(to right, #000 80%, transparent); mask-image: linear-gradient(to right, #000 80%, transparent); }
+.lista li.fuera { display: none; }
+.lista-mas { margin: 0; font-size: 12px; color: var(--suave); }
 .cuentas { order: 3; flex: 1 1 100%; display: flex; gap: 4px; padding: 3px; background: var(--panel); border: 1px solid var(--borde); border-radius: 12px; overflow-x: auto; }
 .cuentas button { flex: 1 0 auto; min-height: 44px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; color: var(--suave); font-size: 14px; font-weight: 500; white-space: nowrap; }
 .cuentas button[aria-pressed="true"] { background: #2A2F37; color: var(--fuerte); font-weight: 600; }
@@ -115,15 +150,37 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .conexion.ok .punto { background: var(--listo); }
 .conexion.mal { color: var(--espera); border-color: rgba(255,176,103,0.45); }
 .conexion.mal .punto { background: var(--rojo); }
-.relojes { grid-area: relojes; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.reloj { display: flex; flex-direction: column; align-items: center; gap: 2px; background: var(--panel); border: 1px solid var(--borde); border-radius: 20px; padding: 10px 6px 12px; min-width: 0; }
+.relojes { grid-area: relojes; min-width: 0; }
+.reloj { display: none; flex-direction: column; align-items: center; gap: 2px; background: var(--panel); border: 1px solid var(--borde); border-radius: 20px; padding: 10px 6px 12px; min-width: 0; }
 .reloj svg { width: 100%; max-width: 170px; height: auto; display: block; }
 .reloj .pie { font-size: 12px; color: var(--suave); text-align: center; min-height: 1.4em; }
 .aguja { transform-origin: 100px 100px; transition: transform 600ms cubic-bezier(.3,1.4,.5,1); }
 .valor { transition: stroke-dasharray 600ms ease; }
+.limites { display: flex; flex-direction: column; gap: 8px; background: var(--panel); border: 1px solid var(--borde); border-radius: 16px; padding: 10px 12px; }
+.lim { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 14px; align-items: center; }
+.lim.con-cuenta { grid-template-columns: minmax(0, 0.8fr) repeat(2, minmax(0, 1fr)); }
+.lim-cuenta { font-size: 13px; font-weight: 600; color: var(--fuerte); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lim-v { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; align-items: center; min-width: 0; }
+.lim-n { font-size: 12px; color: var(--suave); }
+.lim-pct { font: 600 13px var(--mono); color: var(--fuerte); min-width: 4ch; text-align: right; }
+.barra { height: 6px; border-radius: 3px; background: var(--pista); overflow: hidden; }
+.barra i { display: block; height: 100%; border-radius: 3px; }
+.lim-pie { grid-column: 1 / -1; font-size: 12px; color: var(--suave); }
+.atencion { grid-area: atencion; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.esperan { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.esperan:empty { display: none; }
+.esperan li { border-radius: 16px; padding: 12px 14px; background: var(--panel); border: 1px solid rgba(255,176,103,0.3); display: flex; flex-direction: column; gap: 6px; }
+.e-cab { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.e-nombre { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; color: var(--fuerte); overflow-wrap: anywhere; }
+.e-hace { flex: none; font: 500 11px var(--mono); color: var(--suave); }
+.e-cuenta { font-size: 12px; color: var(--suave); }
+.e-msj { font-size: 14px; color: var(--texto); overflow-wrap: anywhere; white-space: pre-line; }
+.e-nota { font-size: 12px; color: var(--suave); }
+.esperan .s-term { align-self: flex-start; }
 .centro { grid-area: centro; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .contadores { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.contador { border-radius: 14px; padding: 10px 8px; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid; }
+.contador { border-radius: 14px; padding: 10px 8px; min-height: 44px; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid; }
+.contador[aria-pressed="true"] { box-shadow: inset 0 0 0 2px currentColor; }
 .contador .num { font: 700 30px/1.1 var(--mono); }
 .contador .etq { font-size: 11px; font-weight: 600; }
 .c-espera { background: rgba(255,159,67,0.14); border-color: rgba(255,176,103,0.4); color: var(--espera); }
@@ -131,8 +188,22 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .c-trabaja { background: rgba(90,169,255,0.12); border-color: rgba(140,194,255,0.3); color: var(--trabaja); }
 .c-espera.hay .num { animation: alerta 1.4s ease-in-out infinite; }
 @keyframes alerta { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.pedidos, .respondidos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.pedidos:empty, .respondidos:empty { display: none; }
 .pedido { border-radius: 16px; padding: 12px 14px; background: var(--panel); border: 1px solid rgba(255,176,103,0.45); display: flex; flex-direction: column; gap: 10px; }
-.pedido .p-nombre { font-size: 15px; font-weight: 600; color: var(--fuerte); overflow-wrap: anywhere; }
+.pedido.destructivo { border-color: rgba(255,107,91,0.7); }
+.p-cab { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.pedido .p-nombre { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; color: var(--fuerte); overflow-wrap: anywhere; }
+.p-hace { flex: none; font: 500 11px var(--mono); color: var(--suave); }
+.p-titulo { font-size: 13px; color: var(--suave); }
+.p-marca { align-self: flex-start; padding: 3px 10px; border-radius: 999px; background: var(--rojo); color: #1A0A08; font-size: 12px; font-weight: 700; }
+.p-cmd { margin: 0; padding: 8px 10px; border-radius: 10px; background: #0B0D10; border: 1px solid var(--borde); font: 500 13px/1.45 var(--mono); color: var(--fuerte); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 50vh; overflow: auto; }
+.p-cmd.corto { max-height: 7.5em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 65%, transparent); mask-image: linear-gradient(#000 65%, transparent); }
+.p-ver { align-self: flex-start; min-height: 44px; padding: 0 4px; border: 0; background: none; color: var(--celeste); font-size: 14px; font-weight: 600; }
+.b-aprobar-peligro { border: 1px solid rgba(255,107,91,0.75); background: transparent; color: var(--rojo); font-weight: 700; }
+.respondidos li { font-size: 12px; color: var(--suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.respondidos .r-si { color: var(--listo); }
+.solo-lector { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .pedido .p-texto { font-size: 13px; color: var(--suave); overflow-wrap: anywhere; }
 .pedido .p-botones { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .pedido button { min-height: 44px; border-radius: 12px; font-size: 15px; font-weight: 600; }
@@ -145,7 +216,7 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .calma-t { font-size: 15px; font-weight: 600; color: var(--listo); }
 .calma-s { font-size: 12px; color: var(--suave); }
 .titulo-lista { margin: 4px 0 0; font-size: 16px; font-weight: 700; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.titulo-lista span { font-size: 12px; font-weight: 400; color: var(--suave); }
+.titulo-lista .resumen { font-size: 12px; font-weight: 400; color: var(--suave); }
 .lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .lista li { background: var(--panel); border: 1px solid var(--borde); border-radius: 16px; padding: 11px 14px; display: flex; align-items: center; gap: 12px; min-width: 0; }
 .lista .punto { width: 10px; height: 10px; border-radius: 50%; flex: none; }
@@ -162,15 +233,24 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
   .app {
     height: 100%; gap: 16px;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1.55fr) minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1fr);
-    grid-template-areas: "g5 top g7" "g5 pista g7" "g5 centro g7";
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+    grid-template-areas: "g5 top g7" "g5 pista g7" "g5 atencion g7" "g5 centro g7";
     align-content: stretch; align-items: center;
     background: radial-gradient(ellipse at 50% 120%, #15181D 0%, var(--fondo) 70%);
   }
   .relojes { display: contents; }
   #g5 { grid-area: g5; }
   #g7 { grid-area: g7; }
-  .reloj { background: none; border: 0; padding: 0; }
+  .reloj { display: flex; background: none; border: 0; padding: 0; }
+  .limites { display: none; }
+  .atencion { align-self: stretch; }
+  .pedidos:not(:empty) ~ .esperan, .esperan li:nth-child(n+2), .pedidos li:nth-child(n+2), .respondidos { display: none; }
+  .p-titulo { display: none; }
+  .p-cmd { padding: 4px 8px; }
+  .p-cmd.corto { max-height: 3em; }
+  .esperan li { padding: 10px 12px; gap: 4px; }
+  .e-cuenta { display: none; }
+  .e-msj { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
   .reloj svg { max-width: 260px; }
   .app { gap: 8px 16px; padding-top: max(10px, env(safe-area-inset-top)); padding-bottom: max(10px, env(safe-area-inset-bottom)); }
   .marca { display: none; }
@@ -183,18 +263,19 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
   .contador { padding: 6px 8px; }
   .contador .num { font-size: 26px; }
   .pedido { padding: 10px 12px; gap: 8px; }
-  .calma { padding: 10px 12px; }
+  .calma { display: none !important; }
   .titulo-lista { display: none; }
   .lista { gap: 2px; }
-  .lista li { background: none; border: 0; padding: 0; min-height: 26px; gap: 8px; }
+  .lista li { flex: none; background: none; border: 0; padding: 0; min-height: 26px; gap: 8px; }
   .lista li.del-pedido { display: none; }
-  .lista li:nth-child(n+4) { display: none; }
   .lista .punto { width: 8px; height: 8px; }
   .lista .s-detalle { display: none; }
   .lista .s-nombre { font-size: 13px; font-weight: 400; color: var(--texto); }
   .lista .s-lado { flex-direction: row; align-items: center; gap: 8px; }
   .lista .s-estado { background: none !important; padding: 0; }
   .lista .s-hace { width: 48px; text-align: right; }
+  .lista .s-term { min-height: 36px; min-width: 44px; padding: 0 10px; justify-content: center; }
+  .lista .s-term span:not(.s-term-ico) { display: none; }
   .lista { flex: 0 1 auto; min-height: 0; overflow: hidden; }
   .hoy { flex: none; }
   .hoy { margin-top: auto; }
@@ -205,7 +286,9 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .pista button { flex: none; min-height: 44px; padding: 0 12px; border: 0; border-radius: 9px; background: #2A2F37; color: var(--fuerte); font-weight: 600; }
 .aviso-pantalla { position: fixed; inset: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 24px max(24px, env(safe-area-inset-right)) 24px max(24px, env(safe-area-inset-left)); background: var(--fondo); text-align: center; }
 .aviso-pantalla h1 { margin: 0; font-size: 20px; }
+.aviso-pantalla .par-codigo { margin: 12px auto; font: 700 44px var(--mono); letter-spacing: 0.25em; color: var(--fuerte); }
 .aviso-pantalla p { margin: 0 auto; max-width: 36ch; color: var(--suave); }
+.aviso-pantalla .pasos { margin: 8px auto 0; padding-left: 1.4em; max-width: 36ch; text-align: left; color: var(--texto); display: flex; flex-direction: column; gap: 8px; }
 .lista .s-term { flex: none; min-height: 44px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border-radius: 12px; border: 1px solid rgba(140,194,255,0.35); background: rgba(90,169,255,0.12); color: var(--trabaja); font-size: 13px; font-weight: 600; }
 .lista .s-term .s-term-ico { font: 700 13px var(--mono); }
 .lista .s-term:disabled { opacity: 0.5; cursor: default; }
@@ -221,9 +304,38 @@ button:focus-visible { outline: 2px solid var(--trabaja); outline-offset: 2px; }
 .term-pantalla .xterm { padding: 0; }
 .term-teclas { flex: none; display: flex; gap: 4px; padding: 6px 8px; overflow-x: auto; border-top: 1px solid var(--borde); scrollbar-width: none; }
 .term-teclas::-webkit-scrollbar { display: none; }
-.term-teclas button { flex: 1 0 auto; min-width: 38px; min-height: 40px; padding: 0 6px; border: 1px solid var(--borde); border-radius: 10px; background: var(--panel); color: var(--texto); font: 600 13px var(--mono); touch-action: manipulation; }
+.term-teclas button { flex: 1 0 auto; min-width: 44px; min-height: 44px; padding: 0 8px; border: 1px solid var(--borde); border-radius: 10px; background: var(--panel); color: var(--texto); font: 600 13px var(--mono); touch-action: manipulation; white-space: nowrap; }
+.term-escribir { flex: none; display: flex; gap: 6px; padding: 6px 8px 0; border-top: 1px solid var(--borde); }
+.term-escribir input { flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border: 1px solid var(--borde); border-radius: 12px; background: #0B0D10; color: var(--fuerte); font-size: 16px; }
+.term-escribir input::placeholder { color: var(--suave); }
+.term-hist { flex: none; width: 44px; min-height: 44px; border: 1px solid var(--borde); border-radius: 12px; background: var(--panel); color: var(--texto); font-size: 18px; touch-action: manipulation; }
+.term-mandar { flex: none; min-height: 44px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--trabaja); color: #08090B; font-size: 14px; font-weight: 700; touch-action: manipulation; }
+.term-cola { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 12px; color: var(--texto); background: var(--panel); border-top: 1px solid var(--borde); }
+.term-cola-texto { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.term-cola-texto code { font-family: var(--mono); color: var(--fuerte); }
+#term-descartar { flex: none; min-height: 44px; padding: 0 12px; border: 1px solid var(--borde); border-radius: 10px; background: transparent; color: var(--texto); font-weight: 600; }
+@media (orientation: landscape) and (max-height: 500px) {
+  .term-escribir { padding-top: 4px; }
+  .term-teclas { padding: 4px 8px; }
+}
+.term.bajo:not(.escribiendo) .term-escribir, .term.bajo.escribiendo .term-teclas { display: none; }
+.term-teclas .term-a-texto { display: none; }
+.term.bajo .term-teclas .term-a-texto { display: inline-block; }
 .term button:disabled { opacity: 0.5; cursor: default; }
 html.con-term, html.con-term body { overflow: hidden; overscroll-behavior: none; }
+@media (min-width: 720px) and (min-height: 601px) {
+  .app {
+    max-width: 1100px; margin: 0 auto; column-gap: 20px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    grid-template-rows: auto auto auto auto 1fr;
+    grid-template-areas: "top top" "pista pista" "atencion centro" "relojes centro" ". centro";
+  }
+  .cuentas { order: 0; flex: 0 1 auto; }
+}
+@media (prefers-contrast: more) {
+  :root { --suave: #C9CDD2; --borde: #5A616B; }
+  .b-rechazar { border-color: #8A9099; }
+}
 @media (prefers-reduced-motion: reduce) {
   .aguja, .valor { transition: none; }
   .c-espera.hay .num { animation: none; }
@@ -284,15 +396,18 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   var viejo = leer('sloth-token');
   var enlace = new URLSearchParams(location.hash.slice(1)).get('k');
   var enlaceMalo = false;
+  // La clave del QR solo sirve para pedir entrar: este celu genera la suya y la PC la acepta cuando alguien toca «Dejar entrar».
+  var remota = viejo === 'remoto' || !!window.slothFetch;
   if (enlace) {
-    if (window.slothSello.abrirClave(enlace)) guardar('sloth-clave', enlace);
+    if (window.slothSello.abrirClave(enlace)) guardar(remota ? 'sloth-clave' : 'sloth-qr', enlace);
     else enlaceMalo = true;
     try { history.replaceState(null, '', location.pathname); } catch (e) { /* sin historial */ }
   }
-  var token = viejo === 'remoto' ? viejo : (enlaceMalo ? null : enlace || leer('sloth-clave'));
+  var qr = remota || enlaceMalo ? null : leer('sloth-qr');
+  var token = viejo === 'remoto' ? viejo : (enlaceMalo ? null : (remota && enlace) || leer('sloth-clave'));
   if (viejo && viejo !== 'remoto') guardar('sloth-token', null);
   var cuentaElegida = leer('sloth-cuenta');
-  var ultimo = null, desfase = 0, ultimoOk = 0, timer = null, enviando = false, errorPedido = '', avisoHora = false;
+  var ultimo = null, desfase = 0, ultimoOk = 0, timer = null, avisoHora = false;
 
   function el(tag, clase, texto) {
     var n = document.createElement(tag);
@@ -315,6 +430,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     if (h < 24) return h + ' h';
     return Math.floor(h / 24) + ' d';
   }
+  var haceTexto = function (ms) { var h = hace(ms); return h === 'recién' ? h : 'hace ' + h; };
   function reinicio(ms) {
     if (ms === null) return 'Sin hora de reinicio';
     var falta = ms - ahoraPc();
@@ -345,7 +461,8 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       g.appendChild(svg('line', { x1: mayor ? 150 : 156, y1: 100, x2: 163, y2: 100, stroke: mayor ? '#5A606A' : '#3A3F47', 'stroke-width': mayor ? 2.5 : 2, transform: 'rotate(' + (150 + i * 24) + ' 100 100)' }));
     }
     s.appendChild(g);
-    var tag = svg('text', { x: 100, y: 72, 'text-anchor': 'middle', fill: '#9AA0A6', 'font-size': 12, 'font-weight': 600, 'letter-spacing': 2, 'font-family': 'Inter, sans-serif' });
+    // Abajo del porcentaje: la aguja barre de 150° a 390° y nunca baja de y=130, así no tacha el rótulo.
+    var tag = svg('text', { x: 100, y: 172, 'text-anchor': 'middle', fill: '#9AA0A6', 'font-size': 11, 'font-weight': 600, 'letter-spacing': 2, 'font-family': 'Inter, sans-serif' });
     tag.textContent = etiqueta;
     s.appendChild(tag);
     var aguja = svg('line', { x1: 100, y1: 100, x2: 158, y2: 100, stroke: '#F1F3F4', 'stroke-width': 4, 'stroke-linecap': 'round', 'class': 'aguja' });
@@ -361,19 +478,21 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   }
   var relojes = { g5: armarReloj($('g5'), '5 HORAS'), g7: armarReloj($('g7'), 'SEMANA') };
 
-  function pintarReloj(r, v, nombreLargo) {
+  var colorDe = function (f) { return f >= 0.85 ? '#FF6B5B' : f >= 0.6 ? '#FFB547' : '#7CC4FF'; };
+  function pintarReloj(r, v, nombreLargo, quien) {
+    var antes = quien ? quien + ' · ' : '';
     if (!v) {
       r.valor.setAttribute('stroke-dasharray', '0 ' + CIRC);
       r.valor.setAttribute('opacity', '0');
       r.aguja.style.transform = 'rotate(150deg)';
       r.aguja.setAttribute('opacity', '0.35');
       r.pct.textContent = '—';
-      r.pie.textContent = 'Sin datos todavía';
+      r.pie.textContent = antes + 'Sin datos todavía';
       r.s.setAttribute('aria-label', nombreLargo + ': sin datos todavía. Aparece cuando Claude responda en esta cuenta.');
       return;
     }
     var f = Math.max(0, Math.min(1, v.pct / 100));
-    var color = f >= 0.85 ? '#FF6B5B' : f >= 0.6 ? '#FFB547' : '#7CC4FF';
+    var color = colorDe(f);
     r.valor.setAttribute('stroke', color);
     r.valor.setAttribute('opacity', '1');
     r.valor.setAttribute('stroke-dasharray', (ARCO * f).toFixed(1) + ' ' + CIRC);
@@ -381,29 +500,112 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     r.aguja.setAttribute('opacity', '1');
     r.pct.textContent = Math.round(v.pct) + '%';
     var texto = reinicio(v.reiniciaEn);
-    r.pie.textContent = texto;
+    r.pie.textContent = antes + texto;
     r.s.setAttribute('aria-label', nombreLargo + ': ' + Math.round(v.pct) + ' % usado. ' + texto);
   }
 
+  var TODAS = 'todas';
+  var FILTROS = { waiting: 'Te necesita', done: 'Terminaron', working: 'Trabajando' };
+  var filtroEstado = null;
+  var nombreCuenta = function (e, id) { var c = e.cuentas.filter(function (x) { return x.id === id; })[0]; return c ? c.nombre : ''; };
+  var cuentasEnVista = function (e) { return cuentaElegida === TODAS ? e.cuentas : e.cuentas.filter(function (c) { return c.id === cuentaElegida; }); };
+  // Con una cuenta (o ninguna con datos) no hay selector: se ven todas las sesiones, aunque alguna sea de una cuenta que no vino.
+  var deLaCuenta = function (e) { return cuentaElegida === TODAS || e.cuentas.length < 2 ? e.sesiones : e.sesiones.filter(function (s) { return s.cuentaId === cuentaElegida; }); };
+  var pctDe = function (v) { return v ? v.pct : -1; };
+
   function pintarCuentas(e) {
     var cont = $('cuentas');
-    if (!e.cuentas.some(function (c) { return c.id === cuentaElegida; })) {
-      var conDatos = e.cuentas.filter(function (c) { return c.cincoHoras || c.semana; })[0];
-      cuentaElegida = (conDatos || e.cuentas[0] || { id: null }).id;
-    }
+    var varias = e.cuentas.length > 1;
+    var existe = e.cuentas.some(function (c) { return c.id === cuentaElegida; });
+    if (cuentaElegida === TODAS ? !varias : !existe) cuentaElegida = varias ? TODAS : (e.cuentas[0] || { id: null }).id;
     cont.textContent = '';
-    cont.hidden = e.cuentas.length < 2;
-    e.cuentas.forEach(function (c) {
+    cont.hidden = !varias;
+    [{ id: TODAS, nombre: 'Todas' }].concat(e.cuentas).forEach(function (c) {
       var b = el('button', '', c.nombre);
       b.type = 'button';
       b.setAttribute('aria-pressed', c.id === cuentaElegida ? 'true' : 'false');
       b.addEventListener('click', function () { cuentaElegida = c.id; guardar('sloth-cuenta', c.id); pintar(); });
       cont.appendChild(b);
     });
-    var actual = e.cuentas.filter(function (c) { return c.id === cuentaElegida; })[0];
-    pintarReloj(relojes.g5, actual && actual.cincoHoras, 'Límite de 5 horas');
-    pintarReloj(relojes.g7, actual && actual.semana, 'Límite semanal');
-    $('hoy').textContent = actual && actual.hoy ? 'Hoy: ' + tokens(actual.hoy.tokens) + ' tokens · ' + actual.hoy.mensajes + ' mensajes' : 'Hoy: sin datos';
+    var enVista = cuentasEnVista(e);
+    // Acostado entran dos relojes: con «Todas», los de la cuenta más cerca del límite de 5 h.
+    var actual = enVista.slice().sort(function (a, b) { return pctDe(b.cincoHoras) - pctDe(a.cincoHoras); })[0];
+    var quien = cuentaElegida === TODAS && actual ? actual.nombre : '';
+    pintarReloj(relojes.g5, actual && actual.cincoHoras, 'Límite de 5 horas' + (quien ? ' de ' + quien : ''), quien);
+    pintarReloj(relojes.g7, actual && actual.semana, 'Límite semanal' + (quien ? ' de ' + quien : ''), quien);
+    var hoy = enVista.filter(function (c) { return c.hoy; });
+    var tk = 0, msj = 0;
+    hoy.forEach(function (c) { tk += c.hoy.tokens; msj += c.hoy.mensajes; });
+    $('hoy').textContent = !hoy.length ? 'Hoy: sin datos' : !tk && !msj ? 'Hoy: sin uso todavía' : 'Hoy: ' + tokens(tk) + ' tokens · ' + msj + (msj === 1 ? ' mensaje' : ' mensajes');
+    deslizar();
+  }
+
+  // Si las cuentas no entran, el borde derecho se desvanece: hay más deslizando.
+  function deslizar() {
+    var c = $('cuentas');
+    c.classList.toggle('desliza', c.scrollWidth > c.clientWidth + 1 && c.scrollLeft + c.clientWidth < c.scrollWidth - 1);
+  }
+  $('cuentas').addEventListener('scroll', deslizar);
+
+  function ventanaCompacta(nombre, v) {
+    var cel = el('div', 'lim-v');
+    cel.appendChild(el('span', 'lim-n', nombre));
+    var barra = el('span', 'barra');
+    var relleno = el('i');
+    if (v) {
+      var f = Math.max(0, Math.min(1, v.pct / 100));
+      relleno.style.width = (f * 100).toFixed(1) + '%';
+      relleno.style.background = colorDe(f);
+    }
+    barra.appendChild(relleno);
+    cel.appendChild(barra);
+    cel.appendChild(el('span', 'lim-pct', v ? Math.round(v.pct) + ' %' : '—'));
+    return cel;
+  }
+
+  // Parado, los límites van en una franja (una fila por cuenta) para que lo urgente quede arriba sin bajar.
+  function pintarLimites(e) {
+    var cont = $('limites');
+    cont.textContent = '';
+    var lista = cuentasEnVista(e);
+    cont.hidden = !lista.length;
+    var varias = lista.length > 1;
+    var cuando = function (nombre, v) {
+      if (!v) return nombre + ' sin datos';
+      var r = reinicio(v.reiniciaEn);
+      return nombre + ' ' + r.charAt(0).toLowerCase() + r.slice(1);
+    };
+    var pct = function (v) { return v ? Math.round(v.pct) + ' % usado' : 'sin datos'; };
+    lista.forEach(function (c) {
+      var fila = el('div', varias ? 'lim con-cuenta' : 'lim');
+      if (varias) fila.appendChild(el('span', 'lim-cuenta', c.nombre));
+      fila.appendChild(ventanaCompacta('5 h', c.cincoHoras));
+      fila.appendChild(ventanaCompacta('Semana', c.semana));
+      var pie = !c.cincoHoras && !c.semana ? 'Sin datos todavía: aparecen cuando Claude responda en esta cuenta.' : cuando('5 h', c.cincoHoras) + ' · ' + cuando('Semana', c.semana);
+      if (!varias) fila.appendChild(el('span', 'lim-pie', pie));
+      fila.setAttribute('role', 'img');
+      fila.setAttribute('aria-label', c.nombre + '. Límite de 5 horas: ' + pct(c.cincoHoras) + '. Semanal: ' + pct(c.semana) + '. ' + pie);
+      cont.appendChild(fila);
+    });
+  }
+
+  function botonTerminal(e, s) {
+    var enWifi = e.terminal && !window.slothFetch;
+    var soloWifi = !!window.slothFetch && !!e.terminalEnWifi;
+    if (!(enWifi || soloWifi) || s.estado === 'exited') return null;
+    var bt = el('button', 's-term');
+    bt.appendChild(el('span', 's-term-ico', '>_'));
+    bt.appendChild(el('span', '', 'Terminal'));
+    bt.type = 'button';
+    if (soloWifi) {
+      bt.disabled = true;
+      bt.setAttribute('aria-label', 'Terminal de ' + s.nombre + ': escaneá el QR del Wi-Fi de casa para abrirla');
+      bt.setAttribute('aria-describedby', 'term-nota');
+    } else {
+      bt.setAttribute('aria-label', 'Abrir la terminal de ' + s.nombre);
+      bt.addEventListener('click', function () { abrirTerminal(s.id, s.nombre); });
+    }
+    return bt;
   }
 
   function textoError(error) {
@@ -412,61 +614,150 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     return error;
   }
 
-  function decidir(id, decision) {
-    if (enviando) return;
-    enviando = true;
-    errorPedido = '';
+  // Cada pedido con su tarjeta y sus botones: se puede responder cualquiera, no solo el primero.
+  var enviandoId = null, errores = {}, expandidos = {}, confirmar = { id: null, hasta: 0 }, respondidos = [], vistos = {}, firmaPedidos = '';
+  var CONFIRMAR_MS = 5000, LARGO_MAX = 300, LINEAS_MAX = 6;
+  var confirmando = function (p) { return confirmar.id === p.id && Date.now() < confirmar.hasta; };
+  var esLargo = function (p) { return p.texto.length > LARGO_MAX || p.texto.split(String.fromCharCode(10)).length > LINEAS_MAX; };
+
+  function anunciar(texto) {
+    var a = $('aviso-nuevo');
+    a.textContent = '';
+    setTimeout(function () { a.textContent = texto; }, 50);
+  }
+
+  function decidir(p, decision) {
+    if (enviandoId) return;
+    enviandoId = p.id;
+    delete errores[p.id];
     pintar();
-    pedirApi('/api/permiso', { id: id, decision: decision })
+    pedirApi('/api/permiso', { id: p.id, decision: decision })
       .then(function (r) {
         if (r.ok) return null;
         return r.json().then(function (j) { return j && j.error ? textoError(j.error) : 'No se pudo responder.'; }, function () { return 'No se pudo responder.'; });
       })
-      .then(function (err) { errorPedido = err || ''; }, function () { errorPedido = 'Sin conexión con la PC. Probá de nuevo.'; })
-      .then(function () { enviando = false; consultar(); });
+      .then(function (err) {
+        if (err) { errores[p.id] = err; return; }
+        respondidos.unshift({ aprobado: decision === 'allow', sesion: p.sesion, texto: p.texto, hora: Date.now() });
+        respondidos = respondidos.slice(0, 3);
+        anunciar((decision === 'allow' ? 'Aprobado: ' : 'Rechazado: ') + p.sesion);
+      }, function () { errores[p.id] = 'Sin conexión con la PC. Probá de nuevo.'; })
+      .then(function () { enviandoId = null; confirmar.id = null; consultar(); });
   }
 
-  function pintarPedido(e) {
-    var p = e.pedidos[0];
-    var caja = $('pedido');
-    $('calma').hidden = !!p;
-    caja.hidden = !p;
-    if (!p) {
-      var ultimaListo = e.sesiones.filter(function (s) { return s.estado === 'done'; })[0];
-      $('calma-s').textContent = ultimaListo ? ultimaListo.nombre + ' terminó hace ' + hace(ahoraPc() - ultimaListo.desde) : 'Ningún permiso pendiente.';
-      return;
+  function tarjetaPedido(e, p, i) {
+    var li = el('li', 'pedido' + (p.destructivo ? ' destructivo' : ''));
+    var cab = el('div', 'p-cab');
+    var ses = e.sesiones.filter(function (s) { return s.id === p.sesionId; })[0];
+    var cuenta = e.cuentas.length > 1 && ses ? '  ·  ' + nombreCuenta(e, ses.cuentaId) : '';
+    cab.appendChild(el('span', 'p-nombre', p.sesion + cuenta));
+    cab.appendChild(el('span', 'p-hace', hace(ahoraPc() - p.desde)));
+    li.appendChild(cab);
+    li.appendChild(el('span', 'p-titulo', (p.titulo || 'Claude pide permiso') + (e.pedidos.length > 1 ? '  ·  ' + (i + 1) + ' de ' + e.pedidos.length : '')));
+    if (p.destructivo) li.appendChild(el('span', 'p-marca', 'Destructivo: ' + p.destructivo));
+    var largo = esLargo(p), abierto = !!expandidos[p.id];
+    li.appendChild(el('pre', 'p-cmd' + (largo && !abierto ? ' corto' : ''), p.texto));
+    if (largo) {
+      var ver = el('button', 'p-ver', abierto ? 'Ver menos' : 'Ver todo (' + p.texto.length + ' caracteres)');
+      ver.type = 'button';
+      ver.setAttribute('aria-expanded', abierto ? 'true' : 'false');
+      ver.addEventListener('click', function () { expandidos[p.id] = !abierto; pintar(); });
+      li.appendChild(ver);
     }
-    caja.textContent = '';
-    var cab = el('div');
-    cab.appendChild(el('div', 'p-nombre', p.sesion + (e.pedidos.length > 1 ? '  ·  1 de ' + e.pedidos.length : '')));
-    cab.appendChild(el('div', 'p-texto', 'Pide permiso: ' + p.texto + ' · hace ' + hace(ahoraPc() - p.desde)));
-    caja.appendChild(cab);
     if (e.aprobar) {
       var botones = el('div', 'p-botones');
       var no = el('button', 'b-rechazar', 'Rechazar');
-      var si = el('button', 'b-aprobar', enviando ? 'Enviando…' : 'Aprobar');
+      var dos = confirmando(p);
+      var si = el('button', p.destructivo ? 'b-aprobar-peligro' : 'b-aprobar', enviandoId === p.id ? 'Enviando…' : dos ? 'Tocá de nuevo para aprobar' : 'Aprobar');
       no.type = si.type = 'button';
-      no.disabled = si.disabled = enviando;
-      no.addEventListener('click', function () { decidir(p.id, 'deny'); });
-      si.addEventListener('click', function () { decidir(p.id, 'allow'); });
+      no.disabled = !!enviandoId;
+      // Lo que no se vio entero no se aprueba: primero «Ver todo».
+      si.disabled = !!enviandoId || (largo && !abierto) || !!p.cortado;
+      no.addEventListener('click', function () { decidir(p, 'deny'); });
+      si.addEventListener('click', function () {
+        if (p.destructivo && !confirmando(p)) {
+          confirmar = { id: p.id, hasta: Date.now() + CONFIRMAR_MS };
+          pintar();
+          setTimeout(pintar, CONFIRMAR_MS + 50);
+          return;
+        }
+        decidir(p, 'allow');
+      });
       botones.appendChild(no);
       botones.appendChild(si);
-      caja.appendChild(botones);
-    } else {
-      caja.appendChild(el('div', 'p-nota', 'Respondelo en la PC. Para hacerlo desde acá, prendé «Aprobar desde el celu» en Sloth.'));
+      li.appendChild(botones);
+      if (p.cortado) li.appendChild(el('span', 'p-nota', 'Es demasiado largo para verlo entero en el celu: para aprobarlo, respondelo en la PC.'));
+      else if (largo && !abierto) li.appendChild(el('span', 'p-nota', 'Para aprobar, mirá el pedido entero con «Ver todo».'));
+      else if (dos) li.appendChild(el('span', 'p-nota', 'Es destructivo: tocá «Aprobar» otra vez en 5 s para confirmarlo.'));
+    } else if (i === 0) {
+      li.appendChild(el('span', 'p-nota', 'Respondelo en la PC. Para hacerlo desde acá, prendé «Aprobar desde el celu» en Sloth.'));
     }
-    if (errorPedido) caja.appendChild(el('div', 'p-error', errorPedido));
+    if (errores[p.id]) li.appendChild(el('span', 'p-error', errores[p.id]));
+    return li;
+  }
+
+  function pintarPedidos(e) {
+    var nuevos = e.pedidos.filter(function (p) { return !vistos[p.id]; });
+    e.pedidos.forEach(function (p) { vistos[p.id] = true; });
+    if (nuevos.length) anunciar(nuevos.length === 1 ? 'Pedido de permiso en ' + nuevos[0].sesion + ': ' + (nuevos[0].titulo || nuevos[0].texto) + (nuevos[0].destructivo ? '. Destructivo.' : '.') : nuevos.length + ' pedidos de permiso nuevos.');
+    // Se rearma solo si cambió algo: rearmar cada 1,5 s le saca el foco al botón que se está por tocar.
+    var firma = JSON.stringify([e.aprobar, e.cuentas.length, enviandoId, confirmar.id && confirmando({ id: confirmar.id }) ? confirmar.id : null, expandidos, errores, e.pedidos.map(function (p) { return [p.id, p.texto, p.destructivo, hace(ahoraPc() - p.desde)]; })]);
+    if (firma !== firmaPedidos) {
+      firmaPedidos = firma;
+      var cont = $('pedidos');
+      cont.textContent = '';
+      e.pedidos.forEach(function (p, i) { cont.appendChild(tarjetaPedido(e, p, i)); });
+    }
+    var lista = $('respondidos');
+    lista.textContent = '';
+    respondidos.filter(function (r) { return Date.now() - r.hora < 15 * 60000; }).forEach(function (r) {
+      var hora = new Date(r.hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+      var li = el('li', r.aprobado ? 'r-si' : 'r-no', (r.aprobado ? '✓ Aprobaste' : '✕ Rechazaste') + ' a las ' + hora + ' · ' + r.sesion + ' · ' + r.texto);
+      lista.appendChild(li);
+    });
+  }
+
+  // «Te necesita» sin pedido de permiso: Claude preguntó algo o espera que sigas. Va arriba, con el mensaje entero.
+  function pintarEsperan(e) {
+    var cont = $('esperan');
+    cont.textContent = '';
+    var conPedido = {};
+    e.pedidos.forEach(function (p) { conPedido[p.sesionId] = true; });
+    var esperan = e.sesiones.filter(function (s) { return s.estado === 'waiting' && !conPedido[s.id]; });
+    var nuevas = esperan.filter(function (s) { return !vistos[s.id + ':' + s.desde]; });
+    esperan.forEach(function (s) { vistos[s.id + ':' + s.desde] = true; });
+    if (nuevas.length) anunciar(nuevas.map(function (s) { return s.nombre + ' te necesita'; }).join('. ') + '.');
+    esperan.forEach(function (s) {
+      var li = el('li');
+      var cab = el('div', 'e-cab');
+      cab.appendChild(el('span', 'e-nombre', s.nombre));
+      cab.appendChild(el('span', 'e-hace', hace(ahoraPc() - s.desde)));
+      li.appendChild(cab);
+      if (e.cuentas.length > 1) li.appendChild(el('span', 'e-cuenta', nombreCuenta(e, s.cuentaId)));
+      li.appendChild(el('span', 'e-msj', s.detalle || 'Claude espera tu respuesta.'));
+      li.appendChild(botonTerminal(e, s) || el('span', 'e-nota', 'Respondé en la PC.'));
+      cont.appendChild(li);
+    });
+    var hay = e.pedidos.length > 0 || esperan.length > 0;
+    $('calma').hidden = hay;
+    if (!hay) {
+      var ultimaListo = e.sesiones.filter(function (s) { return s.estado === 'done'; })[0];
+      $('calma-s').textContent = ultimaListo ? ultimaListo.nombre + ' terminó ' + haceTexto(ahoraPc() - ultimaListo.desde) : 'Ningún permiso ni pregunta pendiente.';
+    }
   }
 
   function pintarLista(e) {
     var lista = $('lista');
     lista.textContent = '';
+    // La de la tarjeta de arriba (el pedido o, si no hay, la primera que espera) va al final: acostado se oculta.
     var conPedido = e.pedidos[0] ? e.pedidos[0].sesionId : null;
-    var nombres = {};
-    e.cuentas.forEach(function (c) { nombres[c.id] = c.nombre; });
+    if (!conPedido) conPedido = (e.sesiones.filter(function (s) { return s.estado === 'waiting'; })[0] || { id: null }).id;
+    var base = deLaCuenta(e);
+    var visibles = filtroEstado ? base.filter(function (s) { return s.estado === filtroEstado; }) : base;
+    var conCuenta = e.cuentas.length > 1 && cuentaElegida === TODAS;
     if (!e.sesiones.length) lista.appendChild(el('li', 'vacio', 'No hay espacios abiertos en la PC.'));
-    // La del pedido va al final: acostado se oculta y no le quita lugar a las otras tres.
-    var orden = e.sesiones.filter(function (s) { return s.id !== conPedido; }).concat(e.sesiones.filter(function (s) { return s.id === conPedido; }));
+    else if (!visibles.length) lista.appendChild(el('li', 'vacio', filtroEstado ? 'Ninguna sesión en «' + FILTROS[filtroEstado] + '»' + (cuentaElegida === TODAS ? '' : ' en esta cuenta') + '.' : 'Esta cuenta no tiene espacios abiertos.'));
+    var orden = visibles.filter(function (s) { return s.id !== conPedido; }).concat(visibles.filter(function (s) { return s.id === conPedido; }));
     orden.forEach(function (s) {
       var st = ESTADOS[s.estado] || ESTADOS.idle;
       var li = el('li', s.id === conPedido ? 'del-pedido' : '');
@@ -474,8 +765,10 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       punto.style.background = st.c;
       var texto = el('div', 's-texto');
       texto.appendChild(el('span', 's-nombre', s.nombre));
-      var cuenta = nombres[s.cuentaId] || '';
-      texto.appendChild(el('span', 's-detalle', cuenta + (s.detalle ? ' · ' + s.detalle : '')));
+      var partes = [];
+      if (conCuenta) partes.push(nombreCuenta(e, s.cuentaId));
+      if (s.detalle) partes.push(s.detalle);
+      if (partes.length) texto.appendChild(el('span', 's-detalle', partes.join(' · ')));
       var lado = el('div', 's-lado');
       var chip = el('span', 's-estado', st.t);
       chip.style.color = st.c;
@@ -485,33 +778,43 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       li.appendChild(punto);
       li.appendChild(texto);
       li.appendChild(lado);
-      var enWifi = e.terminal && !window.slothFetch;
-      var soloWifi = !!window.slothFetch && !!e.terminalEnWifi;
-      if ((enWifi || soloWifi) && s.estado !== 'exited') {
-        var bt = el('button', 's-term');
-        bt.appendChild(el('span', 's-term-ico', '>_'));
-        bt.appendChild(el('span', '', 'Terminal'));
-        bt.type = 'button';
-        if (soloWifi) {
-          bt.disabled = true;
-          bt.setAttribute('aria-label', 'Terminal de ' + s.nombre + ': escaneá el QR del Wi-Fi de casa para abrirla');
-          bt.setAttribute('aria-describedby', 'term-nota');
-        } else {
-          bt.setAttribute('aria-label', 'Abrir la terminal de ' + s.nombre);
-          bt.addEventListener('click', function () { abrirTerminal(s.id, s.nombre); });
-        }
-        li.appendChild(bt);
-      }
+      var bt = botonTerminal(e, s);
+      if (bt) li.appendChild(bt);
       lista.appendChild(li);
     });
-    var n = function (k) { return e.sesiones.filter(function (s) { return s.estado === k; }).length; };
+    var n = function (k) { return base.filter(function (s) { return s.estado === k; }).length; };
     $('n-espera').textContent = n('waiting');
-    $('n-espera').parentNode.classList.toggle('hay', n('waiting') > 0);
+    $('f-waiting').classList.toggle('hay', n('waiting') > 0);
     $('n-listo').textContent = n('done');
     $('n-trabaja').textContent = n('working');
+    for (var k in FILTROS) $('f-' + k).setAttribute('aria-pressed', filtroEstado === k ? 'true' : 'false');
     $('term-nota').hidden = !(window.slothFetch && e.terminalEnWifi);
-    $('resumen').textContent = e.sesiones.length ? e.sesiones.length + (e.sesiones.length === 1 ? ' abierta' : ' abiertas') : '';
+    var abiertas = e.sesiones.length + (e.sesiones.length === 1 ? ' abierta' : ' abiertas');
+    $('resumen').textContent = !e.sesiones.length ? '' : visibles.length === e.sesiones.length ? abiertas : visibles.length + ' de ' + abiertas;
   }
+  // Acostado la lista tiene el alto que sobra: se muestran las filas que entran enteras y el resto se cuenta.
+  function recortarLista() {
+    var lista = $('lista'), mas = $('lista-mas');
+    var filas = lista.children ? Array.prototype.slice.call(lista.children) : [];
+    filas.forEach(function (li) { li.classList.remove('fuera'); });
+    mas.hidden = true;
+    if (!esHorizontal() || !filas.length || !lista.getBoundingClientRect) return;
+    var desbordan = function () {
+      var fondo = lista.getBoundingClientRect().bottom + 0.5;
+      return filas.filter(function (li) { return li.offsetParent !== null && li.getBoundingClientRect().bottom > fondo; });
+    };
+    if (!desbordan().length) return;
+    mas.hidden = false;
+    mas.textContent = '+';
+    desbordan().forEach(function (li) { li.classList.add('fuera'); });
+    var n = filas.filter(function (li) { return li.classList.contains('fuera'); }).length;
+    mas.textContent = '+' + n + ' más · parado se ven todas';
+  }
+  window.addEventListener('resize', function () { recortarLista(); deslizar(); });
+
+  Object.keys(FILTROS).forEach(function (k) {
+    $('f-' + k).addEventListener('click', function () { filtroEstado = filtroEstado === k ? null : k; pintar(); });
+  });
 
   function pintarConexion() {
     var c = $('conexion');
@@ -522,33 +825,39 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     if (avisoHora) t.textContent = HORA_CORRIDA;
     else if (!ultimoOk) t.textContent = 'Buscando la PC…';
     else if (lejos < 6000) t.textContent = 'PC conectada';
-    else t.textContent = 'Sin conexión con la PC · hace ' + hace(lejos);
+    else t.textContent = 'Sin conexión con la PC · ' + haceTexto(lejos);
   }
 
   function pintar() {
     pintarConexion();
     if (!ultimo) return;
     pintarCuentas(ultimo);
-    pintarPedido(ultimo);
+    pintarLimites(ultimo);
+    pintarPedidos(ultimo);
+    pintarEsperan(ultimo);
     pintarLista(ultimo);
+    recortarLista();
   }
 
-  function sinToken(texto) {
+  var perdioEscrito = false;
+  function sinToken(titulo, texto) {
     $('app').hidden = true;
     $('sin-token').hidden = false;
-    if (texto) $('sin-token-texto').textContent = texto;
+    if (titulo) $('sin-token-titulo').textContent = titulo;
+    if (texto) $('sin-token-texto').textContent = texto + (perdioEscrito ? ' Lo que escribiste en la terminal y no había llegado a la PC se perdió.' : '');
   }
 
   function consultar() {
     clearTimeout(timer);
-    if (!token) return sinToken(enlaceMalo ? 'El QR no se leyó bien. Escaneá el QR de nuevo en Sloth.' : viejo ? 'Hay que volver a emparejar este celu: escaneá el QR de nuevo en Sloth.' : undefined);
+    if (qr) return emparejar();
+    if (!token) return enlaceMalo ? sinToken('No se pudo conectar', 'El QR no se leyó bien: escanealo de nuevo, de cerca y con buena luz.') : viejo ? sinToken('Hay que volver a conectar este celu', 'Escaneá el QR de nuevo en Sloth.') : sinToken();
     pedirApi('/api/estado')
       .then(function (r) {
         if (r.status === 401) {
           guardar('sloth-token', null);
           guardar('sloth-clave', null);
           token = null;
-          sinToken('Este celu ya no está autorizado (se regeneró el código en Sloth). Escaneá el QR de nuevo.');
+          sinToken('Este celu ya no tiene acceso', 'Lo sacaron desde la PC, se regeneró el código o pasó un mes sin usarse. Escaneá el QR de Sloth para pedir entrar de nuevo.');
           return null;
         }
         if (r.status === 409) {
@@ -569,6 +878,72 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
         pintar();
       }, function () { pintarConexion(); })
       .then(function () { if (token && !document.hidden) timer = setTimeout(consultar, CADA_MS); });
+  }
+
+  var PAR_CADA_MS = 2000, parPidio = false;
+  // 32 bytes al azar en base64url (43 letras), como las que arma la PC.
+  var B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  function claveNueva() {
+    var b = new Uint8Array(32), t = '';
+    window.crypto.getRandomValues(b);
+    for (var i = 0; i < 32; i += 3) {
+      var n = (b[i] << 16) | ((b[i + 1] || 0) << 8) | (b[i + 2] || 0);
+      t += B64.charAt((n >> 18) & 63) + B64.charAt((n >> 12) & 63) + (i + 1 < 32 ? B64.charAt((n >> 6) & 63) : '') + (i + 2 < 32 ? B64.charAt(n & 63) : '');
+    }
+    return t;
+  }
+  function finEmparejar() {
+    guardar('sloth-qr', null);
+    guardar('sloth-par', null);
+    qr = null;
+    parPidio = false;
+    $('emparejando').hidden = true;
+  }
+  function sinEntrar(titulo, texto) {
+    finEmparejar();
+    token = leer('sloth-clave');
+    if (token) { consultar(); return; }
+    sinToken(titulo, texto);
+  }
+  function entro(clave) {
+    finEmparejar();
+    guardar('sloth-clave', clave);
+    token = clave;
+    $('sin-token').hidden = true;
+    $('app').hidden = false;
+    consultar();
+  }
+  // Pide entrar con la clave del QR y después pregunta cada 2 s cómo va. Un celu que ya tenía clave la reusa: no suma otro a la lista.
+  function emparejar() {
+    clearTimeout(timer);
+    var propia = leer('sloth-par') || leer('sloth-clave') || claveNueva();
+    guardar('sloth-par', propia);
+    token = qr;
+    $('app').hidden = true;
+    $('sin-token').hidden = true;
+    $('emparejando').hidden = false;
+    pedirApi('/api/emparejar', parPidio ? { clave: propia, consultar: true } : { clave: propia })
+      .then(function (r) {
+        if (r.status === 401) { guardar('sloth-par', null); sinEntrar('Este QR ya no sirve', 'En Sloth se regeneró el código. Escaneá el QR nuevo.'); return null; }
+        if (!r.json) throw new Error('http ' + r.status);
+        return r.json().then(function (j) {
+          if (r.ok && j && j.ya === true) { entro(qr); return null; }
+          if (r.status === 409 && j && j.error === 'reloj') { $('par-estado').textContent = HORA_CORRIDA; return true; }
+          if (!r.ok) { guardar('sloth-par', null); sinEntrar('No se pudo pedir entrar', (j && j.error) || 'La PC no aceptó el pedido.'); return null; }
+          if (j.codigo) $('par-codigo').textContent = j.codigo;
+          parPidio = true;
+          if (j.estado === 'listo') { entro(propia); return null; }
+          if (j.estado === 'rechazado') { guardar('sloth-par', null); sinEntrar('No te dejaron entrar', 'En la PC tocaron «No». Si fue un error, escaneá el QR de nuevo.'); return null; }
+          if (j.estado === 'vencido') { guardar('sloth-par', null); sinEntrar('Se venció el pedido', 'Pasaron 5 minutos sin respuesta en la PC. Escaneá el QR de nuevo.'); return null; }
+          $('par-estado').textContent = 'Esperando la respuesta de la PC…';
+          return true;
+        });
+      })
+      .then(null, function () {
+        $('par-estado').textContent = 'Sin conexión con la PC. Reintentando…';
+        return true;
+      })
+      .then(function (seguir) { if (seguir && qr && !document.hidden) timer = setTimeout(emparejar, PAR_CADA_MS); });
   }
 
   // Sin la barra del navegador. Una página http no se puede instalar como app en Android, pero sí
@@ -598,7 +973,12 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   // Terminal, con dos lazos. «Mirar» deja un pedido abierto en la PC (hasta 20 s) que contesta apenas hay salida
   // nueva; «escribir» manda lo que se teclea en pedidos aparte, de a uno y en orden, y la PC contesta ya.
   // Todo sellado por el mismo canal que el estado. xterm se carga recién al abrirla (pesa ~500 kB).
-  var TECLAS = { esc: '\\x1b', tab: '\\t', arriba: '\\x1b[A', abajo: '\\x1b[B', der: '\\x1b[C', izq: '\\x1b[D', ctrlc: '\\x03', enter: '\\r' };
+  var TECLAS = {
+    esc: '\\x1b', escesc: ['\\x1b', '\\x1b'], tab: '\\t', shifttab: '\\x1b[Z', arriba: '\\x1b[A', abajo: '\\x1b[B', der: '\\x1b[C', izq: '\\x1b[D',
+    ctrlc: '\\x03', ctrld: '\\x04', enter: '\\r', barra: '/', inicio: '\\x1b[H', fin: '\\x1b[F', repag: '\\x1b[5~', avpag: '\\x1b[6~'
+  };
+  // Solo en memoria: lo que se le dice a Claude puede tener datos que no conviene dejar guardados en el celu.
+  var TERM_HIST_MAX = 20, termHist = [], termHistI = -1;
   var TERM_MAX = 1500, TERM_ESPERA = 20000, TERM_MARGEN = 8000, TERM_ESCRIBIR_MAX = 10000;
   var term = null, termId = null, termDesde = -1, termCola = [], termTam = null;
   var termCerrada = false, xtermCargando = null, conHistoria = false;
@@ -708,7 +1088,10 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     el.style.top = (vv ? vv.offsetTop : 0) + 'px';
     el.style.height = (vv ? vv.height : window.innerHeight) + 'px';
     el.style.bottom = 'auto';
-    return vv ? vv.height : window.innerHeight;
+    var alto = vv ? vv.height : window.innerHeight;
+    // Con poca altura (teclado abierto, celu acostado) no entran el cuadro y la botonera: queda el que se está usando.
+    if (el.classList) el.classList.toggle('bajo', alto < 420);
+    return alto;
   }
 
   function alCambiarVentana() {
@@ -770,11 +1153,65 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       if (junta) { ult.t += texto.slice(ini, i); ult.p = p; }
       else termCola.push({ t: texto.slice(ini, i), p: p, aparte: !!aparte });
     }
+    pintarCola();
     enviarEscritura();
   }
 
   var retardoTerm = function (fallas) { return fallas ? Math.min(4000, 250 * Math.pow(2, fallas - 1)) : 0; };
-  var botonesTerm = function () { for (var i = 0; i < botonesTecla.length; i++) botonesTecla[i].disabled = termCerrada || termParada; };
+  var botonesTerm = function () {
+    for (var i = 0; i < botonesTecla.length; i++) botonesTecla[i].disabled = termCerrada || termParada;
+    pintarCola();
+  };
+
+  // Lo que no llega se ve y se puede tirar: si no, con la red caída cada toque se acumula y sale todo junto al volver.
+  var aVista = function (t) {
+    return t.replace(/\\r/g, '⏎').replace(/\\x1b\\[[\\d;]*[A-Za-z~]|\\x1b/g, '⎋').replace(/[\\x00-\\x1f\\x7f]/g, '');
+  };
+  function pintarCola() {
+    var hay = termCola.length > 0 && termEscFallas > 0 && !termCerrada && !termParada;
+    $('term-cola').hidden = !hay;
+    if (!hay) return;
+    var t = '';
+    for (var i = 0; i < termCola.length && t.length < 60; i++) t += aVista(termCola[i].t);
+    if (t.length > 60) t = t.slice(0, 59) + '…';
+    $('term-cola-texto').textContent = 'Sin llegar a la PC: ' + (t || 'teclas');
+  }
+
+  function descartarCola() {
+    var viajaba = !!(termCola[0] && termCola[0].n);
+    soltarEscribir();
+    termCola = [];
+    termEscFallas = 0;
+    termNota = viajaba ? 'Descartado. Lo primero ya había salido: puede que haya llegado a la PC.' : '';
+    avisoTerm(termNota);
+    pintarCola();
+  }
+
+  function limpiarTexto(t) {
+    return t.replace(/[\\x00-\\x1f\\x7f]+/g, ' ');
+  }
+
+  // El cuadro propio deja usar el dictado y el autocorrector del celu, que en la terminal no andan. El Enter va
+  // en otro pedido, igual que al tipear en la terminal, para que Claude no lo tome como parte de lo pegado.
+  function mandarTexto() {
+    var campo = $('term-texto');
+    var t = limpiarTexto(campo.value || '');
+    if (termCerrada || termParada || !termId || !t.trim()) return;
+    encolar(t, true);
+    encolar(TECLAS.enter, true);
+    if (termHist[termHist.length - 1] !== t) termHist.push(t);
+    if (termHist.length > TERM_HIST_MAX) termHist.shift();
+    termHistI = -1;
+    campo.value = '';
+    $('term-hist').disabled = false;
+  }
+
+  // Cada toque trae uno más viejo; después del primero vuelve el cuadro vacío.
+  function historialAnterior() {
+    if (!termHist.length) return;
+    termHistI = termHistI < 0 ? termHist.length - 1 : termHistI - 1;
+    $('term-texto').value = termHistI < 0 ? '' : termHist[termHistI];
+  }
 
   // Lo que llegue de un pedido de mirar anterior a esto ya no vale: se compara termGen.
   function soltarMirar() {
@@ -863,7 +1300,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     pedirApi('/api/terminal', { id: id, desde: termDesde, espera: espera, sesion: TERM_SESION }, ctl ? ctl.signal : null)
       .then(function (r) {
         if (gen !== termGen) return null;
-        if (r.status === 401) { cerrarTerminal(false); consultar(); return null; }
+        if (r.status === 401) { perdioEscrito = termCola.length > 0 || termEscribiendo; cerrarTerminal(false); consultar(); return null; }
         if (!r.json) throw new Error('http ' + r.status);
         return r.json().then(function (j) { return { r: r, j: j }; });
       })
@@ -913,6 +1350,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
 
   function quitarEscrito(item) {
     if (termCola[0] === item) termCola.shift();
+    pintarCola();
   }
 
   function programarEscritura() {
@@ -923,6 +1361,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
   function falloEscribir(tipo) {
     termEscFallas++;
     if (termEscFallas >= 2) avisoTerm(tipo === 'ocupada' ? 'La PC está ocupada. Reintentando…' : 'Sin conexión con la PC. Reintentando…');
+    pintarCola();
   }
 
   // Un pedido por vez y en orden. Mientras no haya respuesta el item sigue en la cola con su número: si la
@@ -958,7 +1397,7 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     pedirApi('/api/terminal', pedido, ctl ? ctl.signal : null)
       .then(function (r) {
         if (tok !== termEscTok) return null;
-        if (r.status === 401) { cerrarTerminal(false); consultar(); return null; }
+        if (r.status === 401) { perdioEscrito = true; cerrarTerminal(false); consultar(); return null; }
         if (!r.json) throw new Error('http ' + r.status);
         return r.json().then(function (j) { return { r: r, j: j }; });
       })
@@ -1012,6 +1451,8 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
     termTipo = '';
     termIguales = 0;
     termNota = '';
+    termHistI = -1;
+    $('term-texto').value = '';
     $('term-nombre').textContent = nombre;
     $('term').hidden = false;
     botonesTerm();
@@ -1082,9 +1523,27 @@ export const PAGINA_JS = SELLO_JS + '\n' + `(function () {
       botonesTecla.push(b);
       // Con el dedo sobre una tecla el foco no se mueve: si se movía, el teclado se cerraba en cada toque.
       b.addEventListener('mousedown', function (ev) { ev.preventDefault(); });
-      b.addEventListener('click', function () { encolar(TECLAS[b.getAttribute('data-tecla')], true); });
+      b.addEventListener('click', function () {
+        var v = TECLAS[b.getAttribute('data-tecla')];
+        var lista = typeof v === 'string' ? [v] : v || [];
+        for (var i = 0; i < lista.length; i++) encolar(lista[i], true);
+      });
     });
   }
+  botonesTecla.push($('term-texto'), $('term-mandar'), $('term-a-texto'));
+  $('term-escribir').addEventListener('submit', function (ev) { ev.preventDefault(); mandarTexto(); });
+  // Mandar y el historial no se llevan el foco: el teclado del celu queda abierto para seguir escribiendo.
+  $('term-mandar').addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+  $('term-hist').addEventListener('mousedown', function (ev) { ev.preventDefault(); });
+  $('term-hist').addEventListener('click', historialAnterior);
+  $('term-descartar').addEventListener('click', descartarCola);
+  // Con poca altura el cuadro se esconde detrás de este botón; el foco sale del mismo toque, o iOS no abre el teclado.
+  $('term-a-texto').addEventListener('click', function () {
+    if ($('term').classList) $('term').classList.add('escribiendo');
+    $('term-texto').focus();
+  });
+  $('term-texto').addEventListener('focus', function () { if ($('term').classList) $('term').classList.add('escribiendo'); });
+  $('term-texto').addEventListener('blur', function () { if ($('term').classList) $('term').classList.remove('escribiendo'); });
 
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { clearTimeout(timer); soltarMirar(); clearTimeout(termEscTimer); termEscTimer = null; }
@@ -1107,6 +1566,10 @@ export function manifiesto(): string {
     orientation: 'any',
     background_color: '#08090B',
     theme_color: '#08090B',
-    icons: [{ src: '/icono.png', sizes: '256x256', type: 'image/png', purpose: 'any' }]
+    icons: [
+      { src: '/icono.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icono-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/icono-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+    ]
   })
 }

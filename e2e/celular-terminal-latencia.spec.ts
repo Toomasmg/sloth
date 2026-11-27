@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { chromium, devices, webkit, type BrowserContext, type ElectronApplication, type Page } from '@playwright/test'
 import { test, expect } from './sloth'
 import { shellReady } from './terminal'
+import { claveQr, emparejar } from './celular-celu'
 import { elegirIp } from '../src/main/features/celular-core'
 
 /**
@@ -62,8 +63,6 @@ function guardar(clave: string, valor: unknown): void {
 
 async function prepararPC(app: ElectronApplication, page: Page): Promise<string> {
   await shellReady(page)
-  const userData = await app.evaluate(({ app: a }) => a.getPath('userData'))
-  const clave = (JSON.parse(readFileSync(join(userData, 'perfiles', 'principal', 'features', 'celular.json'), 'utf8')) as { clave: string }).clave
   await page.keyboard.press('Control+k')
   await page.getByRole('combobox').first().fill('Ver Sloth en el celular')
   await page.keyboard.press('Enter')
@@ -73,6 +72,7 @@ async function prepararPC(app: ElectronApplication, page: Page): Promise<string>
   await panel.getByRole('switch', { name: 'Ver Sloth en el celu' }).click()
   await expect(panel.getByRole('img', { name: /Código QR/ })).toBeVisible()
   await panel.getByRole('switch', { name: 'Abrir las terminales desde el celu' }).click()
+  const clave = await emparejar(panel, `http://${ip}:${PUERTO}`, await claveQr(app))
   return `http://${ip}:${PUERTO}/#k=${clave}`
 }
 

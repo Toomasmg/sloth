@@ -1,5 +1,6 @@
 import { derivarClaves } from './celular-sello'
 import type { AccountUsage, AgentStatus } from '../../shared/types'
+import { destructivoDe, kindOf, labelOf, titleOf } from '../../shared/permissions-core'
 import type { CuentaCelular, EstadoCelular, EstadoSesion, PedidoCelular, SesionCelular, VentanaLimite } from '../../shared/celular'
 
 /** Lo que importa de una interfaz de red (la forma de os.networkInterfaces()). */
@@ -31,6 +32,29 @@ export function elegirIp(redes: Record<string, InterfazRed[] | undefined>): stri
     }
   }
   return (candidatas.find((c) => WIFI.test(c.nombre)) ?? candidatas[0])?.ip ?? null
+}
+
+/**
+ * La IP de Tailscale de la PC (100.64.0.0/10), o null si Tailscale no está conectado. Solo de la interfaz de Tailscale:
+ * ese rango también lo usan los datos móviles y algunos hoteles (CGNAT), y abrir ahí sería abrirle la página a esa red.
+ */
+export function ipTailscale(redes: Record<string, InterfazRed[] | undefined>): string | null {
+  for (const [nombre, lista] of Object.entries(redes)) {
+    if (!/tailscale/i.test(nombre)) continue
+    for (const r of lista ?? []) {
+      const v4 = r.family === 'IPv4' || r.family === 4
+      const [a, b] = r.address.split('.').map(Number)
+      if (v4 && !r.internal && a === 100 && b >= 64 && b <= 127) return r.address
+    }
+  }
+  return null
+}
+
+/** La dirección que da `tailscale serve` (https://<pc>.<tailnet>.ts.net), sin barra final; null si no es una de esas. */
+export function httpsTailscale(v: unknown): string | null {
+  if (typeof v !== 'string' || v.length > 200) return null
+  const m = /^https:\/\/((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+ts\.net)\/?$/i.exec(v.trim())
+  return m ? `https://${m[1].toLowerCase()}` : null
 }
 
 /** La clave del QR: 32 bytes en base64url canónico (43 caracteres). */
@@ -120,7 +144,21 @@ export interface Entrada {
   agentes: ReadonlyMap<string, AgentStatus> | Record<string, AgentStatus>
   uso: Record<string, AccountUsage>
   limites: Record<string, ReturnType<typeof leerLimites>>
-  pedidos: { id: string; ws: string; texto: string; at: number; expiresAt: number }[]
+  pedidos: { id: string; ws: string; tool: string; input: Record<string, unknown>; at: number; expiresAt: number }[]
+}
+
+/** Lo que se aprueba desde el celu se tiene que ver entero: el corte es solo un tope de tamaño. */
+export const MAX_PEDIDO = 4000
+
+// Controles (salvo salto y tabulación), bidi y ancho cero: harían que el celu muestre algo distinto de lo que corre.
+const INVISIBLES = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\p{Cf}\p{Zl}\p{Zp}]/gu
+
+/** Qué pide un permiso, como lo ve el celu. */
+export function pedidoParaCelu(tool: string, input: Record<string, unknown>): { texto: string; titulo: string; destructivo: string | null; cortado?: true } {
+  const kind = kindOf(tool)
+  const entero = labelOf(kind, tool, input).replace(INVISIBLES, '\uFFFD')
+  // Lo que no entra no se ve entero, y lo que no se vio entero no se aprueba desde el celu.
+  return { texto: corto(entero, MAX_PEDIDO), titulo: titleOf(kind, tool, input), destructivo: destructivoDe(kind, input), ...(entero.length > MAX_PEDIDO && { cortado: true as const }) }
 }
 
 const agenteDe = (a: Entrada['agentes'], id: string): AgentStatus | undefined =>
@@ -157,7 +195,7 @@ export function armarEstado(e: Entrada): EstadoCelular {
   const pedidos: PedidoCelular[] = e.pedidos
     .filter((p) => nombres.has(p.ws))
     .sort((a, b) => a.at - b.at)
-    .map((p) => ({ id: p.id, sesionId: p.ws, sesion: corto(nombres.get(p.ws) as string, 60), texto: corto(p.texto), desde: p.at, vence: p.expiresAt }))
+    .map((p) => ({ id: p.id, sesionId: p.ws, sesion: corto(nombres.get(p.ws) as string, 60), ...pedidoParaCelu(p.tool, p.input), desde: p.at, vence: p.expiresAt }))
   return { ahora: e.ahora, aprobar: e.aprobar, terminal: e.terminal, cuentas, sesiones, pedidos }
 }
 
@@ -178,6 +216,42 @@ export function textoAviso(tipo: TipoAviso, espacio: string, detalle?: string, a
   if (tipo === 'termino') return { titulo: `${nombre} terminó`, cuerpo: `${agente} terminó. Revisá los cambios antes de seguir.` }
   if (tipo === 'permiso') return { titulo: `${nombre} pide permiso`, cuerpo: corto((detalle ?? `${agente} necesita tu permiso.`).replace(/[\r\n]+/g, ' ')) }
   return { titulo: `${nombre} te necesita`, cuerpo: corto((detalle || `${agente} necesita tu atención.`).replace(/[\r\n]+/g, ' ')) }
+}
+
+const PRIVADO: Record<TipoAviso, string> = { termino: 'Una sesión terminó.', teNecesita: 'Una sesión te necesita.', permiso: 'Una sesión pide permiso.' }
+
+/** «Sin nombres»: el servidor de ntfy no se entera de cómo se llaman tus espacios ni de qué dijo Claude. */
+export const textoAvisoPrivado = (tipo: TipoAviso): { titulo: string; cuerpo: string } => ({ titulo: 'Sloth', cuerpo: PRIVADO[tipo] })
+
+/**
+ * El JSON que se publica en ntfy. Con `abrir`, tocar el aviso (o «Abrir Sloth») abre la página del celu: la
+ * dirección va sin la clave, que el celu ya tiene guardada desde que escaneó el QR.
+ */
+export function cuerpoNtfy(tema: string, tipo: TipoAviso, texto: { titulo: string; cuerpo: string }, abrir: string | null): Record<string, unknown> {
+  return {
+    topic: tema,
+    title: texto.titulo,
+    message: texto.cuerpo,
+    priority: tipo === 'termino' ? 3 : 4,
+    tags: [tipo === 'termino' ? 'white_check_mark' : 'warning'],
+    ...(abrir && { click: abrir, actions: [{ action: 'view', label: 'Abrir Sloth', url: abrir, clear: true }] })
+  }
+}
+
+/**
+ * A dónde lleva tocar el aviso, sin clave nunca. Primero lo que anda también fuera de casa (la dirección https de
+ * Tailscale, la página remota); el Wi-Fi solo sirve en casa. Con avisos privados no va nada que diga cómo se llama
+ * la PC ni su IP: solo la página remota, que es pública.
+ */
+export function enlaceAviso(o: { wifi: { ip: string; puerto: number } | null; remoto: string | null; https?: string | null; privado?: boolean }): string | null {
+  if (o.https && !o.privado) return `${o.https}/`
+  if (o.remoto) {
+    const u = new URL(o.remoto)
+    u.hash = ''
+    u.search = ''
+    return u.toString()
+  }
+  return o.wifi && !o.privado ? `http://${o.wifi.ip}:${o.wifi.puerto}/` : null
 }
 
 /**

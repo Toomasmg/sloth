@@ -32,7 +32,20 @@ test('Celular: la terminal del espacio se abre desde el celu, se escribe y vuelv
     void w.loadURL(url)
   }, `http://${ip}:47389/#k=${clave}`)
   const celu = await ventana
+  // El QR solo deja pedir entrar: el celu muestra un código y la PC, el mismo, hasta que alguien lo deja entrar.
+  await expect(celu.getByRole('heading', { name: 'Confirmá en la PC' })).toBeVisible()
+  const codigo = (await celu.locator('#par-codigo').textContent()) ?? ''
+  expect(codigo).toMatch(/^\d{4}$/)
+  await expect(celu.getByText('web', { exact: true })).toBeHidden()
+  const pedido = panel.getByRole('group', { name: /Pedido para entrar/ })
+  await expect(pedido).toContainText(codigo)
+  await pedido.getByRole('button', { name: 'Dejar entrar' }).click()
   await expect(celu.getByText('web', { exact: true })).toBeVisible()
+  await expect(panel.getByRole('list', { name: 'Celus con acceso' }).getByRole('listitem')).toHaveCount(1)
+  // Con la clave del QR sola no se ve nada: la página ya usa la suya y el QR quedó solo para pedir entrar.
+  const qr = (JSON.parse(readFileSync(join(userData, 'perfiles', 'principal', 'features', 'celular.json'), 'utf8')) as { clave: string; celus: { clave: string }[] })
+  expect(qr.celus).toHaveLength(1)
+  expect(qr.celus[0].clave).not.toBe(clave)
   // Apagada en la PC, el celu no ofrece la terminal.
   await expect(celu.getByRole('button', { name: 'Abrir la terminal de web' })).toHaveCount(0)
 

@@ -1,9 +1,8 @@
-import { readFileSync } from 'node:fs'
 import { networkInterfaces } from 'node:os'
-import { join } from 'node:path'
 import { chromium, devices, webkit, type BrowserContext, type Page } from '@playwright/test'
 import { test, expect } from './sloth'
 import { shellReady } from './terminal'
+import { claveQr, emparejar } from './celular-celu'
 import { elegirIp } from '../src/main/features/celular-core'
 
 /**
@@ -64,8 +63,6 @@ test('Celular movil: la terminal anda en un Galaxy y un iPhone simulados, con sa
   test.skip(!ip, 'Esta PC no tiene una red privada: no hay dónde abrir el servidor.')
   test.setTimeout(300_000)
   await shellReady(page)
-  const userData = await app.evaluate(({ app: a }) => a.getPath('userData'))
-  const clave = (JSON.parse(readFileSync(join(userData, 'perfiles', 'principal', 'features', 'celular.json'), 'utf8')) as { clave: string }).clave
   await page.keyboard.press('Control+k')
   await page.getByRole('combobox').first().fill('Ver Sloth en el celular')
   await page.keyboard.press('Enter')
@@ -74,6 +71,7 @@ test('Celular movil: la terminal anda en un Galaxy y un iPhone simulados, con sa
   await panel.getByRole('button', { name: 'Guardar' }).first().click()
   await panel.getByRole('switch', { name: 'Ver Sloth en el celu' }).click()
   await expect(panel.getByRole('img', { name: /Código QR/ })).toBeVisible()
+  const clave = await emparejar(panel, `http://${ip}:47391`, await claveQr(app))
   const url = `http://${ip}:47391/#k=${clave}`
 
   // Sin la terminal prendida no hay botón; al prenderla aparece sola.
@@ -120,7 +118,8 @@ test('Celular movil: la terminal anda en un Galaxy y un iPhone simulados, con sa
       await expect.poll(veces).toBe(2)
       await escribir('Start-Sleep 60')
       // Un Ctrl C que llega antes de que la shell arranque el comando se pierde: se repite hasta que aparece el prompt de nuevo.
-      const prompts = async (): Promise<number> => (((await pantalla.textContent()) ?? '').match(/❯/g) ?? []).length
+      // El prompt depende del perfil de PowerShell de la PC: «❯» con uno armado, «PS C:\…>» sin perfil.
+      const prompts = async (): Promise<number> => (((await pantalla.textContent()) ?? '').match(/❯|PS [^>\n]*>/g) ?? []).length
       const conSleep = await prompts()
       await expect
         .poll(
@@ -133,7 +132,14 @@ test('Celular movil: la terminal anda en un Galaxy y un iPhone simulados, con sa
         .toBe(true)
       await escribir("Write-Output ('tras-' + 'cc')")
       await expect(pantalla).toContainText('tras-cc', { timeout: 10_000 })
-      for (const tecla of ['Tab', 'Esc', 'Flecha izquierda', 'Flecha derecha', 'Flecha abajo']) await term.getByRole('button', { name: tecla }).click()
+      for (const tecla of ['Tab', 'Esc', 'Flecha izquierda', 'Flecha derecha', 'Flecha abajo']) await term.getByRole('button', { name: tecla, exact: true }).click()
+
+      // El cuadro propio (el del dictado y el autocorrector) manda el texto y el Enter.
+      const cuadro = term.getByRole('textbox', { name: 'Mensaje para la terminal' })
+      await cuadro.fill("Write-Output ('desde-' + 'cuadro')")
+      await term.getByRole('button', { name: 'Mandar' }).click()
+      await expect(pantalla).toContainText('desde-cuadro', { timeout: 10_000 })
+      await expect(cuadro).toHaveValue('')
 
       // Salida grande, como la de una sesión de Claude Code: un color distinto por letra, miles de ESC.
       await escribir("$e=[char]27; 1..2000 | % { -join (1..20 | % { \"$e[3$($_ % 7 + 1)mx\" }) }; Write-Output ('fin-' + 'grande')")

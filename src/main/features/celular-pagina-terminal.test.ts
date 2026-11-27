@@ -136,7 +136,7 @@ async function abrir(responder: Responder, opciones: Opciones = {}): Promise<Pag
   let semilla = 0
   const timers = new Map<number, { f: () => void; en: number }>()
   const guardado = new Map<string, string>(Object.entries(opciones.guardado ?? {}))
-  const teclas = ['esc', 'arriba', 'enter'].map((t) => {
+  const teclas = ['esc', 'arriba', 'enter', 'escesc'].map((t) => {
     const n = new Nodo()
     n.atributos.set('data-tecla', t)
     return n
@@ -204,6 +204,8 @@ async function abrir(responder: Responder, opciones: Opciones = {}): Promise<Pag
       const ab = abrirPedido(claves, url, init.body ?? '')
       if (!ab) return Promise.resolve({ status: 401, ok: false, text: async () => '' })
       if (url === '/api/estado') return Promise.resolve({ status: 200, ok: true, text: async () => sellarRespuesta(claves, ab.iv, JSON.stringify(estado)) })
+      // La clave del enlace ya es la de un celu con acceso: la PC contesta que ya está y la página la usa tal cual.
+      if (url === '/api/emparejar') return Promise.resolve({ status: 200, ok: true, text: async () => sellarRespuesta(claves, ab.iv, JSON.stringify({ ya: true })) })
       const b = (JSON.parse(ab.json) as { b: Cuerpo }).b
       const reg: Pedido = { b, largo: (init.body ?? '').length, en: reloj, abortado: false, conSenal: !!init.signal }
       pedidos.push(reg)
@@ -716,4 +718,55 @@ test('la clave del sello se deriva una vez, no en cada pedido', async () => {
   await p.esperar(() => p.escritos.length >= 2)
   await p.avanzar(5000)
   assert.equal(llamadas, 0)
+})
+
+const toque = { preventDefault: (): void => undefined }
+
+test('el cuadro de texto manda el mensaje y después el Enter, aparte; sin controles y con historial en memoria', async () => {
+  const p = await abrir(reposo)
+  const campo = p.nodo('term-texto')
+  campo.value = 'arreglá el test\x07\nya'
+  p.nodo('term-escribir').escuchas.get('submit')?.(toque)
+  await p.esperar(() => p.escritos.length >= 2)
+  assert.deepEqual(p.escritos.map((x) => x.b.escribir), ['arreglá el test ya', '\r'], 'un control pegado no llega a la terminal')
+  assert.equal(campo.value, '')
+  campo.value = '   '
+  p.nodo('term-escribir').escuchas.get('submit')?.(toque)
+  await p.avanzar(500)
+  assert.equal(p.escritos.length, 2, 'un cuadro vacío no manda un Enter suelto')
+  p.nodo('term-hist').escuchas.get('click')?.(toque)
+  assert.equal(campo.value, 'arreglá el test ya')
+  p.nodo('term-hist').escuchas.get('click')?.(toque)
+  assert.equal(campo.value, '', 'después del más viejo vuelve el cuadro vacío')
+  assert.equal([...p.guardado.values()].some((v) => v.includes('arreglá')), false, 'el historial no se guarda en el celu')
+})
+
+test('Doble Esc manda dos Esc, cada uno en su pedido', async () => {
+  const p = await abrir(reposo)
+  p.teclas[3].escuchas.get('click')?.(toque)
+  await p.esperar(() => p.escritos.length >= 2)
+  assert.deepEqual(p.escritos.map((x) => x.b.escribir), ['\x1b', '\x1b'])
+})
+
+test('lo que no llega a la PC se ve en la cola y se puede descartar: no sale todo junto al volver la red', async () => {
+  let red = false
+  const p = await abrir((b) => (!b.soloEscribir ? 'colgar' : red ? ok(SALIDA) : 'red'))
+  assert.equal(p.nodo('term-cola').hidden, true)
+  p.teclear('ls')
+  await p.esperar(() => p.escritos.length >= 1)
+  await p.esperar()
+  p.teclear('\r')
+  assert.equal(p.nodo('term-cola').hidden, false)
+  assert.match(p.nodo('term-cola-texto').textContent, /ls⏎/)
+  p.nodo('term-descartar').escuchas.get('click')?.(toque)
+  assert.equal(p.nodo('term-cola').hidden, true)
+  assert.match(p.aviso(), /puede que haya llegado/)
+  red = true
+  const antes = p.escritos.length
+  await p.avanzar(10_000)
+  assert.equal(p.escritos.length, antes, 'lo descartado no se reenvía')
+  p.teclear('pwd')
+  await p.esperar(() => p.escritos.length > antes)
+  assert.equal(p.escritos.at(-1)?.b.escribir, 'pwd')
+  assert.ok((p.escritos.at(-1)?.b.n ?? 0) > (p.escritos[0].b.n ?? 0), 'el número sigue creciendo: la PC no lo toma por repetido')
 })
