@@ -9,6 +9,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.8.3',
+    date: '2026-11-27',
+    title: 'Scroll suave y deslizar sin quedar a medias',
+    items: [
+      'El scroll de la terminal se desliza a 60 cuadros, con el touchpad y con la rueda, en lugar de avanzar de a una línea.',
+      'Deslizar con dos dedos entre pestañas ya no queda «casi cambiando»: si soltás cerca del final cambia, y si no, el panel vuelve a su lugar.'
+    ]
+  },
+  {
     version: '0.8.2',
     date: '2026-11-27',
     title: 'Scroll del touchpad sin saltos',
