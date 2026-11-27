@@ -6,12 +6,35 @@ import type { ErrorDictado, TipoErrorDictado } from '../shared/dictado'
  * se baja la primera vez que se dicta, a userData/whisper, y se verifica con SHA-256.
  */
 
-export const WHISPER_MODEL = 'ggml-small-q5_1.bin'
-export const MODELO_URL = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin'
-/** Es el mismo hash que `X-Linked-ETag` de HuggingFace y el del archivo que traía el instalador. */
-export const MODELO_SHA256 = 'ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb'
-/** Tamaño real del archivo; solo sirve para el progreso si la respuesta no trae content-length. */
-export const MODELO_BYTES = 190_085_487
+export interface ModeloWhisper {
+  archivo: string
+  url: string
+  /** Es el mismo hash que `X-Linked-ETag` de HuggingFace. */
+  sha256: string
+  /** Tamaño real del archivo: para el progreso si la respuesta no trae content-length y para el tope. */
+  bytes: number
+}
+
+const HF = 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/'
+
+/** El de siempre (también lo traía el instalador): anda en cualquier PC, pero se equivoca bastante. */
+export const MODELO_CHICO: ModeloWhisper = {
+  archivo: 'ggml-small-q5_1.bin',
+  url: `${HF}ggml-small-q5_1.bin`,
+  sha256: 'ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb',
+  bytes: 190_085_487
+}
+
+/**
+ * Mucho más preciso en español, pero el encoder procesa siempre 30 s de audio: en una Core Ultra 5 tarda
+ * ~15 s por parte (el chico, ~7). Por eso es opcional («Dictado más preciso»).
+ */
+export const MODELO_TURBO: ModeloWhisper = {
+  archivo: 'ggml-large-v3-turbo-q5_0.bin',
+  url: `${HF}ggml-large-v3-turbo-q5_0.bin`,
+  sha256: '394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2',
+  bytes: 574_041_195
+}
 /** HuggingFace redirige a su CDN: solo estos hosts, y solo por https. */
 export const MODELO_HOSTS: readonly string[] = [
   'huggingface.co',
@@ -26,22 +49,38 @@ export const MODELO_HOSTS: readonly string[] = [
 export const MAX_WAV_BYTES = 12 * 1024 * 1024
 
 /**
- * Pista para Whisper: el vocabulario técnico y el voseo salen mejor si el modelo los «espera».
- * No se transcribe: solo orienta.
+ * Pista para Whisper: el vocabulario técnico y el voseo salen mejor si el modelo los «espera». No se
+ * transcribe: solo orienta. Es una frase en castellano con las palabras técnicas adentro: una lista de
+ * palabras en inglés hacía que las partes cortas salieran en inglés.
  */
 export const PISTA =
-  'Le hablo a Claude Code en español rioplatense sobre programación: commit, branch, staging, main, merge, pull request, release, deploy, tests, TypeScript, React. Revisá, hacé, fijate.'
+  'Bueno, che, te cuento lo que quiero que hagas en el proyecto. Fijate el commit en la branch de staging, hacé el merge y revisá el pull request antes del deploy. Dale, avisame.'
+
+/** De lo ya dictado, cuánto se le pasa a la parte siguiente para que siga la oración (caracteres). */
+const MAX_PREVIO = 220
+
+/** Lo último ya transcripto, limpio y cortado en una palabra entera: el contexto de la parte siguiente. */
+export function previoDe(texto: unknown): string {
+  if (typeof texto !== 'string') return ''
+  // Primero la cola: limpiarTexto corta a MAX_TEXTO desde el principio.
+  const t = limpiarTexto(texto.slice(-MAX_PREVIO * 2))
+  if (t.length <= MAX_PREVIO) return t
+  const cola = t.slice(-MAX_PREVIO)
+  const espacio = cola.indexOf(' ')
+  return espacio >= 0 ? cola.slice(espacio + 1) : cola
+}
 
 /** Hilos para whisper-cli: la mitad de los núcleos, entre 2 y 8 (deja aire para la app y las terminales). */
 export function hilos(cpus: number): number {
   return Math.max(2, Math.min(8, Math.floor(cpus / 2)))
 }
 
-export function whisperArgs(o: { model: string; wav: string; threads: number }): string[] {
+export function whisperArgs(o: { model: string; wav: string; threads: number; previo?: string }): string[] {
+  const prompt = o.previo ? `${PISTA} ${o.previo}` : PISTA
   // --carry-initial-prompt: sin él la pista solo vale para los primeros 30 s y después vuelve el castellano
   // de España («vosotros sabéis»). -mc acota lo que arrastra de una ventana a otra, para que un error no
   // contagie a lo que sigue.
-  return ['-m', o.model, '-f', o.wav, '-l', 'es', '-t', String(o.threads), '-nt', '-np', '--prompt', PISTA, '--carry-initial-prompt', '-mc', '64']
+  return ['-m', o.model, '-f', o.wav, '-l', 'es', '-t', String(o.threads), '-nt', '-np', '--prompt', prompt, '--carry-initial-prompt', '-mc', '64']
 }
 
 /** Tiempo para transcribir un WAV de 16 kHz mono: 30 s fijos más 4 veces lo que dura (una PC lenta tarda más que el audio). */
@@ -102,7 +141,7 @@ export const AJUSTES_DICTADO: Partial<Record<TipoErrorDictado, string>> = {
 export function errorDictado(tipo: TipoErrorDictado, detalle?: string): ErrorDictado {
   let mensaje = MENSAJES[tipo]
   if (tipo === 'otro' && detalle) mensaje = `${MENSAJES.otro} (${detalle.slice(0, 80)})`
-  if (tipo === 'sin-modelo' && detalle === 'disco') mensaje = 'No hay espacio para bajar el modelo de dictado (190 MB).'
+  if (tipo === 'sin-modelo' && detalle === 'disco') mensaje = 'No hay espacio para bajar el modelo de dictado.'
   if (tipo === 'sin-modelo' && detalle === 'servidor') mensaje = 'El servidor del modelo de dictado respondió algo inesperado. Actualizá Sloth o probá más tarde.'
   return { tipo, mensaje, ajustes: tipo in AJUSTES_DICTADO }
 }

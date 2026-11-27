@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { MAX_WAV_BYTES, errorDictado, hilos, limpiarTexto, textoDeSalida, timeoutMs, wavValido, whisperArgs } from './dictado-core'
+import { MAX_WAV_BYTES, PISTA, errorDictado, hilos, previoDe, limpiarTexto, textoDeSalida, timeoutMs, wavValido, whisperArgs } from './dictado-core'
 import { encodeWav } from '../shared/wav'
 
 test('whisperArgs pide español, sin marcas de tiempo y con la pista', () => {
@@ -13,6 +13,22 @@ test('whisperArgs repite la pista en cada ventana y acota el contexto', () => {
   const a = whisperArgs({ model: 'm.bin', wav: 'a.wav', threads: 4 })
   assert.ok(a.includes('--carry-initial-prompt'))
   assert.equal(a[a.indexOf('-mc') + 1], '64')
+})
+
+test('whisperArgs suma lo ya dictado a la pista', () => {
+  const a = whisperArgs({ model: 'm.bin', wav: 'a.wav', threads: 4, previo: 'y después revisá' })
+  assert.equal(a[a.indexOf('--prompt') + 1], `${PISTA} y después revisá`)
+  const b = whisperArgs({ model: 'm.bin', wav: 'a.wav', threads: 4, previo: '' })
+  assert.equal(b[b.indexOf('--prompt') + 1], PISTA)
+})
+
+test('previoDe: la cola de lo dictado, limpia y en una palabra entera', () => {
+  assert.equal(previoDe(undefined), '')
+  assert.equal(previoDe(42), '')
+  assert.equal(previoDe('hola\r\nche'), 'hola che')
+  const largo = 'palabra '.repeat(1000) + 'final'
+  const p = previoDe(largo)
+  assert.ok(p.length <= 220 && p.endsWith('final') && p.startsWith('palabra'))
 })
 
 test('timeoutMs crece con lo que dura el audio', () => {

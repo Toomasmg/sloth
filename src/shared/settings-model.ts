@@ -27,6 +27,8 @@ export interface TerminalSettings {
   shell: ShellChoice
   /** Líneas de historial por terminal (scrollback de xterm). */
   scrollback: number
+  /** Dictado con el modelo grande (turbo): más preciso, pero tarda bastante más en transcribir. */
+  dictadoPreciso: boolean
 }
 
 /** Qué avisa Sloth. «No molestar» es `SlothSettings.noMolestar`. */
@@ -177,7 +179,8 @@ export const DEFAULT_SETTINGS: SlothSettings = {
     cursorStyle: 'barra',
     cursorBlink: true,
     shell: 'PowerShell 7',
-    scrollback: SCROLLBACK.default
+    scrollback: SCROLLBACK.default,
+    dictadoPreciso: false
   },
   accountColors: {},
   accountPlans: {},
@@ -364,12 +367,13 @@ export function applyPatch(current: SlothSettings, patch: unknown, opts: PatchOp
   if ('terminal' in patch) {
     const t = patch.terminal
     if (!isObj(t)) throw new Error('terminal tiene que ser un objeto.')
-    checkKeys(t, ['fontSize', 'fontFamily', 'lineHeight', 'cursorStyle', 'cursorBlink', 'shell', 'scrollback'], 'terminal.')
+    checkKeys(t, ['fontSize', 'fontFamily', 'lineHeight', 'cursorStyle', 'cursorBlink', 'shell', 'scrollback', 'dictadoPreciso'], 'terminal.')
     if ('fontSize' in t) next.terminal.fontSize = intIn(t.fontSize, TERM_FONT.min, TERM_FONT.max, 'El tamaño de la terminal')
     if ('fontFamily' in t) next.terminal.fontFamily = oneOf(t.fontFamily, TERM_FONTS, 'La fuente')
     if ('lineHeight' in t) next.terminal.lineHeight = lineHeight(t.lineHeight)
     if ('cursorStyle' in t) next.terminal.cursorStyle = oneOf(t.cursorStyle, CURSORS, 'El cursor')
     if ('cursorBlink' in t) next.terminal.cursorBlink = bool(t.cursorBlink, 'El parpadeo')
+    if ('dictadoPreciso' in t) next.terminal.dictadoPreciso = bool(t.dictadoPreciso, '«Dictado más preciso»')
     if ('shell' in t) next.terminal.shell = oneOf(t.shell, SHELLS, 'El shell')
     if ('scrollback' in t) next.terminal.scrollback = intIn(t.scrollback, SCROLLBACK.min, SCROLLBACK.max, 'El historial de la terminal')
   }
