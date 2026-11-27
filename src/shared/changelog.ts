@@ -9,6 +9,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.8.2',
+    date: '2026-11-27',
+    title: 'Scroll del touchpad sin saltos',
+    items: [
+      'Subir o bajar con dos dedos en la terminal acompaña a los dedos: ya no salta cientos de líneas de golpe, y la inercia al soltar frena sola. La rueda del mouse sigue bajando 3 líneas por muesca.'
+    ]
+  },
+  {
     version: '0.8.1',
     date: '2026-11-27',
     title: 'El celu, más seguro y más claro; dictado que sigue la oración',
