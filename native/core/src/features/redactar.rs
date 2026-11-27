@@ -382,6 +382,7 @@ mod tests {
     }
 
     #[test]
+    // En debug y con la suite en paralelo cada caso tarda segundos: el tope busca backtracking catastrófico, no velocidad.
     fn texto_enorme_sin_forma_de_secreto_no_se_cuelga() {
         let casos = [
             "a".repeat(100_000),
@@ -401,7 +402,7 @@ mod tests {
         for c in &casos {
             let ini = Instant::now();
             redactar(c, &CTX);
-            assert!(ini.elapsed().as_millis() < 5000, "tardó {} ms con «{}»", ini.elapsed().as_millis(), &c[..c.len().min(12)]);
+            assert!(ini.elapsed().as_millis() < 30_000, "tardó {} ms con «{}»", ini.elapsed().as_millis(), &c[..c.len().min(12)]);
         }
         assert_eq!(redactar(&"a".repeat(100_000), &CTX).len(), 100_000);
     }
