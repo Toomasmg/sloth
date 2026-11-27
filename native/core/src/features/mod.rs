@@ -1,6 +1,13 @@
-//! Lógica pura de las funciones chicas de `src/main/features`. Lo que toca el SO o Electron queda afuera: se pasa como dato o como closure.
+//! Lógica pura de las funciones de `src/main/features`, portadas de a una. Lo que toca el SO, Electron, los diálogos, el
+//! store o la red queda afuera: se pasa como dato o como closure.
 pub mod broadcast;
 pub mod diagnostico;
+pub mod dictado_core;
+pub mod dictado_modelo;
+pub mod export_crypto;
+pub mod export_import;
+pub mod export_import_logic;
+pub mod export_regla;
 pub mod help;
 pub mod move_account;
 pub mod onboarding;
@@ -12,6 +19,7 @@ pub mod report;
 pub mod rendimiento;
 pub mod sleep;
 pub mod templates;
+pub mod url_lite;
 
 /// Fecha civil (año, mes 1-12, día) de los días desde 1970-01-01 (algoritmo de Howard Hinnant).
 pub(crate) fn civil_de_dias(dias: i64) -> (i64, i64, i64) {

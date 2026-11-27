@@ -1,0 +1,17 @@
+{
+  "formato": "sloth-config",
+  "formatoVersion": 2,
+  "versión": "0.8.0",
+  "exportado": "2026-01-02T03:04:05.000Z",
+  "cifrado": {
+    "algoritmo": "aes-256-gcm",
+    "kdf": "scrypt",
+    "N": 1024,
+    "r": 4,
+    "p": 2,
+    "sal": "8OHSw7Sllod4aVpLPC0eDxEiM0RVZneI",
+    "iv": "AQIDBAUGBwgJCgsM",
+    "tag": "Qlx7f0MUbOpV7LCXOSSqcA=="
+  },
+  "datos": "kthIzgKaNV5GrqAHlCytpCMh0ySLtYf0wupglklJKROMegy1dOjh3HOsveomhh4zYv+GGGMz3sLOMq8Cx/F5OdDVAwNlo09yRZdukz8nnIQXJm99dtmFdFHcxC6DKD3VLow3tyf9T4dl4oLjFEmdGBZQv/awJOBDTtqpoqjRgEu2VgpivgXgc+2LX43IIE85V13THdwyqRO/t2g79zRUrR2wMadLWNCZmYBnJJR4s25/M3VPvnfHdVwo455/IFMrH99byO9DGHLKlSSkiJhXovBolC+XInnqdZwHVK/BjiwbogOzs0eASznZzIyVBKOBKdFBEkkPSu+VAjaDmR/NfVeBwXANlQWz6KiI3uGPO9zO6QMz7seBZEA+OaUuqXX0NrTSOPgPKIFGamV7Szfk6me5xZKC1DGK2DA="
+}
