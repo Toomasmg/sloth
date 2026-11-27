@@ -1,0 +1,33 @@
+/* Mismo lugar y tamaño que los botones que dibuja Windows con titleBarOverlay: 3 × 46 px por 40 de alto. */
+.wc {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: var(--z-menu);
+  display: flex;
+  height: 40px;
+  -webkit-app-region: no-drag;
+}
+.wc-btn {
+  width: 46px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-2, currentColor);
+  cursor: default;
+}
+.wc-btn:hover {
+  background: var(--hover, rgb(128 128 128 / 0.18));
+  color: var(--text, currentColor);
+}
+.wc-close:hover {
+  background: #e81123;
+  color: #fff;
+}
+.wc-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
