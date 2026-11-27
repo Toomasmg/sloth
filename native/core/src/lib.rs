@@ -10,6 +10,7 @@ pub mod perfiles_fs;
 pub mod persistencia;
 pub mod respaldo;
 pub mod segundo_plano;
+pub mod settings_model;
 pub mod shell_args;
 pub mod store;
 pub mod store_core;
