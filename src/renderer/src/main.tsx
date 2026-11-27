@@ -5,8 +5,13 @@ import './fonts.css'
 import './tokens.css'
 import './styles.css'
 import './themes.css'
-import { initSettings } from './features/settings/store'
-import { App } from './App'
+import { iniciarPuenteTauri } from './tauri-bridge'
+
+// En Tauri, window.sloth se arma acá y tiene que existir antes de que se evalúe cualquier módulo que lo use
+// (api.ts lo lee al importarse): por eso la app se importa después. En Electron el preload ya lo puso.
+await iniciarPuenteTauri()
+const { initSettings } = await import('./features/settings/store')
+const { App } = await import('./App')
 
 // Tema, densidad y letra: lo último conocido (localStorage) se aplica al instante y main lo confirma
 // después. No se espera a main ni a las fuentes: el texto cambia de letra cuando llega la webfont

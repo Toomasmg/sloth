@@ -37,3 +37,25 @@ y se pasa a Rust feature por feature. Sloth anda y se publica en cada hito.
 ## Entorno de build (esta PC)
 
 Rust (MSVC) con Build Tools en `D:\VS\BuildTools`; `CARGO_HOME`/`RUSTUP_HOME` en `D:\rust`.
+
+## Estado (hito 1 hecho)
+
+La ventana de Tauri carga el renderer y `window.sloth` funciona sobre `ipc_invoke` / `ipc_send` / `sloth://event`.
+El main corre sin Electron en `out/sidecar/sloth-sidecar.cjs` (`npm run build:sidecar`, shim en `src/sidecar`).
+Probado: arranca, responde `state:get` y la interfaz se pinta con los datos reales.
+
+Se prueba a mano con `npx electron-vite build && npm run build:daemon && npm run build:sidecar` y
+`npx tauri build --debug --no-bundle`; el ejecutable queda en `src-tauri/target/debug/sloth.exe`.
+
+### Brechas conocidas (se cierran en los hitos 2 y 3)
+
+- Barra de título propia y colores de ventana: hoy es la barra nativa.
+- Eventos de ventana hacia el main (foco, mover, maximizar, cerrar con guardado de estado): faltan.
+- Bandeja, menú y atajos globales: el shim los ignora.
+- `safeStorage`: no disponible, la sesión del chat no se guarda entre reinicios. Hay que leer el formato de
+  os_crypt (clave en `Local State` protegida con DPAPI) para conservar lo ya guardado.
+- Arrastrar carpetas a la UI: `pathForFile` devuelve vacío (usar el evento de arrastre de Tauri).
+- `clipboard.read()` de imágenes, `shell.trashItem`, `nativeImage`, `protocol`, `session` (CSP y permisos de micrófono).
+- Updater: `electron-updater` está reemplazado por un shim que avisa; falta el updater de Tauri.
+- Instancia única, paquete NSIS y que el instalador traiga Node: hoy se usa el `node` del PATH.
+- Tests e2e de Playwright siguen contra Electron.
