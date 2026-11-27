@@ -4,6 +4,8 @@
  * Lo que todavía no tiene equivalente queda como no-op documentado en docs/migracion-tauri.md.
  */
 import { EventEmitter } from 'node:events'
+import { readFileSync } from 'node:fs'
+import { crc32, deflateSync } from 'node:zlib'
 import { connect as netConnect } from 'node:net'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -31,14 +33,27 @@ export function iniciar(r: Rpc): void {
   rpc.alEventoNativo('window', (nombre, valor) => {
     const w = BrowserWindow.principal
     if (!w || typeof nombre !== 'string') return
-    if (nombre === 'bounds' && valor) w.bounds = valor as Rectangle
-    if (nombre === 'visible') ventanaVisible = valor === true
-    if (nombre === 'focused') w.enfocada = valor === true
-    if (nombre === 'maximized') w.maximizada = valor === true
-    if (nombre === 'minimized') w.minimizada = valor === true
-    w.emit(nombre, ...(valor === undefined ? [] : [valor]))
+    if (nombre === 'close') w.pedirCierre()
+    else if (nombre === 'bounds' && valor) w.cambiarBounds(valor as Rectangle)
+    else if (nombre === 'focused') {
+      w.enfocada = valor === true
+      w.emit(w.enfocada ? 'focus' : 'blur')
+    } else if (nombre === 'maximized' && w.maximizada !== (valor === true)) {
+      w.maximizada = valor === true
+      w.emit(w.maximizada ? 'maximize' : 'unmaximize')
+    } else if (nombre === 'minimized' && w.minimizada !== (valor === true)) {
+      w.minimizada = valor === true
+      w.emit(w.minimizada ? 'minimize' : 'restore')
+    } else if (nombre === 'visible' && ventanaVisible !== (valor === true)) {
+      ventanaVisible = valor === true
+      w.emit(ventanaVisible ? 'show' : 'hide')
+    }
   })
   rpc.alEventoNativo('notification:click', (id) => Notification.clics.get(id as number)?.emit('click'))
+  rpc.alEventoNativo('tray', (que, id) => {
+    if (que === 'activate') Tray.activo?.emit('click')
+    else if (que === 'menu' && typeof id === 'number') Tray.activo?.clic(id)
+  })
   rpc.alEventoNativo('app', (nombre) => {
     if (typeof nombre === 'string') app.emit(nombre)
   })
@@ -132,8 +147,11 @@ class App extends EventEmitter {
   }
   setAppUserModelId(): void {}
   disableHardwareAcceleration(): void {}
+  /** Como en Electron: antes de salir se avisa con `before-quit`, y quien lo frena sale después con otro quit(). */
   quit(): void {
-    ignorar(nativo('app.quit'))
+    let frenado = false
+    this.emit('before-quit', { preventDefault: () => (frenado = true) })
+    if (!frenado) this.exit(0)
   }
   exit(codigo = 0): void {
     ignorar(nativo('app.exit', codigo))
@@ -185,6 +203,8 @@ export class BrowserWindow extends EventEmitter {
   static principal: BrowserWindow | null = null
   readonly webContents = new WebContents()
   bounds: Rectangle = { x: 0, y: 0, width: 1500, height: 920 }
+  /** Último rectángulo con la ventana normal (ni maximizada ni minimizada): lo que se guarda al cerrar. */
+  normal: Rectangle = { x: 0, y: 0, width: 1500, height: 920 }
   enfocada = false
   maximizada = false
   minimizada = false
@@ -194,6 +214,7 @@ export class BrowserWindow extends EventEmitter {
     super()
     BrowserWindow.principal = this
     this.bounds = { x: opciones.x ?? 0, y: opciones.y ?? 0, width: opciones.width ?? 1500, height: opciones.height ?? 920 }
+    this.normal = this.bounds
     ventanaVisible = false
   }
   static getAllWindows(): BrowserWindow[] {
@@ -226,7 +247,15 @@ export class BrowserWindow extends EventEmitter {
     return this.bounds
   }
   getNormalBounds(): Rectangle {
-    return this.bounds
+    return this.normal
+  }
+  cambiarBounds(b: Rectangle): void {
+    const movida = b.x !== this.bounds.x || b.y !== this.bounds.y
+    const redimensionada = b.width !== this.bounds.width || b.height !== this.bounds.height
+    this.bounds = b
+    if (!this.maximizada && !this.minimizada) this.normal = b
+    if (redimensionada) this.emit('resize')
+    if (movida) this.emit('move')
   }
   setBounds(b: Partial<Rectangle>): void {
     this.bounds = { ...this.bounds, ...b }
@@ -250,8 +279,19 @@ export class BrowserWindow extends EventEmitter {
   maximize(): void {
     ignorar(nativo('window.maximize'))
   }
+  /** Como `close()` de Electron: los oyentes de `close` pueden frenarlo con preventDefault(). */
   close(): void {
-    ignorar(nativo('window.close'))
+    this.pedirCierre()
+  }
+  pedirCierre(): void {
+    let frenado = false
+    this.emit('close', { preventDefault: () => (frenado = true) })
+    if (frenado || this.destruida) return
+    this.destruida = true
+    ventanaVisible = false
+    ignorar(nativo('window.hide'))
+    this.emit('closed')
+    app.emit('window-all-closed')
   }
   flashFrame(flash: boolean): void {
     ignorar(nativo('window.flash', flash))
@@ -377,44 +417,161 @@ export const session = {
   }
 }
 
+/** Imagen en PNG: lo que la bandeja le pasa a Rust. El resto de las operaciones de NativeImage no se usan. */
 class NativeImage {
-  constructor(private readonly vacia: boolean) {}
+  png: Buffer
+  constructor(png: Buffer) {
+    this.png = png
+  }
   isEmpty(): boolean {
-    return this.vacia
+    return this.png.length === 0
   }
   resize(): NativeImage {
     return this
   }
-  addRepresentation(): void {}
+  addRepresentation(r: { buffer?: Buffer }): void {
+    if (r.buffer?.length) this.png = r.buffer
+  }
   setTemplateImage(): void {}
   getSize(): { width: number; height: number } {
     return { width: 0, height: 0 }
   }
-  toDataURL(): string {
-    return ''
-  }
   toPNG(): Buffer {
-    return Buffer.alloc(0)
+    return this.png
+  }
+  toDataURL(): string {
+    return `data:image/png;base64,${this.png.toString('base64')}`
   }
 }
+
+function crc(tipo: string, datos: Buffer): Buffer {
+  const cuerpo = Buffer.concat([Buffer.from(tipo, 'latin1'), datos])
+  const sal = Buffer.alloc(8)
+  sal.writeUInt32BE(datos.length, 0)
+  sal.write(tipo, 4, 'latin1')
+  const fin = Buffer.alloc(4)
+  fin.writeUInt32BE(crc32(cuerpo) >>> 0, 0)
+  return Buffer.concat([sal, datos, fin])
+}
+
+/** PNG RGBA a partir de un bitmap BGRA (el formato de Electron). */
+function pngDeBitmap(bgra: Buffer, ancho: number, alto: number): Buffer {
+  const filas = Buffer.alloc((ancho * 4 + 1) * alto)
+  for (let y = 0; y < alto; y++) {
+    const o = y * (ancho * 4 + 1)
+    for (let x = 0; x < ancho; x++) {
+      const i = (y * ancho + x) * 4
+      const d = o + 1 + x * 4
+      filas[d] = bgra[i + 2]
+      filas[d + 1] = bgra[i + 1]
+      filas[d + 2] = bgra[i]
+      filas[d + 3] = bgra[i + 3]
+    }
+  }
+  const cab = Buffer.alloc(13)
+  cab.writeUInt32BE(ancho, 0)
+  cab.writeUInt32BE(alto, 4)
+  cab[8] = 8
+  cab[9] = 6
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), crc('IHDR', cab), crc('IDAT', deflateSync(filas)), crc('IEND', Buffer.alloc(0))])
+}
+
 export const nativeImage = {
-  createEmpty: (): NativeImage => new NativeImage(true),
-  createFromPath: (): NativeImage => new NativeImage(false),
-  createFromBitmap: (): NativeImage => new NativeImage(false)
+  createEmpty: (): NativeImage => new NativeImage(Buffer.alloc(0)),
+  createFromPath: (ruta: string): NativeImage => {
+    try {
+      return new NativeImage(readFileSync(ruta))
+    } catch {
+      return new NativeImage(Buffer.alloc(0))
+    }
+  },
+  createFromBitmap: (bitmap: Buffer, o: { width: number; height: number }): NativeImage => new NativeImage(pngDeBitmap(bitmap, o.width, o.height))
+}
+
+interface ItemMenu {
+  label?: string
+  type?: string
+  enabled?: boolean
+  click?: () => void
+  submenu?: ItemMenu[]
 }
 
 export class Menu {
-  static buildFromTemplate(): Menu {
-    return new Menu()
+  readonly plantilla: ItemMenu[]
+  constructor(plantilla: ItemMenu[] = []) {
+    this.plantilla = plantilla
+  }
+  static buildFromTemplate(plantilla: ItemMenu[]): Menu {
+    return new Menu(plantilla)
   }
   static setApplicationMenu(): void {}
 }
 
+interface ItemPlano {
+  id?: number
+  label?: string
+  separator?: boolean
+  enabled?: boolean
+  items?: ItemPlano[]
+}
+
 export class Tray extends EventEmitter {
-  setToolTip(): void {}
-  setContextMenu(): void {}
-  setImage(): void {}
-  destroy(): void {}
+  static activo: Tray | null = null
+  private readonly clics = new Map<number, () => void>()
+  private imagen: NativeImage
+  private tip = ''
+  private menu: Menu | null = null
+  private destruida = false
+  private iconoEnviado: Buffer | null = null
+
+  constructor(imagen: NativeImage) {
+    super()
+    this.imagen = imagen
+    Tray.activo = this
+    this.enviar()
+  }
+  isDestroyed(): boolean {
+    return this.destruida
+  }
+  setToolTip(t: string): void {
+    this.tip = t
+    this.enviar()
+  }
+  setImage(i: NativeImage): void {
+    this.imagen = i
+    this.enviar()
+  }
+  setContextMenu(m: Menu | null): void {
+    this.menu = m
+    this.enviar()
+  }
+  clic(id: number): void {
+    this.clics.get(id)?.()
+  }
+  destroy(): void {
+    if (this.destruida) return
+    this.destruida = true
+    if (Tray.activo === this) Tray.activo = null
+    ignorar(nativo('tray.destroy'))
+  }
+  private plano(items: ItemMenu[]): ItemPlano[] {
+    return items.map((it) => {
+      if (it.type === 'separator') return { separator: true }
+      if (it.submenu) return { label: it.label, enabled: it.enabled !== false, items: this.plano(it.submenu) }
+      const id = this.clics.size + 1
+      if (it.click) this.clics.set(id, it.click)
+      return { id, label: it.label, enabled: it.enabled !== false && !!it.click }
+    })
+  }
+  private enviar(): void {
+    if (this.destruida) return
+    this.clics.clear()
+    const items = this.menu ? this.plano(this.menu.plantilla) : []
+    // El PNG pesa: solo viaja cuando cambió la imagen.
+    const icon = this.iconoEnviado === this.imagen.png ? '' : this.imagen.png.toString('base64')
+    this.iconoEnviado = this.imagen.png
+    ignorar(nativo('tray.set', { tooltip: this.tip, icon, items }))
+  }
 }
 
 export default { app, ipcMain, BrowserWindow, shell, dialog, clipboard, nativeTheme, powerMonitor, screen, net, Notification, safeStorage, protocol, session, nativeImage, Menu, Tray }

@@ -6,6 +6,7 @@ import './tokens.css'
 import './styles.css'
 import './themes.css'
 import { iniciarPuenteTauri } from './tauri-bridge'
+import { WindowControls } from './layout/WindowControls'
 
 // En Tauri, window.sloth se arma acá y tiene que existir antes de que se evalúe cualquier módulo que lo use
 // (api.ts lo lee al importarse): por eso la app se importa después. En Electron el preload ya lo puso.
@@ -21,6 +22,7 @@ void initSettings()
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
+    <WindowControls />
   </StrictMode>
 )
 

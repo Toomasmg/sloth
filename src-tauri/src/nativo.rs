@@ -1,7 +1,11 @@
 //! Lo nativo que el main pide por el puente (`native` en src/sidecar/rpc.ts): shell, portapapeles,
 //! diálogos, ventana y notificaciones. Lo que no está acá responde error y el main lo toma como "no disponible".
+use base64::Engine;
 use serde_json::{json, Value};
-use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, UserAttentionType};
+use tauri::image::Image;
+use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, UserAttentionType};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tauri_plugin_notification::NotificationExt;
@@ -96,6 +100,68 @@ fn dialogo_mensaje(app: &AppHandle, o: &Value) -> Result<Value, String> {
     Ok(json!({ "response": if acepto { 0 } else { botones.len().saturating_sub(1).min(1) }, "checkboxChecked": false }))
 }
 
+type Elemento = Box<dyn IsMenuItem<tauri::Wry>>;
+
+fn elementos_de_menu(app: &AppHandle, items: &[Value]) -> Result<Vec<Elemento>, String> {
+    let mut out: Vec<Elemento> = Vec::new();
+    for it in items {
+        let activo = it.get("enabled").and_then(Value::as_bool).unwrap_or(true);
+        let etiqueta = cadena(it, "label").unwrap_or("");
+        if it.get("separator") == Some(&Value::Bool(true)) {
+            out.push(Box::new(PredefinedMenuItem::separator(app).map_err(|e| e.to_string())?));
+        } else if let Some(hijos) = it.get("items").and_then(Value::as_array) {
+            let hijos = elementos_de_menu(app, hijos)?;
+            let refs: Vec<&dyn IsMenuItem<tauri::Wry>> = hijos.iter().map(|h| h.as_ref()).collect();
+            out.push(Box::new(Submenu::with_items(app, etiqueta, activo, &refs).map_err(|e| e.to_string())?));
+        } else {
+            let id = it.get("id").and_then(Value::as_u64).unwrap_or(0).to_string();
+            out.push(Box::new(MenuItem::with_id(app, id, etiqueta, activo, None::<&str>).map_err(|e| e.to_string())?));
+        }
+    }
+    Ok(out)
+}
+
+fn bandeja(app: &AppHandle, o: &Value) -> Result<Value, String> {
+    let items = o.get("items").and_then(Value::as_array).cloned().unwrap_or_default();
+    let elementos = elementos_de_menu(app, &items)?;
+    let refs: Vec<&dyn IsMenuItem<tauri::Wry>> = elementos.iter().map(|e| e.as_ref()).collect();
+    let menu = Menu::with_items(app, &refs).map_err(|e| e.to_string())?;
+    let icono = cadena(o, "icon")
+        .filter(|i| !i.is_empty())
+        .and_then(|i| base64::engine::general_purpose::STANDARD.decode(i).ok())
+        .and_then(|png| Image::from_bytes(&png).ok());
+    let tip = cadena(o, "tooltip").unwrap_or("Sloth");
+    if let Some(t) = app.tray_by_id("sloth") {
+        t.set_menu(Some(menu)).map_err(|e| e.to_string())?;
+        t.set_tooltip(Some(tip)).map_err(|e| e.to_string())?;
+        if let Some(i) = icono {
+            t.set_icon(Some(i)).map_err(|e| e.to_string())?;
+        }
+        return Ok(Value::Null);
+    }
+    let mut b = TrayIconBuilder::with_id("sloth")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .tooltip(tip)
+        .on_menu_event(|app, e| {
+            if let (Some(a), Ok(n)) = (app.try_state::<crate::Apoyo>(), e.id().as_ref().parse::<u64>()) {
+                a.0.evento_nativo("tray", json!(["menu", n]));
+            }
+        })
+        .on_tray_icon_event(|t, e| {
+            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e {
+                if let Some(a) = t.app_handle().try_state::<crate::Apoyo>() {
+                    a.0.evento_nativo("tray", json!(["activate"]));
+                }
+            }
+        });
+    if let Some(i) = icono.or_else(|| app.default_window_icon().cloned()) {
+        b = b.icon(i);
+    }
+    b.build(app).map_err(|e| e.to_string())?;
+    Ok(Value::Null)
+}
+
 pub fn atender(app: &AppHandle, op: &str, args: Vec<Value>) -> Result<Value, String> {
     let nulo = Ok(Value::Null);
     match op {
@@ -160,14 +226,20 @@ pub fn atender(app: &AppHandle, op: &str, args: Vec<Value>) -> Result<Value, Str
             let w = ventana(app)?;
             let b = args.first().cloned().unwrap_or(Value::Null);
             let n = |k: &str| b.get(k).and_then(Value::as_i64).unwrap_or(0);
-            let _ = w.set_position(PhysicalPosition::new(n("x") as i32, n("y") as i32));
-            let _ = w.set_size(PhysicalSize::new(n("width") as u32, n("height") as u32));
+            // Los rectángulos del main son lógicos (DIP), como los de Electron.
+            let _ = w.set_position(LogicalPosition::new(n("x") as f64, n("y") as f64));
+            let _ = w.set_size(LogicalSize::new(n("width") as f64, n("height") as f64));
             nulo
         }
         "window.setZoom" => {
             // Electron usa niveles (1.2^n); el webview toma el factor.
             let nivel = args.first().and_then(Value::as_f64).unwrap_or(0.0);
             ventana(app)?.set_zoom(1.2f64.powf(nivel)).map_err(|e| e.to_string()).map(|_| Value::Null)
+        }
+        "tray.set" => bandeja(app, args.first().unwrap_or(&Value::Null)),
+        "tray.destroy" => {
+            app.remove_tray_by_id("sloth");
+            nulo
         }
         "app.quit" => {
             app.exit(0);

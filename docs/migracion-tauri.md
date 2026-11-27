@@ -38,7 +38,13 @@ y se pasa a Rust feature por feature. Sloth anda y se publica en cada hito.
 
 Rust (MSVC) con Build Tools en `D:\VS\BuildTools`; `CARGO_HOME`/`RUSTUP_HOME` en `D:\rust`.
 
-## Estado (hito 1 hecho)
+## Estado (hitos 1 y 2 hechos)
+
+Hito 2: ventana sin marco con botones propios (`layout/WindowControls.tsx`) y arrastre por `-webkit-app-region`,
+eventos de ventana (foco, mover, tamaño, maximizar) hacia el main con el rectángulo en DIP, cierre cancelable
+(`close` -> confirmación o bandeja -> `before-quit` -> `app.exit`) y bandeja del sistema con menú dinámico.
+
+## Detalle del hito 1
 
 La ventana de Tauri carga el renderer y `window.sloth` funciona sobre `ipc_invoke` / `ipc_send` / `sloth://event`.
 El main corre sin Electron en `out/sidecar/sloth-sidecar.cjs` (`npm run build:sidecar`, shim en `src/sidecar`).
@@ -49,9 +55,8 @@ Se prueba a mano con `npx electron-vite build && npm run build:daemon && npm run
 
 ### Brechas conocidas (se cierran en los hitos 2 y 3)
 
-- Barra de título propia y colores de ventana: hoy es la barra nativa.
-- Eventos de ventana hacia el main (foco, mover, maximizar, cerrar con guardado de estado): faltan.
-- Bandeja, menú y atajos globales: el shim los ignora.
+- Colores de la barra de título según el tema (hoy la barra es la del renderer) y `setOverlayIcon`.
+- Menú de aplicación y atajos globales: el shim los ignora.
 - `safeStorage`: no disponible, la sesión del chat no se guarda entre reinicios. Hay que leer el formato de
   os_crypt (clave en `Local State` protegida con DPAPI) para conservar lo ya guardado.
 - Arrastrar carpetas a la UI: `pathForFile` devuelve vacío (usar el evento de arrastre de Tauri).
