@@ -79,14 +79,23 @@ export interface StatusLine {
 const esStatusLine = (v: unknown): v is StatusLine =>
   !!v && typeof v === 'object' && (v as StatusLine).type === 'command' && typeof (v as StatusLine).command === 'string'
 
+/** Lo que envolvió una versión anterior: `node "<script>" <original en base64url>` o `<sloth-hook> statusline <original>`. */
+const ENVUELTA = /^(?:node "[^"]*sloth-statusline\.cjs"|\S*sloth-hook\S* statusline)(?: (\S+))?$/
+
 /**
- * Envuelve la statusline de la cuenta. Si ya está envuelta, la deja igual. Sin statusline, solo
- * captura y no imprime nada. Si hay algo que no es una statusline de comando, no se toca.
+ * Envuelve la statusline de la cuenta. Sin statusline, solo captura y no imprime nada. Si hay algo que no es una
+ * statusline de comando, no se toca. Con `helper` (el ejecutable en Rust) el envoltorio no necesita Node: una que
+ * había envuelto la versión con Node se vuelve a envolver con el ejecutable, conservando la original.
  */
-export function envolverStatusline(actual: unknown, script: string): unknown {
-  const capturar = `node "${script.replace(/\\/g, '/')}"`
+export function envolverStatusline(actual: unknown, script: string, helper?: string | null): unknown {
+  const capturar = helper ? `${helper} statusline` : `node "${script.replace(/\\/g, '/')}"`
   if (actual === undefined || actual === null) return { type: 'command', command: capturar }
   if (!esStatusLine(actual)) return actual
+  const envuelta = ENVUELTA.exec(actual.command)
+  if (envuelta) {
+    if (!helper || actual.command.startsWith(capturar)) return actual
+    return { ...actual, command: envuelta[1] ? `${capturar} ${envuelta[1]}` : capturar }
+  }
   if (actual.command.includes(STATUSLINE_MARKER)) return actual
   // base64url: sin comillas, espacios ni signos que Git Bash o PowerShell interpreten.
   return { ...actual, command: `${capturar} ${Buffer.from(actual.command, 'utf8').toString('base64url')}` }
