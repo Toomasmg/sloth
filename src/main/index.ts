@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { Store } from './store'
 import { accountStatus, createAccount, motivoNoAgregarCuenta } from './accounts'
-import { hayNode, installInto, notifyScriptPath, stateForEvent, writeHookScript, type HookEventPayload } from './hooks'
+import { hayNode, helperHook, installInto, notifyScriptPath, stateForEvent, writeHookScript, type HookEventPayload } from './hooks'
 import { esFalsoFinal, pendientes, registrar as registrarFondo, venceEn, type Fondo } from './segundo-plano-core'
 import { baseEnv, toSpawnSpec, type PtySpec } from './ptys'
 import { pastePayload } from './shell-args'
@@ -396,7 +396,7 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
       try {
         // Sin config.toml queda el de siempre (con el almacén de credenciales en archivo), no uno que solo tenga el notify.
         proveedorExigido(acc).prepararCarpeta(acc.configDir)
-        motivo = prepararNotify(acc.configDir, hayNode() ? 'node' : undefined, notifyScriptPath())
+        motivo = helperHook() ? prepararNotify(acc.configDir, helperHook()!.exe, 'notify') : prepararNotify(acc.configDir, hayNode() ? 'node' : undefined, notifyScriptPath())
       } catch (e) {
         motivo = `No pude preparar la carpeta de la cuenta de Codex (${(e as NodeJS.ErrnoException).code ?? 'error'}).`
       }

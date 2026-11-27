@@ -1,0 +1,17 @@
+[package]
+name = "sloth-hook"
+version = "0.8.0"
+edition = "2021"
+publish = false
+
+# Lo que Claude Code y Codex ejecutan en cada hook, en la statusline y al terminar un turno. Reemplaza a los scripts
+# de Node (sloth-hook.cjs, sloth-statusline.cjs, sloth-notify.cjs): así las cuentas no necesitan Node.
+[dependencies]
+serde_json = { version = "1", features = ["preserve_order"] }
+base64 = "0.22"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+opt-level = "z"

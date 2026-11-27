@@ -50,4 +50,6 @@ jobs:
       - run: npm run build:sidecar
       - run: node scripts/prepare-tauri.mjs
       - run: cargo test --manifest-path native/daemon/Cargo.toml
+      - run: cargo test --manifest-path native/helper/Cargo.toml
+      - run: cargo test --manifest-path native/core/Cargo.toml
       - run: cargo check --manifest-path src-tauri/Cargo.toml

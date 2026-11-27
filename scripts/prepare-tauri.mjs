@@ -31,6 +31,7 @@ mkdirSync(join(stage, 'daemon'), { recursive: true })
 cpSync(necesita(join(root, 'out', 'sidecar', 'sloth-sidecar.cjs'), 'npm run build:sidecar'), join(stage, 'sidecar', 'sloth-sidecar.cjs'))
 cpSync(necesita(join(root, 'out', 'daemon', 'sloth-daemon.cjs'), 'npm run build:daemon'), join(stage, 'daemon', 'sloth-daemon.cjs'))
 cpSync(necesita(join(root, 'out', 'daemon', 'sloth-daemon.exe'), 'npm run build:daemon-rs'), join(stage, 'daemon', 'sloth-daemon.exe'))
+cpSync(necesita(join(root, 'out', 'daemon', 'sloth-hook.exe'), 'npm run build:daemon-rs'), join(stage, 'daemon', 'sloth-hook.exe'))
 cpSync(necesita(join(root, 'build', 'icon.png'), 'ícono'), join(stage, 'icon.png'))
 
 // node-pty sin fuentes ni prebuilds de otras plataformas (como excluía electron-builder). Va en dos lugares:

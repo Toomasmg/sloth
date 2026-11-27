@@ -23,6 +23,11 @@ también Rust, así las dos implementaciones se prueban contra el mismo archivo.
 
 1. **Base (`native/core`)** — hecho: `versionado`, `persistencia` (JSON atómico, apartado de archivos dañados,
    respaldos), `avisos`, `store_core` y `store`. 58 tests.
+1b. **Hooks sin Node** — hecho: `native/helper` es `sloth-hook.exe`, que reemplaza a los tres scripts que Claude Code y
+   Codex ejecutaban con `node` (`sloth-hook.cjs`, la statusline y el aviso de Codex). `hooks.ts` lo copia a
+   `userData/bin` y escribe sus comandos (con ruta 8.3 si hay espacios, porque PowerShell no ejecuta una ruta entre
+   comillas seguida de argumentos). Una statusline envuelta con Node se migra sola. Si el ejecutable no está, se sigue
+   con Node. Falta el servidor MCP del chat (`chat-mcp-script.ts`), que Claude también arranca con `node`.
 2. **Núcleo de la app**: perfiles (`perfil`, `perfiles-core`, `perfiles-fs`), `setup`, `hooks` y servidor de hooks,
    cliente del daemon (protocolo v2 nativo), terminales (`ptys`), estado de agentes, `usage`, ventana
    (`window-state`), ajustes (`settings-model`, `settings`), y el equivalente de `index.ts` (registro de features,
