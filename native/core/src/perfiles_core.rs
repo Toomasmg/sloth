@@ -39,6 +39,40 @@ fn es_enganoso(c: char) -> bool {
     matches!(c, '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}' | '\u{feff}')
 }
 
+/// Un número como lo escribe JavaScript: sin «.0» si es entero.
+fn numero(n: f64) -> Value {
+    if n.fract() == 0.0 && (0.0..9.0e15).contains(&n) {
+        Value::from(n as u64)
+    } else {
+        Value::from(n)
+    }
+}
+
+impl Perfil {
+    /// `{id, nombre, creado[, ghLogin]}`, en ese orden.
+    pub fn a_json(&self) -> Value {
+        let mut m = serde_json::Map::new();
+        m.insert("id".into(), Value::String(self.id.clone()));
+        m.insert("nombre".into(), Value::String(self.nombre.clone()));
+        m.insert("creado".into(), numero(self.creado));
+        if let Some(g) = &self.gh_login {
+            m.insert("ghLogin".into(), Value::String(g.clone()));
+        }
+        Value::Object(m)
+    }
+}
+
+impl IndicePerfiles {
+    /// `{version: 1, activo, perfiles}`.
+    pub fn a_json(&self) -> Value {
+        let mut m = serde_json::Map::new();
+        m.insert("version".into(), Value::from(1));
+        m.insert("activo".into(), Value::String(self.activo.clone()));
+        m.insert("perfiles".into(), Value::Array(self.perfiles.iter().map(Perfil::a_json).collect()));
+        Value::Object(m)
+    }
+}
+
 pub fn login_gh_valido(s: &str) -> bool {
     (1..=39).contains(&s.len()) && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
 }
