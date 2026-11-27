@@ -89,7 +89,7 @@ test('Celular: terminal de PC ancha en Galaxy e iPhone, vertical y horizontal; l
       await cel.getByRole('button', { name: 'Abrir la terminal de web' }).click()
       const term = cel.getByRole('dialog', { name: 'web' })
       const pantalla = term.locator('.xterm-rows')
-      await expect(pantalla).toContainText(/❯/, { timeout: 15_000 })
+      await expect(pantalla).toContainText(/❯|PS [^>\n]*>/, { timeout: 15_000 })
       const foto = (n: string): Promise<Buffer> => cel.screenshot({ path: test.info().outputPath(`${celu.nombre.replace(/\W/g, '')}-${horiz ? 'horizontal' : 'vertical'}-${n}.png`) })
 
       const escribir = async (texto: string): Promise<void> => {

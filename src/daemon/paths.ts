@@ -18,3 +18,4 @@ export const daemonKeyFileFor = (userDataDir: string): string => join(userDataDi
 export const tokenFileFor = (userDataDir: string): string => join(userDataDir, 'daemon-token')
 export const logFileFor = (userDataDir: string): string => join(userDataDir, 'daemon.log')
 export const DAEMON_SCRIPT_NAME = 'sloth-daemon.cjs'
+export const DAEMON_EXE_NAME = 'sloth-daemon.exe'

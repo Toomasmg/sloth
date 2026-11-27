@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { AccountUsage, AgentStatus } from '../../shared/types'
-import { aMs, claveValida, armarEstado, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, type Entrada } from './celular-core'
+import { aMs, claveValida, armarEstado, cuerpoNtfy, enlaceAviso, textoAvisoPrivado, MAX_PEDIDO, pedidoParaCelu, debeAvisar, elegirIp, leerLimites, puertoValido, resumenPermiso, servidorNtfy, temaValido, textoAviso, tokenNtfyTras, tokenNtfyValido, httpsTailscale, ipTailscale, type Entrada } from './celular-core'
 
 const v4 = (address: string, internal = false) => ({ address, family: 'IPv4', internal })
 
@@ -123,7 +123,7 @@ function entrada(): Entrada {
     agentes,
     uso: { a: uso(1500, 12) },
     limites: { a: { cincoHoras: { pct: 50, reiniciaEn: null }, semana: null, at: 900 } },
-    pedidos: [{ id: 'p1', ws: 'w1', texto: 'Bash: npm test', at: 950, expiresAt: 5000 }]
+    pedidos: [{ id: 'p1', ws: 'w1', tool: 'Bash', input: { command: 'npm test' }, at: 950, expiresAt: 5000 }]
   }
 }
 
@@ -137,7 +137,7 @@ test('armarEstado: un pedido pendiente pone al espacio en «te necesita» y orde
       ['w3', 'idle']
     ]
   )
-  assert.deepEqual(e.pedidos, [{ id: 'p1', sesionId: 'w1', sesion: 'web', texto: 'Bash: npm test', desde: 950, vence: 5000 }])
+  assert.deepEqual(e.pedidos, [{ id: 'p1', sesionId: 'w1', sesion: 'web', texto: 'npm test', titulo: 'Claude quiere ejecutar un comando', destructivo: null, desde: 950, vence: 5000 }])
 })
 
 test('armarEstado: una cuenta sin datos de límites ni uso queda en null, nunca en 0', () => {
@@ -149,10 +149,29 @@ test('armarEstado: una cuenta sin datos de límites ni uso queda en null, nunca 
 
 test('armarEstado: no expone carpetas y descarta pedidos de espacios borrados', () => {
   const ent = entrada()
-  ent.pedidos.push({ id: 'p2', ws: 'borrado', texto: 'x', at: 1, expiresAt: 2 })
+  ent.pedidos.push({ id: 'p2', ws: 'borrado', tool: 'Bash', input: { command: 'x' }, at: 1, expiresAt: 2 })
   const e = armarEstado(ent)
   assert.equal(e.pedidos.length, 1)
   assert.ok(!JSON.stringify(e).includes('cwd'))
+})
+
+test('pedidoParaCelu: el comando entero (no 160), marcado si es destructivo y sin caracteres que escondan lo que corre', () => {
+  const largo = 'npm run build && ' + 'x'.repeat(600) + ' && git push --force origin main'
+  const p = pedidoParaCelu('Bash', { command: largo })
+  assert.equal(p.texto, largo)
+  assert.equal(p.titulo, 'Claude quiere ejecutar un comando')
+  assert.ok(p.destructivo, 'push --force es destructivo')
+  assert.equal(pedidoParaCelu('Bash', { command: 'rm -rf node_modules' }).destructivo !== null, true)
+  assert.equal(pedidoParaCelu('Bash', { command: 'ls -la' }).destructivo, null)
+  // Un override bidi da vuelta lo que se lee; el salto de línea de un comando de varias líneas sí queda.
+  const bidi = pedidoParaCelu('Bash', { command: 'echo hola\u202E fdsa && rm\nls\tx' })
+  assert.equal(bidi.texto, 'echo hola\uFFFD fdsa && rm\nls\tx')
+  const cortado = pedidoParaCelu('Bash', { command: 'a'.repeat(MAX_PEDIDO + 50) })
+  assert.equal(cortado.texto.length, MAX_PEDIDO)
+  assert.equal(cortado.cortado, true, 'lo que no entra se marca: desde el celu solo se puede rechazar')
+  assert.equal(pedidoParaCelu('Bash', { command: 'a'.repeat(MAX_PEDIDO) }).cortado, undefined)
+  assert.deepEqual(pedidoParaCelu('Edit', { file_path: 'src/a.ts' }), { texto: 'Editar src/a.ts', titulo: 'Claude quiere editar un archivo', destructivo: null })
+  assert.equal(pedidoParaCelu('WebFetch', { url: 'https://ejemplo.com/x' }).texto, 'Acceder a ejemplo.com')
 })
 
 test('textoAviso no deja saltos de línea y corta lo largo', () => {
@@ -185,4 +204,60 @@ test('tokenNtfyTras: cambiar de servidor sin token nuevo borra el guardado', () 
   assert.equal(tokenNtfyTras(actual, 'https://ntfy.sh/', undefined), undefined)
   assert.equal(tokenNtfyTras(actual, 'https://ntfy.sh/', 'tk_b'), 'tk_b')
   assert.equal(tokenNtfyTras(actual, 'https://ntfy.miempresa.com/', null), undefined)
+})
+
+test('cuerpoNtfy: con enlace, tocar el aviso o «Abrir Sloth» abre la página; sin enlace, aviso solo', () => {
+  const t = { titulo: 'web terminó', cuerpo: 'Claude terminó.' }
+  const con = cuerpoNtfy('sloth-tema-largo-1234567', 'termino', t, 'http://192.168.0.10:47321/')
+  assert.deepEqual(con, {
+    topic: 'sloth-tema-largo-1234567',
+    title: 'web terminó',
+    message: 'Claude terminó.',
+    priority: 3,
+    tags: ['white_check_mark'],
+    click: 'http://192.168.0.10:47321/',
+    actions: [{ action: 'view', label: 'Abrir Sloth', url: 'http://192.168.0.10:47321/', clear: true }]
+  })
+  const sin = cuerpoNtfy('sloth-tema-largo-1234567', 'permiso', t, null)
+  assert.equal(sin.priority, 4)
+  assert.equal('click' in sin, false)
+  assert.equal('actions' in sin, false)
+})
+
+test('enlaceAviso nunca lleva la clave y prefiere lo que anda fuera de casa; privado, nada que diga la IP o el nombre de la PC', () => {
+  const wifi = { ip: '192.168.0.10', puerto: 47321 }
+  const remoto = 'https://x.github.io/sloth/celu/'
+  const https = 'https://mi-pc.tail.ts.net'
+  assert.equal(enlaceAviso({ wifi, remoto: null }), 'http://192.168.0.10:47321/')
+  assert.equal(enlaceAviso({ wifi, remoto }), 'https://x.github.io/sloth/celu/', 'con la remota prendida, la que anda afuera')
+  assert.equal(enlaceAviso({ wifi, remoto, https }), 'https://mi-pc.tail.ts.net/')
+  assert.equal(enlaceAviso({ wifi: null, remoto: 'https://x.github.io/sloth/celu/#p=secreto?a=1' }), 'https://x.github.io/sloth/celu/')
+  assert.equal(enlaceAviso({ wifi: null, remoto: 'https://x.github.io/sloth/celu/?q=1#p=secreto' }), 'https://x.github.io/sloth/celu/')
+  assert.equal(enlaceAviso({ wifi: null, remoto: null }), null)
+  assert.equal(enlaceAviso({ wifi, remoto: null, https, privado: true }), null, 'privado: ni la IP de casa ni el nombre de la PC')
+  assert.equal(enlaceAviso({ wifi, remoto, https, privado: true }), 'https://x.github.io/sloth/celu/')
+})
+
+test('textoAvisoPrivado no dice el espacio ni lo que dijo Claude', () => {
+  assert.deepEqual(textoAvisoPrivado('termino'), { titulo: 'Sloth', cuerpo: 'Una sesión terminó.' })
+  assert.deepEqual(textoAvisoPrivado('teNecesita'), { titulo: 'Sloth', cuerpo: 'Una sesión te necesita.' })
+  assert.deepEqual(textoAvisoPrivado('permiso'), { titulo: 'Sloth', cuerpo: 'Una sesión pide permiso.' })
+})
+
+test('ipTailscale: la IPv4 del rango de Tailscale (100.64/10), no otra', () => {
+  const v4 = (address: string, internal = false) => ({ address, family: 'IPv4', internal })
+  assert.equal(ipTailscale({ 'Wi-Fi': [v4('192.168.1.5')], Tailscale: [v4('100.101.102.103')] }), '100.101.102.103')
+  assert.equal(ipTailscale({ 'Wi-Fi': [v4('100.72.1.2')], Tailscale: [v4('100.101.102.103')] }), '100.101.102.103', 'un hotspot con CGNAT no es Tailscale')
+  assert.equal(ipTailscale({ 'Wi-Fi': [v4('100.72.1.2')] }), null)
+  assert.equal(ipTailscale({ 'Wi-Fi': [v4('192.168.1.5')] }), null)
+  assert.equal(ipTailscale({ Tailscale: [v4('100.63.0.1'), v4('100.128.0.1')] }), null, 'fuera del rango no es Tailscale')
+  assert.equal(ipTailscale({ Tailscale: [{ address: 'fd7a:115c:a1e0::1', family: 'IPv6', internal: false }] }), null)
+})
+
+test('httpsTailscale: solo direcciones https de ts.net, normalizadas', () => {
+  assert.equal(httpsTailscale('https://mi-pc.tailnet-abc.ts.net/'), 'https://mi-pc.tailnet-abc.ts.net')
+  assert.equal(httpsTailscale('  HTTPS://Mi-PC.Tail1.TS.NET  '), 'https://mi-pc.tail1.ts.net')
+  for (const malo of ['http://mi-pc.tail.ts.net', 'https://mi-pc.tail.ts.net.evil.com', 'https://evil.com/?x=.ts.net', 'https://mi-pc.tail.ts.net/ruta', 'https://ts.net', 'https://-a.tail.ts.net', 1, null]) {
+    assert.equal(httpsTailscale(malo), null, String(malo))
+  }
 })

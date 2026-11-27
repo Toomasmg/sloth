@@ -1,7 +1,7 @@
 {
   "name": "sloth",
   "productName": "Sloth",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Sloth: varias cuentas de Claude Code, cada una en su PowerShell y su repo. Liviano a propósito.",
   "private": true,
   "main": "./out/main/index.js",
@@ -9,11 +9,12 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "dev": "npm run build:daemon && electron-vite dev",
-    "build": "electron-vite build && npm run build:daemon && npm run build:whisper",
+    "dev": "npm run build:daemon && npm run build:daemon-rs && electron-vite dev",
+    "build": "electron-vite build && npm run build:daemon && npm run build:daemon-rs && npm run build:whisper",
     "build:whisper": "node scripts/fetch-whisper.mjs",
     "fetch-whisper": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/test-hooks.mjs scripts/fetch-whisper-model.mjs",
     "build:daemon": "node scripts/build-daemon.mjs",
+    "build:daemon-rs": "node scripts/build-daemon-rs.mjs",
     "build:celu-web": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/test-hooks.mjs scripts/build-celu-web.mjs",
     "postinstall": "node scripts/patch-node-pty.mjs",
     "start": "electron-vite preview",
@@ -78,8 +79,19 @@
         "to": "icon.png"
       },
       {
+        "from": "src/celu-web/iconos",
+        "to": "celu-iconos"
+      },
+      {
         "from": "out/daemon/sloth-daemon.cjs",
         "to": "daemon/sloth-daemon.cjs"
+      },
+      {
+        "from": "out/daemon",
+        "to": "daemon",
+        "filter": [
+          "sloth-daemon.exe"
+        ]
       },
       {
         "from": "vendor/whisper",

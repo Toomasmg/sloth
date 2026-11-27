@@ -4,12 +4,13 @@ import { randomBytes } from 'node:crypto'
 import { connect, type Socket } from 'node:net'
 import type { EstadoCelular } from '../../shared/celular'
 import { crearFuenteWifi, type OpcionesWifi, type ProveedorDeEstado } from './celular-servidor'
-import { abrirRespuesta, derivarClaves, sellarPedido, type Claves } from './celular-sello'
+import { abrirRespuesta, crearRepetidos, derivarClaves, sellarPedido, type Claves } from './celular-sello'
 
 const CLAVE = Buffer.alloc(32, 7).toString('base64url')
 const ESTADO: EstadoCelular = { ahora: 1, aprobar: false, terminal: false, cuentas: [], sesiones: [], pedidos: [] }
 
 const claves = derivarClaves(CLAVE) as Claves
+const clavesQr = claves
 
 async function conServidor(over: Partial<ProveedorDeEstado>, fn: (base: string, decisiones: string[]) => Promise<void>, opciones: Partial<OpcionesWifi> = {}): Promise<void> {
   const decisiones: string[] = []
@@ -39,11 +40,14 @@ const enviarSobre = (base: string, ruta: string, sobre: string): Promise<Respons
 interface Opciones {
   t?: number
   rutaSellada?: string
+  /** Otra clave que la del QR de siempre (la de un celu con acceso). */
+  con?: string
 }
 
 /** Manda un pedido sellado como lo hace la página y abre la respuesta; la hora y la ruta sellada se pueden falsear. */
 async function postSellado(base: string, ruta: string, obj: unknown, o: Opciones = {}): Promise<{ status: number; cuerpo: unknown; texto: string }> {
   const iv = randomBytes(16)
+  const claves = o.con ? (derivarClaves(o.con) as Claves) : clavesQr
   const sobre = sellarPedido(claves, o.rutaSellada ?? ruta, JSON.stringify({ t: o.t ?? Date.now(), b: obj }), iv)
   const r = await enviarSobre(base, ruta, sobre)
   const texto = await r.text()
@@ -64,6 +68,31 @@ test('sin cuerpo, con el MAC roto o con otra ruta: 401 sin cuerpo', async () => 
     assert.equal(otraRuta.status, 401)
     assert.equal(otraRuta.texto, '')
   })
+})
+
+test('la PC sabe quién pidió (IP y navegador) solo cuando la clave es buena', async () => {
+  const vistos: unknown[] = []
+  await conServidor(
+    {
+      estado: async (q) => {
+        vistos.push(['estado', q])
+        return ESTADO
+      },
+      puedeAprobar: () => true,
+      decidir: (id, d, q) => void vistos.push(['decidir', id, d, q])
+    },
+    async (base) => {
+      const ua = 'Mozilla/5.0 (Linux; Android 13) Chrome/120 Mobile'
+      const iv = randomBytes(16)
+      await fetch(base + '/api/estado', { method: 'POST', headers: { 'user-agent': ua }, body: sellarPedido(claves, '/api/estado', JSON.stringify({ t: Date.now(), b: {} }), iv) })
+      await fetch(base + '/api/estado', { method: 'POST', headers: { 'user-agent': ua }, body: 'roto' })
+      await postSellado(base, '/api/permiso', { id: 'p1', decision: 'deny' })
+      assert.equal(vistos.length, 2, 'el pedido con la clave mala no llega a la PC')
+      assert.deepEqual(vistos[0], ['estado', { ip: '127.0.0.1', ua }])
+      const [tipo, id, d, q] = vistos[1] as [string, string, string, { ip: string; ua: string }]
+      assert.deepEqual([tipo, id, d, q.ip], ['decidir', 'p1', 'deny', '127.0.0.1'])
+    }
+  )
 })
 
 test('con el sobre bien sellado devuelve el estado sellado, sin caché', async () => {
@@ -148,13 +177,35 @@ test('si el pedido ya no está, el celu recibe el motivo sellado', async () => {
   })
 })
 
+test('los archivos de la página se revalidan con ETag: si el celu ya los tiene, 304 sin cuerpo', async () => {
+  await conServidor({ icono: () => Buffer.from('png') }, async (base) => {
+    for (const ruta of ['/app.js', '/app.css', '/icono.png']) {
+      const r = await fetch(base + ruta)
+      assert.equal(r.status, 200)
+      assert.equal(r.headers.get('cache-control'), 'no-cache')
+      const etag = r.headers.get('etag') ?? ''
+      assert.match(etag, /^"[\w-]+"$/)
+      await r.arrayBuffer()
+      const otra = await fetch(base + ruta, { headers: { 'if-none-match': etag } })
+      assert.equal(otra.status, 304, ruta)
+      assert.equal(await otra.text(), '')
+      assert.equal((await fetch(base + ruta, { headers: { 'if-none-match': '"viejo"' } })).status, 200)
+    }
+  })
+})
+
 test('la página se sirve sin clave, con CSP y sin referer; lo desconocido es 404', async () => {
   await conServidor({}, async (base) => {
     const r = await fetch(`${base}/`)
     assert.equal(r.status, 200)
     assert.match(r.headers.get('content-security-policy') ?? '', /script-src 'self'/)
     assert.equal(r.headers.get('referrer-policy'), 'no-referrer')
-    assert.ok(!(await r.text()).includes(CLAVE))
+    const html = await r.text()
+    assert.ok(!html.includes(CLAVE))
+    // Sin hosts de afuera: sin internet (o con un portal cautivo) la página no queda en blanco esperándolos.
+    assert.doesNotMatch(html, /(?:href|src)="https?:/)
+    assert.doesNotMatch(r.headers.get('content-security-policy') ?? '', /https?:/)
+    assert.equal(r.headers.get('cache-control'), 'no-store')
     const js = await fetch(`${base}/app.js`)
     assert.equal(js.status, 200)
     assert.ok((await js.text()).includes('slothSello'))
@@ -354,4 +405,105 @@ test('conexiones: una que no manda nada se corta sola', async () => {
     },
     { ociosoMs: 150 }
   )
+})
+
+test('emparejar: con la clave del QR solo se pide entrar; los datos abren con la clave de un celu que la PC dejó entrar', async () => {
+  const CELU = Buffer.alloc(32, 9).toString('base64url')
+  const lista: { id: string; clave: string }[] = []
+  const vistos: unknown[] = []
+  await conServidor(
+    {
+      celus: () => lista,
+      entrar: (b, q) => {
+        vistos.push(['entrar', b, q.celu])
+        return { status: 200, data: { codigo: '0042', estado: 'esperando' } }
+      },
+      estado: async (q) => {
+        vistos.push(['estado', q?.celu])
+        return ESTADO
+      },
+      puedeAprobar: (q) => q?.celu === 'c1',
+      decidir: (id, d, q) => void vistos.push(['decidir', id, d, q?.celu])
+    },
+    async (base) => {
+      assert.equal((await postSellado(base, '/api/estado', {})).status, 401, 'el QR solo no deja ver nada')
+      assert.equal((await postSellado(base, '/api/terminal', { id: 'w', desde: -1 })).status, 401)
+      const pide = await postSellado(base, '/api/emparejar', { clave: CELU })
+      assert.equal(pide.status, 200)
+      assert.deepEqual(pide.cuerpo, { codigo: '0042', estado: 'esperando' })
+      assert.equal((await postSellado(base, '/api/estado', {}, { con: CELU })).status, 401, 'sin el sí de la PC, la clave del celu no sirve')
+      lista.push({ id: 'c1', clave: CELU })
+      assert.equal((await postSellado(base, '/api/estado', {}, { con: CELU })).status, 200)
+      const ya = await postSellado(base, '/api/emparejar', { clave: CELU }, { con: CELU })
+      assert.deepEqual([ya.status, ya.cuerpo], [200, { ya: true }], 'con la clave del celu, emparejar dice que ya está')
+      assert.equal((await postSellado(base, '/api/permiso', { id: 'p', decision: 'allow' }, { con: CELU })).status, 200, 'puedeAprobar recibe quién es')
+      lista.length = 0
+      assert.equal((await postSellado(base, '/api/estado', {}, { con: CELU })).status, 401, 'sacado de la lista, queda afuera en el acto')
+      assert.deepEqual(vistos, [['entrar', { clave: CELU }, undefined], ['estado', 'c1'], ['decidir', 'p', 'allow', 'c1']])
+    }
+  )
+})
+
+test('por la misma IP (como por `tailscale serve`), cada celu tiene su cupo; la PC lo ve con la etiqueta, no 127.0.0.1', async () => {
+  const A = Buffer.alloc(32, 10).toString('base64url')
+  const B = Buffer.alloc(32, 11).toString('base64url')
+  const ips: string[] = []
+  await conServidor(
+    {
+      celus: () => [{ id: 'a', clave: A }, { id: 'b', clave: B }],
+      entrar: () => ({ status: 200, data: {} }),
+      estado: async (q) => {
+        if (q) ips.push(q.ip)
+        return ESTADO
+      },
+      terminal: async () => SIN_SALIDA
+    },
+    async (base) => {
+      for (let i = 0; i < 200; i++) assert.equal((await postSellado(base, '/api/terminal', { id: 'ws', desde: 0 }, { con: A })).status, 200)
+      assert.equal((await postSellado(base, '/api/terminal', { id: 'ws', desde: 0 }, { con: A })).status, 429)
+      assert.equal((await postSellado(base, '/api/terminal', { id: 'ws', desde: 0 }, { con: B })).status, 200, 'el otro celu no paga lo que gastó el primero')
+      await postSellado(base, '/api/estado', {}, { con: B })
+      assert.deepEqual(ips, ['Tailscale (HTTPS)'])
+    },
+    { etiqueta: 'Tailscale (HTTPS)' }
+  )
+})
+
+test('emparejar sin proveedor de entradas (como en v1): la clave del QR da acceso y emparejar contesta que ya está', async () => {
+  await conServidor({}, async (base) => {
+    assert.equal((await postSellado(base, '/api/estado', {})).status, 200)
+    const ya = await postSellado(base, '/api/emparejar', { clave: CLAVE })
+    assert.deepEqual([ya.status, ya.cuerpo], [200, { ya: true }])
+  })
+})
+
+test('los íconos de 512 (para instalarla como app) se sirven si están; el manifiesto los pide', async () => {
+  const png = Buffer.from('png-512')
+  await conServidor({ icono: (a) => (a === 'icono-512.png' ? png : null) }, async (base) => {
+    const r = await fetch(`${base}/icono-512.png`)
+    assert.equal(r.status, 200)
+    assert.equal(r.headers.get('content-type'), 'image/png')
+    assert.deepEqual(Buffer.from(await r.arrayBuffer()), png)
+    assert.equal((await fetch(`${base}/icono-maskable.png`)).status, 404)
+    assert.equal((await fetch(`${base}/__proto__`)).status, 404)
+    const m = (await (await fetch(`${base}/manifest.webmanifest`)).json()) as { icons: { src: string; sizes: string; purpose: string }[] }
+    assert.deepEqual(m.icons.map((i) => `${i.src} ${i.sizes} ${i.purpose}`), ['/icono.png 192x192 any', '/icono-512.png 512x512 any', '/icono-maskable.png 512x512 maskable'])
+  })
+})
+
+test('dos servidores de la misma PC (Wi-Fi y Tailscale) comparten la memoria de sobres: uno copiado de un lado no vale del otro', async () => {
+  const repetidos = crearRepetidos()
+  const proveedor: ProveedorDeEstado = { estado: async () => ESTADO, decidir: () => undefined, puedeAprobar: () => false, clave: () => CLAVE, icono: () => null, terminal: async () => ({ status: 403, error: 'x' }), xterm: () => null }
+  const a = crearFuenteWifi({ host: '127.0.0.1', puerto: 0, proveedor, repetidos })
+  const b = crearFuenteWifi({ host: '127.0.0.1', puerto: 0, proveedor, repetidos })
+  await a.iniciar()
+  await b.iniciar()
+  try {
+    const sobre = sellarPedido(claves, '/api/estado', JSON.stringify({ t: Date.now(), b: {} }))
+    assert.equal((await enviarSobre(`http://127.0.0.1:${a.puerto()}`, '/api/estado', sobre)).status, 200)
+    assert.equal((await enviarSobre(`http://127.0.0.1:${b.puerto()}`, '/api/estado', sobre)).status, 409)
+  } finally {
+    await a.detener()
+    await b.detener()
+  }
 })

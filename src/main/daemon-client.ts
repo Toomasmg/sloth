@@ -10,7 +10,7 @@ import { connect, type Socket } from 'node:net'
 import { spawn, execFileSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { basename, join, sep } from 'node:path'
+import { basename, dirname, join, sep } from 'node:path'
 import * as nodePty from 'node-pty'
 import type { PtyChunk, PtyStartResult } from '../shared/types'
 import type {
@@ -25,7 +25,7 @@ import type {
 } from '../shared/daemon-protocol'
 import { TerminalCore } from '../daemon/core'
 import { copiaPty, hashArchivo, hashesDe, mismosHashes } from './daemon-bin'
-import { daemonKeyFileFor, DAEMON_SCRIPT_NAME, legacyPipeNameFor, pipeNameFor, tokenFileFor } from '../daemon/paths'
+import { daemonKeyFileFor, DAEMON_EXE_NAME, DAEMON_SCRIPT_NAME, legacyPipeNameFor, pipeNameFor, tokenFileFor } from '../daemon/paths'
 import { KEY_RE, mismaPrueba, NONCE_RE, nuevoNonce, pruebaCliente, pruebaDaemon } from '../daemon/auth'
 
 export type { HookEventPayload, PendingPermission, SessionInfo, SpawnSpec }
@@ -159,7 +159,8 @@ interface Launcher {
   pipe: string
   key: string
   /** Lanza el daemon (detached). Tira si no hay node o faltan archivos. */
-  launch(): void
+  /** Devuelve cuál lanzó. Con `soloNode` ignora el daemon en Rust. */
+  launch(soloNode?: boolean): 'rust' | 'node'
 }
 
 function ensureKey(userDataDir: string): string {
@@ -256,20 +257,64 @@ function runtimeFiles(opts: CreateBackendOptions): { script: string; ptyDir: str
   throw new Error('No se encontró el script del daemon.')
 }
 
+/**
+ * El daemon en Rust (un solo .exe, sin node ni node-pty). En la app instalada se copia a
+ * userData/daemon-bin/<versión> por la misma razón que el de Node. undefined si no está compilado
+ * o si SLOTH_DAEMON=node lo descarta.
+ */
+function rustExe(opts: CreateBackendOptions): string | undefined {
+  if (process.platform !== 'win32' || process.env.SLOTH_DAEMON === 'node') return undefined
+  const packaged = opts.resourcesDir ? join(opts.resourcesDir, 'daemon', DAEMON_EXE_NAME) : ''
+  if (packaged && existsSync(packaged)) {
+    const dest = join(opts.userDataDir, 'daemon-bin', opts.appVersion.replace(/[^0-9A-Za-z.+-]/g, '_'), DAEMON_EXE_NAME)
+    if (!existsSync(dest) || hashArchivo(dest) !== hashArchivo(packaged)) {
+      mkdirSync(dirname(dest), { recursive: true })
+      cpSync(packaged, dest)
+    }
+    return dest
+  }
+  const dev = opts.projectRoot ? join(opts.projectRoot, 'out', 'daemon', DAEMON_EXE_NAME) : ''
+  return dev && existsSync(dev) ? dev : undefined
+}
+
+function entornoDelDaemon(): Record<string, string> {
+  const env: Record<string, string> = {}
+  for (const [k, v] of Object.entries(process.env)) {
+    const K = k.toUpperCase()
+    if (v === undefined || K.startsWith('ELECTRON_') || K === 'NODE_OPTIONS' || K.startsWith('SLOTH_') || K.startsWith('ANTIREA_')) continue
+    env[k] = v
+  }
+  return env
+}
+
 function makeLauncher(opts: CreateBackendOptions): Launcher {
   const key = ensureKey(opts.userDataDir)
+  const pipe = pipeNameFor(opts.userDataDir)
   return {
-    pipe: pipeNameFor(opts.userDataDir),
+    pipe,
     key,
-    launch() {
+    launch(soloNode) {
+      let exe: string | undefined
+      try {
+        exe = soloNode ? undefined : rustExe(opts)
+      } catch (e) {
+        opts.log?.(`[daemon] no se pudo preparar el daemon en Rust, se usa el de Node: ${(e as Error).message}`)
+      }
+      if (exe) {
+        const hijo = spawn(exe, ['--user-data', opts.userDataDir, '--pipe', pipe, '--app-version', opts.appVersion], {
+          detached: true,
+          stdio: 'ignore',
+          windowsHide: true,
+          cwd: opts.userDataDir,
+          env: entornoDelDaemon()
+        })
+        hijo.on('error', () => {})
+        hijo.unref()
+        return 'rust'
+      }
       const nodePath = findNode(opts.nodePath)
       const { script, ptyDir } = runtimeFiles(opts)
-      const env: Record<string, string> = {}
-      for (const [k, v] of Object.entries(process.env)) {
-        const K = k.toUpperCase()
-        if (v === undefined || K.startsWith('ELECTRON_') || K === 'NODE_OPTIONS' || K.startsWith('SLOTH_') || K.startsWith('ANTIREA_')) continue
-        env[k] = v
-      }
+      const env = entornoDelDaemon()
       const child = spawn(
         nodePath,
         [
@@ -287,6 +332,7 @@ function makeLauncher(opts: CreateBackendOptions): Launcher {
       )
       child.on('error', () => {})
       child.unref()
+      return 'node'
     }
   }
 }
@@ -407,20 +453,30 @@ async function connectOrLaunch(l: Launcher, appVersion: string, allowLaunch: boo
     if (code !== 'ENOENT' && code !== 'ECONNREFUSED') throw e
     if (!allowLaunch) throw e
   }
-  l.launch()
-  const deadline = Date.now() + CONNECT_TIMEOUT_MS
-  let last: unknown
-  while (Date.now() < deadline) {
-    await sleep(150)
-    try {
-      return await handshake(await connectPipe(l.pipe), l.key, appVersion)
-    } catch (e) {
-      last = e
-      const code = (e as NodeJS.ErrnoException).code
-      if (code !== 'ENOENT' && code !== 'ECONNREFUSED') throw e
+  const usado = l.launch()
+  const esperar = async (): Promise<Conn | Error> => {
+    const deadline = Date.now() + CONNECT_TIMEOUT_MS
+    let last: unknown
+    while (Date.now() < deadline) {
+      await sleep(150)
+      try {
+        return await handshake(await connectPipe(l.pipe), l.key, appVersion)
+      } catch (e) {
+        last = e
+        const code = (e as NodeJS.ErrnoException).code
+        if (code !== 'ENOENT' && code !== 'ECONNREFUSED') throw e
+      }
     }
+    return new Error(`El daemon no levantó en ${CONNECT_TIMEOUT_MS / 1000} s (${(last as Error)?.message ?? '?'}).`)
   }
-  throw new Error(`El daemon no levantó en ${CONNECT_TIMEOUT_MS / 1000} s (${(last as Error)?.message ?? '?'}).`)
+  const primero = await esperar()
+  if (!(primero instanceof Error)) return primero
+  if (usado !== 'rust') throw primero
+  // Un .exe que no arranca (antivirus, falta de permisos) no puede dejarnos sin terminales persistentes.
+  l.launch(true)
+  const segundo = await esperar()
+  if (segundo instanceof Error) throw segundo
+  return segundo
 }
 
 async function waitPipeGone(pipe: string, ms: number): Promise<boolean> {

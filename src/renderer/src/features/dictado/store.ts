@@ -20,7 +20,7 @@ const INACTIVO: VistaDictado = { estado: 'inactivo' }
 const vistas = new Map<string, VistaDictado>()
 const subs = new Set<() => void>()
 /** La grabación en curso y las partes que ya se mandaron a transcribir, en orden. */
-let activa: { paneId: string; grab: Grabacion; partes: Promise<ResultadoDictado>[] } | null = null
+let activa: { paneId: string; grab: Grabacion; partes: Cadena } | null = null
 
 function set(paneId: string, v: VistaDictado): void {
   vistas.set(paneId, v)
@@ -118,10 +118,10 @@ export async function empezar(paneId: string, onTexto: (texto: string) => void):
   }
   set(paneId, { estado: 'escuchando' })
   try {
-    const partes: Promise<ResultadoDictado>[] = []
+    const partes = cadena()
     const grab = await grabar(
       () => void terminar(paneId, onTexto),
-      (wav) => partes.push(transcribir(wav))
+      (wav) => partes.sumar(wav)
     )
     // Si mientras se pedía el micrófono se tocó otro panel o se canceló, se suelta.
     if (vistas.get(paneId)?.estado !== 'escuchando' || activa) {
@@ -146,8 +146,8 @@ export async function terminar(paneId: string, onTexto: (texto: string) => void)
   })
   try {
     const wav = await grab.terminar()
-    if (wav) partes.push(transcribir(wav))
-    const resultados = await Promise.all(partes)
+    if (wav) partes.sumar(wav)
+    const resultados = await partes.resultados()
     // Lo que sí se transcribió se pega igual: una parte que falla no tira el dictado entero.
     const texto = resultados.flatMap((r) => (r.ok && r.texto ? [r.texto] : [])).join(' ')
     const fallo = resultados.find((r): r is Extract<ResultadoDictado, { ok: false }> => !r.ok)
@@ -159,8 +159,36 @@ export async function terminar(paneId: string, onTexto: (texto: string) => void)
   }
 }
 
-function transcribir(wav: Uint8Array): Promise<ResultadoDictado> {
-  return (window.sloth.feat.invoke('feat:dictado:transcribir', wav) as Promise<ResultadoDictado>).catch(
+interface Cadena {
+  sumar(wav: Uint8Array): void
+  resultados(): Promise<ResultadoDictado[]>
+}
+
+/**
+ * Las partes de un dictado, transcriptas de a una y en orden: cada una lleva lo ya dictado para que
+ * Whisper siga la oración (sin eso cada parte arrancaba con mayúscula y a veces en inglés). No se pierde
+ * tiempo: main igual transcribe de a una.
+ */
+function cadena(): Cadena {
+  const partes: Promise<ResultadoDictado>[] = []
+  let dictado = ''
+  let ultima: Promise<unknown> = Promise.resolve()
+  return {
+    sumar(wav) {
+      const p = ultima.then(async () => {
+        const r = await transcribir(wav, dictado)
+        if (r.ok && r.texto) dictado = dictado ? `${dictado} ${r.texto}` : r.texto
+        return r
+      })
+      ultima = p
+      partes.push(p)
+    },
+    resultados: () => Promise.all(partes)
+  }
+}
+
+function transcribir(wav: Uint8Array, previo: string): Promise<ResultadoDictado> {
+  return (window.sloth.feat.invoke('feat:dictado:transcribir', { wav, previo }) as Promise<ResultadoDictado>).catch(
     (e: unknown): ResultadoDictado => ({ ok: false, error: { tipo: 'otro', mensaje: `No se pudo transcribir (${cleanError(e)}).`, ajustes: false } })
   )
 }
