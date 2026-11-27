@@ -5,8 +5,7 @@ use crate::perfiles_core::es_blanco_js;
 use crate::versionado::Objeto;
 use serde_json::{json, Value};
 
-/// Tope de la ventana de 5 h en tokens (cupo.ts).
-pub const TOPE_MAX: f64 = 1_000_000_000.0;
+pub use crate::cupo::TOPE_MAX;
 
 pub const THEMES: [&str; 4] = ["oscuro", "noche", "claro", "sistema"];
 pub const DENSITIES: [&str; 2] = ["compacta", "cómoda"];
