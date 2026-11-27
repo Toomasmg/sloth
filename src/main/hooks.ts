@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { AgentState } from '../shared/types'
 import { HOOK_EVENTS, type HookEventPayload } from '../shared/daemon-protocol'
@@ -47,6 +48,60 @@ export function hayNode(): boolean {
 /** Ruta del envoltorio de la statusline (userData/sloth-statusline.cjs). */
 export function statuslineScriptPath(): string {
   return join(raizDatos(), 'sloth-statusline.cjs')
+}
+
+let helperCache: { exe: string; comando: string } | null | undefined
+
+/**
+ * El ejecutable en Rust de los hooks, la statusline y el aviso de Codex (native/helper): reemplaza a los tres scripts
+ * de Node, así las cuentas no necesitan Node. Se copia a userData/bin y se corre desde ahí (no desde la carpeta de
+ * instalación, que el instalador tiene que poder actualizar). `comando` es la ruta para escribirla en un comando de
+ * shell: con barras y sin espacios (en PowerShell una ruta con comillas delante del primer argumento no se ejecuta),
+ * usando el nombre corto 8.3 si la carpeta tiene espacios. Null si no está compilado o no hay ruta usable: se sigue
+ * con Node.
+ */
+export function helperHook(): { exe: string; comando: string } | null {
+  if (helperCache !== undefined) return helperCache
+  helperCache = null
+  if (process.platform !== 'win32') return null
+  const origen = [process.env.SLOTH_HELPER, join(process.resourcesPath ?? '', 'daemon', 'sloth-hook.exe'), join(process.env.SLOTH_APP_PATH ?? process.cwd(), 'out', 'daemon', 'sloth-hook.exe')].find(
+    (c): c is string => !!c && existsSync(c)
+  )
+  if (!origen) return null
+  try {
+    const destino = join(raizDatos(), 'bin', 'sloth-hook.exe')
+    mkdirSync(join(raizDatos(), 'bin'), { recursive: true })
+    const hash = (f: string): string => createHash('sha256').update(readFileSync(f)).digest('hex')
+    if (!existsSync(destino) || hash(destino) !== hash(origen)) {
+      const tmp = `${destino}.${process.pid}.tmp`
+      copyFileSync(origen, tmp)
+      try {
+        renameSync(tmp, destino)
+      } catch (e) {
+        // Un hook corriendo en este momento tiene el archivo abierto: se sigue con el anterior y se reintenta al próximo arranque.
+        rmSync(tmp, { force: true })
+        if (!existsSync(destino)) throw e
+      }
+    }
+    const comando = rutaParaShell(destino)
+    if (comando) helperCache = { exe: destino, comando }
+  } catch (e) {
+    console.warn(`[hooks] no se pudo preparar sloth-hook.exe: ${(e as Error).message}`)
+  }
+  return helperCache
+}
+
+/** Ruta con barras y sin espacios, o null si no hay forma de escribirla sin comillas. */
+export function rutaParaShell(ruta: string): string | null {
+  let r = ruta
+  if (/\s/.test(r)) {
+    try {
+      r = execFileSync('cmd.exe', ['/d', '/s', '/c', `for %I in ("${ruta}") do @echo %~sI`], { encoding: 'utf8', windowsHide: true, timeout: 5000 }).trim()
+    } catch {
+      return null
+    }
+  }
+  return r && !/[\s"'`$&|;<>()^%!]/.test(r.replace(/\\/g, '/')) ? r.replace(/\\/g, '/') : null
 }
 
 export function writeIfChanged(file: string, content: string): void {
@@ -116,9 +171,10 @@ export function installInto(configDir: string, base?: Record<string, unknown>): 
   const isOurs = (cmd?: string): boolean =>
     typeof cmd === 'string' && [HOOK_MARKER, ...LEGACY_HOOK_MARKERS].some((m) => cmd.includes(m))
   const script = hookScriptPath().replace(/\\/g, '/')
+  const helper = helperHook()
   for (const event of INSTALLED_EVENTS) {
     const others = (hooks[event] ?? []).filter((e) => !e.hooks?.some((h) => isOurs(h.command)))
-    const hook: Hook = { type: 'command', command: `node "${script}" ${event}` }
+    const hook: Hook = { type: 'command', command: helper ? `${helper.comando} ${event}` : `node "${script}" ${event}` }
     if (event === 'PermissionRequest') hook.timeout = PERMISSION_HOOK_TIMEOUT_S
     const ours: Entry = { hooks: [hook] }
     if (event === 'PreToolUse' || event === 'PermissionRequest') ours.matcher = ''
@@ -126,7 +182,7 @@ export function installInto(configDir: string, base?: Record<string, unknown>): 
   }
   settings.hooks = hooks
   // El % real de los límites solo llega en la entrada de la statusline: se envuelve para leerlo (función «celular»).
-  if (hayNode()) settings.statusLine = envolverStatusline(settings.statusLine, statuslineScriptPath())
+  if (helper || hayNode()) settings.statusLine = envolverStatusline(settings.statusLine, statuslineScriptPath(), helper?.comando)
   const texto = JSON.stringify(settings, null, 2)
   // Un respaldo que no se pudo hacer no frena la terminal: queda en el log.
   try {
