@@ -79,7 +79,7 @@ import { RenameInput } from './layout/RenameInput'
 import { Sidebar } from './layout/Sidebar'
 import { readStorage, writeStorage } from './layout/storage'
 import { TabBar, type TabInfo } from './layout/TabBar'
-import { SOLTAR_MS, direccionDe, pasoSwipe, swipeInicial } from './layout/swipe'
+import { SOLTAR_MS, direccionDe, pasoSwipe, soltarSwipe, swipeInicial } from './layout/swipe'
 import { IconButton, Tag, ToastHost, Tooltip, toast } from './ui'
 import './layout/layout.css'
 import './layout/shell.css'
@@ -602,8 +602,16 @@ export function App(): React.JSX.Element {
         movido?.style.setProperty('translate', `${r.arrastre}px 0`)
       }
       clearTimeout(soltar)
-      // Al soltar sin llegar al umbral, vuelve a su lugar (con la transición de layout.css).
-      soltar = setTimeout(quieto, SOLTAR_MS)
+      // Al soltar: casi en el umbral cambia; si no, vuelve a su lugar (con la transición de layout.css).
+      soltar = setTimeout(() => {
+        quieto()
+        const s = soltarSwipe(swipe.current, performance.now())
+        swipe.current = s.estado
+        if (s.cambio) {
+          pedida.current = s.cambio
+          kbRef.current.cycleBy(s.cambio)
+        }
+      }, SOLTAR_MS)
     }
     // En captura: xterm corta la propagación de la rueda cuando la usa para el historial.
     area.addEventListener('wheel', onWheel, { passive: true, capture: true })

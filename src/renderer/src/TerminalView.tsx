@@ -9,7 +9,7 @@ import { subscribeSettings, termOptions } from './features/settings/store'
 import { usePaneVisible } from './visibility'
 import { PANES_FIT_EVENT } from './layout/store'
 import { MicDictado } from './features/dictado/MicDictado'
-import { pasoRueda, ruedaInicial } from './rueda'
+import { PAUSA_MS, acercar, alinear, deltaEnPx, partir } from './rueda'
 
 /** window.open con la URL: setWindowOpenHandler (main) la manda al navegador del sistema. */
 function abrirLink(uri: string): void {
@@ -51,7 +51,7 @@ export const TerminalView = memo(function TerminalView({ id, label, generation, 
       ...opts,
       cursorBlink: opts.cursorBlink && document.visibilityState === 'visible',
       allowProposedApi: true,
-      // El scroll del historial lo maneja onWheel (rueda.ts); sin animación cada evento se ve al instante.
+      // El scroll del historial lo anima onWheel (rueda.ts) cuadro a cuadro: xterm solo salta a la línea.
       smoothScrollDuration: 0,
       // Links OSC 8 (los que arma Claude Code). El handler por defecto de xterm abre una ventana en blanco
       // y después navega: el main la rechaza por no ser https y el link no abría nada.
@@ -245,17 +245,66 @@ export const TerminalView = memo(function TerminalView({ id, label, generation, 
 
     // Historial de la shell o de Claude: lo mueve rueda.ts. Con el mouse pedido por la app (o en vim, nano)
     // la rueda sigue yendo a xterm; Alt, Shift y Ctrl también, por su scroll rápido, horizontal y zoom.
-    let rueda = ruedaInicial()
+    const pantalla = (): HTMLElement | null => el.querySelector<HTMLElement>('.xterm-screen')
+    const altoCelda = (): number => {
+      const p = pantalla()
+      return p && term.rows ? p.clientHeight / term.rows : opts.fontSize * 1.2
+    }
+    const correr = (px: number): void => {
+      const p = pantalla()
+      if (p) p.style.transform = px ? `translateY(${-px}px)` : ''
+    }
+    // pos y objetivo en px desde el principio del buffer; linea es la que le pedimos a xterm.
+    let pos = 0
+    let objetivo = 0
+    let linea = -1
+    let cuadro = 0
+    let previo = 0
+    let ultimoEvento = -Infinity
+    // Al cambiar de línea, xterm dibuja en el cuadro siguiente: el corrimiento nuevo se pone recién ahí,
+    // si no la pantalla salta una línea durante un cuadro.
+    let fraccionPendiente: number | null = null
+    const sincronizar = (h: number): void => {
+      linea = term.buffer.active.viewportY
+      pos = objetivo = linea * h
+      fraccionPendiente = null
+      correr(0)
+    }
+    const paso = (t: number): void => {
+      cuadro = 0
+      const h = altoCelda()
+      // Algo más movió el historial (salida nueva, una tecla que baja al final): se sigue desde ahí.
+      if (term.buffer.active.viewportY !== linea || !inNormalBuffer()) return sincronizar(h)
+      if (t - ultimoEvento > PAUSA_MS) objetivo = alinear(objetivo, h)
+      pos = acercar(pos, objetivo, Math.min(t - previo, 50))
+      previo = t
+      const p = partir(pos, h)
+      if (p.linea !== linea) {
+        linea = p.linea
+        fraccionPendiente = p.fraccion
+        term.scrollToLine(p.linea)
+      } else if (fraccionPendiente === null) correr(p.fraccion)
+      else fraccionPendiente = p.fraccion
+      if (pos !== objetivo || t - ultimoEvento <= PAUSA_MS) cuadro = requestAnimationFrame(paso)
+    }
+    term.onRender(() => {
+      if (fraccionPendiente === null) return
+      correr(fraccionPendiente)
+      fraccionPendiente = null
+    })
     const onWheel = (ev: WheelEvent): void => {
       if (ev.altKey || ev.shiftKey || ev.ctrlKey || Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) return
       if (term.modes.mouseTrackingMode !== 'none' || !inNormalBuffer()) return
       ev.preventDefault()
       ev.stopPropagation()
-      const pantalla = el.querySelector<HTMLElement>('.xterm-screen')
-      const altoCelda = pantalla && term.rows ? pantalla.clientHeight / term.rows : opts.fontSize * 1.2
-      const r = pasoRueda(rueda, ev.deltaY, ev.deltaMode, altoCelda, ev.timeStamp)
-      rueda = r.estado
-      if (r.lineas) term.scrollLines(r.lineas)
+      const h = altoCelda()
+      if (!cuadro && term.buffer.active.viewportY !== linea) sincronizar(h)
+      objetivo = Math.max(0, Math.min(term.buffer.active.baseY * h, objetivo + deltaEnPx(ev.deltaY, ev.deltaMode, h)))
+      ultimoEvento = performance.now()
+      if (!cuadro) {
+        previo = ultimoEvento
+        cuadro = requestAnimationFrame(paso)
+      }
     }
     el.addEventListener('wheel', onWheel, { passive: false, capture: true })
 
@@ -325,6 +374,7 @@ export const TerminalView = memo(function TerminalView({ id, label, generation, 
       el.removeEventListener('contextmenu', onContext)
       el.removeEventListener('scroll', onScroll, true)
       el.removeEventListener('wheel', onWheel, { capture: true })
+      cancelAnimationFrame(cuadro)
       el.removeEventListener('dragover', onDragOver)
       el.removeEventListener('dragleave', onDragLeave)
       el.removeEventListener('drop', onDropFiles)
