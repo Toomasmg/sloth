@@ -67,14 +67,24 @@ Probado: arranca, responde `state:get` y la interfaz se pinta con los datos real
 Se prueba a mano con `npx electron-vite build && npm run build:daemon && npm run build:sidecar` y
 `npx tauri build --debug --no-bundle`; el ejecutable queda en `src-tauri/target/debug/sloth.exe`.
 
-### Brechas conocidas (se cierran en los hitos 2 y 3)
+### Resuelto después del hito 3
 
-- Colores de la barra de título según el tema (hoy la barra es la del renderer) y `setOverlayIcon`.
-- Menú de aplicación y atajos globales: el shim los ignora.
-- `safeStorage`: no disponible, la sesión del chat no se guarda entre reinicios. Hay que leer el formato de
-  os_crypt (clave en `Local State` protegida con DPAPI) para conservar lo ya guardado.
-- Arrastrar carpetas a la UI: `pathForFile` devuelve vacío (usar el evento de arrastre de Tauri).
-- `clipboard.read()` de imágenes, `shell.trashItem`, `nativeImage`, `protocol`, `session` (CSP y permisos de micrófono).
-- Updater: `electron-updater` está reemplazado por un shim que avisa; falta el updater de Tauri.
-- Instancia única, paquete NSIS y que el instalador traiga Node: hoy se usa el `node` del PATH.
-- Tests e2e de Playwright siguen contra Electron.
+- `safeStorage` compatible con Electron (`src/sidecar/safe-storage.ts`): clave AES en `Local State` protegida con DPAPI
+  (vía PowerShell, una vez por arranque) y formato `v10`; lo que guardó Electron se sigue leyendo.
+- Arrastrar archivos y carpetas: `tauri-archivos.ts` convierte el evento de Tauri en eventos DOM con `File` que
+  recuerdan su ruta (`api.pathForFile`).
+- Portapapeles con imagen (`clipboard.read`), papelera (`shell.trashItem`), color de fondo, tema del sistema,
+  pantallas, batería (`powerMonitor`), inicio con Windows e instancia única.
+- Micrófono del dictado: WebView2 lo concede sin preguntar (`permisos.rs`), como hacía `session` en Electron.
+- Zoom con Ctrl + / - / 0 (`zoom-keys.ts` compartido con el main).
+- e2e sobre Tauri: `SLOTH_E2E_RUNTIME=tauri npx playwright test ...` lanza `src-tauri/target/release/sloth.exe`
+  (compilar con `node scripts/prepare-tauri.mjs && npx tauri build --no-bundle`) y se conecta por CDP. El proceso de
+  apoyo ejecuta lo que los specs hacían con `app.evaluate` (solo con `SLOTH_E2E=1`). Las capturas de referencia son de
+  Electron: los specs con `toHaveScreenshot` no se comparan hasta rehacerlas con autorización.
+- CI: job `tauri` (daemon Rust con sus tests y `cargo check` de la cáscara).
+
+### Brechas que quedan
+
+- Menú de aplicación, `setOverlayIcon` y clics en notificaciones (el plugin de Tauri no los da en escritorio).
+- Canal beta del updater.
+- Bandeja: se verificó el pedido al main y a Rust, no el icono en la bandeja de Windows.

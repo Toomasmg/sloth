@@ -57,3 +57,21 @@ jobs:
       - run: cargo test --manifest-path native/daemon/Cargo.toml
       - run: node scripts/build-daemon-rs.mjs
       - run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/test-hooks.mjs --test src/daemon/helper.test.ts src/daemon/rust-daemon.test.ts
+
+  # La cáscara de Tauri: compila (con sloth-core por path) y pasa sus tests. Lleva su tiempo, por eso va aparte.
+  tauri:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+      - run: npm run build
+      - run: npm run build:sidecar
+      - run: node scripts/prepare-tauri.mjs
+      - run: cargo test --manifest-path src-tauri/Cargo.toml

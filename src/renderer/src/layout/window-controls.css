@@ -16,16 +16,16 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--text-2, currentColor);
+  color: var(--text-2);
   cursor: default;
 }
 .wc-btn:hover {
-  background: var(--hover, rgb(128 128 128 / 0.18));
-  color: var(--text, currentColor);
+  background: var(--hover);
+  color: var(--text);
 }
 .wc-close:hover {
-  background: #e81123;
-  color: #fff;
+  background: var(--danger);
+  color: var(--bg);
 }
 .wc-btn:focus-visible {
   outline: 2px solid var(--accent);
