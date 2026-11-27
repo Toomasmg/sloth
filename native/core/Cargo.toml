@@ -8,5 +8,10 @@ publish = false
 # (cargo test) y la usa la cáscara de src-tauri. Es el reemplazo, módulo a módulo, de src/main (ver docs/migracion-rust.md).
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-unicode-normalization = "0.1"
 serde_json = { version = "1", features = ["preserve_order"] }
+unicode-normalization = "0.1"
+base64 = "0.22"
+unicode-segmentation = "1"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Threading"] }
