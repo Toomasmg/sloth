@@ -425,9 +425,10 @@ mod tests {
 
     #[test]
     fn con_la_sal_y_el_iv_fijos_el_archivo_cifrado_sale_igual_que_el_de_node() {
-        let archivo = include_str!("../../fixtures/export/default.sloth");
+        // En Windows, git puede dejar el fixture con CRLF.
+        let archivo = include_str!("../../fixtures/export/default.sloth").replace("\r\n", "\n");
         let plano = include_str!("../../fixtures/export/default.plano.json");
-        let v: Value = serde_json::from_str(archivo).unwrap();
+        let v: Value = serde_json::from_str(&archivo).unwrap();
         let dec = |k: &str| {
             use base64::Engine;
             base64::engine::general_purpose::STANDARD.decode(v["cifrado"][k].as_str().unwrap()).unwrap()
