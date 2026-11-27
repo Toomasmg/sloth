@@ -4,6 +4,7 @@ pub mod agente_exe;
 pub mod avisos;
 pub mod candado;
 pub mod cupo;
+pub mod history_core;
 pub mod hook_env;
 pub mod hooks;
 pub mod initial_prompt;
