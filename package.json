@@ -16,6 +16,7 @@
     "build:daemon": "node scripts/build-daemon.mjs",
     "build:daemon-rs": "node scripts/build-daemon-rs.mjs",
     "build:sidecar": "node scripts/build-sidecar.mjs",
+    "release:tauri": "node scripts/release-tauri.mjs",
     "build:celu-web": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/test-hooks.mjs scripts/build-celu-web.mjs",
     "postinstall": "node scripts/patch-node-pty.mjs",
     "start": "electron-vite preview",

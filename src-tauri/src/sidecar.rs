@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::oneshot;
 
 type Pendientes = Mutex<HashMap<u64, oneshot::Sender<Result<Value, String>>>>;
@@ -54,21 +54,46 @@ fn raiz_del_proyecto() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().map(PathBuf::from).unwrap_or_default()
 }
 
-/// Lanza `node out/sidecar/sloth-sidecar.cjs`. `nativo` atiende los pedidos de la parte nativa.
+/// Windows devuelve rutas con prefijo `\?\` que Node y varias herramientas no esperan.
+fn sin_prefijo(p: PathBuf) -> PathBuf {
+    let t = p.to_string_lossy();
+    let prefijo = format!("{0}{0}?{0}", '\\');
+    t.strip_prefix(prefijo.as_str()).map(PathBuf::from).unwrap_or(p)
+}
+
+/// Lanza el proceso de apoyo. Instalado: el `node` que el instalador deja junto al ejecutable y el main
+/// de la carpeta de recursos. En desarrollo: el `node` del PATH y `out/sidecar` del proyecto.
+/// `nativo` atiende los pedidos de la parte nativa.
 pub fn lanzar(app: AppHandle, nativo: fn(&AppHandle, &str, Vec<Value>) -> Result<Value, String>) -> Result<Arc<Sidecar>, String> {
-    let raiz = std::env::var("SLOTH_APP_PATH").map(PathBuf::from).unwrap_or_else(|_| raiz_del_proyecto());
-    let script = raiz.join("out").join("sidecar").join("sloth-sidecar.cjs");
+    let recursos = app.path().resource_dir().ok().map(sin_prefijo);
+    let instalado = recursos.as_ref().filter(|r| r.join("sidecar").join("sloth-sidecar.cjs").exists());
+    let forzar = std::env::var_os("SLOTH_FORCE_PACKAGED").is_some();
+    let empaquetado = instalado.filter(|_| !cfg!(debug_assertions) || forzar);
+    let (raiz, script, node) = match empaquetado {
+        Some(r) => {
+            let junto = std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.join("node.exe"))).filter(|n| n.exists());
+            (r.clone(), r.join("sidecar").join("sloth-sidecar.cjs"), junto.unwrap_or_else(|| PathBuf::from("node")))
+        }
+        None => {
+            let raiz = std::env::var("SLOTH_APP_PATH").map(PathBuf::from).unwrap_or_else(|_| raiz_del_proyecto());
+            let script = raiz.join("out").join("sidecar").join("sloth-sidecar.cjs");
+            (raiz, script, PathBuf::from("node"))
+        }
+    };
     if !script.exists() {
         return Err(format!("falta {} (corré npm run build:sidecar)", script.display()));
     }
-    let mut cmd = Command::new("node");
+    let mut cmd = Command::new(node);
     cmd.arg(&script)
         .current_dir(&raiz)
         .env("SLOTH_APP_PATH", &raiz)
-        .env("SLOTH_VERSION", env!("CARGO_PKG_VERSION"))
+        .env("SLOTH_VERSION", app.package_info().version.to_string())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
+    if empaquetado.is_some() {
+        cmd.env("SLOTH_PACKAGED", "1").env("SLOTH_RESOURCES", &raiz);
+    }
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
