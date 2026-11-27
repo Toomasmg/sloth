@@ -10,6 +10,8 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
+use tauri_plugin_updater::{Update, UpdaterExt};
+use std::sync::Mutex;
 
 fn texto(args: &[Value], i: usize) -> Result<String, String> {
     args.get(i).and_then(Value::as_str).map(str::to_owned).ok_or_else(|| format!("falta el argumento {i}"))
@@ -98,6 +100,51 @@ fn dialogo_mensaje(app: &AppHandle, o: &Value) -> Result<Value, String> {
     // Tauri solo distingue aceptar de cancelar: aceptar es el primer botón (índice 0) y cancelar el segundo.
     let acepto = d.blocking_show();
     Ok(json!({ "response": if acepto { 0 } else { botones.len().saturating_sub(1).min(1) }, "checkboxChecked": false }))
+}
+
+/// La actualización encontrada y, cuando ya se bajó, su instalador.
+static ACTUALIZACION: Mutex<Option<(Update, Option<Vec<u8>>)>> = Mutex::new(None);
+
+fn avisar(app: &AppHandle, nombre: &str, args: Value) {
+    if let Some(a) = app.try_state::<crate::Apoyo>() {
+        a.0.evento_nativo(nombre, args);
+    }
+}
+
+fn buscar_actualizacion(app: &AppHandle) -> Result<Value, String> {
+    let update = tauri::async_runtime::block_on(async { app.updater().map_err(|e| e.to_string())?.check().await.map_err(|e| e.to_string()) })?;
+    let Some(u) = update else {
+        *ACTUALIZACION.lock().map_err(|e| e.to_string())? = None;
+        return Ok(Value::Null);
+    };
+    let info = json!({ "version": u.version, "date": u.date.map(|d| d.to_string()), "notes": u.body });
+    *ACTUALIZACION.lock().map_err(|e| e.to_string())? = Some((u, None));
+    Ok(info)
+}
+
+fn bajar_actualizacion(app: &AppHandle) -> Result<Value, String> {
+    let u = ACTUALIZACION.lock().map_err(|e| e.to_string())?.as_ref().map(|(u, _)| u.clone()).ok_or("Primero buscá una actualización.")?;
+    let mut bajado: u64 = 0;
+    let bytes = tauri::async_runtime::block_on(u.download(
+        |trozo, total| {
+            bajado += trozo as u64;
+            avisar(app, "updater", json!(["progress", { "transferred": bajado, "total": total }]));
+        },
+        || {},
+    ))
+    .map_err(|e| e.to_string())?;
+    if let Some(slot) = ACTUALIZACION.lock().map_err(|e| e.to_string())?.as_mut() {
+        slot.1 = Some(bytes);
+    }
+    Ok(Value::Null)
+}
+
+fn instalar_actualizacion() -> Result<Value, String> {
+    let (u, bytes) = ACTUALIZACION.lock().map_err(|e| e.to_string())?.take().ok_or("No hay una actualización descargada.")?;
+    let bytes = bytes.ok_or("La actualización todavía no se descargó.")?;
+    // En Windows el instalador se lanza y la app sale sola.
+    u.install(bytes).map_err(|e| e.to_string())?;
+    Ok(Value::Null)
 }
 
 type Elemento = Box<dyn IsMenuItem<tauri::Wry>>;
@@ -236,6 +283,9 @@ pub fn atender(app: &AppHandle, op: &str, args: Vec<Value>) -> Result<Value, Str
             let nivel = args.first().and_then(Value::as_f64).unwrap_or(0.0);
             ventana(app)?.set_zoom(1.2f64.powf(nivel)).map_err(|e| e.to_string()).map(|_| Value::Null)
         }
+        "updater.check" => buscar_actualizacion(app),
+        "updater.download" => bajar_actualizacion(app),
+        "updater.install" => instalar_actualizacion(),
         "tray.set" => bandeja(app, args.first().unwrap_or(&Value::Null)),
         "tray.destroy" => {
             app.remove_tray_by_id("sloth");

@@ -71,6 +71,12 @@ interface Display {
   scaleFactor: number
 }
 
+/** Lo usa el shim del updater, que vive en otro módulo. */
+export const puente = {
+  nativo: <T = unknown>(op: string, ...args: unknown[]): Promise<T> => rpc.nativo<T>(op, ...args),
+  alEvento: (nombre: string, fn: (...args: unknown[]) => void): void => rpc.alEventoNativo(nombre, fn)
+}
+
 const nativo = <T = unknown>(op: string, ...args: unknown[]): Promise<T> => rpc.nativo<T>(op, ...args)
 const ignorar = (p: Promise<unknown>): void => void p.catch(() => {})
 

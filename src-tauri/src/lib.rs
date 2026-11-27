@@ -55,6 +55,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![ipc_invoke, ipc_send])
         .setup(|app| {
             let apoyo = sidecar::lanzar(app.handle().clone(), nativo::atender).map_err(|e| format!("Sloth no pudo arrancar: {e}"))?;
