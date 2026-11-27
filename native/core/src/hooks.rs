@@ -16,24 +16,7 @@ pub const HOOK_EVENTS: [&str; 6] = ["SessionStart", "UserPromptSubmit", "PreTool
 /// PermissionRequest espera la respuesta de la interfaz, por eso lleva timeout propio.
 const PERMISSION_HOOK_TIMEOUT_S: u32 = 130;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EstadoAgente {
-    Idle,
-    Working,
-    Waiting,
-    Done,
-}
-
-impl EstadoAgente {
-    pub fn como_texto(self) -> &'static str {
-        match self {
-            EstadoAgente::Idle => "idle",
-            EstadoAgente::Working => "working",
-            EstadoAgente::Waiting => "waiting",
-            EstadoAgente::Done => "done",
-        }
-    }
-}
+pub use crate::agent_machine::EstadoAgente;
 
 /// Qué estado le corresponde al agente según el evento, y el detalle que lo acompaña. None si el evento no se conoce.
 pub fn estado_para_evento(evento: &str, tool: Option<&str>, message: Option<&str>) -> Option<(EstadoAgente, Option<String>)> {
