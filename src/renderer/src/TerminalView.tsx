@@ -9,6 +9,7 @@ import { subscribeSettings, termOptions } from './features/settings/store'
 import { usePaneVisible } from './visibility'
 import { PANES_FIT_EVENT } from './layout/store'
 import { MicDictado } from './features/dictado/MicDictado'
+import { pasoRueda, ruedaInicial } from './rueda'
 
 /** window.open con la URL: setWindowOpenHandler (main) la manda al navegador del sistema. */
 function abrirLink(uri: string): void {
@@ -50,10 +51,8 @@ export const TerminalView = memo(function TerminalView({ id, label, generation, 
       ...opts,
       cursorBlink: opts.cursorBlink && document.visibilityState === 'visible',
       allowProposedApi: true,
-      // xterm 6 pasa cada px del touchpad a 1,25 px de historial: subir un poco saltaba de golpe. Con la
-      // mitad, el touchpad acompaña a los dedos y la rueda del mouse baja ~3 líneas por muesca.
-      scrollSensitivity: 0.5,
-      smoothScrollDuration: 100,
+      // El scroll del historial lo maneja onWheel (rueda.ts); sin animación cada evento se ve al instante.
+      smoothScrollDuration: 0,
       // Links OSC 8 (los que arma Claude Code). El handler por defecto de xterm abre una ventana en blanco
       // y después navega: el main la rechaza por no ser https y el link no abría nada.
       linkHandler: { activate: (_e, uri) => abrirLink(uri) }
@@ -244,6 +243,22 @@ export const TerminalView = memo(function TerminalView({ id, label, generation, 
     }
     el.addEventListener('scroll', onScroll, true)
 
+    // Historial de la shell o de Claude: lo mueve rueda.ts. Con el mouse pedido por la app (o en vim, nano)
+    // la rueda sigue yendo a xterm; Alt, Shift y Ctrl también, por su scroll rápido, horizontal y zoom.
+    let rueda = ruedaInicial()
+    const onWheel = (ev: WheelEvent): void => {
+      if (ev.altKey || ev.shiftKey || ev.ctrlKey || Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) return
+      if (term.modes.mouseTrackingMode !== 'none' || !inNormalBuffer()) return
+      ev.preventDefault()
+      ev.stopPropagation()
+      const pantalla = el.querySelector<HTMLElement>('.xterm-screen')
+      const altoCelda = pantalla && term.rows ? pantalla.clientHeight / term.rows : opts.fontSize * 1.2
+      const r = pasoRueda(rueda, ev.deltaY, ev.deltaMode, altoCelda, ev.timeStamp)
+      rueda = r.estado
+      if (r.lineas) term.scrollLines(r.lineas)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false, capture: true })
+
     // Fit agrupado en un frame y nunca con el panel oculto (display:none mide 0 y rompería cols/rows).
     let raf = 0
     const ro = new ResizeObserver(() => {
@@ -309,6 +324,7 @@ export const TerminalView = memo(function TerminalView({ id, label, generation, 
       offSettings()
       el.removeEventListener('contextmenu', onContext)
       el.removeEventListener('scroll', onScroll, true)
+      el.removeEventListener('wheel', onWheel, { capture: true })
       el.removeEventListener('dragover', onDragOver)
       el.removeEventListener('dragleave', onDragLeave)
       el.removeEventListener('drop', onDropFiles)
