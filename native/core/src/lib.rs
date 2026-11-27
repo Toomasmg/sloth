@@ -8,6 +8,7 @@ pub mod cupo;
 pub mod daemon_cliente;
 pub mod daemon_protocolo;
 pub mod enlace;
+pub mod features;
 pub mod history_core;
 pub mod hook_env;
 pub mod hooks;
