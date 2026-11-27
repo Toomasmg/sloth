@@ -13,6 +13,11 @@ export const SOLTAR_MS = 120
 /** Cuánto acompaña el panel a los dedos antes de cambiar (px, a cada lado). */
 const MAX_ARRASTRE = 56
 /**
+ * Al soltar (o cuando la inercia se apaga) pasado este tanto del umbral, cambia igual. Antes el gesto que
+ * quedaba entre medio dejaba el panel corrido, «casi cambiando», hasta que volvía.
+ */
+const SOLTAR_CAMBIA = 0.7
+/**
  * Tras un cambio, volver a acelerar para el mismo lado cuenta como dedos nuevos recién pasado este tiempo:
  * a mitad de un deslizamiento los dedos frenan y aceleran solos, y eso saltaba dos paneles (de la 1 a la 3).
  */
@@ -67,7 +72,15 @@ export function pasoSwipe(s: EstadoSwipe, dx: number, dy: number, ahora: number)
   return { estado: { ...base, acumulado }, cambio: null, arrastre: arrastreDe(acumulado) }
 }
 
-const arrastreDe = (acumulado: number): number => -Math.max(-MAX_ARRASTRE, Math.min(MAX_ARRASTRE, acumulado * 0.6))
+// Llega al tope justo en el umbral: no queda un tramo con el panel quieto en el borde sin cambiar.
+const arrastreDe = (acumulado: number): number => -Math.max(-MAX_ARRASTRE, Math.min(MAX_ARRASTRE, (acumulado * MAX_ARRASTRE) / UMBRAL_SWIPE))
+
+/** Los dedos se quedaron quietos SOLTAR_MS: si el gesto iba casi por el umbral, cambia; si no, vuelve. */
+export function soltarSwipe(s: EstadoSwipe, ahora: number): { estado: EstadoSwipe; cambio: 1 | -1 | null } {
+  if (s.usado || Math.abs(s.acumulado) < UMBRAL_SWIPE * SOLTAR_CAMBIA) return { estado: { ...s, acumulado: s.usado ? s.acumulado : 0 }, cambio: null }
+  const signo = Math.sign(s.acumulado)
+  return { estado: { ...s, acumulado: 0, usado: true, signo, pico: 0, piso: 0, cambioEn: ahora }, cambio: signo > 0 ? 1 : -1 }
+}
 
 /** Hacia dónde entra el panel nuevo: por su posición en las pestañas, o por el gesto si se dio la vuelta. */
 export function direccionDe(lista: readonly string[], desde: string | null, hacia: string, pedida?: 1 | -1): 1 | -1 {

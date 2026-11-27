@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { FIN_GESTO_MS, UMBRAL_SWIPE, direccionDe, pasoSwipe, swipeInicial, type EstadoSwipe } from './swipe'
+import { FIN_GESTO_MS, UMBRAL_SWIPE, direccionDe, pasoSwipe, soltarSwipe, swipeInicial, type EstadoSwipe } from './swipe'
 
 /** Manda una tanda de eventos con 16 ms entre cada uno y devuelve los cambios que hubo. */
 function gesto(deltas: [number, number][], desde: EstadoSwipe = swipeInicial(), t0 = 1000): { cambios: (1 | -1)[]; estado: EstadoSwipe; arrastres: number[] } {
@@ -85,4 +85,28 @@ test('un deslizamiento largo que acelera sin frenarse cambia una sola vez', () =
 test('los dedos que frenan un poco y vuelven a acelerar en el mismo gesto no saltan dos paneles', () => {
   assert.deepEqual(gesto([...Array(6).fill([20, 0]), [30, 0], [8, 0], [25, 0], ...Array(8).fill([20, 0])]).cambios, [1])
   assert.deepEqual(gesto([...Array(6).fill([20, 0]), [35, 0], [10, 0], [6, 0], [30, 0], [35, 0], ...Array(10).fill([25, 0])]).cambios, [1])
+})
+
+test('el panel llega al tope recién en el umbral, sin tramo quieto antes', () => {
+  const a = gesto([[UMBRAL_SWIPE * 0.85, 0]]).arrastres[0]
+  const b = gesto([[UMBRAL_SWIPE * 0.95, 0]]).arrastres[0]
+  assert.ok(b < a, `${a} → ${b}`)
+})
+
+test('soltar casi en el umbral cambia; soltar a mitad de camino vuelve', () => {
+  const casi = gesto([[UMBRAL_SWIPE * 0.8, 0]])
+  const r = soltarSwipe(casi.estado, 2000)
+  assert.equal(r.cambio, 1)
+  // Lo que siga del mismo gesto (inercia) no cambia otra vez.
+  assert.equal(pasoSwipe(r.estado, 6, 0, 2016).cambio, null)
+  assert.equal(soltarSwipe(gesto([[-UMBRAL_SWIPE * 0.8, 0]]).estado, 2000).cambio, -1)
+  const mitad = soltarSwipe(gesto([[UMBRAL_SWIPE * 0.5, 0]]).estado, 2000)
+  assert.equal(mitad.cambio, null)
+  assert.equal(mitad.estado.acumulado, 0)
+})
+
+test('soltar después de un cambio no cambia de nuevo', () => {
+  const r = gesto(Array(10).fill([15, 0]))
+  assert.deepEqual(r.cambios, [1])
+  assert.equal(soltarSwipe(r.estado, 3000).cambio, null)
 })
