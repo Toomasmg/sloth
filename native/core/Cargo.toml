@@ -1,0 +1,11 @@
+[package]
+name = "sloth-core"
+version = "0.8.0"
+edition = "2021"
+publish = false
+
+# Lógica de Sloth que no depende de Tauri: persistencia, store, hooks, permisos, features. Se prueba sola
+# (cargo test) y la usa la cáscara de src-tauri. Es el reemplazo, módulo a módulo, de src/main (ver docs/migracion-rust.md).
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }

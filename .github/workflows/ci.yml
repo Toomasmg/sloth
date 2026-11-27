@@ -32,3 +32,11 @@ jobs:
       - run: npm run lint:css
       - run: npm test --if-present
       - run: npm run build
+
+  # El núcleo en Rust (native/core): persistencia, store y lo que se vaya portando de src/main. Se prueba solo, sin Tauri.
+  rust:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: cargo test --manifest-path native/core/Cargo.toml
