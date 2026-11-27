@@ -38,7 +38,21 @@ y se pasa a Rust feature por feature. Sloth anda y se publica en cada hito.
 
 Rust (MSVC) con Build Tools en `D:\VS\BuildTools`; `CARGO_HOME`/`RUSTUP_HOME` en `D:\rust`.
 
-## Estado (hitos 1 y 2 hechos)
+## Estado (hitos 1, 2 y 3 hechos; falta probar la migración sobre una instalación real)
+
+Hito 3: `npm run release:tauri` arma el instalador NSIS firmado (28 MB, con Node, el proceso de apoyo, los daemons y
+node-pty), `latest.json` para el updater de Tauri y `latest.yml` para que las instalaciones de Electron se actualicen
+con electron-updater al mismo instalador (nombre `Sloth-Setup-<versión>.exe`). El instalador desinstala el Sloth de
+Electron (clave `0169b5fe-...` en HKCU) sin tocar `%APPDATA%\Sloth` y se vuelve a abrir con `--force-run`.
+La clave de firma está en `D:\sloth-keys\updater.key` (fuera del repo): hay que guardarla y pasarla en
+`TAURI_SIGNING_PRIVATE_KEY` al publicar; la pública va en `tauri.conf.json`.
+
+Probado: build del instalador y ejecutable de release con recursos en otra carpeta (UI embebida, node propio, daemon Rust).
+No probado: instalar encima de una instalación de Electron, el relanzado y la actualización por el updater de Tauri.
+Hacerlo en una PC o VM de prueba antes de publicar una release. El canal beta no existe: el updater de Tauri solo mira
+el `latest.json` estable.
+
+Hito 2 (ventana y bandeja):
 
 Hito 2: ventana sin marco con botones propios (`layout/WindowControls.tsx`) y arrastre por `-webkit-app-region`,
 eventos de ventana (foco, mover, tamaño, maximizar) hacia el main con el rectángulo en DIP, cierre cancelable
