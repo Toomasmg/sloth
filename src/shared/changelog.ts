@@ -9,6 +9,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.8.1',
+    date: '2026-11-27',
+    title: 'El celu, más seguro y más claro; dictado que sigue la oración',
+    items: [
+      'El QR del celu ahora solo sirve para pedir entrar: cada celu tiene su propia clave y entra cuando tocás «Dejar entrar» en la PC, con el mismo código de 4 dígitos en los dos. Los celus que ya usabas tienen que escanear el QR una vez más.',
+      'En el panel «Celular» ves qué celus tienen acceso, elegís qué puede hacer cada uno («Ver», «Ver y aprobar» o «Ver, aprobar y terminal») y los podés sacar. También ves quién está conectado y qué hizo.',
+      'En el celu, lo que te necesita va arriba; los permisos muestran el comando entero, y los destructivos se marcan y se aprueban con dos toques.',
+      'Desde el celu podés escribir un mensaje entero (con dictado y autocorrector), con más teclas y la cola de lo que falta mandar a la vista.',
+      'Opción «También por Tailscale», para usar el celu fuera de casa, y por HTTPS para instalar la página como app.',
+      'Los avisos de ntfy abren la página del celu al tocarlos, y hay una opción de avisos sin nombres.',
+      'La página del celu se ve mejor acostada y en tablet, y ya no pide fuentes a Google.',
+      'Dictado: cada parte sigue la oración en lugar de arrancar de cero, y las partes son más largas. Nuevo «Dictado más preciso» en Configuración > Terminal (más lento, viene apagado).'
+    ]
+  },
+  {
     version: '0.8.0',
     date: '2026-11-26',
     title: 'Pulido general: paneles, permisos, cupo y conectores',
