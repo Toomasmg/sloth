@@ -6,6 +6,7 @@ import { appendFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { Rpc } from './rpc'
 import { iniciar } from './electron-shim'
+import * as electron from './electron-shim'
 
 // La cáscara de Tauri no tiene consola: lo que sale por stderr también queda en userData/logs/sidecar.log.
 const carpetaLogs = join(process.env.SLOTH_USER_DATA || join(process.env.APPDATA ?? '.', 'Sloth'), 'logs')
@@ -40,6 +41,15 @@ const rpc = new Rpc((linea) => process.stdout.write(linea))
 iniciar(rpc)
 
 ;(process as unknown as { resourcesPath: string }).resourcesPath = process.env.SLOTH_RESOURCES ?? process.cwd()
+
+// Solo en las pruebas e2e: permite ejecutar en el main lo que antes se hacía con `app.evaluate` de Playwright.
+// La función llega como texto y recibe los módulos de electron (shims) como primer argumento.
+if (process.env.SLOTH_E2E === '1') {
+  rpc.handle('e2e:evaluate', (_e, fuente, arg) => {
+    const fn = (0, eval)(`(${String(fuente)})`) as (modulos: typeof electron, arg: unknown) => unknown
+    return fn(electron, arg)
+  })
+}
 
 process.stdin.setEncoding('utf8')
 process.stdin.on('data', (trozo: string) => rpc.recibir(trozo))

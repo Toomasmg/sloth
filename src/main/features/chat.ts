@@ -581,8 +581,8 @@ const feature: Feature = {
     })
     ctx.handle('previewInvite', (text: unknown): ChatInvitePreview => inviteState(parseInvitation(text)))
     ctx.handle('joinInvite', (text: unknown, confirmed: unknown): Promise<ChatInviteJoin> => joinInvite(text, confirmed))
-    ctx.handle('clipboardInvite', (): string | null => {
-      const t = clipboard.readText()
+    ctx.handle('clipboardInvite', async (): Promise<string | null> => {
+      const t = await clipboard.readText()
       return looksLikeInvitation(t) ? t : null
     })
     // El código llega de la UI porque al cambiarlo la lista de equipos tarda en refrescarse; se valida igual.

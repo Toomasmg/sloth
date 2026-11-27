@@ -1,4 +1,5 @@
-import { test as base, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
+import { test as base, expect, chromium, _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
+import { spawn } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -68,9 +69,74 @@ function seedUserData(dir: string, seed: Seed): void {
   writeFileSync(join(dir, 'sloth-state.json'), JSON.stringify(state))
 }
 
+/**
+ * Sloth sobre Tauri (SLOTH_E2E_RUNTIME=tauri): se lanza el ejecutable de release, con WebView2 abierto a CDP, y
+ * Playwright se conecta a su página. Lo que antes era `app.evaluate` de Electron se ejecuta en el proceso de
+ * apoyo (SLOTH_E2E=1 lo habilita) con los módulos de electron que él mismo emula.
+ */
+async function launchTauri(userData: string, seed: Seed): Promise<{ app: ElectronApplication; page: Page; userData: string }> {
+  const exe = process.env.SLOTH_TAURI_EXE ?? join('src-tauri', 'target', 'release', 'sloth.exe')
+  const puerto = 9300 + Math.floor(Math.random() * 600)
+  // --enable-automation: navigator.webdriver en true, que es lo que usa la interfaz para dejar xterm a la vista de las pruebas.
+  const args = [`--remote-debugging-port=${puerto}`, '--enable-automation', '--force-device-scale-factor=1', ...(seed.chromiumArgs ?? [])].join(' ')
+  const proc = spawn(exe, [], {
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      SLOTH_USER_DATA: userData,
+      SLOTH_INPROCESS: '1',
+      SLOTH_E2E: '1',
+      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: args,
+      WEBVIEW2_USER_DATA_FOLDER: join(userData, 'webview')
+    }
+  })
+  let browser: Awaited<ReturnType<typeof chromium.connectOverCDP>> | undefined
+  const limite = Date.now() + 30_000
+  while (!browser) {
+    try {
+      browser = await chromium.connectOverCDP(`http://127.0.0.1:${puerto}`)
+    } catch (e) {
+      if (Date.now() > limite || proc.exitCode !== null) throw e
+      await new Promise((r) => setTimeout(r, 300))
+    }
+  }
+  const context = browser.contexts()[0]
+  const page = context.pages()[0] ?? (await context.waitForEvent('page'))
+  // La página puede estar visible antes de que Tauri inyecte su puente.
+  await page.waitForFunction(() => '__TAURI_INTERNALS__' in window)
+  const app = {
+    process: () => proc,
+    evaluate: (fn: (...a: never[]) => unknown, arg?: unknown) =>
+      page
+        .evaluate(
+          ([fuente, a]) => (window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, p: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__.invoke('ipc_invoke', { channel: 'e2e:evaluate', args: [fuente, a ?? null] }),
+          [fn.toString(), arg] as [string, unknown]
+        )
+        // Si lo que se ejecuta cierra la app, la página desaparece antes de que llegue la respuesta (con Electron, no).
+        .catch((e: unknown) => {
+          if (/context was destroyed|Target (page, context or browser )?has been closed|Target closed|has been closed/i.test(String(e))) return undefined
+          throw e
+        }),
+    firstWindow: () => Promise.resolve(page),
+    // Ventanas nuevas (el celu simulado de celular-terminal): llegan como páginas nuevas del mismo WebView2.
+    waitForEvent: (evento: string) => (evento === 'window' ? context.waitForEvent('page') : Promise.reject(new Error(`Evento no soportado: ${evento}`)))
+  } as unknown as ElectronApplication
+  procs.set(app, proc)
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible() ?? false)).toBe(true)
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows()[0]
+    w.unmaximize()
+    w.setSize(1280, 800)
+  })
+  await page.waitForLoadState('domcontentloaded')
+  await page.evaluate(() => document.fonts.ready.then(() => undefined))
+  return { app, page, userData }
+}
+
 export async function launchSloth(seed: Seed = {}): Promise<{ app: ElectronApplication; page: Page; userData: string }> {
   const userData = mkdtempSync(join(tmpdir(), USERDATA_PREFIX))
   seedUserData(userData, seed)
+  if (process.env.SLOTH_E2E_RUNTIME === 'tauri') return launchTauri(userData, seed)
   const app = await electron.launch({
     args: ['--force-device-scale-factor=1', ...(seed.chromiumArgs ?? []), '.'],
     env: { ...process.env, SLOTH_USER_DATA: userData, SLOTH_INPROCESS: '1', ELECTRON_RENDERER_URL: '' }

@@ -260,6 +260,15 @@ pub fn atender(app: &AppHandle, op: &str, args: Vec<Value>) -> Result<Value, Str
             let _ = w.unmaximize();
             nulo
         }
+        "window.unmaximize" => ventana(app)?.unmaximize().map_err(|e| e.to_string()).map(|_| Value::Null),
+        "window.setSize" => {
+            let n = |i: usize| args.get(i).and_then(Value::as_f64).unwrap_or(0.0);
+            let w = ventana(app)?;
+            let _ = w.unmaximize();
+            // En las pruebas e2e el navegador va con escala 1 forzada: un pixel de la página es un pixel físico.
+            let tam: tauri::Size = if std::env::var_os("SLOTH_E2E").is_some() { tauri::PhysicalSize::new(n(0) as u32, n(1) as u32).into() } else { LogicalSize::new(n(0), n(1)).into() };
+            w.set_size(tam).map_err(|e| e.to_string()).map(|_| Value::Null)
+        }
         "window.maximize" => ventana(app)?.maximize().map_err(|e| e.to_string()).map(|_| Value::Null),
         "window.close" => ventana(app)?.close().map_err(|e| e.to_string()).map(|_| Value::Null),
         "window.flash" => {
@@ -286,6 +295,59 @@ pub fn atender(app: &AppHandle, op: &str, args: Vec<Value>) -> Result<Value, Str
         "updater.check" => buscar_actualizacion(app),
         "updater.download" => bajar_actualizacion(app),
         "updater.install" => instalar_actualizacion(),
+        "clipboard.readImage" => {
+            let img = app.clipboard().read_image().map_err(|e| e.to_string())?;
+            let mut png_bytes = Vec::new();
+            {
+                let mut enc = png::Encoder::new(&mut png_bytes, img.width(), img.height());
+                enc.set_color(png::ColorType::Rgba);
+                enc.set_depth(png::BitDepth::Eight);
+                let mut w = enc.write_header().map_err(|e| e.to_string())?;
+                w.write_image_data(img.rgba()).map_err(|e| e.to_string())?;
+            }
+            Ok(Value::String(base64::engine::general_purpose::STANDARD.encode(png_bytes)))
+        }
+        "clipboard.readFiles" => {
+            // Archivos copiados en el Explorador (CF_HDROP): el plugin del portapapeles no los lee.
+            let archivos: Vec<String> = clipboard_win::get_clipboard(clipboard_win::formats::FileList).map_err(|e| e.to_string())?;
+            Ok(json!(archivos))
+        }
+        // Solo para las pruebas e2e: una segunda ventana con una URL (el celu simulado). La app nunca abre otras.
+        "window.open" => {
+            if std::env::var_os("SLOTH_E2E").is_none() {
+                return Err("no disponible".into());
+            }
+            static CONTADOR: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+            let url: tauri::Url = texto(&args, 0)?.parse().map_err(|e: <tauri::Url as std::str::FromStr>::Err| e.to_string())?;
+            let n = CONTADOR.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let ancho = args.get(1).and_then(Value::as_f64).unwrap_or(390.0);
+            let alto = args.get(2).and_then(Value::as_f64).unwrap_or(780.0);
+            tauri::WebviewWindowBuilder::new(app, format!("extra-{n}"), tauri::WebviewUrl::External(url))
+                .inner_size(ancho, alto)
+                .build()
+                .map_err(|e| e.to_string())?;
+            nulo
+        }
+        "shell.trashItem" => {
+            trash::delete(texto(&args, 0)?).map_err(|e| e.to_string())?;
+            nulo
+        }
+        "window.setBackgroundColor" => {
+            let c = texto(&args, 0)?;
+            let h = c.trim_start_matches('#');
+            if h.len() != 6 {
+                return Err("color inválido".into());
+            }
+            let n = |i: usize| u8::from_str_radix(&h[i..i + 2], 16).map_err(|e| e.to_string());
+            ventana(app)?.set_background_color(Some(tauri::window::Color(n(0)?, n(2)?, n(4)?, 255))).map_err(|e| e.to_string()).map(|_| Value::Null)
+        }
+        "app.setLoginItem" => {
+            use tauri_plugin_autostart::ManagerExt;
+            let activar = args.first().and_then(Value::as_bool).unwrap_or(false);
+            let r = if activar { app.autolaunch().enable() } else { app.autolaunch().disable() };
+            r.map_err(|e| e.to_string())?;
+            nulo
+        }
         "tray.set" => bandeja(app, args.first().unwrap_or(&Value::Null)),
         "tray.destroy" => {
             app.remove_tray_by_id("sloth");

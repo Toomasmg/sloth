@@ -4,12 +4,15 @@
  * Lo que todavía no tiene equivalente queda como no-op documentado en docs/migracion-tauri.md.
  */
 import { EventEmitter } from 'node:events'
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { crc32, deflateSync } from 'node:zlib'
 import { connect as netConnect } from 'node:net'
+import { pathToFileURL } from 'node:url'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Rpc } from './rpc'
+import { cifrar, claveDeUserData, descifrar } from './safe-storage'
 
 let rpc!: Rpc
 let ventanaVisible = false
@@ -54,6 +57,13 @@ export function iniciar(r: Rpc): void {
     if (que === 'activate') Tray.activo?.emit('click')
     else if (que === 'menu' && typeof id === 'number') Tray.activo?.clic(id)
   })
+  // La interfaz pide abrir un enlace con window.open (links de la terminal); antes lo hacía setWindowOpenHandler.
+  rpc.on('tauri:open-external', (_e, url) => {
+    if (typeof url === 'string' && /^https?:\/\//i.test(url)) ignorar(shell.openExternal(url))
+  })
+  rpc.alEventoNativo('login-item', (activo) => {
+    app.inicioConWindows = activo === true
+  })
   rpc.alEventoNativo('app', (nombre) => {
     if (typeof nombre === 'string') app.emit(nombre)
   })
@@ -86,6 +96,7 @@ const carpetaDatos = (): string => process.env.APPDATA ?? join(homedir(), 'AppDa
 
 class App extends EventEmitter {
   isPackaged = process.env.SLOTH_PACKAGED === '1'
+  inicioConWindows = false
   private nombre = 'Sloth'
   private rutas = new Map<string, string>()
   commandLine = { appendSwitch: (): void => {}, hasSwitch: (): boolean => false }
@@ -170,7 +181,7 @@ class App extends EventEmitter {
     ignorar(nativo('app.setLoginItem', opciones.openAtLogin === true))
   }
   getLoginItemSettings(): { openAtLogin: boolean } {
-    return { openAtLogin: false }
+    return { openAtLogin: this.inicioConWindows }
   }
 }
 export const app = new App()
@@ -216,9 +227,14 @@ export class BrowserWindow extends EventEmitter {
   minimizada = false
   private destruida = false
 
+  private readonly secundaria: boolean
+  private readonly tamano: [number, number]
+
   constructor(opciones: { width?: number; height?: number; x?: number; y?: number; show?: boolean } = {}) {
     super()
-    BrowserWindow.principal = this
+    this.secundaria = BrowserWindow.principal !== null
+    this.tamano = [opciones.width ?? 390, opciones.height ?? 780]
+    if (!this.secundaria) BrowserWindow.principal = this
     this.bounds = { x: opciones.x ?? 0, y: opciones.y ?? 0, width: opciones.width ?? 1500, height: opciones.height ?? 920 }
     this.normal = this.bounds
     ventanaVisible = false
@@ -226,7 +242,9 @@ export class BrowserWindow extends EventEmitter {
   static getAllWindows(): BrowserWindow[] {
     return BrowserWindow.principal && !BrowserWindow.principal.destruida ? [BrowserWindow.principal] : []
   }
-  loadURL(): Promise<void> {
+  loadURL(url?: string): Promise<void> {
+    // Una segunda ventana con una página web solo existe en las pruebas e2e (el celu simulado).
+    if (this.secundaria && typeof url === 'string' && /^https?:/.test(url)) return nativo('window.open', url, ...this.tamano).then(() => undefined)
     // La ventana de Tauri ya carga la interfaz sola.
     queueMicrotask(() => {
       this.emit('ready-to-show')
@@ -285,6 +303,19 @@ export class BrowserWindow extends EventEmitter {
   maximize(): void {
     ignorar(nativo('window.maximize'))
   }
+  unmaximize(): void {
+    ignorar(nativo('window.unmaximize'))
+  }
+  setSize(ancho: number, alto: number): void {
+    ignorar(nativo('window.setSize', ancho, alto))
+  }
+  /** Sin marco propio de Windows, el tamaño de la ventana y el del contenido son el mismo. */
+  setContentSize(ancho: number, alto: number): void {
+    this.setSize(ancho, alto)
+  }
+  getSize(): [number, number] {
+    return [this.bounds.width, this.bounds.height]
+  }
   /** Como `close()` de Electron: los oyentes de `close` pueden frenarlo con preventDefault(). */
   close(): void {
     this.pedirCierre()
@@ -302,7 +333,9 @@ export class BrowserWindow extends EventEmitter {
   flashFrame(flash: boolean): void {
     ignorar(nativo('window.flash', flash))
   }
-  setBackgroundColor(): void {}
+  setBackgroundColor(color: string): void {
+    ignorar(nativo('window.setBackgroundColor', color))
+  }
   setTitleBarOverlay(): void {}
   setOverlayIcon(): void {}
   destroy(): void {
@@ -342,7 +375,21 @@ export const dialog = {
 export const clipboard = {
   readText: (): Promise<string> => nativo<string>('clipboard.readText'),
   writeText: (texto: string): Promise<void> => nativo('clipboard.writeText', texto),
-  read: (): Promise<string[]> => Promise.resolve([])
+  /** Como el Clipboard API: una lista de items con sus tipos. Hoy solo la imagen (captura de pantalla). */
+  read: async (): Promise<{ types: string[]; getType: (tipo: string) => Promise<{ arrayBuffer: () => Promise<ArrayBuffer>; text: () => Promise<string> }> }[]> => {
+    const items: { types: string[]; getType: (tipo: string) => Promise<{ arrayBuffer: () => Promise<ArrayBuffer>; text: () => Promise<string> }> }[] = []
+    const archivos = await nativo<string[]>('clipboard.readFiles').catch(() => [] as string[])
+    if (archivos.length) {
+      const lista = archivos.map((a) => pathToFileURL(a).href).join('\r\n')
+      items.push({ types: ['text/uri-list'], getType: () => Promise.resolve({ arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)), text: () => Promise.resolve(lista) }) })
+    }
+    const b64 = await nativo<string>('clipboard.readImage').catch(() => '')
+    if (!b64) return items
+    const png = Buffer.from(b64, 'base64')
+    const ab = png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength) as ArrayBuffer
+    items.push({ types: ['image/png'], getType: () => Promise.resolve({ arrayBuffer: () => Promise.resolve(ab), text: () => Promise.resolve('') }) })
+    return items
+  }
 }
 
 // ---------------- sistema ----------------
@@ -398,14 +445,46 @@ export class Notification extends EventEmitter {
   close(): void {}
 }
 
+/** DPAPI de Windows a través de PowerShell: se usa una vez por arranque (para la clave) y no hay API síncrona en Node. */
+function dpapiConPowerShell(operacion: 'Protect' | 'Unprotect'): (datos: Buffer) => Buffer {
+  const script =
+    'Add-Type -AssemblyName System.Security; ' +
+    '$b = [Convert]::FromBase64String([Console]::In.ReadToEnd().Trim()); ' +
+    `[Convert]::ToBase64String([Security.Cryptography.ProtectedData]::${operacion}($b, $null, 'CurrentUser'))`
+  return (datos) => {
+    const salida = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], {
+      input: datos.toString('base64'),
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 20000
+    })
+    return Buffer.from(salida.trim(), 'base64')
+  }
+}
+
+let claveCifrado: Buffer | null | undefined
+function clave(): Buffer | null {
+  if (claveCifrado !== undefined) return claveCifrado
+  try {
+    claveCifrado = claveDeUserData(app.getPath('userData'), { protect: dpapiConPowerShell('Protect'), unprotect: dpapiConPowerShell('Unprotect') })
+  } catch (e) {
+    console.warn('cifrado del sistema no disponible:', e instanceof Error ? e.message : String(e))
+    claveCifrado = null
+  }
+  return claveCifrado
+}
+
 export const safeStorage = {
-  // Pendiente: leer el formato de os_crypt de Electron (clave en Local State protegida con DPAPI).
-  isEncryptionAvailable: (): boolean => false,
-  encryptString: (): Buffer => {
-    throw new Error('El cifrado del sistema todavía no está disponible en esta versión.')
+  isEncryptionAvailable: (): boolean => process.platform === 'win32' && clave() !== null,
+  encryptString: (texto: string): Buffer => {
+    const k = clave()
+    if (!k) throw new Error('El cifrado del sistema no está disponible.')
+    return cifrar(k, texto)
   },
-  decryptString: (): string => {
-    throw new Error('El cifrado del sistema todavía no está disponible en esta versión.')
+  decryptString: (datos: Buffer): string => {
+    const k = clave()
+    if (!k) throw new Error('El cifrado del sistema no está disponible.')
+    return descifrar(k, datos)
   }
 }
 
