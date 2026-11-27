@@ -608,7 +608,13 @@ pub mod prueba {
             let t = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
             let p = std::env::temp_dir().join(format!("{prefijo}-{}-{t}-{}", std::process::id(), N.fetch_add(1, Ordering::SeqCst)));
             std::fs::create_dir_all(&p).expect("crear carpeta temporal de prueba");
-            Temporal(p)
+            // En CI de Windows el temp viene en nombre corto (RUNNER~1) y git devuelve el largo: se compara siempre el largo.
+            let real = std::fs::canonicalize(&p).unwrap_or(p);
+            let t = real.to_string_lossy().into_owned();
+            Temporal(match t.strip_prefix("\\\\?\\") {
+                Some(sin) if sin.as_bytes().get(1) == Some(&b':') => PathBuf::from(sin),
+                _ => real,
+            })
         }
 
         pub fn ruta(&self) -> String {
