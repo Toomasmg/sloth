@@ -45,6 +45,23 @@ test.describe('deslizar entre paneles', () => {
     expect(await activa(page)).toBe(inicial)
   })
 
+  test('soltar casi en el umbral cambia; a mitad de camino vuelve', async ({ sloth: { page } }) => {
+    await expect(page.locator('.xterm')).toHaveCount(2)
+    await page.getByRole('button', { name: /^Uno/ }).first().click()
+    const caja = await page.locator('.panes-area').boundingBox()
+    if (!caja) throw new Error('sin área de paneles')
+    await page.mouse.move(caja.x + caja.width / 2, caja.y + caja.height / 2)
+    const inicial = await activa(page)
+
+    for (let i = 0; i < 3; i++) await page.mouse.wheel(16, 0)
+    await page.waitForTimeout(400)
+    expect(await activa(page)).toBe(inicial)
+    await expect(page.locator('.panes-area > .pane:not(.hidden)')).not.toHaveAttribute('data-swiping')
+
+    for (let i = 0; i < 5; i++) await page.mouse.wheel(17, 0)
+    await expect.poll(() => activa(page)).not.toBe(inicial)
+  })
+
   test('el panel que entra se desliza desde el costado', async ({ sloth: { page } }) => {
     await expect(page.locator('.xterm')).toHaveCount(2)
     await page.getByRole('button', { name: /^Uno/ }).first().click()
