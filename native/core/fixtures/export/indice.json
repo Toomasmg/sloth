@@ -1,0 +1,10 @@
+[
+  {
+    "nombre": "default",
+    "password": "contraseña-larga"
+  },
+  {
+    "nombre": "params",
+    "password": "clave ñandú ✓ 12345"
+  }
+]
