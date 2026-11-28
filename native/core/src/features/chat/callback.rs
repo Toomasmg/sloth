@@ -58,7 +58,7 @@ pub struct ServidorCallback {
     pub puerto: u16,
     pub redirect_to: String,
     estado: Arc<Estado>,
-    resultado: Receiver<ResultadoCallback>,
+    resultado: Mutex<Receiver<ResultadoCallback>>,
 }
 
 impl ServidorCallback {
@@ -68,7 +68,7 @@ impl ServidorCallback {
 
     /// Bloquea hasta que el login termina; después el servidor ya se cerró.
     pub fn esperar(&self) -> ResultadoCallback {
-        self.resultado.recv().unwrap_or(ResultadoCallback::Cancelado)
+        self.resultado.lock().unwrap_or_else(|e| e.into_inner()).recv().unwrap_or(ResultadoCallback::Cancelado)
     }
 
     #[cfg(test)]
@@ -232,7 +232,7 @@ pub fn iniciar_servidor(o: OpcionesCallback) -> Res<ServidorCallback> {
         }
     });
 
-    Ok(ServidorCallback { puerto, redirect_to, estado, resultado })
+    Ok(ServidorCallback { puerto, redirect_to, estado, resultado: Mutex::new(resultado) })
 }
 
 pub struct DepsLogin {

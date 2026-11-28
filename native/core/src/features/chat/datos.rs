@@ -2457,12 +2457,11 @@ mod tests {
         m.datos.arrancar();
         m.eventos.send(EventoRealtime::Estado { canal: INBOX.into(), estado: EstadoCanal::Subscribed }).unwrap();
         m.eventos.send(EventoRealtime::Cambio { canal: INBOX.into(), tipo: "INSERT".into(), fila: fila_msg(M1, OTRO, "por el socket", "2024-01-01T00:00:05+00:00") }).unwrap();
-        // El hilo consumidor es asíncrono: se espera el efecto, no un tiempo.
-        for _ in 0..2000 {
-            if !m.entorno.emitidos.lock().unwrap().is_empty() {
-                break;
-            }
-            std::thread::yield_now();
+        // El hilo consumidor es asíncrono: se espera el efecto; el plazo es solo para que un fallo no cuelgue la corrida.
+        let limite = std::time::Instant::now() + Duration::from_secs(30);
+        while m.entorno.emitidos.lock().unwrap().is_empty() {
+            assert!(std::time::Instant::now() < limite, "el mensaje no llegó");
+            std::thread::sleep(Duration::from_millis(5));
         }
         assert_eq!(m.entorno.emitidos.lock().unwrap()[0].1["body"], "por el socket");
         m.datos.parar();
