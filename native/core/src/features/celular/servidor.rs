@@ -794,6 +794,47 @@ mod tests {
         derivar_claves(&clave_de(7)).unwrap()
     }
 
+    /// Una conexión que se reutiliza: los tests de cientos de pedidos no abren cientos de sockets (en Windows, con la
+    /// suite entera en paralelo, eso agota los puertos efímeros y es lo que los hacía depender de la carga).
+    struct Persistente(TcpStream);
+
+    impl Persistente {
+        fn nueva(puerto: u16) -> Self {
+            let s = TcpStream::connect(("127.0.0.1", puerto)).unwrap();
+            s.set_read_timeout(Some(Duration::from_secs(30))).unwrap();
+            Persistente(s)
+        }
+
+        fn pedir(&mut self, ruta: &str, cuerpo: &[u8]) -> Resp {
+            let cab = format!("POST {ruta} HTTP/1.1\r\nhost: x\r\ncontent-length: {}\r\n\r\n", cuerpo.len());
+            self.0.write_all(cab.as_bytes()).unwrap();
+            self.0.write_all(cuerpo).unwrap();
+            let mut cabecera = Vec::new();
+            let mut b = [0u8; 1];
+            while !cabecera.ends_with(b"\r\n\r\n") {
+                assert_eq!(self.0.read(&mut b).unwrap(), 1, "el servidor cerró la conexión");
+                cabecera.push(b[0]);
+            }
+            let texto = String::from_utf8_lossy(&cabecera).into_owned();
+            let mut lineas = texto.trim_end().split("\r\n");
+            let status = lineas.next().unwrap().split(' ').nth(1).unwrap().parse().unwrap();
+            let cabeceras: Vec<(String, String)> = lineas.filter_map(|l| l.split_once(':')).map(|(k, v)| (k.trim().to_ascii_lowercase(), v.trim().to_string())).collect();
+            let largo: usize = cabeceras.iter().find(|(k, _)| k == "content-length").map_or(0, |(_, v)| v.parse().unwrap());
+            let mut cuerpo = vec![0u8; largo];
+            self.0.read_exact(&mut cuerpo).unwrap();
+            Resp { status, cabeceras, cuerpo }
+        }
+
+        fn sellado(&mut self, ruta: &str, obj: Value, con: Option<&str>) -> Sellado {
+            let iv = iv_aleatorio();
+            let claves = derivar_claves(&con.map_or_else(|| clave_de(7), String::from)).unwrap();
+            let r = self.pedir(ruta, sobre_de(&claves, ruta, ahora_ms(), &obj, &iv).as_bytes());
+            let texto = r.texto();
+            let plano = if r.status == 401 || texto.is_empty() { None } else { abrir_respuesta(&claves, &iv, &texto) };
+            Sellado { status: r.status, cuerpo: plano.map(|p| serde_json::from_str(&p).unwrap()), texto }
+        }
+    }
+
     #[test]
     fn sin_cuerpo_con_el_mac_roto_o_con_otra_ruta_401_sin_cuerpo() {
         con_servidor(Falso::nuevo(), |p, _| {
@@ -1051,17 +1092,18 @@ mod tests {
             Ok(sin_salida())
         });
         con_servidor(f, |p, _| {
+            let mut c = Persistente::nueva(p);
             for i in 0..300 {
-                assert_eq!(pedir(p, "POST", "/api/terminal", &[], format!("basura{i}").as_bytes()).status, 401);
+                assert_eq!(c.pedir("/api/terminal", format!("basura{i}").as_bytes()).status, 401);
             }
             for i in 0..200 {
-                assert_eq!(post_sellado(p, "/api/terminal", json!({ "id": "ws", "desde": 0 }), Opciones::default()).status, 200, "pedido {i}");
+                assert_eq!(c.sellado("/api/terminal", json!({ "id": "ws", "desde": 0 }), None).status, 200, "pedido {i}");
             }
             let sobre = sobre_de(&claves_qr(), "/api/terminal", ahora_ms(), &json!({ "id": "ws", "desde": 0 }), &iv_aleatorio());
-            let r = pedir(p, "POST", "/api/terminal", &[], sobre.as_bytes());
+            let r = c.pedir("/api/terminal", sobre.as_bytes());
             assert_eq!((r.status, r.texto().as_str()), (429, ""));
             assert_eq!(llegaron.load(Ordering::SeqCst), 200);
-            assert_eq!(post_sellado(p, "/api/estado", json!({}), Opciones::default()).status, 200, "el límite es solo de la terminal");
+            assert_eq!(c.sellado("/api/estado", json!({}), None).status, 200, "el límite es solo de la terminal");
         });
     }
 
@@ -1223,13 +1265,13 @@ mod tests {
         f.terminal = Box::new(|_, _| Ok(sin_salida()));
         *f.celus.lock().unwrap() = vec![("a".into(), a.clone()), ("b".into(), b.clone())];
         con_servidor_con(f, |o| o.etiqueta = Some("Tailscale (HTTPS)".into()), |p, prov| {
-            let con = |c: &str| Opciones { con: Some(c.to_string()), ..Default::default() };
+            let mut c = Persistente::nueva(p);
             for _ in 0..200 {
-                assert_eq!(post_sellado(p, "/api/terminal", json!({ "id": "ws", "desde": 0 }), con(&a)).status, 200);
+                assert_eq!(c.sellado("/api/terminal", json!({ "id": "ws", "desde": 0 }), Some(&a)).status, 200);
             }
-            assert_eq!(post_sellado(p, "/api/terminal", json!({ "id": "ws", "desde": 0 }), con(&a)).status, 429);
-            assert_eq!(post_sellado(p, "/api/terminal", json!({ "id": "ws", "desde": 0 }), con(&b)).status, 200, "el otro celu no paga lo que gastó el primero");
-            post_sellado(p, "/api/estado", json!({}), con(&b));
+            assert_eq!(c.sellado("/api/terminal", json!({ "id": "ws", "desde": 0 }), Some(&a)).status, 429);
+            assert_eq!(c.sellado("/api/terminal", json!({ "id": "ws", "desde": 0 }), Some(&b)).status, 200, "el otro celu no paga lo que gastó el primero");
+            c.sellado("/api/estado", json!({}), Some(&b));
             assert_eq!(prov.vistos.lock().unwrap().clone(), ["estado Tailscale (HTTPS)||b"]);
         });
     }
