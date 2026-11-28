@@ -511,7 +511,7 @@ pub struct ArchivoPlantillas<'a> {
     futura: bool,
     por_respaldar: bool,
     avisos: &'a Avisos,
-    nuevo_id: Box<dyn FnMut() -> String + 'a>,
+    nuevo_id: Box<dyn FnMut() -> String + Send + 'a>,
 }
 
 fn nombre_archivo(p: &Path) -> String {
@@ -519,7 +519,7 @@ fn nombre_archivo(p: &Path) -> String {
 }
 
 impl<'a> ArchivoPlantillas<'a> {
-    pub fn abrir(file: &Path, avisos: &'a Avisos, nuevo_id: Box<dyn FnMut() -> String + 'a>) -> Self {
+    pub fn abrir(file: &Path, avisos: &'a Avisos, nuevo_id: Box<dyn FnMut() -> String + Send + 'a>) -> Self {
         let estado = Cell::new(None);
         let migraciones = Migraciones::new();
         let validar = |v: &Value| {
@@ -670,7 +670,7 @@ mod tests {
         v
     }
 
-    fn ids() -> Box<dyn FnMut() -> String> {
+    fn ids() -> Box<dyn FnMut() -> String + Send> {
         let mut n = 0;
         Box::new(move || {
             n += 1;
