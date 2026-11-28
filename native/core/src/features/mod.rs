@@ -1,8 +1,14 @@
 //! Lógica pura de las funciones chicas de `src/main/features`. Lo que toca el SO o Electron queda afuera: se pasa como dato o como closure.
+pub mod broadcast;
+pub mod diagnostico;
 pub mod help;
 pub mod move_account;
 pub mod onboarding;
+pub mod permissions;
+pub mod permissions_paths;
 pub mod poda;
+pub mod redactar;
+pub mod report;
 pub mod rendimiento;
 pub mod sleep;
 pub mod templates;
