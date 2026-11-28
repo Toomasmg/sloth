@@ -14,6 +14,14 @@ pub type Evento = (String, Vec<Value>);
 pub struct PlataformaSimulada {
     pub eventos: Mutex<Vec<Evento>>,
     pub abiertos: Mutex<Vec<String>>,
+    pub version: Mutex<Option<String>>,
+    pub datos: Mutex<PathBuf>,
+}
+
+impl PlataformaSimulada {
+    pub fn fijar_version(&self, v: &str) {
+        *self.version.lock().unwrap() = Some(v.to_string());
+    }
 }
 
 impl Plataforma for PlataformaSimulada {
@@ -21,13 +29,13 @@ impl Plataforma for PlataformaSimulada {
         "Sloth".into()
     }
     fn version(&self) -> String {
-        "0.0.0".into()
+        self.version.lock().unwrap().clone().unwrap_or_else(|| "0.0.0".into())
     }
     fn empaquetada(&self) -> bool {
         false
     }
     fn carpeta_de_datos(&self) -> PathBuf {
-        PathBuf::new()
+        self.datos.lock().unwrap().clone()
     }
     fn pedir_instancia_unica(&self) -> bool {
         true
@@ -83,11 +91,21 @@ impl EntornoDePrueba {
         let _ = fs::remove_dir_all(&carpeta);
         fs::create_dir_all(carpeta.join("perfil")).unwrap();
         let plataforma = Arc::new(PlataformaSimulada::default());
+        *plataforma.datos.lock().unwrap() = carpeta.clone();
         EntornoDePrueba { entorno: Entorno::nuevo(plataforma.clone()), plataforma, carpeta }
     }
 
     pub fn fijar_estado(&self, estado: &Value) {
         fs::write(self.carpeta.join("perfil").join("sloth-state.json"), serde_json::to_string_pretty(estado).unwrap()).unwrap();
+    }
+
+    /// Lo que contesta el proceso de apoyo a los canales que la función le pide por el router (p. ej. `workspaces:add`).
+    pub fn fijar_apoyo(&self, f: impl Fn(&str, &[Value]) -> Respuesta + Send + Sync + 'static) {
+        let f = Arc::new(f);
+        self.entorno.fijar_pedidos(Arc::new(move |canal: String, args: Vec<Value>| {
+            let r = f(&canal, &args);
+            Box::pin(async move { r }) as Futuro<Respuesta>
+        }));
     }
 
     pub fn eventos(&self) -> Vec<Evento> {

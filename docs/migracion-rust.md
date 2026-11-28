@@ -67,7 +67,18 @@ depende de `sloth-core` por path; con el mismo `CARGO_TARGET_DIR` las dependenci
   handlers de Rust responden «Sloth todavía está arrancando.». Rust lee el estado solo para consultar (sin migrar ni
   reescribir). Los hooks de Claude llegan a las funciones de Rust reenviados por el puente (`rust.hook`).
 
-Conectado: `git` (26 canales). Por qué el resto sigue en el proceso de apoyo:
+Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11) y `prs` (9).
+
+- `help`: el changelog lo genera `src-tauri/build.rs` desde `src/shared/changelog.ts` (`scripts/changelog-json.mjs`, con
+  Node) y entra con `include_str!`; no hay copia a mano.
+- `report`: la línea del daemon se pide a `daemon:info` del proceso de apoyo (1,5 s como mucho). La captura de la ventana
+  no existe en Tauri todavía (tampoco andaba por el proceso de apoyo): `capture` responde un error claro.
+- `prs`: abrir la rama de un PR puede crear un espacio; eso lo hace el dueño del store, pedido por el router
+  (`Entorno::pedir("workspaces:add")`, mismas validaciones que «Nuevo espacio»). Cuando el store pase a Rust, el pedido
+  sigue andando sin cambios porque va por el router.
+- Las funciones de Rust leen cuentas, espacios y `templates.json` sin escribirlos (`Entorno::estado`).
+
+Por qué el resto sigue en el proceso de apoyo:
 
 - `state:get`, cuentas y espacios (`accounts:*`, `workspaces:*`): mutan el store y arman el estado con los agentes, que
   dependen de las terminales y del servidor de hooks. Pasan a Rust con ptys y hooks; antes habría dos dueños del
@@ -76,9 +87,12 @@ Conectado: `git` (26 canales). Por qué el resto sigue en el proceso de apoyo:
   esas copias quedarían viejas. Pasa junto con ellos.
 - `worktrees`, `history`, `templates`, `move-account`: escriben o dependen del store (alta y baja de espacios, cuentas) o de
   las terminales.
-- `help`: necesita el changelog (`src/shared/changelog.ts`) como dato para Rust; falta definir de dónde sale sin duplicarlo.
-- `sleep`, `rendimiento`, `onboarding`, `report`, `diagnostico`, `permissions`, `broadcast`, `export-import`, `dictado`,
-  `prs`, `team`: el port de `native/core` es de piezas puras sin la función completa armada (falta el contexto con su
+- `team`: arma su vista con lo que trae el conector de Tickets (`ticketsParaEquipo` y `alCambiarTickets`, en memoria del
+  proceso de apoyo). Pasa junto con `tickets`; antes haría falta un puente nuevo de ida y vuelta solo para esto.
+- `diagnostico`: su texto sale del log en memoria del main de Node (`logger.recientes`, `logger.fallo`), de la marca de
+  cierre inesperado que calcula ese proceso al arrancar y de los ajustes que tiene en memoria; `errorRenderer` escribe en ese
+  mismo log. En Rust mostraría un log casi vacío. Pasa cuando el logger y el arranque sean de Rust.
+- `sleep`, `rendimiento`, `onboarding`, `permissions`, `broadcast`, `export-import`, `dictado`: el port de `native/core` es de piezas puras sin la función completa armada (falta el contexto con su
   estado y E/S); se conectan de a una en PRs siguientes.
 
 El TS de `git` (`src/main/features/git.ts`, `git-ops`, `git-run`) queda como respaldo: Electron lo sigue usando y worktrees,

@@ -7,6 +7,10 @@ use serde_json::Value;
 use std::sync::Arc;
 
 pub mod git;
+pub mod help;
+pub mod prs;
+pub mod report;
+pub mod team_config;
 
 static NULO: Value = Value::Null;
 
@@ -20,17 +24,23 @@ pub fn a_json<T: Serialize>(r: Result<T, String>) -> Respuesta {
 }
 
 /// Las funciones del lado main que atiende Rust. El proceso de apoyo no las registra ni las corre.
-pub const FUNCIONES_EN_RUST: &[&str] = &[git::NOMBRE];
+pub const FUNCIONES_EN_RUST: &[&str] = &[git::NOMBRE, help::NOMBRE, report::NOMBRE, team_config::NOMBRE, prs::NOMBRE];
 
 pub fn funciones_en_rust() -> String {
     FUNCIONES_EN_RUST.join(",")
 }
 
 pub fn registrar_todo(router: &mut Router, entorno: &Arc<Entorno>) -> Vec<Arc<dyn AlHook>> {
-    vec![git::registrar(router, entorno.clone())]
+    help::registrar(router, entorno.clone());
+    report::registrar(router, entorno.clone());
+    team_config::registrar(router, entorno.clone());
+    vec![git::registrar(router, entorno.clone()), prs::registrar(router, entorno.clone())]
 }
 
 /// Lo que el proceso de apoyo reenvía de sus hooks de Claude a las funciones que pasaron a Rust.
 pub trait AlHook: Send + Sync {
     fn al_hook(&self, evento: &str, ws: Option<&str>);
+
+    /// La ventana principal tomó el foco (prs refresca si su vista está abierta).
+    fn al_enfocar(&self) {}
 }

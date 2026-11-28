@@ -53,6 +53,11 @@ fn limites(v: &Window) -> Option<Value> {
 }
 
 fn avisar_ventana(v: &Window, evento: &WindowEvent) {
+    if let (WindowEvent::Focused(true), Some(h)) = (evento, v.app_handle().try_state::<puente::Hooks>()) {
+        for f in &h.0 {
+            f.al_enfocar();
+        }
+    }
     let Some(a) = v.app_handle().try_state::<Apoyo>() else { return };
     let apoyo = &a.0;
     match evento {
@@ -114,6 +119,17 @@ pub fn run() {
             let mut router = Router::nuevo(Arc::new(ReenvioApoyo(apoyo.clone())));
             let hooks = handlers::registrar_todo(&mut router, &entorno);
             app.manage(router);
+            // Los handlers piden por el router lo que todavía tiene otro dueño (p. ej. `workspaces:add`).
+            let app_h = app.handle().clone();
+            entorno.fijar_pedidos(Arc::new(move |canal, args| {
+                let futuro = app_h.try_state::<Router>().map(|r| r.invocar(canal, args));
+                Box::pin(async move {
+                    match futuro {
+                        Some(f) => f.await,
+                        None => Err("Sloth todavía está arrancando.".into()),
+                    }
+                })
+            }));
             app.manage(puente::Hooks(hooks));
             app.manage(Apoyo(apoyo));
             ajustar_a_pantalla(app.handle());
