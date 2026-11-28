@@ -23,6 +23,7 @@ import { lectorLimites, limitesDeCuenta } from './codex-limites'
 import type { LecturaLimitesCodex } from '../shared/celular'
 import { avisarNotify, desinstalarNotify, prepararNotify } from './codex-notify'
 import { entornoDeTerminal } from './hook-env-core'
+import { anunciarPerfil, atiendeRust, hayFuncionesEnRust, reenviarHook } from './rust-features'
 import { detectarAgentes, powerShell7Disponible } from './agentes'
 import { AVISO_POWERSHELL_7 } from './copilot-exe'
 import { initialPromptProblem } from '../shared/initial-prompt'
@@ -58,7 +59,7 @@ import {
   type RevealTarget,
   type Workspace
 } from '../shared/types'
-import { cambiandoDePerfil, iniciarPerfiles, marcarCambioDePerfil, raizDatos } from './perfil'
+import { cambiandoDePerfil, iniciarPerfiles, marcarCambioDePerfil, raizDatos, rutaPerfil } from './perfil'
 import { decidirCierreTerminales, esTerminalPropia, terminalesAjenas } from './perfiles-core'
 
 let win: BrowserWindow | null = null
@@ -791,7 +792,10 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
   }
 
   // Funciones (features): cada una con sus canales feat:<nombre>:<op>.
+  if (hayFuncionesEnRust()) safe('perfil para Rust', () => anunciarPerfil(rutaPerfil(), (e) => logger.error('rust', e)))
+  if (hayFuncionesEnRust()) hookListeners.push((p) => reenviarHook(p.event, p.ws, (e) => logger.error('rust', e)))
   for (const f of FEATURES) {
+    if (atiendeRust(f.name)) continue
     const ctx: FeatureContext = {
       name: f.name,
       store,

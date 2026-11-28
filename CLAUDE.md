@@ -16,7 +16,7 @@ App de escritorio (Electron + React + TypeScript, Windows primero) para usar var
 - `npm run typecheck`: tsc sin emitir.
 - `npm test`: tests unitarios de módulos puros con `node --test`, usando el type stripping de Node (necesita Node ≥ 22.18).
 - `npm run build`: electron-vite más los daemons. `npm run build:sidecar` arma el proceso de apoyo.
-- `npm run release`: instalador de Tauri firmado y publicación en GitHub (`TAURI_SIGNING_PRIVATE_KEY`; `--sin-subir` solo arma `dist-tauri/`). `release:electron` es el flujo viejo.
+- `npm run release:tauri`: instalador de Tauri firmado y publicación en GitHub (`TAURI_SIGNING_PRIVATE_KEY`; `--sin-subir` solo arma `dist-tauri/`). `npm run release` sigue siendo el flujo de Electron hasta que Tauri sea la versión publicada.
 - `npm run test:e2e`: build más Playwright. Nunca uses `test:e2e:update` para que un test pase: si cambia una captura, explicá por qué.
 - `npm run test:e2e:tauri`: los e2e sobre el ejecutable de Tauri (las capturas de referencia son de Electron: los specs con `toHaveScreenshot` no se comparan hasta rehacerlas).
 - `npm run dev` (Electron, para trabajar la interfaz). Para una instancia de prueba al lado de la instalada: `SLOTH_USER_DATA=<carpeta> npm run dev`.

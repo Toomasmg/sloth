@@ -39,6 +39,8 @@ console.warn = aStderr('warn')
 
 const rpc = new Rpc((linea) => process.stdout.write(linea))
 iniciar(rpc)
+// Lo que Rust necesita pedirle a este proceso (ver src/main/rust-features.ts).
+;(globalThis as { slothPuente?: unknown }).slothPuente = { nativo: (op: string, ...args: unknown[]) => rpc.nativo(op, ...args) }
 
 ;(process as unknown as { resourcesPath: string }).resourcesPath = process.env.SLOTH_RESOURCES ?? process.cwd()
 

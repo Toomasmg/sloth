@@ -1,9 +1,17 @@
+mod entorno;
+mod handlers;
 mod nativo;
 mod permisos;
+mod plataforma;
+mod puente;
+pub mod router;
 pub mod sidecar;
 mod sistema;
+#[cfg(test)]
+mod tests_comunes;
 
 use serde_json::Value;
+use router::{Futuro, Reenvio, Respuesta, Router};
 use sidecar::Sidecar;
 use std::sync::Arc;
 use serde_json::json;
@@ -11,14 +19,29 @@ use tauri::{Manager, State, Window, WindowEvent};
 
 pub struct Apoyo(pub Arc<Sidecar>);
 
-#[tauri::command]
-async fn ipc_invoke(apoyo: State<'_, Apoyo>, channel: String, args: Vec<Value>) -> Result<Value, String> {
-    apoyo.0.invocar(channel, args).await
+/// El proceso de apoyo como destino de los canales que Rust no atiende.
+struct ReenvioApoyo(Arc<Sidecar>);
+
+impl Reenvio for ReenvioApoyo {
+    fn invocar(&self, canal: String, args: Vec<Value>) -> Futuro<Respuesta> {
+        let apoyo = self.0.clone();
+        Box::pin(async move { apoyo.invocar(canal, args).await })
+    }
+
+    fn enviar(&self, canal: String, args: Vec<Value>) {
+        self.0.enviar(canal, args);
+    }
 }
 
 #[tauri::command]
-fn ipc_send(apoyo: State<'_, Apoyo>, channel: String, args: Vec<Value>) {
-    apoyo.0.enviar(channel, args);
+async fn ipc_invoke(router: State<'_, Router>, channel: String, args: Vec<Value>) -> Result<Value, String> {
+    let respuesta = router.invocar(channel, args);
+    respuesta.await
+}
+
+#[tauri::command]
+fn ipc_send(router: State<'_, Router>, channel: String, args: Vec<Value>) {
+    router.enviar(channel, args);
 }
 
 /// Rectángulo lógico (DIP) de la ventana, como lo da `getBounds()` en Electron.
@@ -85,7 +108,13 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![ipc_invoke, ipc_send])
         .setup(|app| {
+            let entorno = entorno::Entorno::nuevo(Arc::new(plataforma::PlataformaTauri::nueva(app.handle().clone())));
+            app.manage(entorno.clone());
             let apoyo = sidecar::lanzar(app.handle().clone(), nativo::atender).map_err(|e| format!("Sloth no pudo arrancar: {e}"))?;
+            let mut router = Router::nuevo(Arc::new(ReenvioApoyo(apoyo.clone())));
+            let hooks = handlers::registrar_todo(&mut router, &entorno);
+            app.manage(router);
+            app.manage(puente::Hooks(hooks));
             app.manage(Apoyo(apoyo));
             ajustar_a_pantalla(app.handle());
             sistema::empujar_estado(app.handle());

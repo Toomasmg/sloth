@@ -212,6 +212,7 @@ fn bandeja(app: &AppHandle, o: &Value) -> Result<Value, String> {
 pub fn atender(app: &AppHandle, op: &str, args: Vec<Value>) -> Result<Value, String> {
     let nulo = Ok(Value::Null);
     match op {
+        op if op.starts_with("rust.") => crate::puente::atender(app, op, &args),
         "shell.openExternal" => {
             let url = texto(&args, 0)?;
             // Solo web y correo: un esquema raro no sale de la app hacia el sistema.

@@ -88,6 +88,7 @@ pub fn lanzar(app: AppHandle, nativo: fn(&AppHandle, &str, Vec<Value>) -> Result
         .current_dir(&raiz)
         .env("SLOTH_APP_PATH", &raiz)
         .env("SLOTH_VERSION", app.package_info().version.to_string())
+        .env("SLOTH_RUST_FEATURES", crate::handlers::funciones_en_rust())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
