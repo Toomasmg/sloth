@@ -1,11 +1,11 @@
 //! Piezas simuladas para probar handlers y router sin ventana ni proceso de apoyo.
-use crate::entorno::Entorno;
+use crate::entorno::{DialogoArchivo, Entorno, PlataformaCompartida};
 use crate::router::{Futuro, Reenvio, Respuesta};
 use serde_json::Value;
 use sloth_core::app_state::{OpcionesDeVentana, Plataforma};
 use sloth_core::window_state_core::Rect;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 pub type Evento = (String, Vec<Value>);
@@ -16,6 +16,9 @@ pub struct PlataformaSimulada {
     pub abiertos: Mutex<Vec<String>>,
     pub version: Mutex<Option<String>>,
     pub datos: Mutex<PathBuf>,
+    pub guardar_en: Mutex<Option<PathBuf>>,
+    pub elegido: Mutex<Option<PathBuf>>,
+    pub papelera: Mutex<Vec<PathBuf>>,
 }
 
 impl PlataformaSimulada {
@@ -70,6 +73,34 @@ impl Plataforma for PlataformaSimulada {
         Value::Null
     }
     fn escribir_portapapeles(&self, _: &str) {}
+}
+
+impl PlataformaCompartida for PlataformaSimulada {
+    fn guardar_como(&self, _: &DialogoArchivo) -> Option<PathBuf> {
+        self.guardar_en.lock().unwrap().clone()
+    }
+    fn elegir_archivo(&self, _: &DialogoArchivo) -> Option<PathBuf> {
+        self.elegido.lock().unwrap().clone()
+    }
+    /// Sin Papelera en las pruebas: se anota y se borra.
+    fn a_la_papelera(&self, ruta: &Path) -> Result<(), String> {
+        self.papelera.lock().unwrap().push(ruta.to_path_buf());
+        if ruta.is_dir() { fs::remove_dir_all(ruta) } else { fs::remove_file(ruta) }.map_err(|e| e.to_string())
+    }
+    fn mostrar_en_carpeta(&self, ruta: &Path) -> Result<(), String> {
+        self.abiertos.lock().unwrap().push(ruta.to_string_lossy().into_owned());
+        Ok(())
+    }
+    fn carpeta_documentos(&self) -> PathBuf {
+        self.carpeta_de_datos()
+    }
+    fn carpeta_whisper(&self) -> PathBuf {
+        self.carpeta_de_datos().join("motor")
+    }
+    fn abrir_uri(&self, uri: &str) -> Result<(), String> {
+        self.abiertos.lock().unwrap().push(uri.to_string());
+        Ok(())
+    }
 }
 
 pub struct EntornoDePrueba {

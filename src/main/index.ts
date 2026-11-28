@@ -212,6 +212,14 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
   const prepareListeners: ((acc: Account) => void)[] = []
   const removeListeners: ((acc: Account) => void)[] = []
   const commandOverrides: ((ws: Workspace, acc: Account) => string | undefined)[] = []
+  // Las funciones que en Tauri atiende Rust no pueden sumar un reemplazo acá: piden retomar por `pty:resumeOnce`.
+  const retomarUnaVez = new Map<string, { sessionId: string; accountId: string }>()
+  commandOverrides.push((ws, acc) => {
+    const r = retomarUnaVez.get(ws.id)
+    if (!r || r.accountId !== acc.id) return undefined
+    retomarUnaVez.delete(ws.id)
+    return `claude --resume ${r.sessionId}`
+  })
   /** Primer mensaje que no se pudo pasar como argumento: se pega en el primer SessionStart del espacio. */
   const pendingPaste = new Map<string, { text: string; until: number }>()
   const safe = (name: string, fn: () => void): void => {
@@ -741,6 +749,17 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     }
     if (store.workspace(id)) moveAgent(id, 'start')
     return result
+  })
+  // Las terminales siguen siendo de este proceso: las funciones que atiende Rust las consultan por estos canales.
+  handle('pty:running', async (_e, id: unknown) => {
+    if (!idValido(id)) throw new Error('Pedido inválido.')
+    return (await backend()).isRunning(id)
+  })
+  handle('pty:resumeOnce', (_e, wsId: unknown, accountId: unknown, sessionId: unknown) => {
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!idValido(wsId) || !idValido(accountId) || typeof sessionId !== 'string' || !uuid.test(sessionId)) throw new Error('Pedido inválido.')
+    if (!store.workspace(wsId)) throw new Error('Ese espacio ya no existe.')
+    retomarUnaVez.set(wsId, { sessionId, accountId })
   })
   // El tamaño que le dio la PC a cada terminal: el celu la muestra igual y, si la achica, después la devuelve a este.
   const tamPc = new Map<string, { cols: number; rows: number }>()

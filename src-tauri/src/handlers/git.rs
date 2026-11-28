@@ -7,7 +7,6 @@ use serde_json::{json, Value};
 use sloth_core::git_feature::{ContextoGit, GitFeature};
 use sloth_core::git_run::{Git, GitError, ProcesoEjecutor};
 use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const NOMBRE: &str = "git";
 
@@ -25,8 +24,7 @@ impl ContextoGit for ContextoDeGit {
     }
 
     fn registrar_pr(&self, numero: &str) {
-        let ahora = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0);
-        if let Err(e) = self.entorno.registrar_pr(numero, ahora) {
+        if let Err(e) = self.entorno.registrar_pr(numero, super::comun::ahora_ms()) {
             sloth_core::logger_global::aviso("perfiles", &format!("no se pudo registrar la actividad: {e}"));
         }
     }

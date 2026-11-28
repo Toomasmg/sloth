@@ -2,6 +2,7 @@
 //! (`mcp_main`), todo de `sloth_core::features::chat`. Acá están los entornos de esas piezas sobre la cáscara: cuentas y
 //! espacios leídos del estado sin escribirlo, terminales pedidas al dueño por el router, ajustes de solo lectura, avisos
 //! del sistema y la sesión que «celular» (todavía en el proceso de apoyo) reusa para su canal remoto.
+use super::comun::{ahora_ms, nuevo_uuid, texto};
 use super::{a_json, arg, AlHook};
 use crate::entorno::Entorno;
 use crate::router::{Respuesta, Router};
@@ -17,7 +18,7 @@ use sloth_core::proveedores::{nombre_proveedor, proveedor_id_de, ProveedorId};
 use sloth_core::proveedores_fs::{env_cuenta, resolver_exe_claude};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock, Weak};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 pub const NOMBRE: &str = "chat";
 
@@ -25,27 +26,6 @@ const CLI_MS: u64 = 30_000;
 const CERRAR_OTRAS_MS: u64 = 8_000;
 const ESPERA_TERMINALES: Duration = Duration::from_secs(20);
 const MAX_ARRANQUE: Duration = Duration::from_secs(60);
-
-fn ahora_ms() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
-}
-
-fn nuevo_uuid() -> String {
-    let mut b = [0u8; 16];
-    if getrandom::getrandom(&mut b).is_err() {
-        // Sin azar del sistema, el reloj en nanosegundos al menos no se repite entre dos envíos seguidos.
-        let t = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
-        b = t.to_le_bytes();
-    }
-    b[6] = (b[6] & 0x0f) | 0x40;
-    b[8] = (b[8] & 0x3f) | 0x80;
-    let h: String = b.iter().map(|x| format!("{x:02x}")).collect();
-    format!("{}-{}-{}-{}-{}", &h[0..8], &h[8..12], &h[12..16], &h[16..20], &h[20..32])
-}
-
-fn texto(v: &Value, k: &str) -> Option<String> {
-    v.get(k).and_then(Value::as_str).map(String::from)
-}
 
 /// Lo que se puede cambiar en las pruebas: la red, el socket de Realtime, el cifrado y los puertos del login.
 pub struct Opciones {
@@ -157,7 +137,7 @@ impl EntornoPrincipal for EntornoChat {
         self.entorno.plataforma.version()
     }
     fn ahora_ms(&self) -> i64 {
-        ahora_ms()
+        ahora_ms() as i64
     }
     fn ventana_con_foco(&self) -> bool {
         self.entorno.con_foco()
@@ -275,7 +255,7 @@ impl EntornoMcp for EntornoMcpChat {
         }
     }
     fn ahora_ms(&self) -> i64 {
-        ahora_ms()
+        ahora_ms() as i64
     }
     fn nuevo_id(&self) -> String {
         nuevo_uuid()

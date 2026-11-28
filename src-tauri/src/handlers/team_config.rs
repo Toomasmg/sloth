@@ -14,7 +14,8 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use super::comun::ahora_ms;
+use std::time::Duration;
 
 pub const NOMBRE: &str = "team-config";
 
@@ -23,10 +24,6 @@ const ESPERA_PRIMERA_REVISION: Duration = Duration::from_secs(3);
 
 fn es_dir(p: &str) -> bool {
     Path::new(p).is_dir()
-}
-
-fn ahora_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
 }
 
 struct Estado {
