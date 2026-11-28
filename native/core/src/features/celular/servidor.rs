@@ -481,8 +481,27 @@ fn atender_conexion(c: &Arc<Compartido>, mut s: TcpStream, ip: &str) {
             }
         };
         let Some(r) = respuesta else { return };
-        if escribir_respuesta(&mut s, &r, p.metodo == "HEAD", seguir).is_err() || !seguir {
+        let escrito = escribir_respuesta(&mut s, &r, p.metodo == "HEAD", seguir);
+        if p.demasiado_grande {
+            descartar_resto(&mut s);
+        }
+        if escrito.is_err() || !seguir {
             return;
+        }
+    }
+}
+
+/// Con un cuerpo que no se leyó, cerrar de golpe manda un RST y el celu pierde el 413: se cierra la escritura y se
+/// tira lo que siga llegando un rato (acotado) antes de soltar el socket.
+fn descartar_resto(s: &mut TcpStream) {
+    let _ = s.shutdown(Shutdown::Write);
+    let _ = s.set_read_timeout(Some(Duration::from_millis(500)));
+    let mut buf = [0u8; 4096];
+    let mut total = 0;
+    while total < 256 * 1024 {
+        match s.read(&mut buf) {
+            Ok(0) | Err(_) => break,
+            Ok(n) => total += n,
         }
     }
 }
