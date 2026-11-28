@@ -186,6 +186,17 @@ impl PlataformaCompartida for PlataformaTauri {
     fn carpeta_documentos(&self) -> PathBuf {
         self.app.path().document_dir().unwrap_or_else(|_| self.carpeta_de_datos())
     }
+
+    fn carpeta_whisper(&self) -> PathBuf {
+        match crate::sidecar::raiz_de_la_app(&self.app) {
+            (r, true) => r.join("whisper"),
+            (r, false) => r.join("vendor").join("whisper"),
+        }
+    }
+
+    fn abrir_uri(&self, uri: &str) -> Result<(), String> {
+        self.app.opener().open_url(uri, None::<&str>).map_err(|e| e.to_string())
+    }
 }
 
 #[cfg(test)]

@@ -90,6 +90,13 @@ impl PlataformaCompartida for PlataformaSimulada {
     fn carpeta_documentos(&self) -> PathBuf {
         self.carpeta_de_datos()
     }
+    fn carpeta_whisper(&self) -> PathBuf {
+        self.carpeta_de_datos().join("motor")
+    }
+    fn abrir_uri(&self, uri: &str) -> Result<(), String> {
+        self.abiertos.lock().unwrap().push(uri.to_string());
+        Ok(())
+    }
 }
 
 pub struct EntornoDePrueba {

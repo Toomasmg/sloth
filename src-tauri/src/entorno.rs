@@ -27,6 +27,10 @@ pub trait PlataformaCompartida: Plataforma + Send + Sync {
     fn elegir_archivo(&self, d: &DialogoArchivo) -> Option<PathBuf>;
     fn a_la_papelera(&self, ruta: &Path) -> Result<(), String>;
     fn carpeta_documentos(&self) -> PathBuf;
+    /// Donde está whisper-cli: los recursos instalados o `vendor/whisper` del proyecto, como en Electron.
+    fn carpeta_whisper(&self) -> PathBuf;
+    /// Abre una URI de una lista cerrada que no es http(s) (las pantallas `ms-settings:` de Windows).
+    fn abrir_uri(&self, uri: &str) -> Result<(), String>;
 }
 
 /// Invoca un canal por el router, como si lo pidiera la UI: lo atiende quien sea su dueño (Rust o el proceso de apoyo).

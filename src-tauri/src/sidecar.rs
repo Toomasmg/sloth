@@ -64,21 +64,26 @@ fn sin_prefijo(p: PathBuf) -> PathBuf {
 /// Lanza el proceso de apoyo. Instalado: el `node` que el instalador deja junto al ejecutable y el main
 /// de la carpeta de recursos. En desarrollo: el `node` del PATH y `out/sidecar` del proyecto.
 /// `nativo` atiende los pedidos de la parte nativa.
-pub fn lanzar(app: AppHandle, nativo: fn(&AppHandle, &str, Vec<Value>) -> Result<Value, String>) -> Result<Arc<Sidecar>, String> {
+/// Carpeta de la app como la ve el proceso de apoyo (`resourcesPath` instalado, la del proyecto en desarrollo) y si es
+/// la instalada.
+pub fn raiz_de_la_app(app: &AppHandle) -> (PathBuf, bool) {
     let recursos = app.path().resource_dir().ok().map(sin_prefijo);
-    let instalado = recursos.as_ref().filter(|r| r.join("sidecar").join("sloth-sidecar.cjs").exists());
+    let instalado = recursos.filter(|r| r.join("sidecar").join("sloth-sidecar.cjs").exists());
     let forzar = std::env::var_os("SLOTH_FORCE_PACKAGED").is_some();
-    let empaquetado = instalado.filter(|_| !cfg!(debug_assertions) || forzar);
-    let (raiz, script, node) = match empaquetado {
-        Some(r) => {
-            let junto = std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.join("node.exe"))).filter(|n| n.exists());
-            (r.clone(), r.join("sidecar").join("sloth-sidecar.cjs"), junto.unwrap_or_else(|| PathBuf::from("node")))
-        }
-        None => {
-            let raiz = std::env::var("SLOTH_APP_PATH").map(PathBuf::from).unwrap_or_else(|_| raiz_del_proyecto());
-            let script = raiz.join("out").join("sidecar").join("sloth-sidecar.cjs");
-            (raiz, script, PathBuf::from("node"))
-        }
+    match instalado.filter(|_| !cfg!(debug_assertions) || forzar) {
+        Some(r) => (r, true),
+        None => (std::env::var("SLOTH_APP_PATH").map(PathBuf::from).unwrap_or_else(|_| raiz_del_proyecto()), false),
+    }
+}
+
+pub fn lanzar(app: AppHandle, nativo: fn(&AppHandle, &str, Vec<Value>) -> Result<Value, String>) -> Result<Arc<Sidecar>, String> {
+    let (raiz, instalado) = raiz_de_la_app(&app);
+    let empaquetado = instalado.then_some(&raiz);
+    let (script, node) = if instalado {
+        let junto = std::env::current_exe().ok().and_then(|e| e.parent().map(|d| d.join("node.exe"))).filter(|n| n.exists());
+        (raiz.join("sidecar").join("sloth-sidecar.cjs"), junto.unwrap_or_else(|| PathBuf::from("node")))
+    } else {
+        (raiz.join("out").join("sidecar").join("sloth-sidecar.cjs"), PathBuf::from("node"))
     };
     if !script.exists() {
         return Err(format!("falta {} (corré npm run build:sidecar)", script.display()));

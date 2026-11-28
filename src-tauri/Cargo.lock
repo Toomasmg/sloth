@@ -4213,6 +4213,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tokio",
  "trash",
+ "ureq",
  "webview2-com",
  "windows-sys 0.59.0",
 ]
