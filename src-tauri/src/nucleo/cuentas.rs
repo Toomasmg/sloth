@@ -16,7 +16,8 @@ use std::sync::{Mutex, OnceLock};
 
 pub struct Cuentas {
     raiz: PathBuf,
-    helper: OnceLock<Option<String>>,
+    /// (ejecutable, ruta para escribir en un comando de shell).
+    helper: OnceLock<Option<(PathBuf, String)>>,
     hay_node: OnceLock<bool>,
     avisados: Mutex<HashSet<String>>,
     exes: Mutex<HashMap<&'static str, Option<String>>>,
@@ -60,7 +61,7 @@ impl Cuentas {
 
     /// `sloth-hook.exe` copiado a userData/bin (no se corre desde la instalación, que el instalador tiene que poder
     /// reemplazar). None si no está compilado: los hooks siguen con los scripts de Node.
-    fn helper(&self) -> Option<String> {
+    fn helper(&self) -> Option<(PathBuf, String)> {
         self.helper
             .get_or_init(|| {
                 let app = std::env::var("SLOTH_APP_PATH").map(PathBuf::from).unwrap_or_default();
@@ -82,7 +83,7 @@ impl Cuentas {
                         }
                     }
                 }
-                ruta_para_shell(&destino.to_string_lossy())
+                ruta_para_shell(&destino.to_string_lossy()).map(|c| (destino, c))
             })
             .clone()
     }
@@ -92,7 +93,7 @@ impl Cuentas {
     }
 
     fn instalar_hooks(&self, config_dir: &Path, base: Option<&Value>) {
-        let helper = self.helper();
+        let helper = self.helper().map(|h| h.1);
         let barras = |n: &str| self.raiz.join(n).to_string_lossy().replace('\\', "/");
         let (hook, statusline) = (barras("sloth-hook.cjs"), barras("sloth-statusline.cjs"));
         let l = Lanzador { helper: helper.as_deref(), script_hook: &hook, script_statusline: &statusline, hay_node: self.hay_node() };
@@ -115,7 +116,10 @@ impl Cuentas {
             Ok(avisos) => avisos.iter().for_each(|a| sloth_core::logger_global::aviso(a.origen, &a.texto)),
             Err(e) => sloth_core::logger_global::error("cuentas", e),
         }
-        // Hooks y setup compartido son de Claude Code. El aviso de turno de Codex lo pone el apoyo al recibir el evento.
+        if id == ProveedorId::Codex && id.capacidades().aviso_turno {
+            self.ajustar_notify(acc);
+        }
+        // Hooks y setup compartido son de Claude Code.
         if id.capacidades().hooks {
             self.instalar_hooks(&dir, Cuentas::base_de(acc).as_ref());
             let reporte = sincronizar_setup_compartido(&CuentaSetup { config_dir: &dir, share_setup: acc["shareSetup"].as_bool() }, &home(), !n.cuenta_ocupada(acc["id"].as_str().unwrap_or_default()));
@@ -141,6 +145,23 @@ impl Cuentas {
         }
         self.instalar_hooks(&dir, Cuentas::base_de(acc).as_ref());
         texto_de_reporte(&sincronizar_setup_compartido(&CuentaSetup { config_dir: &dir, share_setup: Some(true) }, &home(), !n.cuenta_ocupada(acc["id"].as_str().unwrap_or_default())))
+    }
+
+    /// Deja el `notify` de Sloth en la cuenta de Codex si su aviso de «terminó» está activado, y lo saca si no. Lo corre
+    /// `sloth-hook.exe`. Devuelve el motivo si no quedó como se pidió (también queda en el log, una vez).
+    pub fn ajustar_notify(&self, acc: &Value) -> Option<String> {
+        let helper = self.helper();
+        let programa = helper.as_ref().map(|(exe, _)| (exe.to_string_lossy().into_owned(), "notify"));
+        let motivo = sloth_core::codex_notify::ajustar_notify(acc, programa.as_ref().map(|(e, s)| (e.as_str(), *s)), &sloth_core::codex_notify::FsReal);
+        if let Some(m) = &motivo {
+            sloth_core::codex_notify::avisar_notify(m);
+        }
+        motivo
+    }
+
+    /// El ejecutable del agente, si se encuentra.
+    pub fn exe_de(&self, id: ProveedorId) -> Option<String> {
+        self.exe(id).ok().flatten()
     }
 
     fn exe(&self, id: ProveedorId) -> Result<Option<String>, String> {

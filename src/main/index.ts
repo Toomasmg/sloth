@@ -430,9 +430,7 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
   if (enRust)
     alEventoDeRust('rust.cuentaPreparada', (a) => {
       const acc = typeof a === 'object' && a !== null ? store.account((a as Account).id) : undefined
-      const p = acc && proveedorDe(acc)
-      if (!acc || !p) return
-      if (p.id === 'codex' && p.capacidades.avisoTurno) safe('notify', () => ajustarNotify(acc))
+      if (!acc || !proveedorDe(acc)) return
       for (const l of prepareListeners) safe('preparar cuenta', () => l(acc))
     })
 

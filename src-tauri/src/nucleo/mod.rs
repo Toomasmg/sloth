@@ -80,6 +80,10 @@ pub struct Nucleo {
     pub terminales_efimeras: bool,
     /// Las funciones del apoyo terminaron de registrarse (algunas fijan estado al arrancar, como los espacios dormidos).
     apoyo_listo: (Mutex<bool>, Condvar),
+    /// Consumo de las cuentas (`accounts:usage`).
+    pub uso: Mutex<sloth_core::usage::EscanerUso>,
+    /// Límites de Codex (experimental): nunca se leen con una terminal abierta de la misma cuenta.
+    pub limites: Arc<sloth_core::codex_limites::LectorLimites>,
     yo: Weak<Nucleo>,
 }
 
@@ -90,6 +94,13 @@ impl Nucleo {
         let ajustes = ajustes::Ajustes::cargar(&arranque.perfil.join("features").join("settings.json"), avisos);
         Arc::new_cyclic(|yo: &Weak<Nucleo>| {
             let debil = yo.clone();
+            let limites = Arc::new(sloth_core::codex_limites::LectorLimites::nuevo(sloth_core::codex_limites::DepsLimites::reales()));
+            let para_permiso = yo.clone();
+            limites.conectar_permiso(move |id| {
+                let Some(n) = para_permiso.upgrade() else { return sloth_core::cuentas::PermisoLimites::Apagada };
+                let cuenta = n.cuenta(id);
+                sloth_core::cuentas::permiso_de_limites(cuenta.as_ref(), n.terminales_si_hay().is_some(), n.cuenta_ocupada(id))
+            });
             let terminales = Terminales::nuevas(
                 conf,
                 Arc::new(move |ev| {
@@ -118,6 +129,8 @@ impl Nucleo {
                 oscuro_previo: Mutex::new(None),
                 terminales_efimeras: std::env::var("SLOTH_INPROCESS").as_deref() == Ok("1"),
                 apoyo_listo: (Mutex::new(false), Condvar::new()),
+                uso: Mutex::default(),
+                limites,
                 yo: yo.clone(),
             }
         })
