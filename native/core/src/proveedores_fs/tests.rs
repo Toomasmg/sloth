@@ -357,3 +357,15 @@ fn claude_exe_un_shim_a_un_exe_que_no_existe_cae_al_paquete_de_js_o_a_none() {
     let leer = |_: &str| Some("\"%dp0%\\falta\\claude.exe\" %*".to_string());
     assert_eq!(resolver_exe_claude("C:\\npm", "C:\\h", &e, &leer, true), None);
 }
+
+#[test]
+fn resolver_exe_elige_la_regla_de_cada_agente() {
+    use ProveedorId::*;
+    let e = existentes(&[r"C:\a\claude.exe", r"C:\a\codex.cmd", r"C:\a\copilot.exe"]);
+    let entorno = EntornoExe { path: r"C:\a", home: r"C:\h", existe: &e, leer_archivo: &sin_archivos, win: true };
+    assert_eq!(resolver_exe(Claude, &entorno), Some(r"C:\a\claude.exe".into()));
+    assert_eq!(resolver_exe(Codex, &entorno), Some(r"C:\a\codex.cmd".into()));
+    assert_eq!(resolver_exe(Copilot, &entorno), Some(r"C:\a\copilot.exe".into()));
+    let vacio = EntornoExe { path: "", home: r"C:\h", existe: &e, leer_archivo: &sin_archivos, win: true };
+    assert_eq!(resolver_exe(Codex, &vacio), None);
+}

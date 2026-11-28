@@ -28,13 +28,18 @@ pub struct Peticion {
     pub verbatim: bool,
     /// Con un corte por línea el hijo es líder de su grupo fuera de Windows: sin eso no se alcanza a sus nietos.
     pub arbol: bool,
+    /// Tras el prompt, stdin sigue abierto para lo que pida `Mirada::Escribir` (un servidor que conversa por líneas).
+    /// Cerrado, el hijo ve el fin de la entrada apenas termina el prompt, como espera `claude -p`.
+    pub stdin_abierto: bool,
 }
 
 /// Qué hacer con una línea de stdout apenas llega.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Mirada {
     Seguir,
     Cortar,
+    /// Mandarle este texto al hijo por stdin (solo con `stdin_abierto`) y seguir leyendo.
+    Escribir(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -129,7 +134,15 @@ impl ProcesoRun for Real {
             Err(e) => return SalidaRun::NoAbrio(e.to_string()),
         };
         let pid = hijo.id();
-        if let Some(mut stdin) = hijo.stdin.take() {
+        let mut entrada = hijo.stdin.take();
+        if p.stdin_abierto {
+            // Lo que se conversa son pocas líneas: escribirlas acá no traba aunque el hijo todavía no lea.
+            if let Some(s) = entrada.as_mut() {
+                if s.write_all(p.prompt.as_bytes()).and_then(|()| s.flush()).is_err() {
+                    entrada = None;
+                }
+            }
+        } else if let Some(mut stdin) = entrada.take() {
             let prompt = p.prompt.clone();
             std::thread::spawn(move || {
                 let _ = stdin.write_all(prompt.as_bytes());
@@ -180,9 +193,19 @@ impl ProcesoRun for Real {
                     while let Some(i) = pendiente.iter().position(|b| *b == b'\n') {
                         let linea: Vec<u8> = pendiente.drain(..=i).collect();
                         let l = String::from_utf8_lossy(&linea[..linea.len() - 1]).into_owned();
-                        if mirar(&l) == Mirada::Cortar {
-                            matar(&mut hijo);
-                            return SalidaRun::Cortada;
+                        match mirar(&l) {
+                            Mirada::Seguir => {}
+                            Mirada::Cortar => {
+                                matar(&mut hijo);
+                                return SalidaRun::Cortada;
+                            }
+                            Mirada::Escribir(t) => {
+                                if let Some(s) = entrada.as_mut() {
+                                    if s.write_all(t.as_bytes()).and_then(|()| s.flush()).is_err() {
+                                        entrada = None;
+                                    }
+                                }
+                            }
                         }
                     }
                     if pendiente.len() > MAX_STDOUT {
@@ -193,6 +216,7 @@ impl ProcesoRun for Real {
                 Err(RecvTimeoutError::Timeout) => {}
             }
         }
+        drop(entrada);
         let code = hijo.wait().ok().and_then(|s| s.code());
         // El lector de stderr termina junto con el hijo; si un nieto sostiene el pipe se usa lo que llegó.
         if let Some((_, listo)) = &err {
@@ -267,6 +291,7 @@ pub fn run_claude<T>(ej: &dyn ProcesoRun, o: &OpcionesRun<T>) -> Res<T> {
         timeout: Duration::from_millis(timeout_ms),
         verbatim: o.verbatim,
         arbol: o.cortar_si.is_some(),
+        stdin_abierto: false,
     };
     let corte: RefCell<Option<Corte<T>>> = RefCell::new(None);
     let mut mirar = |l: &str| -> Mirada {
@@ -448,7 +473,7 @@ mod tests {
         let (exe, mut base) = if cfg!(windows) { ("cmd.exe", vec!["/C".to_string()]) } else { ("sh", vec!["-c".to_string()]) };
         base.extend(args.iter().map(|a| a.to_string()));
         let env: BTreeMap<String, String> = std::env::vars().collect();
-        Peticion { exe: exe.into(), args: base, prompt: String::new(), cwd: PathBuf::from("."), env, timeout: Duration::from_secs(60), verbatim: false, arbol: true }
+        Peticion { exe: exe.into(), args: base, prompt: String::new(), cwd: PathBuf::from("."), env, timeout: Duration::from_secs(60), verbatim: false, arbol: true, stdin_abierto: false }
     }
 
     fn largo() -> &'static str {
@@ -484,6 +509,22 @@ mod tests {
         });
         assert_eq!(r, SalidaRun::Cortada);
         assert_eq!(vistas, vec!["uno".to_string()]);
+    }
+
+    #[test]
+    fn real_con_stdin_abierto_conversa_por_lineas() {
+        let guion = if cfg!(windows) { "set /p sloth_a=& call echo r-%sloth_a%& set /p sloth_b=& call echo r-%sloth_b%& ping -n 60 127.0.0.1 >nul" } else { "read a; echo r-$a; read b; echo r-$b; sleep 60" };
+        let mut p = peticion(&[guion]);
+        p.prompt = "uno\n".into();
+        p.stdin_abierto = true;
+        let mut vistas = Vec::new();
+        let r = Real.correr(&p, None, &mut |l| {
+            let l = l.trim().to_string();
+            vistas.push(l.clone());
+            if l == "r-uno" { Mirada::Escribir("dos\n".into()) } else { Mirada::Cortar }
+        });
+        assert_eq!(r, SalidaRun::Cortada);
+        assert_eq!(vistas, ["r-uno", "r-dos"]);
     }
 
     #[test]
