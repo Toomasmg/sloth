@@ -37,3 +37,8 @@ pub mod propios;
 mod propios_tests;
 pub mod acciones;
 pub mod archivos;
+pub mod servicio;
+#[cfg(test)]
+mod servicio_tests;
+pub mod mcp_ajenos;
+pub mod entorno_consulta;
