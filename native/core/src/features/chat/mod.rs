@@ -1,0 +1,44 @@
+//! Función «chat» (equipo, mensajes directos y MCP para Claude). Equivale a src/main/features/chat*.ts y a
+//! src/shared/chat*.ts. Acá va todo lo puro y lo testeable; Supabase, Electron y el SO entran por traits o closures.
+pub mod auth;
+pub mod config;
+pub mod expulsar;
+pub mod fecha;
+pub mod fotos;
+pub mod invitacion;
+pub mod mapa;
+pub mod mcp_atencion;
+pub mod mcp_core;
+pub mod mcp_registro;
+pub mod texto;
+pub mod tipos;
+pub mod topicos;
+pub mod validar;
+
+/// Los errores de esta función son el texto que se le muestra a la persona.
+pub type Res<T> = Result<T, String>;
+
+/// Primeros `n` caracteres (unidades UTF-16) como `s.slice(0, n)`; un par partido por la mitad se descarta.
+pub(crate) fn cortar_utf16(s: &str, n: usize) -> String {
+    let mut u = 0;
+    s.chars()
+        .take_while(|c| {
+            u += c.len_utf16();
+            u <= n
+        })
+        .collect()
+}
+
+/// `String(error.message).slice(0, 300)` de los `msgOf` del TypeScript.
+pub(crate) fn mensaje_corto(m: &str) -> String {
+    if m.is_empty() {
+        "Algo salió mal.".to_string()
+    } else {
+        cortar_utf16(m, 300)
+    }
+}
+
+/// `String.prototype.trim` de JS.
+pub(crate) fn trim_js(s: &str) -> &str {
+    s.trim_matches(crate::perfiles_core::es_blanco_js)
+}
