@@ -27,6 +27,7 @@ import {
 } from '../../shared/permissions-core'
 import { dentroDelRepoReal, type PathFs } from './permissions-paths'
 import { carpetaFeatures } from '../perfil'
+import { pedirAlNucleo, rustEsDueno } from '../rust-features'
 
 export type { DecisionEntry }
 
@@ -72,9 +73,11 @@ let responder: ((id: string, choice: PermissionChoice) => void) | null = null
 
 /**
  * Responde un pedido pendiente con la misma lógica que las tarjetas de la app (queda en el historial
- * de decisiones). Lo usa «celular». Lanza si el pedido ya no está pendiente.
+ * de decisiones). Lo usa «celular». Falla si el pedido ya no está pendiente. En Tauri los permisos
+ * son de Rust (src-tauri/src/nucleo/permisos.rs): se le pide a él.
  */
-export function responderPermiso(id: string, choice: 'allow' | 'deny'): void {
+export function responderPermiso(id: string, choice: 'allow' | 'deny'): void | Promise<void> {
+  if (rustEsDueno()) return pedirAlNucleo<void>('decidirPermiso', id, choice)
   if (!responder) throw new Error('Los permisos todavía no están listos.')
   responder(id, choice)
 }

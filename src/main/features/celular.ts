@@ -365,14 +365,14 @@ const feature: Feature = {
           pedidos: pedidos().map((p) => ({ id: p.id, ws: p.ws, tool: p.tool, input: p.input, at: p.at, expiresAt: p.expiresAt }))
         })
       },
-      decidir(id, decision, quien) {
+      async decidir(id, decision, quien) {
         if (!cfg.aprobar) throw new Error('Aprobar desde el celu está apagado en Sloth.')
         if (!permisos(quien).aprobar) throw new Error('Este celu solo puede mirar. En la PC, panel «Celular», podés darle permiso para aprobar.')
         const pedido = pedidos().find((p) => p.id === id)
         const ws = pedido?.ws
         // Una página vieja no sabe de `cortado`: la PC no acepta aprobar algo que el celu no pudo mostrar entero.
         if (decision === 'allow' && pedido && pedidoParaCelu(pedido.tool, pedido.input).cortado) throw new Error('Es demasiado largo para verlo entero en el celu: respondelo en la PC.')
-        responderPermiso(id, decision)
+        await responderPermiso(id, decision)
         if (ws) anotarCelu(quien, decision === 'allow' ? 'aprobo' : 'rechazo', ws)
         ctx.log(`permiso ${decision === 'allow' ? 'aprobado' : 'rechazado'} desde el celu`)
       },

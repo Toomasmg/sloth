@@ -15,6 +15,7 @@ pub mod git;
 pub mod help;
 pub mod history;
 pub mod onboarding;
+pub mod permissions;
 pub mod prs;
 pub mod report;
 pub mod sleep;
@@ -38,8 +39,8 @@ pub fn a_json<T: Serialize>(r: Result<T, String>) -> Respuesta {
 /// Las funciones del lado main que atiende Rust. El proceso de apoyo no las registra ni las corre.
 pub const FUNCIONES_EN_RUST: &[&str] = &[git::NOMBRE, help::NOMBRE, report::NOMBRE, team_config::NOMBRE, prs::NOMBRE, chat::NOMBRE, history::NOMBRE, templates::NOMBRE, worktrees::NOMBRE, dictado::NOMBRE, export_import::NOMBRE, onboarding::NOMBRE, tickets::NOMBRE, team::NOMBRE];
 
-/// Las que atiende el núcleo porque viven de su estado (`handlers_estado.rs`, `diagnostico.rs` y `sleep.rs`).
-pub const FUNCIONES_DEL_NUCLEO: &[&str] = &[crate::handlers_estado::NOMBRE_SETTINGS, diagnostico::NOMBRE, sleep::NOMBRE];
+/// Las que atiende el núcleo porque viven de su estado (`handlers_estado.rs`, `diagnostico.rs`, `sleep.rs` y `permissions.rs`).
+pub const FUNCIONES_DEL_NUCLEO: &[&str] = &[crate::handlers_estado::NOMBRE_SETTINGS, diagnostico::NOMBRE, sleep::NOMBRE, permissions::NOMBRE];
 
 /// Todas las funciones que atiende Rust: las de los handlers y las del núcleo.
 pub fn nombres_en_rust() -> impl Iterator<Item = &'static str> {

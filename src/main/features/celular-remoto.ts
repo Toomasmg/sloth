@@ -124,7 +124,7 @@ export function crearFuenteRemota(o: OpcionesRemota): FuenteDeEstado {
     if (!o.puedeAprobar()) res = { id: d.id, ok: false, error: APROBAR_APAGADO }
     else
       try {
-        o.proveedor.decidir(d.id, d.decision)
+        await o.proveedor.decidir(d.id, d.decision)
         res = { id: d.id, ok: true }
       } catch (e) {
         res = { id: d.id, ok: false, error: msg(e) }

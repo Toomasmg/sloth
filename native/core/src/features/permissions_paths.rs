@@ -133,10 +133,66 @@ pub fn dentro_del_repo_real(archivo: &str, cwd: &str, fs: &dyn DiscoFs, p: &dyn 
     ruta_real_dentro(&p.resolver(&[cwd, archivo]), &real_cwd, fs, p).is_some_and(|f| dentro_del_repo(&f, &real_cwd))
 }
 
+/// El disco de verdad, como `realpathSync.native` y `lstatSync` de Node.
+pub struct DiscoReal;
+
+fn error_fs(e: std::io::Error) -> ErrorFs {
+    match e.kind() {
+        std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory => ErrorFs::NoExiste,
+        _ => ErrorFs::Otro,
+    }
+}
+
+/// `canonicalize` de Windows devuelve `\\?\C:\...` (o `\\?\UNC\servidor\...`); realpath de Node, sin el prefijo.
+fn sin_prefijo_largo(p: &str) -> String {
+    if let Some(unc) = p.strip_prefix(r"\\?\UNC\") {
+        return format!(r"\\{unc}");
+    }
+    p.strip_prefix(r"\\?\").unwrap_or(p).to_string()
+}
+
+impl DiscoFs for DiscoReal {
+    fn real(&self, p: &str) -> Result<String, ErrorFs> {
+        std::fs::canonicalize(p).map(|r| sin_prefijo_largo(&r.to_string_lossy())).map_err(error_fs)
+    }
+
+    /// En Windows `is_symlink` también es true para los junctions, como `isSymbolicLink()` de Node.
+    fn lstat_es_enlace(&self, p: &str) -> Result<bool, ErrorFs> {
+        std::fs::symlink_metadata(p).map(|m| m.file_type().is_symlink()).map_err(error_fs)
+    }
+}
+
+/// `dentro_del_repo_real` contra el disco de verdad.
+pub fn dentro_del_repo_en_disco(archivo: &str, cwd: &str) -> bool {
+    dentro_del_repo_real(archivo, cwd, &DiscoReal, &Win32)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::HashMap;
+
+    #[test]
+    fn el_prefijo_largo_de_windows_se_saca_como_en_node() {
+        assert_eq!(sin_prefijo_largo(r"\\?\C:\Users\ana"), r"C:\Users\ana");
+        assert_eq!(sin_prefijo_largo(r"\\?\UNC\srv\carpeta\x"), r"\\srv\carpeta\x");
+        assert_eq!(sin_prefijo_largo(r"C:\ya\corta"), r"C:\ya\corta");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn en_disco_un_archivo_nuevo_del_repo_vale_y_uno_de_afuera_no() {
+        let base = std::env::temp_dir().join(format!("sloth-permisos-disco-{}", std::process::id()));
+        let repo = base.join("repo");
+        std::fs::create_dir_all(repo.join("src")).unwrap();
+        let cwd = repo.to_string_lossy().to_string();
+        assert!(dentro_del_repo_en_disco(r"src\nuevo.ts", &cwd), "todavía no existe, pero cae en el repo");
+        assert!(dentro_del_repo_en_disco(&repo.join("src").join("a.ts").to_string_lossy(), &cwd));
+        assert!(!dentro_del_repo_en_disco(&base.join("otro.ts").to_string_lossy(), &cwd));
+        assert!(!dentro_del_repo_en_disco(r"C:\Windows\x.ts", &cwd));
+        assert_eq!(DiscoReal.real(&base.join("no-existe").to_string_lossy()), Err(ErrorFs::NoExiste));
+        let _ = std::fs::remove_dir_all(&base);
+    }
 
     const REPO: &str = "C:\\Users\\ana\\repo";
 

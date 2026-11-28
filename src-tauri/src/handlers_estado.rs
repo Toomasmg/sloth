@@ -458,6 +458,15 @@ pub fn atender_apoyo(n: &Nucleo, op: &str, args: &[Value]) -> Respuesta {
                     n.cambiando_perfil.store(true, std::sync::atomic::Ordering::SeqCst);
                     Ok(Value::Null)
                 }
+                // `celular` (todavía en el apoyo) responde desde el celu con la misma lógica que las tarjetas.
+                "decidirPermiso" => {
+                    let eleccion = match texto(2)? {
+                        "allow" => sloth_core::features::permissions::Eleccion::Allow,
+                        "deny" => sloth_core::features::permissions::Eleccion::Deny,
+                        _ => return Err(PEDIDO_INVALIDO.into()),
+                    };
+                    n.permisos.decidir(n, texto(1)?, eleccion, None).map(|_| Value::Null)
+                }
                 "listo" => {
                     n.marcar_apoyo_listo(nombres_de_funciones(a(1)));
                     Ok(Value::Null)
@@ -491,6 +500,7 @@ mod tests {
     use crate::router::{Futuro, Reenvio};
     use crate::tests_comunes::PlataformaSimulada;
     use sloth_core::agent_machine::EstadoAgente;
+    use sloth_core::daemon_protocolo::PendingPermission;
     use std::path::PathBuf;
     use std::sync::Mutex;
 
@@ -752,7 +762,7 @@ mod tests {
     fn diagnostico_lista_las_funciones_de_rust_y_del_apoyo_y_avisa_el_cierre_inesperado_una_vez() {
         let mut a = armar("diagnostico", None, None);
         crate::handlers::diagnostico::registrar(&mut a.router, &a.nucleo, "142.0.3595.53".into());
-        a.nucleo.marcar_apoyo_listo(nombres_de_funciones(&json!(["permissions", "", 7, "x".repeat(65), "celular"])));
+        a.nucleo.marcar_apoyo_listo(nombres_de_funciones(&json!(["rendimiento", "", 7, "x".repeat(65), "celular"])));
         let (_, _) = crate::nucleo::arranque::MarcaDeSesion::iniciar(&a.raiz);
         let (marca, crash) = crate::nucleo::arranque::MarcaDeSesion::iniciar(&a.raiz);
         assert!(crash);
@@ -761,7 +771,7 @@ mod tests {
         let texto = invocar(&a, "feat:diagnostico:texto", vec![]).unwrap();
         let texto = texto.as_str().unwrap();
         assert!(texto.contains("WebView2 142.0.3595.53") && !texto.contains("Electron"), "{texto}");
-        assert!(texto.contains("settings, diagnostico, sleep, permissions, celular
+        assert!(texto.contains("settings, diagnostico, sleep, permissions, rendimiento, celular
 "), "{texto}");
         assert!(texto.contains("Funciones activas: git, "), "{texto}");
         assert!(texto.contains("La sesión anterior terminó de forma inesperada."));
@@ -804,6 +814,63 @@ mod tests {
         // Sin terminal viva la marca queda: la próxima terminal arranca con `claude --continue` y la gasta.
         assert!(a.nucleo.dormir.tomar_para_retomar("w1"));
         assert!(!a.nucleo.dormir.tomar_para_retomar("w1"));
+        let _ = std::fs::remove_dir_all(&repo);
+    }
+
+    #[test]
+    fn permisos_lista_aprueba_por_regla_importa_y_deshace() {
+        let repo = std::env::temp_dir().join(format!("sloth-repo-permisos-{}", std::process::id()));
+        std::fs::create_dir_all(&repo).unwrap();
+        let ahora = ahora_ms();
+        let archivo = json!({
+            "rules": [
+                { "id": "r1", "workspaceId": "w1", "kind": "cmd", "tool": "Bash", "match": "npm test", "label": "npm test", "on": true, "createdAt": 1 },
+                { "id": "huerfana", "workspaceId": "borrado", "kind": "cmd", "tool": "Bash", "match": "ls", "on": true },
+                { "basura": true }
+            ],
+            "history": [{ "id": "vieja", "at": 1, "tag": "once" }, { "id": "hoy", "at": ahora, "tag": "always", "ruleId": "r1" }]
+        });
+        let mut a = armar_con("permisos", Some(estado_con_espacio(&repo.to_string_lossy())), None, |perfil| {
+            std::fs::create_dir_all(perfil.join("features")).unwrap();
+            std::fs::write(perfil.join("features").join("permissions.json"), archivo.to_string()).unwrap();
+        });
+        crate::handlers::permissions::registrar(&mut a.router, &a.nucleo);
+        let ids = |v: &Value, k: &str| v[k].as_array().unwrap().iter().map(|x| x["id"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+
+        let l = invocar(&a, "feat:permissions:list", vec![]).unwrap();
+        assert_eq!(ids(&l, "rules"), ["r1"], "la de un espacio borrado se poda y la que no se entiende se descarta");
+        assert_eq!(ids(&l, "history"), ["hoy"], "solo las decisiones de hoy");
+        assert_eq!(l["spaces"]["w1"]["name"], "Uno");
+
+        let pedido = |id: &str, cmd: &str| PendingPermission { id: id.into(), ws: "w1".into(), tool: "Bash".into(), input: json!({ "command": cmd }), suggestions: None, at: 0, expires_at: 0 };
+        assert!(a.nucleo.permisos.al_pedido(&a.nucleo, &pedido("p1", "npm test")), "la regla lo aprueba sola");
+        assert!(!a.nucleo.permisos.al_pedido(&a.nucleo, &pedido("p2", "npm run build")));
+        let l = invocar(&a, "feat:permissions:list", vec![]).unwrap();
+        assert_eq!((l["history"][0]["tag"].clone(), l["history"][0]["ruleId"].clone()), (json!("rule"), json!("r1")));
+
+        invocar(&a, "feat:permissions:rule:set", vec![json!("r1"), json!(false)]).unwrap();
+        assert!(!a.nucleo.permisos.al_pedido(&a.nucleo, &pedido("p3", "npm test")), "apagada no aprueba");
+        assert!(invocar(&a, "feat:permissions:rule:set", vec![json!("r1"), json!("no")]).is_err());
+        assert_eq!(invocar(&a, "feat:permissions:rule:set", vec![json!("nada"), json!(true)]).unwrap_err(), "Esa regla ya no existe.");
+
+        invocar(&a, "feat:permissions:undo", vec![json!("hoy")]).unwrap();
+        let l = invocar(&a, "feat:permissions:list", vec![]).unwrap();
+        assert!(ids(&l, "rules").is_empty(), "deshacer quita la regla");
+        assert_eq!(invocar(&a, "feat:permissions:undo", vec![json!("hoy")]).unwrap_err(), "Esa decisión no se puede deshacer.");
+
+        let r = invocar(&a, "feat:permissions:addRules", vec![json!({ "reglas": [
+            { "workspaceId": "w1", "kind": "net", "tool": "WebFetch", "match": "docs.rs", "label": "docs.rs" },
+            { "workspaceId": "no-existe", "kind": "net", "tool": "WebFetch", "match": "docs.rs", "label": "docs.rs" },
+            { "workspaceId": "w1", "kind": "raro", "tool": "X", "match": "*" }
+        ] })]).unwrap();
+        assert_eq!(r, json!({ "agregadas": 1, "omitidas": 2 }));
+        assert!(invocar(&a, "feat:permissions:addRules", vec![json!({ "reglas": "x" })]).is_err());
+
+        assert_eq!(invocar(&a, "feat:permissions:decide", vec![json!({ "id": "p2", "answer": "quizas" })]).unwrap_err(), "Respuesta inválida.");
+        assert!(invocar(&a, "feat:permissions:decide", vec![json!({ "id": "p2", "answer": "allow" })]).is_err(), "sin terminales no hay pedido que responder");
+        assert_eq!(invocar(&a, "feat:permissions:focus", vec![json!("w1")]).unwrap(), Value::Null);
+        let guardado: Value = serde_json::from_str(&std::fs::read_to_string(a.nucleo.arranque.perfil.join("features").join("permissions.json")).unwrap()).unwrap();
+        assert_eq!(guardado["rules"][0]["match"], "docs.rs");
         let _ = std::fs::remove_dir_all(&repo);
     }
 }

@@ -22,6 +22,15 @@ impl Tipo {
             _ => return None,
         })
     }
+
+    pub fn texto(self) -> &'static str {
+        match self {
+            Self::Cmd => "cmd",
+            Self::Edit => "edit",
+            Self::Net => "net",
+            Self::Other => "other",
+        }
+    }
 }
 
 /// Lo que elige la persona. `Terminal` deja que Claude pregunte en la terminal, como antes.
@@ -31,6 +40,19 @@ pub enum Eleccion {
     AllowAlways,
     Deny,
     Terminal,
+}
+
+impl Eleccion {
+    /// Las de `CHOICES` de permissions-core.ts; cualquier otro texto no es una respuesta.
+    pub fn desde_texto(t: &str) -> Option<Self> {
+        Some(match t {
+            "allow" => Self::Allow,
+            "allowAlways" => Self::AllowAlways,
+            "deny" => Self::Deny,
+            "terminal" => Self::Terminal,
+            _ => return None,
+        })
+    }
 }
 
 pub type Entrada = Map<String, Value>;
@@ -479,6 +501,25 @@ pub fn regla_desde_pedido(req: &Pedido, id: &str, created_at: f64) -> Regla {
     Regla { id: id.into(), workspace_id, kind, tool, match_, label, on: true, created_at }
 }
 
+/// Una regla guardada en permissions.json. Sin tipo conocido no puede coincidir con nada: queda afuera.
+pub fn regla_de_valor(v: &Value) -> Option<Regla> {
+    let t = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or_default().to_string();
+    Some(Regla {
+        id: v.get("id")?.as_str()?.to_string(),
+        workspace_id: v.get("workspaceId")?.as_str()?.to_string(),
+        kind: Tipo::desde_texto(v.get("kind")?.as_str()?)?,
+        tool: t("tool"),
+        match_: t("match"),
+        label: t("label"),
+        on: v.get("on").and_then(Value::as_bool).unwrap_or(false),
+        created_at: v.get("createdAt").and_then(Value::as_f64).unwrap_or(0.0),
+    })
+}
+
+pub fn regla_a_valor(r: &Regla) -> Value {
+    json!({ "id": r.id, "workspaceId": r.workspace_id, "kind": r.kind.texto(), "tool": r.tool, "match": r.match_, "label": r.label, "on": r.on, "createdAt": r.created_at })
+}
+
 // Carpetas del repo donde un archivo escrito termina ejecutándose solo (hooks de git, de Claude, tareas del editor, contenedores, CI).
 const CARPETAS_SENSIBLES: [&str; 9] = [".git", ".claude", ".vscode", ".husky", ".githooks", ".idea", ".devcontainer", ".github", ".sloth"];
 
@@ -675,6 +716,25 @@ mod tests {
 
     fn pedido(tool: &str, input: Value) -> Pedido {
         Pedido { id: "p1".into(), ws: "w1".into(), tool: tool.into(), input: entrada(input), at: 0.0, expires_at: 0.0 }
+    }
+
+    #[test]
+    fn la_regla_va_y_vuelve_de_json_y_sin_tipo_conocido_no_vale() {
+        let r = regla_desde_pedido(&pedido("Bash", json!({ "command": "npm test" })), "r1", 5.0);
+        assert_eq!(regla_de_valor(&regla_a_valor(&r)), Some(r));
+        assert_eq!(regla_a_valor(&regla_desde_pedido(&pedido("WebFetch", json!({ "url": "https://a.com/x" })), "r2", 1.0))["kind"], "net");
+        for v in [json!({ "id": "r", "workspaceId": "w", "kind": "raro" }), json!({ "id": "r", "kind": "cmd" }), json!({ "workspaceId": "w", "kind": "cmd" }), json!(null)] {
+            assert_eq!(regla_de_valor(&v), None, "{v}");
+        }
+        let apagada = regla_de_valor(&json!({ "id": "r", "workspaceId": "w", "kind": "other", "tool": "X" })).unwrap();
+        assert!(!apagada.on, "sin «on» no aprueba nada");
+    }
+
+    #[test]
+    fn las_respuestas_validas_son_las_de_choices() {
+        assert_eq!(["allow", "allowAlways", "deny", "terminal"].map(Eleccion::desde_texto), [Some(Eleccion::Allow), Some(Eleccion::AllowAlways), Some(Eleccion::Deny), Some(Eleccion::Terminal)]);
+        assert_eq!(Eleccion::desde_texto("Allow"), None);
+        assert_eq!(Eleccion::desde_texto(""), None);
     }
 
     fn regla(req: &Pedido) -> Regla {

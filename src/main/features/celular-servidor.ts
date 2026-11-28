@@ -13,7 +13,7 @@ export interface ProveedorDeEstado {
   /** `quien` llega solo por el Wi-Fi: la IP y el user-agent del pedido, ya con la clave verificada. */
   estado(quien?: Quien): Promise<EstadoCelular>
   /** Lanza con un mensaje para el celu si no se pudo (venció, ya se respondió). */
-  decidir(id: string, decision: 'allow' | 'deny', quien?: Quien): void
+  decidir(id: string, decision: 'allow' | 'deny', quien?: Quien): void | Promise<void>
   /** Con `quien`, lo que deja el nivel de ese celu además del interruptor. */
   puedeAprobar(quien?: Quien): boolean
   /** La clave del QR: con ella solo se puede pedir entrar. */
@@ -210,7 +210,7 @@ export function crearFuenteWifi(o: OpcionesWifi): FuenteDeEstado & { puerto(): n
       const p = sobre.b as { id?: unknown; decision?: unknown } | null
       if (!p || typeof p !== 'object' || typeof p.id !== 'string' || p.id.length > 100 || (p.decision !== 'allow' && p.decision !== 'deny')) return sellado(400, { error: 'Pedido inválido.' })
       try {
-        o.proveedor.decidir(p.id, p.decision, quien)
+        await o.proveedor.decidir(p.id, p.decision, quien)
       } catch (e) {
         return sellado(409, { error: (e as Error).message })
       }

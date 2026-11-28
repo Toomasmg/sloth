@@ -6,6 +6,7 @@ pub mod ajustes;
 pub mod arranque;
 pub mod cuentas;
 pub mod dormir;
+pub mod permisos;
 pub mod terminales;
 
 use crate::entorno::PlataformaCompartida;
@@ -87,6 +88,9 @@ pub struct Nucleo {
     /// La sesión anterior no cerró limpia (`feat:diagnostico:crashPrevio` lo avisa una sola vez).
     pub crash: sloth_core::features::diagnostico::EstadoCrash,
     pub dormir: dormir::Dormir,
+    pub permisos: permisos::Permisos,
+    /// La vista de las funciones (foco de la ventana y avisos del sistema): la deja `arrancar` después de crear el núcleo.
+    entorno: OnceLock<Arc<crate::entorno::Entorno>>,
     yo: Weak<Nucleo>,
 }
 
@@ -95,6 +99,7 @@ impl Nucleo {
         let avisos = Avisos::global();
         let store = Store::cargar(&arranque.perfil.join("sloth-state.json"), &antirea_vieja(&arranque.raiz), &arranque.raiz.to_string_lossy(), avisos);
         let ajustes = ajustes::Ajustes::cargar(&arranque.perfil.join("features").join("settings.json"), avisos);
+        let permisos = permisos::Permisos::cargar(&arranque.perfil.join("features").join("permissions.json"), avisos);
         let dormir = dormir::Dormir::cargar(&arranque.perfil.join("features").join("sleep.json"), |id| store.workspace(id).is_some(), store.confiable(), avisos);
         // Los dormidos se ven «Dormido» desde el primer `state:get`: su terminal no se abre hasta despertarlos.
         let mut agentes = Agentes::default();
@@ -135,6 +140,8 @@ impl Nucleo {
                 marca_de_sesion: OnceLock::new(),
                 crash: Default::default(),
                 dormir,
+                permisos,
+                entorno: OnceLock::new(),
                 yo: yo.clone(),
             }
         })
@@ -296,6 +303,21 @@ impl Nucleo {
         Some(nuevo)
     }
 
+    pub fn fijar_entorno(&self, e: Arc<crate::entorno::Entorno>) {
+        let _ = self.entorno.set(e);
+    }
+
+    pub fn ventana_con_foco(&self) -> bool {
+        self.entorno.get().is_some_and(|e| e.con_foco())
+    }
+
+    /// Aviso de Windows (sin entorno, en pruebas, no se muestra).
+    pub fn avisar_al_sistema(&self, titulo: &str, cuerpo: &str) {
+        if let Some(e) = self.entorno.get() {
+            e.notificar(titulo, cuerpo);
+        }
+    }
+
     /// La marca de esta sesión (la deja `arrancar` antes de crear el núcleo): se cierra limpia en `al_salir`.
     pub fn fijar_sesion(&self, marca: arranque::MarcaDeSesion, crash_previo: bool) {
         self.crash.marcar(crash_previo);
@@ -442,6 +464,7 @@ impl Nucleo {
             p.en_fondo = Some(n as u64);
         }
         self.apoyo.evento("rust.pty", json!(["hook", p]));
+        self.permisos.al_hook(self, &p);
         for h in self.al_hook.read().unwrap_or_else(|e| e.into_inner()).iter() {
             h.al_hook(&p.event, Some(&p.ws));
         }
@@ -475,6 +498,10 @@ impl Nucleo {
     pub fn al_permiso(&self, r: PendingPermission) {
         if self.espacio(&r.ws).is_none() {
             self.terminales.responder_permiso(&r.id, Value::Null);
+            return;
+        }
+        // Si una regla «Permitir siempre» lo cubre, se aprueba solo y no hace falta la tarjeta.
+        if self.permisos.al_pedido(self, &r) {
             return;
         }
         let v = prompt_de_permiso(&r);
