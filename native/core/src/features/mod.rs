@@ -2,6 +2,7 @@
 //! store o la red queda afuera: se pasa como dato o como closure.
 pub mod broadcast;
 pub mod diagnostico;
+pub mod chat;
 pub mod dictado_core;
 pub mod dictado_modelo;
 pub mod export_crypto;
