@@ -56,15 +56,15 @@ pub fn registrar_todo(router: &mut Router, entorno: &Arc<Entorno>) -> Vec<Arc<dy
     vec![git::registrar(router, entorno.clone()), prs::registrar(router, entorno.clone()), chat::registrar(router, entorno.clone()), t as Arc<dyn AlHook>]
 }
 
-/// Lo que el proceso de apoyo reenvía de sus hooks de Claude a las funciones que pasaron a Rust.
+/// Los hooks de Claude que el núcleo (dueño de la conexión con el daemon) les pasa a las funciones de Rust.
 pub trait AlHook: Send + Sync {
     fn al_hook(&self, evento: &str, ws: Option<&str>);
 
     /// La ventana principal tomó el foco (prs refresca si su vista está abierta).
     fn al_enfocar(&self) {}
 
-    /// Lo que pasa en lo que todavía es de otro dueño: `cuentaPreparada` y `cuentaBorrada` (con la cuenta) y
-    /// `terminalCerrada`. Llega por el puente (`rust.evento`) desde quien sea el dueño de cuentas y terminales.
+    /// Lo que pasa con cuentas y terminales, que son del núcleo: `cuentaPreparada` y `cuentaBorrada` (con la cuenta) y
+    /// `terminalCerrada`.
     fn al_evento(&self, _evento: &str, _datos: &Value) {}
 
     /// Un pedido `rust.<algo>` del proceso de apoyo para esta función; `None` si no es suyo.
@@ -75,7 +75,7 @@ pub trait AlHook: Send + Sync {
     /// Al salir de la app.
     fn al_salir(&self) {}
 
-    /// El proceso de apoyo avisó la carpeta del perfil: lo que la UI pidió antes recibió «Sloth todavía está arrancando.»
-    /// y una función que la UI carga una sola vez al abrir le manda ahora su estado.
+    /// El perfil quedó cargado (al arrancar, antes de que la UI pida nada): una función que la UI carga una sola vez al
+    /// abrir le manda su estado.
     fn al_perfil(&self) {}
 }

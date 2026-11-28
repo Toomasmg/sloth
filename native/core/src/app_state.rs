@@ -64,7 +64,7 @@ impl Agentes {
     }
 }
 
-fn solo_lectura_json(s: &SoloLecturaStore) -> Value {
+pub fn solo_lectura_json(s: &SoloLecturaStore) -> Value {
     let causa = match s.causa {
         CausaSoloLectura::VersionFutura => "version-futura",
         CausaSoloLectura::Io => "io",

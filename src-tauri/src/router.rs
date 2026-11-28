@@ -16,21 +16,32 @@ pub trait Reenvio: Send + Sync + 'static {
 }
 
 type Handler = Arc<dyn Fn(Vec<Value>) -> Respuesta + Send + Sync>;
+type Oyente = Arc<dyn Fn(Vec<Value>) + Send + Sync>;
+
+/// Canales internos entre Rust y el proceso de apoyo: la interfaz no los puede invocar aunque el apoyo los atienda.
+pub const PREFIJO_INTERNO: &str = "nucleo:";
 
 pub struct Router {
     handlers: HashMap<String, Handler>,
+    oyentes: HashMap<String, Oyente>,
     reenvio: Arc<dyn Reenvio>,
 }
 
 impl Router {
     pub fn nuevo(reenvio: Arc<dyn Reenvio>) -> Router {
-        Router { handlers: HashMap::new(), reenvio }
+        Router { handlers: HashMap::new(), oyentes: HashMap::new(), reenvio }
     }
 
     /// Un canal tiene un solo dueño: registrarlo dos veces es un error de armado, no algo que se resuelva en silencio.
     pub fn registrar(&mut self, canal: &str, f: impl Fn(Vec<Value>) -> Respuesta + Send + Sync + 'static) {
         let anterior = self.handlers.insert(canal.to_string(), Arc::new(f));
         assert!(anterior.is_none(), "el canal {canal} ya tiene handler en Rust");
+    }
+
+    /// Un canal de `ipc_send` (sin respuesta) que atiende Rust, como `pty:write`.
+    pub fn registrar_envio(&mut self, canal: &str, f: impl Fn(Vec<Value>) + Send + Sync + 'static) {
+        let anterior = self.oyentes.insert(canal.to_string(), Arc::new(f));
+        assert!(anterior.is_none(), "el envío {canal} ya tiene oyente en Rust");
     }
 
     pub fn atiende(&self, canal: &str) -> bool {
@@ -44,6 +55,9 @@ impl Router {
     }
 
     pub fn invocar(&self, canal: String, args: Vec<Value>) -> Futuro<Respuesta> {
+        if canal.starts_with(PREFIJO_INTERNO) {
+            return Box::pin(async move { Err(format!("Sin handler para {canal}")) });
+        }
         let Some(h) = self.handlers.get(&canal).cloned() else { return self.reenvio.invocar(canal, args) };
         // Los handlers hacen E/S (git, archivos): van fuera del hilo que atiende los comandos de la ventana.
         Box::pin(async move {
@@ -54,7 +68,14 @@ impl Router {
     }
 
     pub fn enviar(&self, canal: String, args: Vec<Value>) {
-        self.reenvio.enviar(canal, args);
+        if canal.starts_with(PREFIJO_INTERNO) {
+            return;
+        }
+        match self.oyentes.get(&canal).cloned() {
+            // En orden y sin esperar: lo que se escribe en una terminal no puede llegar desordenado.
+            Some(f) => f(args),
+            None => self.reenvio.enviar(canal, args),
+        }
     }
 }
 
@@ -134,11 +155,33 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn el_envio_sin_respuesta_siempre_va_al_apoyo() {
+    async fn el_envio_sin_oyente_en_rust_va_al_apoyo() {
         let (mut r, apoyo) = armar();
         r.registrar("pty:write", |_| Ok(Value::Null));
         r.enviar("pty:write".into(), vec![json!("id"), json!("ls")]);
         assert_eq!(apoyo.enviados.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn el_envio_con_oyente_en_rust_no_llega_al_apoyo_y_respeta_el_orden() {
+        let (mut r, apoyo) = armar();
+        let vistos = Arc::new(Mutex::new(Vec::new()));
+        let v = vistos.clone();
+        r.registrar_envio("pty:write", move |a| v.lock().unwrap().push(a[1].clone()));
+        for t in ["a", "b", "c"] {
+            r.enviar("pty:write".into(), vec![json!("id"), json!(t)]);
+        }
+        assert_eq!(*vistos.lock().unwrap(), vec![json!("a"), json!("b"), json!("c")]);
+        assert!(apoyo.enviados.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn la_interfaz_no_alcanza_los_canales_internos_del_apoyo() {
+        let (r, apoyo) = armar();
+        let e = r.invocar("nucleo:comando".into(), vec![]).await.unwrap_err();
+        assert!(e.contains("nucleo:comando"));
+        r.enviar("nucleo:x".into(), vec![]);
+        assert!(apoyo.invocados.lock().unwrap().is_empty() && apoyo.enviados.lock().unwrap().is_empty());
     }
 
     #[test]

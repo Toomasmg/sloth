@@ -50,6 +50,10 @@ impl Sidecar {
     }
 }
 
+fn en_orden(m: &Value) -> bool {
+    m["op"] == "rust.nucleo" && matches!(m["args"][0].as_str(), Some("write" | "resize" | "log"))
+}
+
 fn raiz_del_proyecto() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().map(PathBuf::from).unwrap_or_default()
 }
@@ -61,9 +65,6 @@ fn sin_prefijo(p: PathBuf) -> PathBuf {
     t.strip_prefix(prefijo.as_str()).map(PathBuf::from).unwrap_or(p)
 }
 
-/// Lanza el proceso de apoyo. Instalado: el `node` que el instalador deja junto al ejecutable y el main
-/// de la carpeta de recursos. En desarrollo: el `node` del PATH y `out/sidecar` del proyecto.
-/// `nativo` atiende los pedidos de la parte nativa.
 /// Carpeta de la app como la ve el proceso de apoyo (`resourcesPath` instalado, la del proyecto en desarrollo) y si es
 /// la instalada.
 pub fn raiz_de_la_app(app: &AppHandle) -> (PathBuf, bool) {
@@ -76,7 +77,10 @@ pub fn raiz_de_la_app(app: &AppHandle) -> (PathBuf, bool) {
     }
 }
 
-pub fn lanzar(app: AppHandle, nativo: fn(&AppHandle, &str, Vec<Value>) -> Result<Value, String>) -> Result<Arc<Sidecar>, String> {
+/// Lanza el proceso de apoyo. Instalado: el `node` que el instalador deja junto al ejecutable y el main de la carpeta de
+/// recursos. En desarrollo: el `node` del PATH y `out/sidecar` del proyecto. `nativo` atiende los pedidos de la parte nativa; `entorno` son variables de más para el
+/// proceso (el perfil que eligió Rust).
+pub fn lanzar(app: AppHandle, nativo: fn(&AppHandle, &str, Vec<Value>) -> Result<Value, String>, entorno: &[(&str, String)]) -> Result<Arc<Sidecar>, String> {
     let (raiz, instalado) = raiz_de_la_app(&app);
     let empaquetado = instalado.then_some(&raiz);
     let (script, node) = if instalado {
@@ -94,6 +98,7 @@ pub fn lanzar(app: AppHandle, nativo: fn(&AppHandle, &str, Vec<Value>) -> Result
         .env("SLOTH_APP_PATH", &raiz)
         .env("SLOTH_VERSION", app.package_info().version.to_string())
         .env("SLOTH_RUST_FEATURES", crate::handlers::funciones_en_rust())
+        .envs(entorno.iter().map(|(k, v)| (*k, v.as_str())))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -134,14 +139,21 @@ pub fn lanzar(app: AppHandle, nativo: fn(&AppHandle, &str, Vec<Value>) -> Result
                     let (id, op) = (m["id"].clone(), m["op"].as_str().unwrap_or("").to_string());
                     let args = m["args"].as_array().cloned().unwrap_or_default();
                     let (sc, app) = (lector.clone(), app.clone());
-                    std::thread::spawn(move || {
+                    let atender = move || {
                         let r = nativo(&app, &op, args);
                         let msg = match r {
                             Ok(v) => json!({ "k": "native-result", "id": id, "ok": true, "result": v }),
                             Err(e) => json!({ "k": "native-result", "id": id, "ok": false, "error": e }),
                         };
                         sc.escribir(&msg);
-                    });
+                    };
+                    // Lo que se escribe en una terminal y las líneas del log no pueden llegar desordenadas: se atienden
+                    // acá mismo, en el orden en que llegan (no bloquean: solo encolan).
+                    if en_orden(&m) {
+                        atender();
+                    } else {
+                        std::thread::spawn(atender);
+                    }
                 }
                 _ => {}
             }

@@ -1,5 +1,5 @@
-//! Lo que comparten los handlers de Rust: la plataforma, la carpeta del perfil que eligió el proceso de apoyo
-//! y la lectura (solo lectura) del estado de espacios que sigue guardando ese proceso.
+//! Lo que comparten los handlers de Rust: la plataforma, la carpeta del perfil de esta sesión y el estado (cuentas y
+//! espacios), que da su dueño, el núcleo (`nucleo`).
 use crate::router::{Futuro, Respuesta};
 use serde_json::Value;
 use sloth_core::app_state::Plataforma;
@@ -7,7 +7,7 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc, Arc, RwLock};
+use std::sync::{mpsc, Arc, OnceLock, RwLock};
 use std::time::Duration;
 
 pub const ACTIVIDAD_MAX_BYTES: u64 = 256 * 1024;
@@ -44,6 +44,8 @@ pub type Notificador = Arc<dyn Fn(&str, &str) + Send + Sync>;
 /// Evento nativo hacia el proceso de apoyo (nombre, argumentos).
 pub type EventosAlApoyo = Arc<dyn Fn(&str, Value) + Send + Sync>;
 
+type FuenteDelEstado = Box<dyn Fn() -> Value + Send + Sync>;
+
 pub struct Entorno {
     pub plataforma: Arc<dyn PlataformaCompartida>,
     perfil: RwLock<Option<PathBuf>>,
@@ -52,6 +54,7 @@ pub struct Entorno {
     foco: AtomicBool,
     notificador: RwLock<Option<Notificador>>,
     al_apoyo: RwLock<Option<EventosAlApoyo>>,
+    fuente: OnceLock<FuenteDelEstado>,
 }
 
 impl Entorno {
@@ -64,6 +67,7 @@ impl Entorno {
             foco: AtomicBool::new(false),
             notificador: RwLock::new(None),
             al_apoyo: RwLock::new(None),
+            fuente: OnceLock::new(),
         })
     }
 
@@ -127,8 +131,17 @@ impl Entorno {
         self.plataforma.carpeta_de_datos()
     }
 
-    /// `sloth-state.json` tal como lo dejó el proceso de apoyo, sin migrar ni reescribir; `{}` si no se puede leer.
+    /// De dónde sale el estado: el store en memoria del núcleo, su único dueño.
+    pub fn fijar_fuente_del_estado(&self, f: impl Fn() -> Value + Send + Sync + 'static) {
+        let _ = self.fuente.set(Box::new(f));
+    }
+
+    /// Cuentas, espacios y paneles. Sin núcleo (pruebas de un handler suelto), `sloth-state.json` leído sin tocarlo;
+    /// `{}` si no se puede leer.
     pub fn estado(&self) -> Value {
+        if let Some(f) = self.fuente.get() {
+            return f();
+        }
         self.perfil().ok().and_then(|p| leer_estado(&p.join("sloth-state.json"))).unwrap_or_else(|| Value::Object(Default::default()))
     }
 
@@ -136,7 +149,7 @@ impl Entorno {
         self.estado().get(clave).and_then(Value::as_array).cloned().unwrap_or_default()
     }
 
-    /// El proceso de apoyo decide el perfil activo (migraciones incluidas) y avisa su carpeta una vez que arrancó.
+    /// La carpeta del perfil la decide el arranque de Rust (migraciones incluidas), antes de registrar los handlers.
     pub fn fijar_perfil(&self, carpeta: PathBuf) {
         *self.perfil.write().unwrap_or_else(|e| e.into_inner()) = Some(carpeta);
     }
@@ -155,7 +168,7 @@ impl Entorno {
     }
 
     pub fn cwd_de_espacio(&self, id: &str) -> Option<String> {
-        cwd_en_estado(&self.perfil().ok()?.join("sloth-state.json"), id)
+        cwd_de(&self.estado(), id)
     }
 
     pub fn registrar_pr(&self, pr: &str, ahora_ms: u64) -> Result<(), String> {
@@ -167,9 +180,7 @@ impl Entorno {
     }
 }
 
-/// Lee, sin migrar ni reescribir, la carpeta de un espacio del `sloth-state.json` que escribe el proceso de apoyo.
-pub fn cwd_en_estado(archivo: &Path, id: &str) -> Option<String> {
-    let v = leer_estado(archivo)?;
+fn cwd_de(v: &Value, id: &str) -> Option<String> {
     v.get("workspaces")?.as_array()?.iter().find(|w| w.get("id").and_then(Value::as_str) == Some(id))?.get("cwd")?.as_str().map(str::to_string)
 }
 
@@ -211,6 +222,15 @@ pub fn agregar_actividad_ticket(dir: &Path, ticket: &str, espacio: &str, ahora_m
     agregar_actividad(dir, ahora_ms, Value::Object(linea))
 }
 
+/// Abrir la terminal de un espacio: `{ t, tipo: 'espacio', espacio }`.
+pub fn agregar_actividad_espacio(dir: &Path, espacio: &str, ahora_ms: u64) -> Result<(), String> {
+    let espacio = campo_limpio(espacio);
+    if espacio.is_empty() {
+        return Err("actividad inválida".into());
+    }
+    agregar_actividad(dir, ahora_ms, serde_json::json!({ "t": ahora_ms, "tipo": "espacio", "espacio": espacio }))
+}
+
 /// Misma rotación que `agregarActividad` de src/main/perfiles-actividad.ts.
 fn agregar_actividad(dir: &Path, ahora_ms: u64, linea: Value) -> Result<(), String> {
     if ahora_ms == 0 {
@@ -249,11 +269,11 @@ mod tests {
         let f = d.join("sloth-state.json");
         let texto = format!("\u{feff}{}", json!({ "version": 1, "workspaces": [{ "id": "a", "cwd": "C:\\repo" }, { "id": "b" }] }));
         fs::write(&f, &texto).unwrap();
-        assert_eq!(cwd_en_estado(&f, "a").as_deref(), Some("C:\\repo"));
-        assert_eq!(cwd_en_estado(&f, "b"), None);
-        assert_eq!(cwd_en_estado(&f, "z"), None);
+        assert_eq!(leer_estado(&f).and_then(|v| cwd_de(&v, "a")).as_deref(), Some("C:\\repo"));
+        assert_eq!(leer_estado(&f).and_then(|v| cwd_de(&v, "b")), None);
+        assert_eq!(leer_estado(&f).and_then(|v| cwd_de(&v, "z")), None);
         assert_eq!(fs::read_to_string(&f).unwrap(), texto);
-        assert_eq!(cwd_en_estado(&d.join("no-existe.json"), "a"), None);
+        assert_eq!(leer_estado(&d.join("no-existe.json")).and_then(|v| cwd_de(&v, "a")), None);
     }
 
     #[test]
@@ -261,7 +281,7 @@ mod tests {
         let d = carpeta("roto");
         let f = d.join("sloth-state.json");
         fs::write(&f, "{no es json").unwrap();
-        assert_eq!(cwd_en_estado(&f, "a"), None);
+        assert_eq!(leer_estado(&f).and_then(|v| cwd_de(&v, "a")), None);
     }
 
     #[test]
