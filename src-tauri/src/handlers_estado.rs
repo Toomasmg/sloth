@@ -178,21 +178,62 @@ fn alta_de_cuenta(n: &Nucleo, label: &Value, proveedor: Option<&Value>) -> Respu
 }
 
 fn hay_powershell_7() -> bool {
-    if !cfg!(windows) {
-        return true;
+    let entorno: Vec<(String, String)> = std::env::vars().collect();
+    sloth_core::agentes::powershell7_disponible(&sloth_core::features::tickets::claude_run::Real, &entorno, cfg!(windows), &|p| Path::new(p).exists())
+}
+
+fn agentes(n: &Nucleo) -> Respuesta {
+    let entorno: Vec<(String, String)> = std::env::vars().collect();
+    let cuentas = n.store().accounts().to_vec();
+    let carpeta_perfiles = n.arranque.raiz.join("perfiles");
+    let tope = |id: ProveedorId| {
+        c::motivo_no_agregar_cuenta(&cuentas, id, &mut || sloth_core::tope_cuentas::cuentas_en_otros_perfiles(&carpeta_perfiles, &n.arranque.id_perfil, id, &mut |t| sloth_core::logger_global::aviso("cuentas", &t)))
+    };
+    let resolver = |id: ProveedorId| n.cuentas.exe_de(id);
+    let existe = |p: &str| Path::new(p).exists();
+    let s = sloth_core::agentes::SistemaAgentes { proceso: &sloth_core::features::tickets::claude_run::Real, entorno: &entorno, windows: cfg!(windows), resolver: &resolver, existe: &existe, motivo_tope: &tope };
+    serde_json::to_value(sloth_core::agentes::detectar_agentes(&s)).map_err(|x| x.to_string())
+}
+
+fn uso(n: &Nucleo) -> Respuesta {
+    let cuentas = sloth_core::usage::cuentas_de_uso(n.store().accounts());
+    let ahora = ahora_ms();
+    let mut u = n.uso.lock().unwrap_or_else(|x| x.into_inner());
+    serde_json::to_value(u.escanear(&cuentas, ahora as i64, crate::handlers::comun::desfase_local_min(ahora))).map_err(|x| x.to_string())
+}
+
+// De a una cuenta: Ajustes muestra cada una apenas llega, sin esperar a las demás.
+fn limites_codex(n: &Nucleo, id: &Value) -> Respuesta {
+    let cuenta = c::pedido_limites_codex(n.store().accounts(), id)?.cloned();
+    // Hasta que el daemon no se conecta no se sabe qué terminales hay abiertas.
+    let _ = n.backend();
+    let lectura = sloth_core::codex_limites::limites_de_cuenta(&n.limites, cuenta.as_ref(), true, &|p| n.cuentas.exe_de(p));
+    serde_json::to_value(lectura).map_err(|x| x.to_string())
+}
+
+fn aplicar(n: &Nucleo, cambio: &c::CambioDeCuenta) -> Result<Value, String> {
+    n.store().exigir_escritura()?;
+    n.cambiar(|s| s.update_account(&cambio.id, &cambio.parche))?.ok_or_else(|| c::CUENTA_INEXISTENTE.to_string())
+}
+
+fn limites_experimentales(n: &Nucleo, id: &Value, activo: &Value) -> Respuesta {
+    let cambio = c::pedido_limites_experimentales(n.store().accounts(), id, activo)?;
+    aplicar(n, &cambio)?;
+    n.limites.olvidar(&cambio.id);
+    Ok(Value::Null)
+}
+
+fn aviso_de_turno(n: &Nucleo, id: &Value, activo: &Value) -> Respuesta {
+    let cambio = c::pedido_aviso_de_turno(n.store().accounts(), id, activo)?;
+    let acc = aplicar(n, &cambio)?;
+    let motivo = n.cuentas.ajustar_notify(&acc);
+    let activo = acc["avisoDeTurno"] == Value::Bool(true);
+    if c::debe_revertir_aviso_de_turno(activo, motivo.as_deref()) {
+        // No queda un switch prendido que no hace nada.
+        aplicar(n, &c::aviso_de_turno_apagado(&cambio.id))?;
+        return Err(motivo.unwrap_or_default());
     }
-    let v = |k: &str| std::env::var(k).ok();
-    let candidatos = sloth_core::agente_exe::candidatos_pwsh(v("ProgramW6432").as_deref(), v("ProgramFiles").as_deref(), &v("PATH").unwrap_or_default(), v("LOCALAPPDATA").as_deref(), &|p| Path::new(p).exists());
-    sloth_core::agente_exe::hay_powershell_7(&candidatos, &mut |exe| {
-        let mut cmd = std::process::Command::new(exe);
-        cmd.args(["-NoProfile", "-NonInteractive", "-NoLogo", "-Command", "$PSVersionTable.PSVersion.Major"]);
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            cmd.creation_flags(0x0800_0000);
-        }
-        cmd.output().ok().map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
-    })
+    Ok(Value::Null)
 }
 
 fn compartir_setup(n: &Nucleo, id: &Value, share: &Value) -> Respuesta {
@@ -293,6 +334,11 @@ pub fn registrar(router: &mut Router, n: &Arc<Nucleo>, imagen: LeerImagen) {
     canal!("daemon:shutdown", |n, a| n.apagar_daemon().map(|_| Value::Null));
     canal!("accounts:add", |n, a| alta_de_cuenta(n, arg(&a, 0), a.get(1).filter(|v| !v.is_null())));
     canal!("accounts:setShareSetup", |n, a| compartir_setup(n, arg(&a, 0), arg(&a, 1)));
+    canal!("accounts:agentes", |n, a| agentes(n));
+    canal!("accounts:usage", |n, a| uso(n));
+    canal!("accounts:limitesCodex", |n, a| limites_codex(n, arg(&a, 0)));
+    canal!("accounts:setLimitesExperimentales", |n, a| limites_experimentales(n, arg(&a, 0), arg(&a, 1)));
+    canal!("accounts:setAvisoDeTurno", |n, a| aviso_de_turno(n, arg(&a, 0), arg(&a, 1)));
     canal!("accounts:remove", |n, a| baja_de_cuenta(n, arg(&a, 0)));
     canal!("accounts:statuses", |n, a| Ok(Value::Object(n.store().accounts().iter().filter_map(|x| Some((x["id"].as_str()?.to_string(), c::estado_de_cuenta(x)))).collect())));
     canal!("workspaces:add", |n, a| alta_de_espacio(n, arg(&a, 0)));
@@ -572,7 +618,7 @@ mod tests {
         assert_eq!(e["openPanes"], json!(["w1"]));
         assert!(e.get("soloLectura").is_none());
         assert!(a.apoyo.reenviados.lock().unwrap().is_empty());
-        let v = invocar(&a, "accounts:usage", vec![]).unwrap();
+        let v = invocar(&a, "feat:sleep:state", vec![]).unwrap();
         assert_eq!(v["desde"], "apoyo");
         assert!(invocar(&a, "nucleo:comando", vec![]).is_err());
     }
@@ -609,6 +655,23 @@ mod tests {
         assert_eq!(invocar(&a, "pty:resumeOnce", vec![json!("nada"), json!("a1"), json!(uuid)]).unwrap_err(), e::ESPACIO_INEXISTENTE);
         invocar(&a, "pty:resumeOnce", vec![json!("w1"), json!("a1"), json!(uuid)]).unwrap();
         assert!(invocar(&a, "pty:running", vec![json!(1)]).is_err());
+    }
+
+    #[test]
+    fn los_canales_de_cuentas_de_codex_y_uso_son_del_nucleo() {
+        let repo = std::env::temp_dir().to_string_lossy().into_owned();
+        let mut estado = estado_con_espacio(&repo);
+        estado["accounts"].as_array_mut().unwrap().push(json!({ "id": "cx", "label": "Codex", "configDir": repo, "createdAt": 3, "proveedor": "codex" }));
+        let a = armar("cuentas-codex", Some(estado), None);
+        assert!(invocar(&a, "accounts:usage", vec![]).unwrap().is_object());
+        assert!(invocar(&a, "accounts:setLimitesExperimentales", vec![json!("a1"), json!(true)]).is_err(), "Claude no tiene límites experimentales");
+        assert_eq!(invocar(&a, "accounts:setLimitesExperimentales", vec![json!("cx"), json!("si")]).unwrap_err(), PEDIDO_INVALIDO);
+        invocar(&a, "accounts:setLimitesExperimentales", vec![json!("cx"), json!(true)]).unwrap();
+        assert_eq!(a.nucleo.cuenta("cx").unwrap()["limitesExperimentales"], true);
+        // Sin sesión de Codex no se lee nada.
+        assert_eq!(invocar(&a, "accounts:limitesCodex", vec![json!("cx")]).unwrap()["tipo"], "sin-dato");
+        assert!(invocar(&a, "accounts:setAvisoDeTurno", vec![json!("a1"), json!(true)]).is_err(), "Claude no usa el aviso de Codex");
+        assert_eq!(invocar(&a, "accounts:limitesCodex", vec![json!(3)]).unwrap_err(), PEDIDO_INVALIDO);
     }
 
     #[test]

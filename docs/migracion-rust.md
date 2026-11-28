@@ -68,7 +68,8 @@ Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `pr
 `templates` (10), `worktrees` (7), `dictado` (2), `export-import` (10), `onboarding` (6), `tickets` (20),
 `team` (4) y el núcleo
 (`src-tauri/src/handlers_estado.rs`): `state:get`, `permission:pending`, `daemon:info`, `daemon:shutdown`, `accounts:add`,
-`accounts:setShareSetup`, `accounts:remove`, `accounts:statuses`, `workspaces:add|remove|update|reveal`, `ui:openPanes`,
+`accounts:setShareSetup`, `accounts:remove`, `accounts:statuses`, `accounts:agentes`, `accounts:usage`,
+`accounts:limitesCodex`, `accounts:setLimitesExperimentales`, `accounts:setAvisoDeTurno`, `workspaces:add|remove|update|reveal`, `ui:openPanes`,
 `dialog:pickFolder`, `pty:start|write|resize|kill|cuentaOcupada|running|resumeOnce`, `clipboard:read|write` y
 `feat:settings:get|set|reset|pickProjectsDir`.
 
@@ -116,9 +117,6 @@ Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `pr
 
 Por qué el resto sigue en el proceso de apoyo:
 
-- `accounts:agentes`, `accounts:usage`, `accounts:limitesCodex`, `accounts:setLimitesExperimentales`,
-  `accounts:setAvisoDeTurno`: dependen de piezas de Codex y del escáner de uso que todavía no están en `native/core`
-  (`codex-limites`, `codex-notify`, `usage` armado). Cuando cambian una cuenta lo piden a Rust por el store espejo.
 - `move-account`: cambia la cuenta de un espacio (`store.updateWorkspace(accountId)`) y no hay canal del dueño para eso
   (`workspaces:update` solo cambia nombre e ícono); además escribe el resumen en la terminal al primer `SessionStart`.
   En Tauri funciona con el store espejo (el cambio va a Rust por `rust.store`); para pasar a Rust le falta el pegado del
@@ -158,8 +156,8 @@ de los agentes: `src-tauri/src/nucleo` (`Nucleo`). Electron no cambia (no hay pu
   el orden en que llegan.
 - **Lo que Rust le pregunta al apoyo** (canales `nucleo:*`, que la interfaz no puede invocar): el comando de un espacio
   cuando una función lo reemplaza (`nucleo:comando`, retomar tras mover de cuenta) y el aviso antes de borrar una cuenta
-  (`nucleo:cuentaBorrada`). Al preparar una cuenta Rust instala hooks y setup compartido y avisa `rust.cuentaPreparada`:
-  el apoyo pone el aviso de turno de Codex y corre las funciones que escuchan.
+  (`nucleo:cuentaBorrada`). Al preparar una cuenta Rust instala hooks y setup compartido, pone el aviso de turno de Codex
+  (`notify`, con `sloth-hook.exe`) y avisa `rust.cuentaPreparada`: el apoyo corre las funciones que escuchan.
 - **Logger:** el archivo es de Rust. El apoyo guarda en memoria (lo usa el diagnóstico) y manda cada línea a Rust.
 - **Terminales:** Rust se conecta al daemon de Rust (`native/daemon`) con E/S superpuesta (tokio), lo lanza suelto si no
   está y reconecta con `daemon_cliente`. No hay terminales en proceso ni daemon de Node: si el daemon no arranca,
