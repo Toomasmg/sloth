@@ -1,15 +1,24 @@
 //! Función «chat» (equipo, mensajes directos y MCP para Claude). Equivale a src/main/features/chat*.ts y a
 //! src/shared/chat*.ts. Acá va todo lo puro y lo testeable; Supabase, Electron y el SO entran por traits o closures.
 pub mod auth;
+pub mod callback;
 pub mod config;
 pub mod expulsar;
 pub mod fecha;
 pub mod fotos;
+pub mod fotos_red;
+pub mod gotrue;
+pub mod http;
 pub mod invitacion;
 pub mod mapa;
 pub mod mcp_atencion;
 pub mod mcp_core;
+pub mod mcp_pipe;
 pub mod mcp_registro;
+pub mod postgrest;
+pub mod realtime;
+pub mod safestorage;
+pub mod sesion;
 pub mod texto;
 pub mod tipos;
 pub mod topicos;
