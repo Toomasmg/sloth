@@ -13,8 +13,21 @@ use std::time::Duration;
 pub const ACTIVIDAD_MAX_BYTES: u64 = 256 * 1024;
 const ACTIVIDAD_ARCHIVOS: usize = 3;
 
-pub trait PlataformaCompartida: Plataforma + Send + Sync {}
-impl<T: Plataforma + Send + Sync> PlataformaCompartida for T {}
+/// Diálogo de archivo: título, ruta sugerida y un filtro por extensión (`Markdown` → `md`).
+pub struct DialogoArchivo<'a> {
+    pub titulo: &'a str,
+    pub ruta_sugerida: Option<PathBuf>,
+    pub filtro: (&'a str, &'a [&'a str]),
+}
+
+/// Lo que piden las funciones del router además de la `Plataforma` del núcleo.
+pub trait PlataformaCompartida: Plataforma + Send + Sync {
+    /// Ruta elegida para guardar, o `None` si se canceló.
+    fn guardar_como(&self, d: &DialogoArchivo) -> Option<PathBuf>;
+    fn elegir_archivo(&self, d: &DialogoArchivo) -> Option<PathBuf>;
+    fn a_la_papelera(&self, ruta: &Path) -> Result<(), String>;
+    fn carpeta_documentos(&self) -> PathBuf;
+}
 
 /// Invoca un canal por el router, como si lo pidiera la UI: lo atiende quien sea su dueño (Rust o el proceso de apoyo).
 pub type Pedidos = Arc<dyn Fn(String, Vec<Value>) -> Futuro<Respuesta> + Send + Sync>;

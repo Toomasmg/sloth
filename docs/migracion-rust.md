@@ -67,7 +67,7 @@ depende de `sloth-core` por path; con el mismo `CARGO_TARGET_DIR` las dependenci
   handlers de Rust responden «Sloth todavía está arrancando.». Rust lee el estado solo para consultar (sin migrar ni
   reescribir). Los hooks de Claude llegan a las funciones de Rust reenviados por el puente (`rust.hook`).
 
-Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `prs` (9) y `chat` (42).
+Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `prs` (9), `chat` (42) y `history` (9).
 
 - `chat`: config y login (`principal`), datos y Realtime (`datos`) y el lado main del MCP (`mcp_main`), con la sesión cifrada
   como en Electron. Cuentas, espacios y `settings.json` se leen sin escribirlos. Lo que es de otro dueño va por el puente o
@@ -88,6 +88,10 @@ Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `pr
   (`Entorno::pedir("workspaces:add")`, mismas validaciones que «Nuevo espacio»). Cuando el store pase a Rust, el pedido
   sigue andando sin cambios porque va por el router.
 - Las funciones de Rust leen cuentas, espacios y `templates.json` sin escribirlos (`Entorno::estado`).
+- `history`: borrar manda el `.jsonl` a la Papelera (crate `trash`) y retomar crea el espacio con `workspaces:add`. Las
+  terminales siguen siendo del proceso de apoyo: Rust pregunta si una está viva (`pty:running`), pide que la próxima
+  arranque con `claude --resume <id>` (`pty:resumeOnce`, el reemplazo de `addClaudeCommandOverride`) y la reinicia con
+  `pty:kill` más `ui:command` `restart-pane`, como `restartTerminal`. El modo liviano se lee de `feat:settings:get`.
 
 Por qué el resto sigue en el proceso de apoyo:
 
@@ -96,7 +100,7 @@ Por qué el resto sigue en el proceso de apoyo:
   `sloth-state.json`.
 - `settings`: el main de Node la lee en memoria en ~12 módulos (tray, updater, sleep, chat...); si Rust la escribiera,
   esas copias quedarían viejas. Pasa junto con ellos.
-- `worktrees`, `history`, `templates`, `move-account`: escriben o dependen del store (alta y baja de espacios, cuentas) o de
+- `worktrees`, `templates`, `move-account`: escriben o dependen del store (alta y baja de espacios, cuentas) o de
   las terminales.
 - `team`: arma su vista con lo que trae el conector de Tickets (`ticketsParaEquipo` y `alCambiarTickets`, en memoria del
   proceso de apoyo). Pasa junto con `tickets`; antes haría falta un puente nuevo de ida y vuelta solo para esto.

@@ -1,8 +1,9 @@
 //! La `Plataforma` del núcleo (sloth_core::app_state) sobre Tauri: lo único que no puede hacer Rust puro.
+use crate::entorno::{DialogoArchivo, PlataformaCompartida};
 use serde_json::{json, Value};
 use sloth_core::app_state::{es_enlace_externo, OpcionesDeVentana, Plataforma};
 use sloth_core::window_state_core::Rect;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager};
 use tauri_plugin_clipboard_manager::ClipboardExt;
@@ -147,6 +148,43 @@ impl Plataforma for PlataformaTauri {
 
     fn escribir_portapapeles(&self, texto: &str) {
         let _ = self.app.clipboard().write_text(texto);
+    }
+}
+
+impl PlataformaCompartida for PlataformaTauri {
+    fn guardar_como(&self, d: &DialogoArchivo) -> Option<PathBuf> {
+        let mut f = self.app.dialog().file().set_title(d.titulo).add_filter(d.filtro.0, d.filtro.1);
+        if let Some(r) = &d.ruta_sugerida {
+            if let Some(dir) = r.parent() {
+                f = f.set_directory(dir);
+            }
+            if let Some(nombre) = r.file_name() {
+                f = f.set_file_name(nombre.to_string_lossy());
+            }
+        }
+        if let Some(w) = self.ventana() {
+            f = f.set_parent(&w);
+        }
+        f.blocking_save_file()?.into_path().ok()
+    }
+
+    fn elegir_archivo(&self, d: &DialogoArchivo) -> Option<PathBuf> {
+        let mut f = self.app.dialog().file().set_title(d.titulo).add_filter(d.filtro.0, d.filtro.1);
+        if let Some(dir) = &d.ruta_sugerida {
+            f = f.set_directory(dir);
+        }
+        if let Some(w) = self.ventana() {
+            f = f.set_parent(&w);
+        }
+        f.blocking_pick_file()?.into_path().ok()
+    }
+
+    fn a_la_papelera(&self, ruta: &Path) -> Result<(), String> {
+        trash::delete(ruta).map_err(|e| e.to_string())
+    }
+
+    fn carpeta_documentos(&self) -> PathBuf {
+        self.app.path().document_dir().unwrap_or_else(|_| self.carpeta_de_datos())
     }
 }
 
