@@ -23,7 +23,8 @@ import { lectorLimites, limitesDeCuenta } from './codex-limites'
 import type { LecturaLimitesCodex } from '../shared/celular'
 import { avisarNotify, desinstalarNotify, prepararNotify } from './codex-notify'
 import { entornoDeTerminal } from './hook-env-core'
-import { anunciarPerfil, atiendeRust, hayFuncionesEnRust, reenviarHook } from './rust-features'
+import { alEventoDeRust, anunciarPerfil, atiendeRust, hayFuncionesEnRust, reenviarEvento, reenviarHook } from './rust-features'
+import { escucharSesionDeRust } from './features/chat'
 import { detectarAgentes, powerShell7Disponible } from './agentes'
 import { AVISO_POWERSHELL_7 } from './copilot-exe'
 import { initialPromptProblem } from '../shared/initial-prompt'
@@ -605,6 +606,15 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     Object.fromEntries(store.accounts.map((a) => [a.id, accountStatus(a)]))
   )
 
+  // Las funciones de Rust que tocan la config de una cuenta (el MCP del chat) preguntan antes si tiene terminales abiertas.
+  // `conocidas` es false hasta que el backend arranca y reporta las que sobrevivieron en el daemon.
+  handle('pty:cuentaOcupada', async (_e, id?: unknown) => {
+    if (id !== undefined && id !== null && !idValido(id)) throw new Error('Pedido inválido.')
+    const b = await backend().catch(() => undefined)
+    const conocidas = !!b && term !== undefined
+    return { conocidas, ocupada: typeof id === 'string' ? !conocidas || accountBusy(id) : false }
+  })
+
   async function addWorkspace(input: NewWorkspaceInput): Promise<Workspace> {
     store.exigirEscritura()
     const name = String(input?.name ?? '').trim()
@@ -794,6 +804,16 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
   // Funciones (features): cada una con sus canales feat:<nombre>:<op>.
   if (hayFuncionesEnRust()) safe('perfil para Rust', () => anunciarPerfil(rutaPerfil(), (e) => logger.error('rust', e)))
   if (hayFuncionesEnRust()) hookListeners.push((p) => reenviarHook(p.event, p.ws, (e) => logger.error('rust', e)))
+  if (hayFuncionesEnRust() && atiendeRust('chat')) {
+    const falla = (e: unknown): void => logger.error('rust', e)
+    prepareListeners.push((acc) => reenviarEvento('cuentaPreparada', acc, falla))
+    removeListeners.push((acc) => reenviarEvento('cuentaBorrada', acc, falla))
+    exitListeners.push(() => reenviarEvento('terminalCerrada', null, falla))
+    alEventoDeRust('aviso', (texto) => {
+      if (typeof texto === 'string' && texto.length > 0 && texto.length <= 2000) avisar(texto)
+    })
+    safe('sesión del chat de Rust', () => escucharSesionDeRust((e) => logger.error('rust', e)))
+  }
   for (const f of FEATURES) {
     if (atiendeRust(f.name)) continue
     const ctx: FeatureContext = {

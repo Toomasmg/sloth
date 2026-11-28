@@ -25,7 +25,20 @@ pub fn atender(app: &AppHandle, op: &str, args: &[Value]) -> Result<Value, Strin
             }
             Ok(Value::Null)
         }
-        _ => Err(format!("operación desconocida: {op}")),
+        "rust.evento" => {
+            let evento = args.first().and_then(Value::as_str).ok_or("falta el evento")?;
+            let datos = args.get(1).unwrap_or(&Value::Null);
+            if let Some(h) = app.try_state::<Hooks>() {
+                for f in &h.0 {
+                    f.al_evento(evento, datos);
+                }
+            }
+            Ok(Value::Null)
+        }
+        _ => {
+            let h = app.try_state::<Hooks>().ok_or("las funciones de Rust no están listas")?;
+            h.0.iter().find_map(|f| f.nativo(op, args)).unwrap_or_else(|| Err(format!("operación desconocida: {op}")))
+        }
     }
 }
 

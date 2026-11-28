@@ -29,11 +29,12 @@ windows-sys = { version = "0.59", features = ["Win32_System_Power", "Win32_Syste
 tokio = { version = "1", features = ["sync", "rt"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
+getrandom = "0.2"
 # Misma versión que usa native/core: con un target común las dependencias se compilan una sola vez.
 sloth-core = { path = "../native/core" }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["sync", "rt", "macros", "time"] }
+tokio = { version = "1", features = ["sync", "rt", "rt-multi-thread", "macros", "time"] }
 
 [profile.release]
 lto = true

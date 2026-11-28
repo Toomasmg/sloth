@@ -50,7 +50,7 @@ test('al regenerar, la PC deja de publicar con la clave vieja y rechaza las deci
     removeChannel: async () => 'ok',
     realtime: { setAuth: async () => undefined }
   } as unknown as SupabaseClient
-  const sesion: SesionChat = { client, userId: USER, supabaseUrl: 'https://x.supabase.co', anonKey: 'k' }
+  const sesion: SesionChat = { client, userId: USER, supabaseUrl: 'https://x.supabase.co', anonKey: 'k', cerrarOtras: async () => null }
   let secreto = VIEJO
   const decididas: string[] = []
   const fuente = crearFuenteRemota({
