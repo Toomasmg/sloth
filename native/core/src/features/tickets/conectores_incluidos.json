@@ -1,0 +1,2618 @@
+[
+  {
+    "id": "github",
+    "nombre": "GitHub Issues",
+    "via": "gh",
+    "verificado": true,
+    "idRegex": "^[1-9]\\d{0,6}$",
+    "idMayusculas": false,
+    "ejemplo": {
+      "id": "123",
+      "estado": "abierto",
+      "prioridad": "etiqueta",
+      "proyecto": "dueño/repo"
+    },
+    "estados": [
+      {
+        "clave": "abierto",
+        "nombre": "Abierto",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "cerrado",
+        "nombre": "Cerrado",
+        "categoria": "hecho"
+      }
+    ],
+    "faltaConector": {
+      "clave": "sin_gh",
+      "mensaje": "Instalá GitHub CLI (gh) y corré gh auth login para ver los issues."
+    }
+  },
+  {
+    "id": "jira",
+    "nombre": "Jira",
+    "via": "mcp",
+    "verificado": true,
+    "idRegex": "^[A-Z][A-Z0-9_]*-\\d{1,7}$",
+    "idMayusculas": true,
+    "personaId": "^[A-Za-z0-9:-]{1,128}$",
+    "ejemplo": {
+      "id": "PROJ-123",
+      "estado": "in_progress",
+      "prioridad": "prioridad",
+      "proyecto": "proyecto"
+    },
+    "herramientas": {
+      "prefijo": "mcp__claude_ai_Atlassian_MCP__",
+      "lista": [
+        "atlassianUserInfo",
+        "getAccessibleAtlassianResources",
+        "searchJiraIssuesUsingJql"
+      ],
+      "detalle": [
+        "getJiraIssue",
+        "listJiraIssueComments"
+      ],
+      "apoyo": [
+        "getAccessibleAtlassianResources"
+      ],
+      "apoyoEn": {
+        "estado": [
+          "executeRead"
+        ]
+      },
+      "escritura": {
+        "estado": "transitionJiraIssue",
+        "tomar": "editJiraIssue",
+        "soltar": "editJiraIssue",
+        "comentar": "addOrEditJiraIssueComment"
+      },
+      "negar": [
+        "transitionJiraIssue",
+        "editJiraIssue",
+        "addOrEditJiraIssueComment",
+        "createJiraIssue",
+        "addOrEditJiraIssueWorklog",
+        "createJiraIssueLink",
+        "manageJiraProjectVersion",
+        "manageJiraProjectVersionRelatedWork",
+        "manageJiraSprint",
+        "createJiraBoard",
+        "watchJiraIssue",
+        "uploadAttachmentToJiraIssue",
+        "editJiraEntityProperty",
+        "createJiraIssueRemoteIssueLink",
+        "convertJiraIssueHierarchy",
+        "executeWrite",
+        "executeDestructive",
+        "createConfluenceContent",
+        "updateConfluenceContent",
+        "addGraphContext"
+      ]
+    },
+    "estados": [
+      {
+        "clave": "backlog",
+        "nombre": "Backlog",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "to_do",
+        "nombre": "To Do",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "todo",
+        "nombre": "Todo",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "open",
+        "nombre": "Open",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "por_hacer",
+        "nombre": "Por hacer",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "abierto",
+        "nombre": "Abierto",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "in_progress",
+        "nombre": "In Progress",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "doing",
+        "nombre": "Doing",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_curso",
+        "nombre": "En curso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_progreso",
+        "nombre": "En progreso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "in_review",
+        "nombre": "In Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "code_review",
+        "nombre": "Code Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "review",
+        "nombre": "Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "qa",
+        "nombre": "QA",
+        "categoria": "revision"
+      },
+      {
+        "clave": "en_revision",
+        "nombre": "En revisión",
+        "categoria": "revision"
+      },
+      {
+        "clave": "blocked",
+        "nombre": "Blocked",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "on_hold",
+        "nombre": "On Hold",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "bloqueado",
+        "nombre": "Bloqueado",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "done",
+        "nombre": "Done",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "closed",
+        "nombre": "Closed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "resolved",
+        "nombre": "Resolved",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "complete",
+        "nombre": "Complete",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "completed",
+        "nombre": "Completed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelled",
+        "nombre": "Cancelled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "canceled",
+        "nombre": "Canceled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "listo",
+        "nombre": "Listo",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "hecho",
+        "nombre": "Hecho",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cerrado",
+        "nombre": "Cerrado",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelado",
+        "nombre": "Cancelado",
+        "categoria": "hecho"
+      }
+    ],
+    "pistas": {
+      "yo": {
+        "conId": "Tu accountId en Jira es \"{id}\": usalo en yo.id.",
+        "sinId": "Tu accountId y tu nombre los sacás de atlassianUserInfo."
+      },
+      "lista": "Sacá el cloudId con getAccessibleAtlassianResources (el primero). Llamá a searchJiraIssuesUsingJql con ese cloudId, jql: \"statusCategory != Done ORDER BY updated DESC\" y maxResults: 100, sin filtrar por asignado (quiero los tickets de todo el equipo). Si no es la última página, seguí con nextPageToken hasta traer todos (como máximo 250). En \"estado\" poné el nombre del estado en minúsculas, sin tildes y con guiones bajos en vez de espacios (In Progress → in_progress).",
+      "estados": "Armá \"estados\" con los estados que viste en las tareas, en el orden del flujo (de pendiente a hecho), sin repetir claves.",
+      "detalle": [
+        {
+          "herramienta": "getJiraIssue",
+          "args": {
+            "issueIdOrKey": "{ticket}"
+          }
+        },
+        {
+          "herramienta": "listJiraIssueComments",
+          "args": {
+            "issueIdOrKey": "{ticket}"
+          }
+        }
+      ],
+      "apoyo": "El cloudId sale de getAccessibleAtlassianResources (el primero); pasalo en cada llamada.",
+      "acciones": {
+        "estado": {
+          "args": {
+            "issueIdOrKey": "{ticket}"
+          },
+          "nota": "Usá la transición del ticket {ticket} cuyo estado destino, en minúsculas y snake_case, sea {estado}: su transitionId sale de executeRead con name listJiraIssueTransitions (con el cloudId y issueIdOrKey en inputs). Pasalo en transitionId."
+        },
+        "tomar": {
+          "args": {
+            "issueIdOrKey": "{ticket}",
+            "fields": {
+              "assignee": {
+                "accountId": "{persona}"
+              }
+            }
+          },
+          "nota": "Es tomar el ticket para esa persona."
+        },
+        "soltar": {
+          "args": {
+            "issueIdOrKey": "{ticket}",
+            "fields": {
+              "assignee": null
+            }
+          },
+          "nota": "Es soltar el ticket (dejarlo sin dueño)."
+        },
+        "comentar": {
+          "args": {
+            "issueIdOrKey": "{ticket}",
+            "commentBody": "{cuerpo}"
+          },
+          "nota": "Publicá el cuerpo tal cual, sin agregar nada."
+        }
+      }
+    },
+    "faltaConector": {
+      "clave": "sin_jira",
+      "mensaje": "Conectá Atlassian (Jira) en claude.ai con esta cuenta (claude.ai → Configuración → Conectores) y probá de nuevo: Claude no encontró las herramientas de Atlassian (Jira)."
+    }
+  },
+  {
+    "id": "linear",
+    "nombre": "Linear",
+    "via": "mcp",
+    "verificado": false,
+    "idRegex": "^[A-Z][A-Z0-9]*-\\d{1,7}$",
+    "idMayusculas": true,
+    "ejemplo": {
+      "id": "ENG-123",
+      "estado": "in_progress",
+      "prioridad": "prioridad",
+      "proyecto": "equipo o proyecto"
+    },
+    "herramientas": {
+      "prefijo": "mcp__claude_ai_Linear__",
+      "lista": [
+        "get_user",
+        "list_issues"
+      ],
+      "detalle": [
+        "get_issue",
+        "list_comments"
+      ],
+      "escritura": {},
+      "negar": [
+        "save_issue",
+        "save_comment",
+        "create_comment",
+        "create_issue",
+        "update_issue",
+        "delete_issue",
+        "update_comment",
+        "delete_comment",
+        "save_project",
+        "create_project",
+        "update_project",
+        "create_issue_label",
+        "create_document",
+        "update_document",
+        "create_attachment",
+        "delete_attachment",
+        "save_milestone",
+        "save_status_update"
+      ]
+    },
+    "estados": [
+      {
+        "clave": "backlog",
+        "nombre": "Backlog",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "to_do",
+        "nombre": "To Do",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "todo",
+        "nombre": "Todo",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "open",
+        "nombre": "Open",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "por_hacer",
+        "nombre": "Por hacer",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "abierto",
+        "nombre": "Abierto",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "in_progress",
+        "nombre": "In Progress",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "doing",
+        "nombre": "Doing",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_curso",
+        "nombre": "En curso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_progreso",
+        "nombre": "En progreso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "in_review",
+        "nombre": "In Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "code_review",
+        "nombre": "Code Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "review",
+        "nombre": "Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "qa",
+        "nombre": "QA",
+        "categoria": "revision"
+      },
+      {
+        "clave": "en_revision",
+        "nombre": "En revisión",
+        "categoria": "revision"
+      },
+      {
+        "clave": "blocked",
+        "nombre": "Blocked",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "on_hold",
+        "nombre": "On Hold",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "bloqueado",
+        "nombre": "Bloqueado",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "done",
+        "nombre": "Done",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "closed",
+        "nombre": "Closed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "resolved",
+        "nombre": "Resolved",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "complete",
+        "nombre": "Complete",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "completed",
+        "nombre": "Completed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelled",
+        "nombre": "Cancelled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "canceled",
+        "nombre": "Canceled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "listo",
+        "nombre": "Listo",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "hecho",
+        "nombre": "Hecho",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cerrado",
+        "nombre": "Cerrado",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelado",
+        "nombre": "Cancelado",
+        "categoria": "hecho"
+      }
+    ],
+    "pistas": {
+      "yo": {
+        "conId": "Tu id en Linear es \"{id}\": usalo en yo.id.",
+        "sinId": "Tu id y tu nombre los sacás de get_user (vos mismo)."
+      },
+      "lista": "Llamá a list_issues sin filtrar por asignado (quiero las tareas abiertas de todo el equipo, sin las terminadas ni canceladas), con limit: 100. Si hay más, paginá hasta traer todas (como máximo 250). El \"id\" es el identificador (ENG-123). En \"estado\" poné el nombre del estado en minúsculas, sin tildes y con guiones bajos en vez de espacios (In Progress → in_progress).",
+      "estados": "Armá \"estados\" con los estados que viste en las tareas, en el orden del flujo (de pendiente a hecho), sin repetir claves.",
+      "detalle": [
+        {
+          "herramienta": "get_issue",
+          "args": {
+            "id": "{ticket}"
+          }
+        },
+        {
+          "herramienta": "list_comments",
+          "args": {
+            "issueId": "{ticket}"
+          }
+        }
+      ],
+      "acciones": {}
+    },
+    "faltaConector": {
+      "clave": "sin_linear",
+      "mensaje": "Conectá Linear en claude.ai con esta cuenta (claude.ai → Configuración → Conectores) y probá de nuevo: Claude no encontró las herramientas de Linear."
+    }
+  },
+  {
+    "id": "gruv",
+    "nombre": "Gruv",
+    "via": "mcp",
+    "verificado": true,
+    "idRegex": "^[A-Z][A-Z0-9]*-\\d{1,7}$",
+    "idMayusculas": true,
+    "comandoTicket": "/ticket",
+    "ejemplo": {
+      "id": "TCK-1234",
+      "estado": "en_revision",
+      "prioridad": "severidad",
+      "proyecto": "espacio o proyecto"
+    },
+    "herramientas": {
+      "prefijo": "mcp__claude_ai_Gruv__",
+      "lista": [
+        "listar_tickets",
+        "ver_flujo_tickets",
+        "ver_mi_inicio",
+        "ver_mi_perfil",
+        "buscar_persona"
+      ],
+      "personas": "buscar_persona",
+      "detalle": [
+        "listar_comentarios_ticket",
+        "listar_criterios_ticket",
+        "ver_reloj",
+        "ver_ticket"
+      ],
+      "escritura": {
+        "estado": "mover_ticket",
+        "tomar": "asignar_ticket",
+        "soltar": "asignar_ticket",
+        "comentar": "comentar_ticket",
+        "criterio": "tildar_criterio_ticket",
+        "horas": "sumar_al_reloj"
+      },
+      "negar": [
+        "mover_ticket",
+        "comentar_ticket",
+        "editar_ticket",
+        "crear_ticket",
+        "borrar_ticket",
+        "archivar_ticket",
+        "asignar_ticket",
+        "pedir_ticket",
+        "retirar_pedido_ticket",
+        "pegar_pr_ticket",
+        "tildar_criterio_ticket",
+        "agregar_criterios_ticket",
+        "borrar_criterio_ticket",
+        "cambiar_severidad_ticket",
+        "cambiar_talla_ticket",
+        "estimar_ticket",
+        "corregir_plazo_ticket",
+        "pedir_prorroga_ticket",
+        "ajustar_tiempo_ticket",
+        "actualizar_tickets_en_tanda",
+        "mover_ticket_de_espacio",
+        "asignar_epica_ticket",
+        "crear_vinculo_ticket",
+        "borrar_vinculo_ticket",
+        "mandar_ticket_al_chat",
+        "mandar_mensaje",
+        "sumar_al_reloj",
+        "corregir_arranque_reloj",
+        "cerrar_el_dia",
+        "poner_veredicto_de_cierre",
+        "guardar_borrador_flujo",
+        "publicar_flujo",
+        "quitar_estado_flujo"
+      ]
+    },
+    "estados": [
+      {
+        "clave": "abierto",
+        "nombre": "Abierto",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "en_curso",
+        "nombre": "En curso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "bloqueado",
+        "nombre": "Bloqueado",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "en_revision",
+        "nombre": "En revisión",
+        "categoria": "revision"
+      },
+      {
+        "clave": "pre_rtd",
+        "nombre": "Pre RTD",
+        "categoria": "revision"
+      },
+      {
+        "clave": "en_qa",
+        "nombre": "En QA",
+        "categoria": "revision"
+      },
+      {
+        "clave": "rechazado",
+        "nombre": "Rechazado",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "cerrado",
+        "nombre": "Cerrado",
+        "categoria": "hecho"
+      }
+    ],
+    "pistas": {
+      "yo": {
+        "conId": "Tu id en Gruv es \"{id}\": usalo en yo.id.",
+        "sinId": "Tu nombre y tu correo salen de ver_mi_perfil; tu id es el de la persona que devuelve buscar_persona con ese correo. No pongas el correo en la respuesta."
+      },
+      "lista": "Llamá a la herramienta de Gruv listar_tickets SIN filtrar por estado ni por asignado (quiero los tickets de todo el equipo), con limite: 50. Si vuelven 50, seguí con desplazamiento: 50, 100… hasta traer todos (como máximo 250).",
+      "listaPor": "Llamá a listar_tickets una vez por cada responsable de esta lista: {asignados}. Usá asignado: <ese id> (o \"sin_asignar\") y limite: 50, todas en paralelo. Si una vuelve con 50, pedí la página siguiente con desplazamiento: 50 (y 100 como máximo). Son los abiertos de cada uno y se leen enteros, sin cortar por fecha. \"fecha\" es created_at.",
+      "listaHechos": "Además, por cada responsable llamá a listar_tickets con estado: \"cerrado\", el mismo asignado y limite: 50, y leé también la página de desplazamiento: 50 (los cerrados no vienen ordenados por cierre). En esos, \"fecha\" es closed_at.",
+      "personas": "Armá la lista de las personas del equipo: llamá a buscar_persona en paralelo con una letra por llamada (a, e, i, o, u, s, n, r, l, m) como texto; cada una devuelve hasta 25. Juntalas sin repetir por id.",
+      "estados": "Llamá a ver_flujo_tickets (sin tipo) y armá \"estados\" con las columnas en su orden, sin repetir claves, con la clave y el nombre que se ven.",
+      "detalle": [
+        {
+          "herramienta": "listar_comentarios_ticket",
+          "args": {
+            "id": "{ticket}"
+          }
+        },
+        {
+          "herramienta": "listar_criterios_ticket",
+          "args": {
+            "id": "{ticket}"
+          }
+        },
+        {
+          "herramienta": "ver_reloj",
+          "args": {
+            "entidad": "ticket",
+            "id": "{ticket}"
+          }
+        },
+        {
+          "herramienta": "ver_ticket",
+          "args": {
+            "id": "{ticket}"
+          }
+        }
+      ],
+      "descripcion": "Gruv no tiene un campo \"descripcion\": el texto del ticket sale de lo que devuelve ver_ticket en \"ocurrido\" (qué pasó), \"esperado\" (qué se esperaba) y \"pasos\". Armalo con los que tengan texto, en ese orden, cada uno en su renglón y encabezado por \"Qué pasó:\", \"Qué se esperaba:\" y \"Pasos:\". Ignorá el resto de los campos de ver_ticket.",
+      "acciones": {
+        "estado": {
+          "args": {
+            "id": "{ticket}",
+            "estado": "{estado}"
+          },
+          "nota": "No pongas resolucion ni resolucion_nota."
+        },
+        "tomar": {
+          "args": {
+            "id": "{ticket}",
+            "persona": "{persona}"
+          },
+          "nota": "Es tomar el ticket para esa persona."
+        },
+        "soltar": {
+          "args": {
+            "id": "{ticket}",
+            "persona": null
+          },
+          "nota": "Es soltar el ticket (dejarlo sin dueño)."
+        },
+        "comentar": {
+          "args": {
+            "id": "{ticket}",
+            "cuerpo": "{cuerpo}"
+          },
+          "nota": "Publicá el cuerpo tal cual, sin agregar nada."
+        },
+        "criterio": {
+          "args": {
+            "criterio_id": "{criterioId}",
+            "hecho": "{hecho}"
+          },
+          "nota": "El criterio pertenece al ticket {ticket}."
+        },
+        "horas": {
+          "args": {
+            "entidad": "ticket",
+            "id": "{ticket}",
+            "minutos": "{minutos}",
+            "motivo": "{motivo}"
+          }
+        }
+      }
+    },
+    "faltaConector": {
+      "clave": "sin_gruv",
+      "mensaje": "Conectá Gruv en claude.ai con esta cuenta (claude.ai → Configuración → Conectores) y probá de nuevo: Claude no encontró las herramientas de Gruv."
+    }
+  },
+  {
+    "id": "asana",
+    "nombre": "Asana",
+    "via": "mcp",
+    "verificado": false,
+    "idRegex": "^\\d{1,19}$",
+    "idMayusculas": false,
+    "ejemplo": {
+      "id": "1204567890123456",
+      "estado": "in_progress",
+      "prioridad": "prioridad",
+      "proyecto": "proyecto"
+    },
+    "herramientas": {
+      "prefijo": "mcp__claude_ai_Asana__",
+      "lista": [
+        "get_me",
+        "get_tasks",
+        "search_tasks"
+      ],
+      "detalle": [
+        "get_task",
+        "get_task_stories"
+      ],
+      "escritura": {
+        "comentar": "add_comment"
+      },
+      "negar": [
+        "update_tasks",
+        "add_comment",
+        "create_task",
+        "create_tasks",
+        "update_task",
+        "delete_task",
+        "create_project",
+        "update_project",
+        "create_project_status",
+        "add_followers",
+        "remove_followers",
+        "set_parent_for_task",
+        "add_task_to_project",
+        "create_portfolio",
+        "update_portfolio",
+        "create_goal",
+        "update_goal"
+      ]
+    },
+    "estados": [
+      {
+        "clave": "backlog",
+        "nombre": "Backlog",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "to_do",
+        "nombre": "To Do",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "todo",
+        "nombre": "Todo",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "open",
+        "nombre": "Open",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "por_hacer",
+        "nombre": "Por hacer",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "abierto",
+        "nombre": "Abierto",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "in_progress",
+        "nombre": "In Progress",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "doing",
+        "nombre": "Doing",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_curso",
+        "nombre": "En curso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_progreso",
+        "nombre": "En progreso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "in_review",
+        "nombre": "In Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "code_review",
+        "nombre": "Code Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "review",
+        "nombre": "Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "qa",
+        "nombre": "QA",
+        "categoria": "revision"
+      },
+      {
+        "clave": "en_revision",
+        "nombre": "En revisión",
+        "categoria": "revision"
+      },
+      {
+        "clave": "blocked",
+        "nombre": "Blocked",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "on_hold",
+        "nombre": "On Hold",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "bloqueado",
+        "nombre": "Bloqueado",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "done",
+        "nombre": "Done",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "closed",
+        "nombre": "Closed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "resolved",
+        "nombre": "Resolved",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "complete",
+        "nombre": "Complete",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "completed",
+        "nombre": "Completed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelled",
+        "nombre": "Cancelled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "canceled",
+        "nombre": "Canceled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "listo",
+        "nombre": "Listo",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "hecho",
+        "nombre": "Hecho",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cerrado",
+        "nombre": "Cerrado",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelado",
+        "nombre": "Cancelado",
+        "categoria": "hecho"
+      }
+    ],
+    "pistas": {
+      "yo": {
+        "conId": "Tu gid en Asana es \"{id}\": usalo en yo.id.",
+        "sinId": "Tu gid y tu nombre los sacás de get_me."
+      },
+      "lista": "Traé las tareas sin completar del proyecto del equipo con get_tasks (o con search_tasks si está disponible), sin filtrar por asignado (no solo las tuyas), con limit: 100. Si hay más, paginá hasta traer todas (como máximo 250). El \"id\" es el gid numérico de la tarea y el estado, la sección donde está. En \"estado\" poné el nombre del estado en minúsculas, sin tildes y con guiones bajos en vez de espacios (In Progress → in_progress).",
+      "estados": "Armá \"estados\" con los estados que viste en las tareas, en el orden del flujo (de pendiente a hecho), sin repetir claves.",
+      "detalle": [
+        {
+          "herramienta": "get_task",
+          "args": {
+            "task_gid": "{ticket}"
+          }
+        },
+        {
+          "herramienta": "get_task_stories",
+          "args": {
+            "task_gid": "{ticket}"
+          }
+        }
+      ],
+      "acciones": {
+        "comentar": {
+          "args": {
+            "task_gid": "{ticket}",
+            "text": "{cuerpo}"
+          },
+          "nota": "Publicá el cuerpo tal cual, sin agregar nada."
+        }
+      }
+    },
+    "faltaConector": {
+      "clave": "sin_asana",
+      "mensaje": "Conectá Asana en claude.ai con esta cuenta (claude.ai → Configuración → Conectores) y probá de nuevo: Claude no encontró las herramientas de Asana."
+    }
+  },
+  {
+    "id": "notion",
+    "nombre": "Notion",
+    "via": "mcp",
+    "verificado": false,
+    "idRegex": "^[A-Z][A-Z0-9]*-\\d{1,7}$",
+    "idMayusculas": true,
+    "ejemplo": {
+      "id": "TAREA-12",
+      "estado": "in_progress",
+      "prioridad": "prioridad",
+      "proyecto": "base de datos"
+    },
+    "herramientas": {
+      "prefijo": "mcp__claude_ai_Notion__",
+      "lista": [
+        "notion-get-self",
+        "notion-search",
+        "notion-fetch"
+      ],
+      "detalle": [
+        "notion-fetch",
+        "notion-get-comments"
+      ],
+      "apoyo": [
+        "notion-search"
+      ],
+      "escritura": {
+        "comentar": "notion-create-comment"
+      },
+      "negar": [
+        "notion-create-pages",
+        "notion-update-page",
+        "notion-create-comment",
+        "notion-update-comment",
+        "notion-delete-comment",
+        "notion-set-discussion-resolved",
+        "notion-set-comment-reaction",
+        "notion-create-suggested-edit",
+        "notion-resolve-suggested-edit",
+        "notion-restore-version",
+        "notion-restore-pages",
+        "notion-move-pages",
+        "notion-duplicate-page",
+        "notion-create-database",
+        "notion-update-database",
+        "notion-update-data-source",
+        "notion-create-view",
+        "notion-update-view"
+      ]
+    },
+    "estados": [
+      {
+        "clave": "backlog",
+        "nombre": "Backlog",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "to_do",
+        "nombre": "To Do",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "todo",
+        "nombre": "Todo",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "open",
+        "nombre": "Open",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "por_hacer",
+        "nombre": "Por hacer",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "abierto",
+        "nombre": "Abierto",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "in_progress",
+        "nombre": "In Progress",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "doing",
+        "nombre": "Doing",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_curso",
+        "nombre": "En curso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_progreso",
+        "nombre": "En progreso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "in_review",
+        "nombre": "In Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "code_review",
+        "nombre": "Code Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "review",
+        "nombre": "Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "qa",
+        "nombre": "QA",
+        "categoria": "revision"
+      },
+      {
+        "clave": "en_revision",
+        "nombre": "En revisión",
+        "categoria": "revision"
+      },
+      {
+        "clave": "blocked",
+        "nombre": "Blocked",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "on_hold",
+        "nombre": "On Hold",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "bloqueado",
+        "nombre": "Bloqueado",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "done",
+        "nombre": "Done",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "closed",
+        "nombre": "Closed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "resolved",
+        "nombre": "Resolved",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "complete",
+        "nombre": "Complete",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "completed",
+        "nombre": "Completed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelled",
+        "nombre": "Cancelled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "canceled",
+        "nombre": "Canceled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "listo",
+        "nombre": "Listo",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "hecho",
+        "nombre": "Hecho",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cerrado",
+        "nombre": "Cerrado",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelado",
+        "nombre": "Cancelado",
+        "categoria": "hecho"
+      }
+    ],
+    "pistas": {
+      "yo": {
+        "conId": "Tu id en Notion es \"{id}\": usalo en yo.id.",
+        "sinId": "Tu id y tu nombre los sacás de notion-get-self."
+      },
+      "lista": "Con notion-search encontrá la base de datos de tareas del equipo y leela con notion-fetch: las tareas abiertas de todos, no solo las tuyas, de a 100 y como máximo 250. El \"id\" es SOLO el valor de la propiedad «ID único» de cada página (p. ej. TAREA-12), nunca el id de la página: descartá las páginas que no tengan esa propiedad. El estado sale de la propiedad Estado o Status. En \"estado\" poné el nombre del estado en minúsculas, sin tildes y con guiones bajos en vez de espacios (In Progress → in_progress).",
+      "estados": "Armá \"estados\" con los estados que viste en las tareas, en el orden del flujo (de pendiente a hecho), sin repetir claves.",
+      "detalle": [
+        {
+          "herramienta": "notion-fetch",
+          "args": {
+            "id": "{ticket}"
+          }
+        },
+        {
+          "herramienta": "notion-get-comments",
+          "args": {
+            "page_id": "{ticket}"
+          }
+        }
+      ],
+      "apoyo": "{ticket} es el «ID único» de la tarea, no el id de su página: buscá la página con notion-search por ese valor y usá su id de página en lugar de {ticket}",
+      "acciones": {
+        "comentar": {
+          "args": {
+            "page_id": "{ticket}",
+            "text": "{cuerpo}"
+          },
+          "nota": "Publicá el cuerpo tal cual, sin agregar nada."
+        }
+      }
+    },
+    "faltaConector": {
+      "clave": "sin_notion",
+      "mensaje": "Conectá Notion en claude.ai con esta cuenta (claude.ai → Configuración → Conectores) y probá de nuevo: Claude no encontró las herramientas de Notion."
+    }
+  },
+  {
+    "id": "clickup",
+    "nombre": "ClickUp",
+    "via": "mcp",
+    "verificado": false,
+    "idRegex": "^[A-Za-z0-9-]{1,20}$",
+    "idMayusculas": false,
+    "ejemplo": {
+      "id": "86c0abcd1",
+      "estado": "in_progress",
+      "prioridad": "prioridad",
+      "proyecto": "lista"
+    },
+    "herramientas": {
+      "prefijo": "mcp__claude_ai_ClickUp__",
+      "lista": [
+        "clickup_get_user",
+        "clickup_filter_tasks"
+      ],
+      "detalle": [
+        "clickup_get_task",
+        "clickup_get_task_comments"
+      ],
+      "escritura": {
+        "estado": "clickup_update_task",
+        "comentar": "clickup_create_task_comment"
+      },
+      "negar": [
+        "clickup_create_task",
+        "clickup_update_task",
+        "clickup_delete_task",
+        "clickup_move_task",
+        "clickup_add_task_to_list",
+        "clickup_remove_task_from_list",
+        "clickup_merge_tasks",
+        "clickup_add_task_dependency",
+        "clickup_remove_task_dependency",
+        "clickup_add_task_link",
+        "clickup_remove_task_link",
+        "clickup_create_space_tag",
+        "clickup_create_comment",
+        "clickup_create_task_comment",
+        "clickup_update_comment",
+        "clickup_delete_comment",
+        "clickup_update_list",
+        "clickup_update_folder",
+        "clickup_execute_operator",
+        "clickup_add_tag_to_task",
+        "clickup_remove_tag_from_task",
+        "clickup_create_list",
+        "clickup_create_list_in_folder",
+        "clickup_create_folder",
+        "clickup_create_document",
+        "clickup_create_document_page",
+        "clickup_update_document_page",
+        "clickup_start_time_tracking",
+        "clickup_stop_time_tracking",
+        "clickup_add_time_entry",
+        "clickup_send_chat_message",
+        "clickup_create_reminder",
+        "clickup_update_reminder"
+      ]
+    },
+    "estados": [
+      {
+        "clave": "backlog",
+        "nombre": "Backlog",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "to_do",
+        "nombre": "To Do",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "todo",
+        "nombre": "Todo",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "open",
+        "nombre": "Open",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "por_hacer",
+        "nombre": "Por hacer",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "abierto",
+        "nombre": "Abierto",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "in_progress",
+        "nombre": "In Progress",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "doing",
+        "nombre": "Doing",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_curso",
+        "nombre": "En curso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_progreso",
+        "nombre": "En progreso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "in_review",
+        "nombre": "In Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "code_review",
+        "nombre": "Code Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "review",
+        "nombre": "Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "qa",
+        "nombre": "QA",
+        "categoria": "revision"
+      },
+      {
+        "clave": "en_revision",
+        "nombre": "En revisión",
+        "categoria": "revision"
+      },
+      {
+        "clave": "blocked",
+        "nombre": "Blocked",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "on_hold",
+        "nombre": "On Hold",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "bloqueado",
+        "nombre": "Bloqueado",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "done",
+        "nombre": "Done",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "closed",
+        "nombre": "Closed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "resolved",
+        "nombre": "Resolved",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "complete",
+        "nombre": "Complete",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "completed",
+        "nombre": "Completed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelled",
+        "nombre": "Cancelled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "canceled",
+        "nombre": "Canceled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "listo",
+        "nombre": "Listo",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "hecho",
+        "nombre": "Hecho",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cerrado",
+        "nombre": "Cerrado",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelado",
+        "nombre": "Cancelado",
+        "categoria": "hecho"
+      }
+    ],
+    "pistas": {
+      "yo": {
+        "conId": "Tu id en ClickUp es \"{id}\": usalo en yo.id.",
+        "sinId": "Tu id y tu nombre los sacás de clickup_get_user."
+      },
+      "lista": "Llamá a clickup_filter_tasks sin filtrar por asignado (quiero las tareas abiertas de todo el equipo, sin las cerradas), de a 100. Si hay más, seguí con la página siguiente hasta traer todas (como máximo 250). El \"id\" es el task_id. En \"estado\" poné el nombre del estado en minúsculas, sin tildes y con guiones bajos en vez de espacios (In Progress → in_progress).",
+      "estados": "Armá \"estados\" con los estados que viste en las tareas, en el orden del flujo (de pendiente a hecho), sin repetir claves.",
+      "detalle": [
+        {
+          "herramienta": "clickup_get_task",
+          "args": {
+            "task_id": "{ticket}"
+          }
+        },
+        {
+          "herramienta": "clickup_get_task_comments",
+          "args": {
+            "task_id": "{ticket}"
+          }
+        }
+      ],
+      "acciones": {
+        "estado": {
+          "args": {
+            "task_id": "{ticket}",
+            "status": "{estado}"
+          },
+          "nota": "En status va el nombre real del estado de la lista que, en minúsculas y snake_case, es {estado}. No cambies nada más."
+        },
+        "comentar": {
+          "args": {
+            "task_id": "{ticket}",
+            "comment_text": "{cuerpo}"
+          },
+          "nota": "Publicá el cuerpo tal cual, sin agregar nada."
+        }
+      }
+    },
+    "faltaConector": {
+      "clave": "sin_clickup",
+      "mensaje": "Conectá ClickUp en claude.ai con esta cuenta (claude.ai → Configuración → Conectores) y probá de nuevo: Claude no encontró las herramientas de ClickUp."
+    }
+  },
+  {
+    "id": "monday",
+    "nombre": "monday.com",
+    "via": "mcp",
+    "verificado": false,
+    "idRegex": "^\\d{1,19}$",
+    "idMayusculas": false,
+    "ejemplo": {
+      "id": "1234567890",
+      "estado": "in_progress",
+      "prioridad": "prioridad",
+      "proyecto": "tablero"
+    },
+    "herramientas": {
+      "prefijo": "mcp__claude_ai_monday_com__",
+      "lista": [
+        "get_user_context",
+        "get_board_items_page"
+      ],
+      "detalle": [
+        "get_updates"
+      ],
+      "escritura": {
+        "comentar": "create_update"
+      },
+      "negar": [
+        "change_item_column_values",
+        "create_update",
+        "create_item",
+        "create_board",
+        "create_group",
+        "create_column",
+        "create_notification",
+        "create_doc",
+        "update_doc",
+        "all_monday_api",
+        "delete_item",
+        "move_item_to_group",
+        "change_item_position",
+        "create_dashboard",
+        "create_widget",
+        "create_workspace",
+        "update_workspace",
+        "create_folder",
+        "update_folder",
+        "move_object",
+        "create_form",
+        "update_form",
+        "create_custom_activity",
+        "create_timeline_item",
+        "duplicate_item",
+        "archive_item"
+      ]
+    },
+    "estados": [
+      {
+        "clave": "backlog",
+        "nombre": "Backlog",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "to_do",
+        "nombre": "To Do",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "todo",
+        "nombre": "Todo",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "open",
+        "nombre": "Open",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "por_hacer",
+        "nombre": "Por hacer",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "abierto",
+        "nombre": "Abierto",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "in_progress",
+        "nombre": "In Progress",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "doing",
+        "nombre": "Doing",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_curso",
+        "nombre": "En curso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_progreso",
+        "nombre": "En progreso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "in_review",
+        "nombre": "In Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "code_review",
+        "nombre": "Code Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "review",
+        "nombre": "Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "qa",
+        "nombre": "QA",
+        "categoria": "revision"
+      },
+      {
+        "clave": "en_revision",
+        "nombre": "En revisión",
+        "categoria": "revision"
+      },
+      {
+        "clave": "blocked",
+        "nombre": "Blocked",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "on_hold",
+        "nombre": "On Hold",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "bloqueado",
+        "nombre": "Bloqueado",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "done",
+        "nombre": "Done",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "closed",
+        "nombre": "Closed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "resolved",
+        "nombre": "Resolved",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "complete",
+        "nombre": "Complete",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "completed",
+        "nombre": "Completed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelled",
+        "nombre": "Cancelled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "canceled",
+        "nombre": "Canceled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "listo",
+        "nombre": "Listo",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "hecho",
+        "nombre": "Hecho",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cerrado",
+        "nombre": "Cerrado",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelado",
+        "nombre": "Cancelado",
+        "categoria": "hecho"
+      }
+    ],
+    "pistas": {
+      "yo": {
+        "conId": "Tu id en monday.com es \"{id}\": usalo en yo.id.",
+        "sinId": "Tu id y tu nombre los sacás de get_user_context."
+      },
+      "lista": "Con get_user_context ubicá el tablero de trabajo del equipo y traé sus ítems con get_board_items_page, sin filtrar por persona (no solo los tuyos) y sin los terminados, de a 100 y como máximo 250. El \"id\" es el id numérico del ítem y el estado, el valor de su columna de estado. En \"estado\" poné el nombre del estado en minúsculas, sin tildes y con guiones bajos en vez de espacios (In Progress → in_progress).",
+      "estados": "Armá \"estados\" con los estados que viste en las tareas, en el orden del flujo (de pendiente a hecho), sin repetir claves.",
+      "detalle": [
+        {
+          "herramienta": "get_updates",
+          "args": {
+            "item_id": "{ticket}"
+          }
+        }
+      ],
+      "acciones": {
+        "comentar": {
+          "args": {
+            "item_id": "{ticket}",
+            "body": "{cuerpo}"
+          },
+          "nota": "Publicá el cuerpo tal cual, sin agregar nada."
+        }
+      }
+    },
+    "faltaConector": {
+      "clave": "sin_monday",
+      "mensaje": "Conectá monday.com en claude.ai con esta cuenta (claude.ai → Configuración → Conectores) y probá de nuevo: Claude no encontró las herramientas de monday.com."
+    }
+  },
+  {
+    "id": "azure-devops",
+    "nombre": "Azure DevOps",
+    "via": "mcp",
+    "verificado": false,
+    "idRegex": "^\\d{1,19}$",
+    "idMayusculas": false,
+    "ejemplo": {
+      "id": "1234",
+      "estado": "in_progress",
+      "prioridad": "prioridad",
+      "proyecto": "proyecto"
+    },
+    "herramientas": {
+      "prefijo": "mcp__azure-devops__",
+      "lista": [
+        "wit_work_item",
+        "search_workitem"
+      ],
+      "detalle": [
+        "wit_work_item"
+      ],
+      "escritura": {
+        "comentar": "wit_work_item_comment_write"
+      },
+      "negar": [
+        "wit_work_item_write",
+        "wit_work_item_comment_write",
+        "wit_work_item_link_write",
+        "wit_work_item_attachment_upload",
+        "wit_work_item_attachment_link",
+        "wit_create_work_item",
+        "wit_update_work_item",
+        "wit_update_work_items_batch",
+        "wit_add_work_item_comment",
+        "wit_update_work_item_comment",
+        "wit_add_child_work_items",
+        "wit_work_items_link",
+        "wit_work_item_unlink",
+        "wit_link_work_item_to_pull_request",
+        "wit_add_artifact_link",
+        "repo_create_pull_request",
+        "repo_update_pull_request",
+        "repo_update_pull_request_reviewers",
+        "repo_create_branch",
+        "repo_create_pull_request_thread",
+        "repo_update_pull_request_thread",
+        "repo_reply_to_comment",
+        "repo_resolve_comment",
+        "repo_vote_pull_request",
+        "pipelines_run_pipeline",
+        "pipelines_create_pipeline",
+        "pipelines_update_build_stage",
+        "wiki_create_or_update_page",
+        "work_create_iterations",
+        "work_assign_iterations",
+        "work_update_team_capacity",
+        "testplan_create_test_plan",
+        "testplan_create_test_suite",
+        "testplan_create_test_case",
+        "testplan_add_test_cases_to_suite",
+        "testplan_update_test_case_steps"
+      ]
+    },
+    "estados": [
+      {
+        "clave": "backlog",
+        "nombre": "Backlog",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "to_do",
+        "nombre": "To Do",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "todo",
+        "nombre": "Todo",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "open",
+        "nombre": "Open",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "por_hacer",
+        "nombre": "Por hacer",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "abierto",
+        "nombre": "Abierto",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "in_progress",
+        "nombre": "In Progress",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "doing",
+        "nombre": "Doing",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_curso",
+        "nombre": "En curso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_progreso",
+        "nombre": "En progreso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "in_review",
+        "nombre": "In Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "code_review",
+        "nombre": "Code Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "review",
+        "nombre": "Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "qa",
+        "nombre": "QA",
+        "categoria": "revision"
+      },
+      {
+        "clave": "en_revision",
+        "nombre": "En revisión",
+        "categoria": "revision"
+      },
+      {
+        "clave": "blocked",
+        "nombre": "Blocked",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "on_hold",
+        "nombre": "On Hold",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "bloqueado",
+        "nombre": "Bloqueado",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "done",
+        "nombre": "Done",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "closed",
+        "nombre": "Closed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "resolved",
+        "nombre": "Resolved",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "complete",
+        "nombre": "Complete",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "completed",
+        "nombre": "Completed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelled",
+        "nombre": "Cancelled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "canceled",
+        "nombre": "Canceled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "listo",
+        "nombre": "Listo",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "hecho",
+        "nombre": "Hecho",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cerrado",
+        "nombre": "Cerrado",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelado",
+        "nombre": "Cancelado",
+        "categoria": "hecho"
+      }
+    ],
+    "pistas": {
+      "yo": {
+        "conId": "Tu id en Azure DevOps es \"{id}\": usalo en yo.id.",
+        "sinId": "Tu nombre sale de los work items asignados a vos (wit_work_item con action: \"my\"); si no ves tu id, poné solo el nombre."
+      },
+      "lista": "Con search_workitem traé los work items abiertos del proyecto, sin filtrar por asignado (no solo los tuyos), de a 100 y como máximo 250. El \"id\" es el id numérico del work item y el estado, System.State. En \"estado\" poné el nombre del estado en minúsculas, sin tildes y con guiones bajos en vez de espacios (In Progress → in_progress).",
+      "estados": "Armá \"estados\" con los estados que viste en las tareas, en el orden del flujo (de pendiente a hecho), sin repetir claves.",
+      "detalle": [
+        {
+          "herramienta": "wit_work_item",
+          "args": {
+            "action": "get",
+            "id": "{ticket}"
+          }
+        },
+        {
+          "herramienta": "wit_work_item",
+          "args": {
+            "action": "list_comments",
+            "id": "{ticket}"
+          }
+        }
+      ],
+      "acciones": {
+        "comentar": {
+          "args": {
+            "action": "add",
+            "id": "{ticket}",
+            "text": "{cuerpo}"
+          },
+          "nota": "Publicá el cuerpo tal cual, sin agregar nada."
+        }
+      }
+    },
+    "faltaConector": {
+      "clave": "sin_azure_devops",
+      "mensaje": "Sumá a Claude Code el servidor MCP de Azure DevOps (https://mcp.dev.azure.com/<organización>) con el nombre azure-devops en esta cuenta y probá de nuevo: Claude no encontró las herramientas de Azure DevOps."
+    }
+  },
+  {
+    "id": "gitlab",
+    "nombre": "GitLab",
+    "via": "mcp",
+    "verificado": false,
+    "idRegex": "^[1-9]\\d{0,6}$",
+    "idMayusculas": false,
+    "ejemplo": {
+      "id": "42",
+      "estado": "in_progress",
+      "prioridad": "etiqueta",
+      "proyecto": "grupo/proyecto"
+    },
+    "herramientas": {
+      "prefijo": "mcp__claude_ai_GitLab__",
+      "lista": [
+        "get_user",
+        "list_work_items"
+      ],
+      "detalle": [
+        "get_work_item"
+      ],
+      "apoyo": [
+        "list_work_items"
+      ],
+      "escritura": {
+        "comentar": "save_note"
+      },
+      "negar": [
+        "save_note",
+        "save_work_item",
+        "link_work_items",
+        "save_merge_request",
+        "save_merge_request_review",
+        "accept_merge_request",
+        "save_project",
+        "add_commit",
+        "add_branch",
+        "fork_repository",
+        "save_pipeline",
+        "save_vulnerability",
+        "attach_scan_profile",
+        "create_issue",
+        "update_issue",
+        "create_merge_request",
+        "update_merge_request",
+        "create_workitem_note",
+        "create_note",
+        "manage_pipeline",
+        "create_branch",
+        "delete_branch"
+      ]
+    },
+    "estados": [
+      {
+        "clave": "backlog",
+        "nombre": "Backlog",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "to_do",
+        "nombre": "To Do",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "todo",
+        "nombre": "Todo",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "open",
+        "nombre": "Open",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "por_hacer",
+        "nombre": "Por hacer",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "abierto",
+        "nombre": "Abierto",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "in_progress",
+        "nombre": "In Progress",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "doing",
+        "nombre": "Doing",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_curso",
+        "nombre": "En curso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_progreso",
+        "nombre": "En progreso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "in_review",
+        "nombre": "In Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "code_review",
+        "nombre": "Code Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "review",
+        "nombre": "Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "qa",
+        "nombre": "QA",
+        "categoria": "revision"
+      },
+      {
+        "clave": "en_revision",
+        "nombre": "En revisión",
+        "categoria": "revision"
+      },
+      {
+        "clave": "blocked",
+        "nombre": "Blocked",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "on_hold",
+        "nombre": "On Hold",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "bloqueado",
+        "nombre": "Bloqueado",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "done",
+        "nombre": "Done",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "closed",
+        "nombre": "Closed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "resolved",
+        "nombre": "Resolved",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "complete",
+        "nombre": "Complete",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "completed",
+        "nombre": "Completed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelled",
+        "nombre": "Cancelled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "canceled",
+        "nombre": "Canceled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "listo",
+        "nombre": "Listo",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "hecho",
+        "nombre": "Hecho",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cerrado",
+        "nombre": "Cerrado",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelado",
+        "nombre": "Cancelado",
+        "categoria": "hecho"
+      }
+    ],
+    "pistas": {
+      "yo": {
+        "conId": "Tu id en GitLab es \"{id}\": usalo en yo.id.",
+        "sinId": "Tu id y tu nombre los sacás de get_user con me: true."
+      },
+      "lista": "Trabajá con UN solo proyecto, el del equipo. Con list_work_items traé sus work items abiertos, sin filtrar por asignado (no solo los tuyos), de a 100 y como máximo 250. El \"id\" es el iid (el número dentro del proyecto) y en \"proyecto\" va la ruta del proyecto. En \"estado\" poné el nombre del estado en minúsculas, sin tildes y con guiones bajos en vez de espacios (In Progress → in_progress).",
+      "estados": "Armá \"estados\" con los estados que viste en las tareas, en el orden del flujo (de pendiente a hecho), sin repetir claves.",
+      "detalle": [
+        {
+          "herramienta": "get_work_item",
+          "args": {
+            "work_item_iid": "{ticket}"
+          }
+        }
+      ],
+      "apoyo": "El ticket {ticket} es el iid de un work item del proyecto del equipo: el project_id sale de list_work_items y va en cada llamada; en get_work_item pedí include con notes para traer los comentarios",
+      "acciones": {
+        "comentar": {
+          "args": {
+            "work_item_iid": "{ticket}",
+            "body": "{cuerpo}"
+          },
+          "nota": "Publicá el cuerpo tal cual, sin agregar nada."
+        }
+      }
+    },
+    "faltaConector": {
+      "clave": "sin_gitlab",
+      "mensaje": "Conectá GitLab en claude.ai con esta cuenta (claude.ai → Configuración → Conectores) y probá de nuevo: Claude no encontró las herramientas de GitLab."
+    }
+  },
+  {
+    "id": "shortcut",
+    "nombre": "Shortcut",
+    "via": "mcp",
+    "verificado": false,
+    "idRegex": "^[1-9]\\d{0,8}$",
+    "idMayusculas": false,
+    "ejemplo": {
+      "id": "1234",
+      "estado": "in_progress",
+      "prioridad": "prioridad",
+      "proyecto": "equipo"
+    },
+    "herramientas": {
+      "prefijo": "mcp__claude_ai_Shortcut__",
+      "lista": [
+        "users-get-current",
+        "stories-search"
+      ],
+      "detalle": [
+        "stories-get-by-id"
+      ],
+      "escritura": {},
+      "negar": [
+        "stories-create",
+        "stories-update",
+        "stories-create-comment",
+        "stories-assign-current-user",
+        "stories-unassign-current-user",
+        "stories-create-subtask",
+        "stories-add-subtask",
+        "stories-remove-subtask",
+        "stories-add-task",
+        "stories-update-task",
+        "stories-add-relation",
+        "stories-add-external-link",
+        "stories-remove-external-link",
+        "stories-set-external-links",
+        "epics-create",
+        "epics-update",
+        "iterations-create",
+        "documents-create",
+        "documents-update",
+        "objectives-create"
+      ]
+    },
+    "estados": [
+      {
+        "clave": "backlog",
+        "nombre": "Backlog",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "to_do",
+        "nombre": "To Do",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "todo",
+        "nombre": "Todo",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "open",
+        "nombre": "Open",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "por_hacer",
+        "nombre": "Por hacer",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "abierto",
+        "nombre": "Abierto",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "in_progress",
+        "nombre": "In Progress",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "doing",
+        "nombre": "Doing",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_curso",
+        "nombre": "En curso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_progreso",
+        "nombre": "En progreso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "in_review",
+        "nombre": "In Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "code_review",
+        "nombre": "Code Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "review",
+        "nombre": "Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "qa",
+        "nombre": "QA",
+        "categoria": "revision"
+      },
+      {
+        "clave": "en_revision",
+        "nombre": "En revisión",
+        "categoria": "revision"
+      },
+      {
+        "clave": "blocked",
+        "nombre": "Blocked",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "on_hold",
+        "nombre": "On Hold",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "bloqueado",
+        "nombre": "Bloqueado",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "done",
+        "nombre": "Done",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "closed",
+        "nombre": "Closed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "resolved",
+        "nombre": "Resolved",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "complete",
+        "nombre": "Complete",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "completed",
+        "nombre": "Completed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelled",
+        "nombre": "Cancelled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "canceled",
+        "nombre": "Canceled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "listo",
+        "nombre": "Listo",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "hecho",
+        "nombre": "Hecho",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cerrado",
+        "nombre": "Cerrado",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelado",
+        "nombre": "Cancelado",
+        "categoria": "hecho"
+      }
+    ],
+    "pistas": {
+      "yo": {
+        "conId": "Tu id en Shortcut es \"{id}\": usalo en yo.id.",
+        "sinId": "Tu id y tu nombre los sacás de users-get-current."
+      },
+      "lista": "Con stories-search traé las historias sin terminar del equipo, sin filtrar por dueño (no solo las tuyas), de a 100 y como máximo 250. El \"id\" es el número de la historia (sin sc-) y el estado, su workflow state. En \"estado\" poné el nombre del estado en minúsculas, sin tildes y con guiones bajos en vez de espacios (In Progress → in_progress).",
+      "estados": "Armá \"estados\" con los estados que viste en las tareas, en el orden del flujo (de pendiente a hecho), sin repetir claves.",
+      "detalle": [
+        {
+          "herramienta": "stories-get-by-id",
+          "args": {
+            "storyPublicId": "{ticket}"
+          }
+        }
+      ],
+      "acciones": {}
+    },
+    "faltaConector": {
+      "clave": "sin_shortcut",
+      "mensaje": "Conectá Shortcut en claude.ai con esta cuenta (claude.ai → Configuración → Conectores) y probá de nuevo: Claude no encontró las herramientas de Shortcut."
+    }
+  },
+  {
+    "id": "youtrack",
+    "nombre": "YouTrack",
+    "via": "mcp",
+    "verificado": false,
+    "idRegex": "^[A-Z][A-Z0-9_]*-\\d{1,7}$",
+    "idMayusculas": true,
+    "personaId": "^[A-Za-z0-9._-]{1,64}$",
+    "ejemplo": {
+      "id": "PROJ-123",
+      "estado": "in_progress",
+      "prioridad": "prioridad",
+      "proyecto": "proyecto"
+    },
+    "herramientas": {
+      "prefijo": "mcp__claude_ai_YouTrack__",
+      "lista": [
+        "get_current_user",
+        "search_issues"
+      ],
+      "detalle": [
+        "get_issue",
+        "get_issue_comments"
+      ],
+      "escritura": {
+        "tomar": "change_issue_assignee",
+        "soltar": "change_issue_assignee",
+        "comentar": "add_issue_comment"
+      },
+      "negar": [
+        "create_issue",
+        "create_draft_issue",
+        "update_issue",
+        "change_issue_assignee",
+        "add_issue_comment",
+        "manage_issue_tags",
+        "link_issues",
+        "log_work",
+        "add_attachment",
+        "create_article",
+        "update_article",
+        "delete_issue",
+        "update_issue_custom_fields",
+        "add_issue_link",
+        "create_project"
+      ]
+    },
+    "estados": [
+      {
+        "clave": "backlog",
+        "nombre": "Backlog",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "to_do",
+        "nombre": "To Do",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "todo",
+        "nombre": "Todo",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "open",
+        "nombre": "Open",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "por_hacer",
+        "nombre": "Por hacer",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "abierto",
+        "nombre": "Abierto",
+        "categoria": "pendiente"
+      },
+      {
+        "clave": "in_progress",
+        "nombre": "In Progress",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "doing",
+        "nombre": "Doing",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_curso",
+        "nombre": "En curso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "en_progreso",
+        "nombre": "En progreso",
+        "categoria": "en_curso"
+      },
+      {
+        "clave": "in_review",
+        "nombre": "In Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "code_review",
+        "nombre": "Code Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "review",
+        "nombre": "Review",
+        "categoria": "revision"
+      },
+      {
+        "clave": "qa",
+        "nombre": "QA",
+        "categoria": "revision"
+      },
+      {
+        "clave": "en_revision",
+        "nombre": "En revisión",
+        "categoria": "revision"
+      },
+      {
+        "clave": "blocked",
+        "nombre": "Blocked",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "on_hold",
+        "nombre": "On Hold",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "bloqueado",
+        "nombre": "Bloqueado",
+        "categoria": "bloqueado"
+      },
+      {
+        "clave": "done",
+        "nombre": "Done",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "closed",
+        "nombre": "Closed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "resolved",
+        "nombre": "Resolved",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "complete",
+        "nombre": "Complete",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "completed",
+        "nombre": "Completed",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelled",
+        "nombre": "Cancelled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "canceled",
+        "nombre": "Canceled",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "listo",
+        "nombre": "Listo",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "hecho",
+        "nombre": "Hecho",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cerrado",
+        "nombre": "Cerrado",
+        "categoria": "hecho"
+      },
+      {
+        "clave": "cancelado",
+        "nombre": "Cancelado",
+        "categoria": "hecho"
+      }
+    ],
+    "pistas": {
+      "yo": {
+        "conId": "Tu login en YouTrack es \"{id}\": usalo en yo.id.",
+        "sinId": "Tu login y tu nombre los sacás de get_current_user: en yo.id va el login."
+      },
+      "lista": "Llamá a search_issues con query: \"#Unresolved sort by: updated desc\", sin filtrar por asignado (quiero los tickets de todo el equipo), de a 100 y como máximo 250. En \"responsable_id\" va el login. En \"estado\" poné el nombre del estado en minúsculas, sin tildes y con guiones bajos en vez de espacios (In Progress → in_progress).",
+      "estados": "Armá \"estados\" con los estados que viste en las tareas, en el orden del flujo (de pendiente a hecho), sin repetir claves.",
+      "detalle": [
+        {
+          "herramienta": "get_issue",
+          "args": {
+            "id": "{ticket}"
+          }
+        },
+        {
+          "herramienta": "get_issue_comments",
+          "args": {
+            "id": "{ticket}"
+          }
+        }
+      ],
+      "acciones": {
+        "tomar": {
+          "args": {
+            "id": "{ticket}",
+            "assignee": "{persona}"
+          },
+          "nota": "Es tomar el ticket para esa persona."
+        },
+        "soltar": {
+          "args": {
+            "id": "{ticket}",
+            "assignee": null
+          },
+          "nota": "Es soltar el ticket (dejarlo sin dueño)."
+        },
+        "comentar": {
+          "args": {
+            "id": "{ticket}",
+            "text": "{cuerpo}"
+          },
+          "nota": "Publicá el cuerpo tal cual, sin agregar nada."
+        }
+      }
+    },
+    "faltaConector": {
+      "clave": "sin_youtrack",
+      "mensaje": "Conectá YouTrack en claude.ai con esta cuenta (claude.ai → Configuración → Conectores) y probá de nuevo: Claude no encontró las herramientas de YouTrack."
+    }
+  }
+]
