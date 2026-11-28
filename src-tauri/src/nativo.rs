@@ -1,17 +1,12 @@
 //! Lo nativo que el main pide por el puente (`native` en src/sidecar/rpc.ts): shell, portapapeles,
-//! diálogos, ventana y notificaciones. Lo que no está acá responde error y el main lo toma como "no disponible".
+//! diálogos, ventana y notificaciones. La bandeja y el updater son funciones de Rust (handlers/tray.rs y updater.rs). Lo que no está acá responde error y el main lo toma como "no disponible".
 use base64::Engine;
 use serde_json::{json, Value};
-use tauri::image::Image;
-use tauri::menu::{IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, UserAttentionType};
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
-use tauri_plugin_updater::{Update, UpdaterExt};
-use std::sync::Mutex;
 
 fn texto(args: &[Value], i: usize) -> Result<String, String> {
     args.get(i).and_then(Value::as_str).map(str::to_owned).ok_or_else(|| format!("falta el argumento {i}"))
@@ -100,113 +95,6 @@ fn dialogo_mensaje(app: &AppHandle, o: &Value) -> Result<Value, String> {
     // Tauri solo distingue aceptar de cancelar: aceptar es el primer botón (índice 0) y cancelar el segundo.
     let acepto = d.blocking_show();
     Ok(json!({ "response": if acepto { 0 } else { botones.len().saturating_sub(1).min(1) }, "checkboxChecked": false }))
-}
-
-/// La actualización encontrada y, cuando ya se bajó, su instalador.
-static ACTUALIZACION: Mutex<Option<(Update, Option<Vec<u8>>)>> = Mutex::new(None);
-
-fn avisar(app: &AppHandle, nombre: &str, args: Value) {
-    if let Some(a) = app.try_state::<crate::Apoyo>() {
-        a.0.evento_nativo(nombre, args);
-    }
-}
-
-fn buscar_actualizacion(app: &AppHandle) -> Result<Value, String> {
-    let update = tauri::async_runtime::block_on(async { app.updater().map_err(|e| e.to_string())?.check().await.map_err(|e| e.to_string()) })?;
-    let Some(u) = update else {
-        *ACTUALIZACION.lock().map_err(|e| e.to_string())? = None;
-        return Ok(Value::Null);
-    };
-    let info = json!({ "version": u.version, "date": u.date.map(|d| d.to_string()), "notes": u.body });
-    *ACTUALIZACION.lock().map_err(|e| e.to_string())? = Some((u, None));
-    Ok(info)
-}
-
-fn bajar_actualizacion(app: &AppHandle) -> Result<Value, String> {
-    let u = ACTUALIZACION.lock().map_err(|e| e.to_string())?.as_ref().map(|(u, _)| u.clone()).ok_or("Primero buscá una actualización.")?;
-    let mut bajado: u64 = 0;
-    let bytes = tauri::async_runtime::block_on(u.download(
-        |trozo, total| {
-            bajado += trozo as u64;
-            avisar(app, "updater", json!(["progress", { "transferred": bajado, "total": total }]));
-        },
-        || {},
-    ))
-    .map_err(|e| e.to_string())?;
-    if let Some(slot) = ACTUALIZACION.lock().map_err(|e| e.to_string())?.as_mut() {
-        slot.1 = Some(bytes);
-    }
-    Ok(Value::Null)
-}
-
-fn instalar_actualizacion() -> Result<Value, String> {
-    let (u, bytes) = ACTUALIZACION.lock().map_err(|e| e.to_string())?.take().ok_or("No hay una actualización descargada.")?;
-    let bytes = bytes.ok_or("La actualización todavía no se descargó.")?;
-    // En Windows el instalador se lanza y la app sale sola.
-    u.install(bytes).map_err(|e| e.to_string())?;
-    Ok(Value::Null)
-}
-
-type Elemento = Box<dyn IsMenuItem<tauri::Wry>>;
-
-fn elementos_de_menu(app: &AppHandle, items: &[Value]) -> Result<Vec<Elemento>, String> {
-    let mut out: Vec<Elemento> = Vec::new();
-    for it in items {
-        let activo = it.get("enabled").and_then(Value::as_bool).unwrap_or(true);
-        let etiqueta = cadena(it, "label").unwrap_or("");
-        if it.get("separator") == Some(&Value::Bool(true)) {
-            out.push(Box::new(PredefinedMenuItem::separator(app).map_err(|e| e.to_string())?));
-        } else if let Some(hijos) = it.get("items").and_then(Value::as_array) {
-            let hijos = elementos_de_menu(app, hijos)?;
-            let refs: Vec<&dyn IsMenuItem<tauri::Wry>> = hijos.iter().map(|h| h.as_ref()).collect();
-            out.push(Box::new(Submenu::with_items(app, etiqueta, activo, &refs).map_err(|e| e.to_string())?));
-        } else {
-            let id = it.get("id").and_then(Value::as_u64).unwrap_or(0).to_string();
-            out.push(Box::new(MenuItem::with_id(app, id, etiqueta, activo, None::<&str>).map_err(|e| e.to_string())?));
-        }
-    }
-    Ok(out)
-}
-
-fn bandeja(app: &AppHandle, o: &Value) -> Result<Value, String> {
-    let items = o.get("items").and_then(Value::as_array).cloned().unwrap_or_default();
-    let elementos = elementos_de_menu(app, &items)?;
-    let refs: Vec<&dyn IsMenuItem<tauri::Wry>> = elementos.iter().map(|e| e.as_ref()).collect();
-    let menu = Menu::with_items(app, &refs).map_err(|e| e.to_string())?;
-    let icono = cadena(o, "icon")
-        .filter(|i| !i.is_empty())
-        .and_then(|i| base64::engine::general_purpose::STANDARD.decode(i).ok())
-        .and_then(|png| Image::from_bytes(&png).ok());
-    let tip = cadena(o, "tooltip").unwrap_or("Sloth");
-    if let Some(t) = app.tray_by_id("sloth") {
-        t.set_menu(Some(menu)).map_err(|e| e.to_string())?;
-        t.set_tooltip(Some(tip)).map_err(|e| e.to_string())?;
-        if let Some(i) = icono {
-            t.set_icon(Some(i)).map_err(|e| e.to_string())?;
-        }
-        return Ok(Value::Null);
-    }
-    let mut b = TrayIconBuilder::with_id("sloth")
-        .menu(&menu)
-        .show_menu_on_left_click(false)
-        .tooltip(tip)
-        .on_menu_event(|app, e| {
-            if let (Some(a), Ok(n)) = (app.try_state::<crate::Apoyo>(), e.id().as_ref().parse::<u64>()) {
-                a.0.evento_nativo("tray", json!(["menu", n]));
-            }
-        })
-        .on_tray_icon_event(|t, e| {
-            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e {
-                if let Some(a) = t.app_handle().try_state::<crate::Apoyo>() {
-                    a.0.evento_nativo("tray", json!(["activate"]));
-                }
-            }
-        });
-    if let Some(i) = icono.or_else(|| app.default_window_icon().cloned()) {
-        b = b.icon(i);
-    }
-    b.build(app).map_err(|e| e.to_string())?;
-    Ok(Value::Null)
 }
 
 fn png_del_portapapeles(app: &AppHandle) -> Result<Vec<u8>, String> {
@@ -310,9 +198,6 @@ pub fn atender(app: &AppHandle, op: &str, args: Vec<Value>) -> Result<Value, Str
             let nivel = args.first().and_then(Value::as_f64).unwrap_or(0.0);
             ventana(app)?.set_zoom(1.2f64.powf(nivel)).map_err(|e| e.to_string()).map(|_| Value::Null)
         }
-        "updater.check" => buscar_actualizacion(app),
-        "updater.download" => bajar_actualizacion(app),
-        "updater.install" => instalar_actualizacion(),
         "clipboard.readImage" => Ok(Value::String(base64::engine::general_purpose::STANDARD.encode(png_del_portapapeles(app)?))),
         "clipboard.readFiles" => {
             // Archivos copiados en el Explorador (CF_HDROP): el plugin del portapapeles no los lee.
@@ -353,11 +238,6 @@ pub fn atender(app: &AppHandle, op: &str, args: Vec<Value>) -> Result<Value, Str
             let activar = args.first().and_then(Value::as_bool).unwrap_or(false);
             let r = if activar { app.autolaunch().enable() } else { app.autolaunch().disable() };
             r.map_err(|e| e.to_string())?;
-            nulo
-        }
-        "tray.set" => bandeja(app, args.first().unwrap_or(&Value::Null)),
-        "tray.destroy" => {
-            app.remove_tray_by_id("sloth");
             nulo
         }
         "app.quit" => {

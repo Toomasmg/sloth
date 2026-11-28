@@ -67,6 +67,7 @@ impl Plataforma for PlataformaTauri {
     }
 
     fn enviar_a_la_ventana(&self, canal: &str, args: &[Value]) {
+        crate::puente::al_evento_ui(&self.app, canal);
         let _ = self.app.emit(EVENTO_UI, json!({ "channel": canal, "args": args }));
     }
 

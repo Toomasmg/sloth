@@ -49,8 +49,8 @@ La clave de firma está en `D:\sloth-keys\updater.key` (fuera del repo): hay que
 
 Probado: build del instalador y ejecutable de release con recursos en otra carpeta (UI embebida, node propio, daemon Rust).
 No probado: instalar encima de una instalación de Electron, el relanzado y la actualización por el updater de Tauri.
-Hacerlo en una PC o VM de prueba antes de publicar una release. El canal beta no existe: el updater de Tauri solo mira
-el `latest.json` estable.
+Hacerlo en una PC o VM de prueba antes de publicar una release. El updater es de Rust (`src-tauri/src/handlers/updater.rs`)
+y respeta el canal de los ajustes: estable con el `latest.json` del endpoint y beta con el de la última prerelease de GitHub.
 
 Hito 2 (ventana y bandeja):
 
@@ -85,6 +85,7 @@ Se prueba a mano con `npx electron-vite build && npm run build:daemon && npm run
 
 ### Brechas que quedan
 
-- Menú de aplicación, `setOverlayIcon` y clics en notificaciones (el plugin de Tauri no los da en escritorio).
-- Canal beta del updater.
-- Bandeja: se verificó el pedido al main y a Rust, no el icono en la bandeja de Windows.
+- Menú de aplicación y clics en notificaciones (el plugin de Tauri no los da en escritorio).
+- Bandeja (`src-tauri/src/handlers/tray.rs`, de Rust): se probó la decisión de la X y sus diálogos, no el ícono en la
+  bandeja de Windows. El punto ámbar de la barra de tareas (`SetOverlayIcon`) y el diálogo con «No volver a preguntar»
+  (`TaskDialogIndirect`) están en `ventanas_win.rs`.

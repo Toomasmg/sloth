@@ -1,6 +1,7 @@
 //! Plantillas de espacio: variables, validación de lo que llega por IPC y el archivo `templates.json` (versionado).
 //! Equivale a src/shared/templates-shared.ts y src/main/features/templates-core.ts. La carpeta, las cuentas, el reloj y
 //! el generador de ids entran como datos o closures.
+use super::cortar_utf16;
 use crate::avisos::Avisos;
 use crate::initial_prompt::problema_del_primer_mensaje;
 use crate::perfiles_core::es_blanco_js;
@@ -21,17 +22,6 @@ const VERSION_PLANTILLAS: u32 = 1;
 
 fn utf16(s: &str) -> usize {
     s.encode_utf16().count()
-}
-
-/// `s.slice(0, n)` en unidades UTF-16; un par partido por la mitad se descarta.
-fn cortar_utf16(s: &str, n: usize) -> String {
-    let mut u = 0;
-    s.chars()
-        .take_while(|c| {
-            u += c.len_utf16();
-            u <= n
-        })
-        .collect()
 }
 
 /// Nombres de las variables que aparecen en un texto (`\{([^{}\s]*)\}`), sin llaves.

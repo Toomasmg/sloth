@@ -34,7 +34,7 @@ fn pantallas(app: &AppHandle) -> Value {
 }
 
 #[cfg(windows)]
-fn con_corriente() -> Option<bool> {
+pub fn con_corriente() -> Option<bool> {
     use windows_sys::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
     let mut s = SYSTEM_POWER_STATUS { ACLineStatus: 255, BatteryFlag: 0, BatteryLifePercent: 0, SystemStatusFlag: 0, BatteryLifeTime: 0, BatteryFullLifeTime: 0 };
     // SAFETY: `s` es un SYSTEM_POWER_STATUS válido y vive durante la llamada.
@@ -43,7 +43,7 @@ fn con_corriente() -> Option<bool> {
 }
 
 #[cfg(not(windows))]
-fn con_corriente() -> Option<bool> {
+pub fn con_corriente() -> Option<bool> {
     None
 }
 
