@@ -53,33 +53,53 @@ PRs principales, por si querés leer el detalle: #172 a #182 (núcleo), #188, #1
 
 ## 4. Lo que quedó a medias (ramas pusheadas)
 
-### `feat/estado-rust`: el bloque más importante
+### `feat/estado-rust`: ya mergeado (#205)
 
-Rust pasa a ser el **único dueño** de `sloth-state.json` en Tauri: perfil, logger, store, ajustes, terminales con el
-daemon de Rust, estado de agentes, hooks y permisos. Código en `src-tauri/src/nucleo/` y `handlers_estado.rs`. El
-proceso de apoyo deja de cargar o escribir el store: trabaja con una copia que le empuja Rust y pide los cambios por
-`rust.store`, `rust.ajustes` y `rust.nucleo`. La frontera está documentada en `docs/migracion-rust.md` de esa rama.
+En Tauri, Rust es el **único dueño** del estado: perfil (con migraciones), `sloth-state.json`, `settings.json`, log,
+terminales (cliente del daemon de Rust, lo lanza y reconecta), hooks, permisos y estado de los agentes. Código en
+`src-tauri/src/nucleo/` y `src-tauri/src/handlers_estado.rs`. El proceso de apoyo (Node) ya no carga ni escribe el
+estado: trabaja con una copia que le empuja Rust y pide los cambios por `rust.store`, `rust.ajustes` y `rust.nucleo`.
+La frontera está en `docs/migracion-rust.md`.
 
-Pasan a Rust: `state:get`, `accounts:*`, `workspaces:*`, `pty:*`, `daemon:*`, `permission:pending`, `ui:openPanes`,
-`dialog:pickFolder`, `clipboard:*`, `feat:settings:*`, y los canales que agregaron chat y medianas
-(`pty:cuentaOcupada`, `pty:running`, `pty:resumeOnce`, eventos `rust.evento`).
+Canales en Rust:
+- `state:get`, `permission:pending`, `daemon:info|shutdown`
+- `accounts:add|setShareSetup|remove|statuses`
+- `workspaces:add|remove|update|reveal`
+- `ui:openPanes`, `dialog:pickFolder`, `clipboard:read|write`, `feat:settings:*`
+- `pty:start|write|resize|kill|cuentaOcupada|running|resumeOnce`
 
-**Estado:** PR **#205** abierto, rebasado sobre `staging` (ya trae #201 y #204). Worktree en la PC de Tomy:
+Las funciones de Rust reciben `al_perfil` y los eventos de cuenta preparada, cuenta borrada y terminal cerrada directo
+del núcleo.
+
+Pruebas al mergear:
+- `src-tauri`: 139 de 139.
+- e2e de Tauri: 63 de 69. Fallan 5 capturas (sus referencias son de Electron) y `teclado › F6`.
+- Electron (`cierre`, `pegar`, `teclado`, `salidas`, `dormido`, `configuracion`): 45 de 46. Falla el mismo F6, que se
+  cae 1 de cada 4 corridas también en Electron y está sin investigar.
+
+### `feat/cuentas-rust`: los cinco canales de cuentas (WIP)
+
+Rama `feat/cuentas-rust`, commit `54c2022` (WIP, sin PR), sale de #205. Worktree en la PC de Tomy:
 `C:\Users\TOMY\Documents\Sloth-wt\estado-rs`.
 
-- **Pruebas:**
-  - `cargo test` de `src-tauri`: 139 de 139 (incluye el daemon real: `pty:start`, `write`, `kill`).
-  - `sloth-core` en verde y `typecheck` sin errores.
-  - `npm test`: solo fallan los 7 de `chat-auth`, que no pueden abrir un puerto en esa PC.
-  - e2e de Tauri: 63 de 69. Fallan 5 capturas (sus referencias son de Electron) y `teclado › F6`, que también falla
-    a veces en Electron.
-  - Ya están arreglados `dormido` («Despertar» abre la terminal) y el Esc de «Nuevo espacio».
-- **CI:** al momento de escribir esto pasaban `verificar`, `rust`, `rust-hooks` y `rust-linux`, y `tauri` seguía
-  corriendo. Mergear solo con todo en verde.
-- **Falta en este PR o en uno siguiente:** enchufar los cinco canales de cuentas que siguen en Node (ver sección 5,
-  punto 2). Si el PR ya está en verde, conviene mergearlo como está y hacer las cuentas en un PR aparte.
-- **Al mergear:** las funciones de Rust (chat, tickets, prs…) reciben `al_perfil` y los eventos de cuentas y
-  terminales directo del núcleo. El mensaje `rust.perfil` del proceso de apoyo desaparece.
+Pasa a Rust `accounts:agentes`, `accounts:usage`, `accounts:limitesCodex`, `accounts:setLimitesExperimentales` y
+`accounts:setAvisoDeTurno`, con la lógica del núcleo de #204. También pasa el aviso de turno de Codex, que ahora pone
+Rust al preparar la cuenta.
+
+- **Estado:** la última corrida dio 139 de 140. Falló `state_get_sale_del_store_de_rust…` porque usaba
+  `accounts:usage` como ejemplo de canal que va al apoyo; se cambió a `feat:sleep:state` pero no se volvió a correr.
+- **Próximo paso:**
+
+```sh
+# rama feat/cuentas-rust
+(cd src-tauri && cargo test)
+npm run typecheck
+npx electron-vite build && npm run build:sidecar && node scripts/prepare-tauri.mjs && npx tauri build --no-bundle
+SLOTH_TAURI_EXE=<target>/release/sloth.exe node scripts/e2e-tauri.mjs e2e/configuracion.spec.ts e2e/pantallas.spec.ts e2e/cierre.spec.ts
+git checkout -- src-tauri/tauri.conf.json
+```
+
+Si pasa: sacá el «WIP:» del commit, rebasá sobre `staging` (ya tiene #205) y abrí el PR.
 
 ### `feat/updater-tray-rust`: actualizaciones y bandeja
 
@@ -123,16 +143,18 @@ quedate con lo de ambos lados.
 
 ## 5. Lo que falta, en orden
 
-1. **Mergear `feat/estado-rust`** (sección 4). Destraba casi todo lo demás.
+1. **Terminar `feat/cuentas-rust` y `feat/updater-tray-rust`** (sección 4).
 2. **Conectar al router lo que sigue en Node** (cada una en `src-tauri/src/handlers/<nombre>.rs`, con el núcleo que ya
    está en `native/core`):
-   - `celular`: usa terminales y agentes, va después del estado. Al pasarlo, sacar el puente provisorio que dejó
+   - `celular`: usa terminales y agentes (ya en Rust desde #205). Al pasarlo, sacar el puente provisorio que dejó
      chat en `src/main/features/chat.ts` para que celular use la sesión del chat.
    - `sleep`, `permissions` y `broadcast`: dependen de terminales y agentes.
-   - `move-account`: falta un canal del dueño del estado para cambiar la cuenta de un espacio.
+   - `move-account`: falta un canal del dueño del estado para cambiar la cuenta de un espacio. Hoy funciona en
+     Tauri porque el cambio llega a Rust por el store espejo.
+   - `teclado › F6`: falla de forma intermitente en Tauri y en Electron; está sin investigar.
    - `rendimiento`: necesita los eventos de ajustes, salida de terminales, reconexión del daemon y energía.
-   - `diagnostico`: lee el log en memoria; pasa cuando el logger sea de Rust (lo hace `feat/estado-rust`).
-   - Si `feat/estado-rust` no los enchufó, los cinco canales de cuentas (`accounts:agentes`, `accounts:usage`,
+   - `diagnostico`: lee el log en memoria; ahora el logger es de Rust (#205), así que ya se puede pasar.
+   - Los cinco canales de cuentas, si `feat/cuentas-rust` no llega a entrar (`accounts:agentes`, `accounts:usage`,
      `accounts:limitesCodex`, `accounts:setLimitesExperimentales`, `accounts:setAvisoDeTurno`): la lógica ya
      está en `native/core` (`agentes.rs`, `codex_limites.rs`, `codex_notify.rs`, `cuentas.rs`, `usage.rs`).
      Cómo enchufar cada uno está en la descripción del PR #204.
