@@ -11,6 +11,7 @@ pub mod export_regla;
 pub mod help;
 pub mod move_account;
 pub mod onboarding;
+pub mod partes_dictado;
 pub mod permissions;
 pub mod permissions_paths;
 pub mod poda;

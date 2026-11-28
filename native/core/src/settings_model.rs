@@ -54,7 +54,7 @@ pub fn por_defecto() -> Objeto {
         "density": "compacta",
         "uiFontSize": 13,
         "accent": "cielo",
-        "terminal": { "fontSize": 12.5, "fontFamily": "JetBrains Mono", "lineHeight": 1, "cursorStyle": "barra", "cursorBlink": true, "shell": "PowerShell 7", "scrollback": 5000 },
+        "terminal": { "fontSize": 12.5, "fontFamily": "JetBrains Mono", "lineHeight": 1, "cursorStyle": "barra", "cursorBlink": true, "shell": "PowerShell 7", "scrollback": 5000, "dictadoPreciso": false },
         "accountColors": {},
         "accountPlans": {},
         "accountCupos": {},
@@ -323,7 +323,7 @@ pub fn aplicar_cambio(actual: &Objeto, patch: &Value, existe_cuenta: Option<&dyn
     }
     if let Some(t) = p.get("terminal") {
         let t = t.as_object().ok_or("terminal tiene que ser un objeto.")?;
-        revisar_claves(t, &["fontSize", "fontFamily", "lineHeight", "cursorStyle", "cursorBlink", "shell", "scrollback"], "terminal.")?;
+        revisar_claves(t, &["fontSize", "fontFamily", "lineHeight", "cursorStyle", "cursorBlink", "shell", "scrollback", "dictadoPreciso"], "terminal.")?;
         let term = sub(&mut next, "terminal");
         if let Some(v) = t.get("fontSize") {
             term.insert("fontSize".into(), entero_en(v, TERM_FONT.0, TERM_FONT.1, "El tamaño de la terminal")?);
@@ -339,6 +339,9 @@ pub fn aplicar_cambio(actual: &Objeto, patch: &Value, existe_cuenta: Option<&dyn
         }
         if let Some(v) = t.get("cursorBlink") {
             term.insert("cursorBlink".into(), booleano(v, "El parpadeo")?);
+        }
+        if let Some(v) = t.get("dictadoPreciso") {
+            term.insert("dictadoPreciso".into(), booleano(v, "«Dictado más preciso»")?);
         }
         if let Some(v) = t.get("shell") {
             term.insert("shell".into(), Value::String(uno_de(v, &SHELLS, "El shell")?));

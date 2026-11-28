@@ -305,6 +305,16 @@ fn el_orden_de_las_claves_es_el_del_archivo_de_siempre() {
     let claves: Vec<String> = d().keys().cloned().collect();
     assert_eq!(claves[..5], ["theme", "density", "uiFontSize", "accent", "terminal"]);
     let t: Vec<String> = d()["terminal"].as_object().unwrap().keys().cloned().collect();
-    assert_eq!(t, ["fontSize", "fontFamily", "lineHeight", "cursorStyle", "cursorBlink", "shell", "scrollback"]);
+    assert_eq!(t, ["fontSize", "fontFamily", "lineHeight", "cursorStyle", "cursorBlink", "shell", "scrollback", "dictadoPreciso"]);
     assert_eq!(serde_json::to_string(&v(&ok(json!({ "theme": "claro" })))).unwrap().find("\"theme\":\"claro\""), Some(1));
+}
+
+#[test]
+fn dictado_preciso_apagado_por_defecto_se_prende_con_un_parche_y_sobrevive_a_normalizar() {
+    assert_eq!(d()["terminal"]["dictadoPreciso"], json!(false));
+    let s = ok(json!({ "terminal": { "dictadoPreciso": true } }));
+    assert_eq!(s["terminal"]["dictadoPreciso"], json!(true));
+    assert_eq!(normalizar(&v(&s))["terminal"]["dictadoPreciso"], json!(true));
+    assert_eq!(normalizar(&json!({ "terminal": { "fontSize": 14 } }))["terminal"]["dictadoPreciso"], json!(false));
+    assert!(ap(&d(), json!({ "terminal": { "dictadoPreciso": "sí" } })).is_err());
 }
