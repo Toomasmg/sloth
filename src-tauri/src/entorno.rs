@@ -1,11 +1,13 @@
 //! Lo que comparten los handlers de Rust: la plataforma, la carpeta del perfil que eligió el proceso de apoyo
 //! y la lectura (solo lectura) del estado de espacios que sigue guardando ese proceso.
+use crate::router::{Futuro, Respuesta};
 use serde_json::Value;
 use sloth_core::app_state::Plataforma;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::sync::{mpsc, Arc, RwLock};
+use std::time::Duration;
 
 pub const ACTIVIDAD_MAX_BYTES: u64 = 256 * 1024;
 const ACTIVIDAD_ARCHIVOS: usize = 3;
@@ -13,14 +15,49 @@ const ACTIVIDAD_ARCHIVOS: usize = 3;
 pub trait PlataformaCompartida: Plataforma + Send + Sync {}
 impl<T: Plataforma + Send + Sync> PlataformaCompartida for T {}
 
+/// Invoca un canal por el router, como si lo pidiera la UI: lo atiende quien sea su dueño (Rust o el proceso de apoyo).
+pub type Pedidos = Arc<dyn Fn(String, Vec<Value>) -> Futuro<Respuesta> + Send + Sync>;
+
 pub struct Entorno {
     pub plataforma: Arc<dyn PlataformaCompartida>,
     perfil: RwLock<Option<PathBuf>>,
+    pedidos: RwLock<Option<Pedidos>>,
 }
 
 impl Entorno {
     pub fn nuevo(plataforma: Arc<dyn PlataformaCompartida>) -> Arc<Entorno> {
-        Arc::new(Entorno { plataforma, perfil: RwLock::new(None) })
+        Arc::new(Entorno { plataforma, perfil: RwLock::new(None), pedidos: RwLock::new(None) })
+    }
+
+    pub fn fijar_pedidos(&self, p: Pedidos) {
+        *self.pedidos.write().unwrap_or_else(|e| e.into_inner()) = Some(p);
+    }
+
+    /// Pide un canal al router y espera la respuesta. Solo desde un handler (corre en un hilo bloqueante del runtime).
+    /// Sirve para lo que todavía tiene otro dueño, como dar de alta un espacio: así el store sigue con uno solo.
+    pub fn pedir(&self, canal: &str, args: Vec<Value>, espera: Duration) -> Respuesta {
+        let p = self.pedidos.read().unwrap_or_else(|e| e.into_inner()).clone().ok_or_else(|| "Sloth todavía está arrancando.".to_string())?;
+        let rt = tokio::runtime::Handle::try_current().map_err(|_| format!("No se pudo pedir {canal}."))?;
+        let (tx, rx) = mpsc::channel();
+        let futuro = p(canal.to_string(), args);
+        rt.spawn(async move {
+            let _ = tx.send(futuro.await);
+        });
+        rx.recv_timeout(espera).unwrap_or_else(|_| Err(format!("{canal} no respondió a tiempo.")))
+    }
+
+    /// Carpeta raíz de datos (la de los logs del daemon y los reportes), no la del perfil.
+    pub fn raiz(&self) -> PathBuf {
+        self.plataforma.carpeta_de_datos()
+    }
+
+    /// `sloth-state.json` tal como lo dejó el proceso de apoyo, sin migrar ni reescribir; `{}` si no se puede leer.
+    pub fn estado(&self) -> Value {
+        self.perfil().ok().and_then(|p| leer_estado(&p.join("sloth-state.json"))).unwrap_or_else(|| Value::Object(Default::default()))
+    }
+
+    pub fn lista_del_estado(&self, clave: &str) -> Vec<Value> {
+        self.estado().get(clave).and_then(Value::as_array).cloned().unwrap_or_default()
     }
 
     /// El proceso de apoyo decide el perfil activo (migraciones incluidas) y avisa su carpeta una vez que arrancó.
@@ -52,9 +89,13 @@ impl Entorno {
 
 /// Lee, sin migrar ni reescribir, la carpeta de un espacio del `sloth-state.json` que escribe el proceso de apoyo.
 pub fn cwd_en_estado(archivo: &Path, id: &str) -> Option<String> {
-    let texto = fs::read_to_string(archivo).ok()?;
-    let v: Value = serde_json::from_str(texto.strip_prefix('\u{feff}').unwrap_or(&texto)).ok()?;
+    let v = leer_estado(archivo)?;
     v.get("workspaces")?.as_array()?.iter().find(|w| w.get("id").and_then(Value::as_str) == Some(id))?.get("cwd")?.as_str().map(str::to_string)
+}
+
+fn leer_estado(archivo: &Path) -> Option<Value> {
+    let texto = fs::read_to_string(archivo).ok()?;
+    serde_json::from_str(texto.strip_prefix('\u{feff}').unwrap_or(&texto)).ok()
 }
 
 fn nombre_actividad(i: usize) -> String {

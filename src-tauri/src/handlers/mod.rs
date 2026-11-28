@@ -7,6 +7,7 @@ use serde_json::Value;
 use std::sync::Arc;
 
 pub mod git;
+pub mod help;
 
 static NULO: Value = Value::Null;
 
@@ -20,13 +21,14 @@ pub fn a_json<T: Serialize>(r: Result<T, String>) -> Respuesta {
 }
 
 /// Las funciones del lado main que atiende Rust. El proceso de apoyo no las registra ni las corre.
-pub const FUNCIONES_EN_RUST: &[&str] = &[git::NOMBRE];
+pub const FUNCIONES_EN_RUST: &[&str] = &[git::NOMBRE, help::NOMBRE];
 
 pub fn funciones_en_rust() -> String {
     FUNCIONES_EN_RUST.join(",")
 }
 
 pub fn registrar_todo(router: &mut Router, entorno: &Arc<Entorno>) -> Vec<Arc<dyn AlHook>> {
+    help::registrar(router, entorno.clone());
     vec![git::registrar(router, entorno.clone())]
 }
 

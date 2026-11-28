@@ -114,6 +114,17 @@ pub fn run() {
             let mut router = Router::nuevo(Arc::new(ReenvioApoyo(apoyo.clone())));
             let hooks = handlers::registrar_todo(&mut router, &entorno);
             app.manage(router);
+            // Los handlers piden por el router lo que todavía tiene otro dueño (p. ej. `workspaces:add`).
+            let app_h = app.handle().clone();
+            entorno.fijar_pedidos(Arc::new(move |canal, args| {
+                let futuro = app_h.try_state::<Router>().map(|r| r.invocar(canal, args));
+                Box::pin(async move {
+                    match futuro {
+                        Some(f) => f.await,
+                        None => Err("Sloth todavía está arrancando.".into()),
+                    }
+                })
+            }));
             app.manage(puente::Hooks(hooks));
             app.manage(Apoyo(apoyo));
             ajustar_a_pantalla(app.handle());
