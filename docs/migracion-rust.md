@@ -66,7 +66,7 @@ depende de `sloth-core` por path; con el mismo `CARGO_TARGET_DIR` las dependenci
 
 Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `prs` (9), `chat` (42), `history` (9),
 `templates` (10), `worktrees` (7), `dictado` (2), `export-import` (10), `onboarding` (6), `tickets` (20),
-`team` (4) y el núcleo
+`team` (4), `broadcast` (2) y el núcleo
 (`src-tauri/src/handlers_estado.rs`): `state:get`, `permission:pending`, `daemon:info`, `daemon:shutdown`, `accounts:add`,
 `accounts:setShareSetup`, `accounts:remove`, `accounts:statuses`, `workspaces:add|remove|update|reveal`, `ui:openPanes`,
 `dialog:pickFolder`, `pty:start|write|resize|kill|cuentaOcupada|running|resumeOnce`, `clipboard:read|write` y
@@ -81,6 +81,8 @@ Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `pr
   no abre la conversación al hacer clic: el aviso de Tauri en Windows no avisa el clic. El TS de chat
   (`src/main/features/chat*.ts`) queda como respaldo, igual que el de git: Electron lo sigue usando.
 
+- `broadcast`: solo guarda los «Últimos envíos» (`features/broadcast.json`, por perfil); el envío lo hace la UI con
+  `pty:write`.
 - `help`: el changelog lo genera `src-tauri/build.rs` desde `src/shared/changelog.ts` (`scripts/changelog-json.mjs`, con
   Node) y entra con `include_str!`; no hay copia a mano.
 - `report`: la línea del daemon sale de `daemon:info` (1,5 s como mucho). La captura de la ventana no existe en Tauri
@@ -128,7 +130,7 @@ Por qué el resto sigue en el proceso de apoyo:
 - `diagnostico`: su texto sale del log en memoria del main de Node (`logger.recientes`, `logger.fallo`), de la marca de
   cierre inesperado que calcula ese proceso al arrancar y de los ajustes que tiene en memoria; `errorRenderer` escribe en ese
   mismo log. En Rust mostraría un log casi vacío. Pasa cuando el logger y el arranque sean de Rust.
-- `sleep`, `permissions`, `broadcast`: el port de `native/core` es de piezas puras sin la función completa armada (falta el contexto con su
+- `sleep`, `permissions`: el port de `native/core` es de piezas puras sin la función completa armada (falta el contexto con su
   estado y E/S); se conectan de a una en PRs siguientes.
 
 El TS de `git` (`src/main/features/git.ts`, `git-ops`, `git-run`) queda como respaldo: Electron lo sigue usando y worktrees,

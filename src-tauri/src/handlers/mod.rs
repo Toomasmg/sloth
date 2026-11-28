@@ -6,6 +6,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::sync::Arc;
 
+pub mod broadcast;
 pub mod chat;
 pub mod comun;
 pub mod dictado;
@@ -34,7 +35,7 @@ pub fn a_json<T: Serialize>(r: Result<T, String>) -> Respuesta {
 }
 
 /// Las funciones del lado main que atiende Rust. El proceso de apoyo no las registra ni las corre.
-pub const FUNCIONES_EN_RUST: &[&str] = &[git::NOMBRE, help::NOMBRE, report::NOMBRE, team_config::NOMBRE, prs::NOMBRE, chat::NOMBRE, history::NOMBRE, templates::NOMBRE, worktrees::NOMBRE, dictado::NOMBRE, export_import::NOMBRE, onboarding::NOMBRE, tickets::NOMBRE, team::NOMBRE];
+pub const FUNCIONES_EN_RUST: &[&str] = &[git::NOMBRE, help::NOMBRE, report::NOMBRE, team_config::NOMBRE, prs::NOMBRE, chat::NOMBRE, history::NOMBRE, templates::NOMBRE, worktrees::NOMBRE, dictado::NOMBRE, export_import::NOMBRE, onboarding::NOMBRE, tickets::NOMBRE, team::NOMBRE, broadcast::NOMBRE];
 
 pub fn funciones_en_rust() -> String {
     FUNCIONES_EN_RUST.join(",")
@@ -50,6 +51,7 @@ pub fn registrar_todo(router: &mut Router, entorno: &Arc<Entorno>) -> Vec<Arc<dy
     dictado::registrar(router, entorno.clone());
     export_import::registrar(router, entorno.clone());
     onboarding::registrar(router, entorno.clone());
+    broadcast::registrar(router, entorno.clone());
     // Equipo arma su vista con lo que Tickets tiene en memoria: van juntas.
     let t = tickets::registrar(router, entorno.clone());
     team::registrar(router, entorno.clone(), t.clone());
