@@ -46,6 +46,16 @@ pub fn atender(app: &AppHandle, op: &str, args: &[Value]) -> Result<Value, Strin
     }
 }
 
+/// Cada evento hacia la UI pasa por acá: así una función de Rust se entera de lo que cambia en otro dueño (la bandeja,
+/// de los agentes y permisos) sin que ese dueño la conozca.
+pub fn al_evento_ui(app: &AppHandle, canal: &str) {
+    if let Some(h) = app.try_state::<Hooks>() {
+        for f in &h.0 {
+            f.al_evento_ui(canal);
+        }
+    }
+}
+
 /// La carpeta del perfil tiene que ser una ruta absoluta que existe: de ahí cuelgan el estado y los archivos de cada función.
 pub fn fijar_perfil(entorno: &Entorno, ruta: Option<&Value>) -> Result<PathBuf, String> {
     let ruta = PathBuf::from(ruta.and_then(Value::as_str).ok_or("falta la carpeta del perfil")?);

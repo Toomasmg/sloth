@@ -9,6 +9,7 @@ pub mod sidecar;
 mod sistema;
 #[cfg(test)]
 mod tests_comunes;
+mod ventanas_win;
 
 use serde_json::Value;
 use router::{Futuro, Reenvio, Respuesta, Router};
@@ -75,9 +76,13 @@ fn avisar_ventana(v: &Window, evento: &WindowEvent) {
             }
         }
         WindowEvent::CloseRequested { api, .. } => {
-            // El cierre lo decide el main (confirma, manda a la bandeja o guarda estado y cierra las terminales).
+            // La bandeja decide (ocultar, preguntar o cerrar); el cierre de verdad lo hace el main, que guarda el estado y
+            // decide qué pasa con las terminales.
             api.prevent_close();
-            apoyo.evento_nativo("window", json!(["close"]));
+            match v.app_handle().try_state::<Arc<handlers::tray::Bandeja>>() {
+                Some(b) => b.inner().al_pedir_cierre(),
+                None => apoyo.evento_nativo("window", json!(["close"])),
+            }
         }
         _ => {}
     }
@@ -99,7 +104,10 @@ pub fn run() {
     tauri::Builder::default()
         // Primero: una segunda instancia solo trae la primera al frente y se va.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(w) = app.get_webview_window("main") {
+            // Con la ventana oculta en la bandeja, abrir Sloth otra vez la muestra.
+            if let Some(b) = app.try_state::<Arc<handlers::tray::Bandeja>>() {
+                b.mostrar();
+            } else if let Some(w) = app.get_webview_window("main") {
                 let _ = w.unminimize();
                 let _ = w.show();
                 let _ = w.set_focus();
@@ -130,7 +138,12 @@ pub fn run() {
             let apoyo_e = apoyo.clone();
             entorno.fijar_eventos_al_apoyo(Arc::new(move |nombre, args| apoyo_e.evento_nativo(nombre, args)));
             let mut router = Router::nuevo(Arc::new(ReenvioApoyo(apoyo.clone())));
-            let hooks = handlers::registrar_todo(&mut router, &entorno);
+            let mut hooks = handlers::registrar_todo(&mut router, &entorno);
+            let bandeja = handlers::tray::registrar_en_tauri(&mut router, entorno.clone(), app.handle().clone());
+            let actualizador = handlers::updater::registrar_en_tauri(&mut router, entorno.clone(), app.handle().clone());
+            hooks.push(bandeja.clone());
+            hooks.push(actualizador);
+            app.manage(bandeja);
             app.manage(router);
             // Los handlers piden por el router lo que todavía tiene otro dueño (p. ej. `workspaces:add`).
             let app_h = app.handle().clone();

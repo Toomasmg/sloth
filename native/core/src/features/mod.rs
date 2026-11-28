@@ -29,6 +29,9 @@ pub mod team_estado;
 pub mod team_github;
 pub mod templates;
 pub mod tickets;
+pub mod tray;
+pub mod updater;
+pub mod updater_notas;
 pub mod url_lite;
 
 /// Fecha civil (año, mes 1-12, día) de los días desde 1970-01-01 (algoritmo de Howard Hinnant).
@@ -42,4 +45,15 @@ pub(crate) fn civil_de_dias(dias: i64) -> (i64, i64, i64) {
     let d = doy - (153 * mp + 2) / 5 + 1;
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     (yoe + era * 400 + i64::from(m <= 2), m, d)
+}
+
+/// `s.slice(0, n)` en unidades UTF-16; un par de sustitutos partido por la mitad se descarta.
+pub(crate) fn cortar_utf16(s: &str, n: usize) -> String {
+    let mut u = 0;
+    s.chars()
+        .take_while(|c| {
+            u += c.len_utf16();
+            u <= n
+        })
+        .collect()
 }

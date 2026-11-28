@@ -29,11 +29,11 @@ const outFile = join(root, 'out', 'sidecar', 'sloth-sidecar.cjs')
 await build({
   input: join(root, 'src', 'sidecar', 'entry.ts'),
   platform: 'node',
-  external: [...builtinModules, ...builtinModules.map((m) => `node:${m}`), 'node-pty'],
+  // electron-updater queda afuera: en Tauri el updater es de Rust (src-tauri/src/handlers/updater.rs) y updater.ts no se registra.
+  external: [...builtinModules, ...builtinModules.map((m) => `node:${m}`), 'node-pty', 'electron-updater'],
   resolve: {
     alias: {
-      electron: join(root, 'src', 'sidecar', 'electron-shim.ts'),
-      'electron-updater': join(root, 'src', 'sidecar', 'updater-shim.ts')
+      electron: join(root, 'src', 'sidecar', 'electron-shim.ts')
     }
   },
   plugins: [raw],

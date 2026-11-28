@@ -6,6 +6,8 @@ import { test, expect, launchSloth, closeSloth } from './sloth'
 /**
  * Aviso al cerrar con la X. El diálogo es nativo (Playwright no lo ve): se reemplaza
  * `dialog.showMessageBox` en main para leer qué pregunta Sloth y contestar como la persona.
+ * En Tauri el aviso es de Rust (src-tauri/src/handlers/tray.rs): con SLOTH_E2E no abre el diálogo, contesta lo que
+ * se le fija con `e2e:dialogos:responder` y anota lo que habría mostrado.
  */
 
 interface Answer {
@@ -13,7 +15,21 @@ interface Answer {
   checkboxChecked?: boolean
 }
 
+const enTauri = process.env.SLOTH_E2E_RUNTIME === 'tauri'
+
+async function invocarRust(app: ElectronApplication, canal: string, ...args: unknown[]): Promise<unknown> {
+  const page = await app.firstWindow()
+  return page.evaluate(
+    ([c, a]) => (window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, p: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__.invoke('ipc_invoke', { channel: c, args: a }),
+    [canal, args] as [string, unknown[]]
+  )
+}
+
 async function stubDialog(app: ElectronApplication, answer: Answer): Promise<void> {
+  if (enTauri) {
+    await invocarRust(app, 'e2e:dialogos:responder', answer)
+    return
+  }
   await app.evaluate(({ dialog }, a) => {
     const g = globalThis as unknown as { __dialogs: unknown[] }
     g.__dialogs = []
@@ -26,7 +42,9 @@ async function stubDialog(app: ElectronApplication, answer: Answer): Promise<voi
 
 type Shown = { message: string; detail: string; buttons: string[]; type: string; checkboxLabel: string }
 const shownDialogs = (app: ElectronApplication): Promise<Shown[]> =>
-  app.evaluate(() => (globalThis as unknown as { __dialogs: Shown[] }).__dialogs)
+  enTauri
+    ? (invocarRust(app, 'e2e:dialogos:vistos') as Promise<Shown[]>)
+    : app.evaluate(() => (globalThis as unknown as { __dialogs: Shown[] }).__dialogs)
 
 /** Toca la X de la ventana (lo mismo que hace Windows). */
 const clickX = (app: ElectronApplication): Promise<void> =>
