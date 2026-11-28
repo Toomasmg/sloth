@@ -253,7 +253,7 @@ pub struct GhConProceso<'a> {
 
 impl GhRun for GhConProceso<'_> {
     fn run(&self, args: &[String], input: Option<&str>) -> GhOut {
-        let p = Peticion { exe: "gh".into(), args: args.to_vec(), prompt: input.unwrap_or("").to_string(), cwd: self.cwd.clone(), env: self.env.clone(), timeout: self.timeout, verbatim: false, arbol: false };
+        let p = Peticion { exe: "gh".into(), args: args.to_vec(), prompt: input.unwrap_or("").to_string(), cwd: self.cwd.clone(), env: self.env.clone(), timeout: self.timeout, verbatim: false, arbol: false, stdin_abierto: false };
         match self.proceso.correr(&p, self.cancelado, &mut |_| Mirada::Seguir) {
             SalidaRun::Termino { code, stdout, stderr } => GhOut { code: code.unwrap_or(-1), stdout, stderr, ..GhOut::default() },
             SalidaRun::Plazo => GhOut { code: -1, timed_out: true, ..GhOut::default() },

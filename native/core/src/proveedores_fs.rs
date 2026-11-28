@@ -199,7 +199,7 @@ pub fn estado_login(id: ProveedorId, config_dir: &Path) -> ResultadoLogin {
     }
 }
 
-fn sufijo_unico() -> String {
+pub(crate) fn sufijo_unico() -> String {
     static N: AtomicU64 = AtomicU64::new(0);
     let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_nanos());
     format!("{}-{nanos:x}-{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed))
@@ -230,7 +230,8 @@ pub fn preparar_carpeta_codex(config_dir: &Path) -> std::io::Result<Vec<Aviso>> 
     }
 }
 
-fn copiar_exclusivo(origen: &Path, destino: &Path) -> std::io::Result<()> {
+/// Falla con `AlreadyExists` si `destino` ya está: nunca pisa un archivo del usuario.
+pub(crate) fn copiar_exclusivo(origen: &Path, destino: &Path) -> std::io::Result<()> {
     let mut d = OpenOptions::new().write(true).create_new(true).open(destino)?;
     let r = fs::read(origen).and_then(|b| d.write_all(&b));
     if r.is_err() {
@@ -321,6 +322,32 @@ pub fn resolver_exe_claude(path: &str, home: &str, existe: &dyn Fn(&str) -> bool
         }
     }
     None
+}
+
+/// Lo del sistema que hace falta para encontrar el ejecutable de un agente.
+pub struct EntornoExe<'a> {
+    pub path: &'a str,
+    pub home: &'a str,
+    pub existe: &'a dyn Fn(&str) -> bool,
+    pub leer_archivo: &'a dyn Fn(&str) -> Option<String>,
+    pub win: bool,
+}
+
+/// El ejecutable del agente, o None si no está instalado.
+pub fn resolver_exe(id: ProveedorId, e: &EntornoExe) -> Option<String> {
+    match id {
+        ProveedorId::Claude => resolver_exe_claude(e.path, e.home, e.existe, e.leer_archivo, e.win),
+        ProveedorId::Codex | ProveedorId::Copilot => crate::agente_exe::resolver_exe(id.como_texto(), e.path, e.existe, e.win),
+    }
+}
+
+/// `resolver_exe` con el PATH, el home y el disco de verdad.
+pub fn resolver_exe_del_sistema(id: ProveedorId) -> Option<String> {
+    let path = std::env::var("PATH").or_else(|_| std::env::var("Path")).unwrap_or_default();
+    let home = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")).unwrap_or_default();
+    let existe = |f: &str| Path::new(f).exists();
+    let leer = |f: &str| fs::read_to_string(f).ok();
+    resolver_exe(id, &EntornoExe { path: &path, home: &home, existe: &existe, leer_archivo: &leer, win: cfg!(windows) })
 }
 
 #[cfg(test)]

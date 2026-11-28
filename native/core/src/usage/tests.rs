@@ -375,3 +375,24 @@ fn escanear_reusa_el_resultado_fresco_y_reescanea_si_vence_o_cambian_las_cuentas
     assert_eq!(r.len(), 2);
     assert_eq!(r["b"].last7d.messages, 0);
 }
+
+#[test]
+fn el_uso_se_serializa_como_el_account_usage_de_la_interfaz() {
+    let e = Entrada { id: "m".into(), ts: AHORA - HORA, input: 10.0, output: 5.0, cache_write: 2.0, cache_read: 1.5 };
+    let u = acumular([&e], AHORA, BA);
+    let j = serde_json::to_value(&u).unwrap();
+    let totales = json!({ "input": 10, "output": 5, "cacheWrite": 2, "cacheRead": 1.5, "messages": 1 });
+    assert_eq!(j["last5h"], totales);
+    assert_eq!(j["today"], totales);
+    assert_eq!(j["scannedAt"], AHORA);
+    assert_eq!(j["windowStart"], AHORA - HORA);
+    assert_eq!(j["ventana"]["inicio"], AHORA - HORA);
+    let vacio = serde_json::to_value(acumular([], AHORA, BA)).unwrap();
+    assert!(vacio.get("windowStart").is_none() && vacio.get("ventana").is_none());
+}
+
+#[test]
+fn cuentas_de_uso_saltea_las_que_no_tienen_id_o_carpeta() {
+    let c = cuentas_de_uso(&[json!({ "id": "a", "configDir": "X" }), json!({ "id": "b" }), json!({ "configDir": "Y" })]);
+    assert_eq!(c.iter().map(|x| x.id.as_str()).collect::<Vec<_>>(), ["a"]);
+}

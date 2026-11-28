@@ -4,6 +4,7 @@ use crate::ipc_guard::id_valido;
 use crate::perfiles_core::es_blanco_js;
 use crate::proveedores::{capacidades_de, motivo_no_agregar, motivo_sin_capacidad, proveedor_id_de, ProveedorId};
 use crate::proveedores_fs::{estado_login, preparar_carpeta, subcarpeta_cuenta, Aviso};
+use crate::versionado::Objeto;
 use serde_json::{Map, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -182,6 +183,51 @@ pub fn comprobar_aviso_de_turno(cuenta: Option<&Value>) -> Result<(), String> {
     Ok(())
 }
 
+/// Un cambio ya validado sobre una cuenta: lo aplica quien es dueño del store (con `Store::update_account`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct CambioDeCuenta {
+    pub id: String,
+    pub parche: Objeto,
+}
+
+impl CambioDeCuenta {
+    fn de(id: &str, campo: &str, valor: bool) -> Self {
+        let mut parche = Objeto::new();
+        parche.insert(campo.into(), Value::Bool(valor));
+        CambioDeCuenta { id: id.to_owned(), parche }
+    }
+}
+
+fn buscar_cuenta<'a>(cuentas: &'a [Value], id: &str) -> Option<&'a Value> {
+    cuentas.iter().find(|c| c.get("id").and_then(Value::as_str) == Some(id))
+}
+
+/// `accounts:setLimitesExperimentales`: valida lo que llega por IPC y arma el cambio. Después de aplicarlo, quien llama
+/// olvida la lectura guardada de esa cuenta: ni la caché ni la espera tras un fallo sobreviven al switch.
+pub fn pedido_limites_experimentales(cuentas: &[Value], id: &Value, activo: &Value) -> Result<CambioDeCuenta, String> {
+    let (id, activo) = pedido_id_y_booleano(id, activo)?;
+    comprobar_limites_experimentales(buscar_cuenta(cuentas, id))?;
+    Ok(CambioDeCuenta::de(id, "limitesExperimentales", activo))
+}
+
+/// `accounts:setAvisoDeTurno`: valida y arma el cambio. Con la cuenta ya cambiada, quien llama corre
+/// `codex_notify::ajustar_notify`; si da un motivo y `debe_revertir_aviso_de_turno`, aplica `aviso_de_turno_apagado`.
+pub fn pedido_aviso_de_turno(cuentas: &[Value], id: &Value, activo: &Value) -> Result<CambioDeCuenta, String> {
+    let (id, activo) = pedido_id_y_booleano(id, activo)?;
+    comprobar_aviso_de_turno(buscar_cuenta(cuentas, id))?;
+    Ok(CambioDeCuenta::de(id, "avisoDeTurno", activo))
+}
+
+pub fn aviso_de_turno_apagado(id: &str) -> CambioDeCuenta {
+    CambioDeCuenta::de(id, "avisoDeTurno", false)
+}
+
+/// `accounts:limitesCodex`: la cuenta pedida, si existe (sin ella la respuesta es «sin dato», no un error).
+pub fn pedido_limites_codex<'a>(cuentas: &'a [Value], id: &Value) -> Result<Option<&'a Value>, String> {
+    let id = id_valido(id).ok_or(PEDIDO_INVALIDO)?;
+    Ok(buscar_cuenta(cuentas, id))
+}
+
 /// `accounts:remove`: una cuenta con espacios no se borra.
 pub fn comprobar_baja_de_cuenta(cuenta_id: &str, espacios: &[Value]) -> Result<(), String> {
     let usados: Vec<&str> = espacios.iter().filter(|w| w.get("accountId").and_then(Value::as_str) == Some(cuenta_id)).map(|w| w.get("name").and_then(Value::as_str).unwrap_or_default()).collect();
@@ -349,6 +395,35 @@ mod tests {
         assert!(debe_revertir_aviso_de_turno(true, Some("x")));
         assert!(!debe_revertir_aviso_de_turno(false, Some("x")));
         assert!(!debe_revertir_aviso_de_turno(true, None));
+    }
+
+    #[test]
+    fn el_switch_de_limites_valida_el_pedido_y_la_capacidad_y_arma_el_parche() {
+        let cuentas = [json!({ "id": "a" }), json!({ "id": "b", "proveedor": "codex" })];
+        assert_eq!(pedido_limites_experimentales(&cuentas, &json!(5), &json!(true)), Err(PEDIDO_INVALIDO.into()));
+        assert_eq!(pedido_limites_experimentales(&cuentas, &json!("z"), &json!(true)), Err(CUENTA_INEXISTENTE.into()));
+        assert!(pedido_limites_experimentales(&cuentas, &json!("a"), &json!(true)).is_err());
+        let c = pedido_limites_experimentales(&cuentas, &json!("b"), &json!(false)).unwrap();
+        assert_eq!((c.id.as_str(), Value::Object(c.parche)), ("b", json!({ "limitesExperimentales": false })));
+    }
+
+    #[test]
+    fn el_switch_del_aviso_de_turno_es_de_codex_y_se_revierte_a_apagado() {
+        let cuentas = [json!({ "id": "a" }), json!({ "id": "b", "proveedor": "codex" })];
+        assert_eq!(pedido_aviso_de_turno(&cuentas, &json!("b"), &json!("si")), Err(PEDIDO_INVALIDO.into()));
+        assert_eq!(pedido_aviso_de_turno(&cuentas, &json!("z"), &json!(true)), Err(CUENTA_INEXISTENTE.into()));
+        assert!(pedido_aviso_de_turno(&cuentas, &json!("a"), &json!(true)).is_err());
+        let c = pedido_aviso_de_turno(&cuentas, &json!("b"), &json!(true)).unwrap();
+        assert_eq!((c.id.as_str(), Value::Object(c.parche)), ("b", json!({ "avisoDeTurno": true })));
+        assert_eq!(Value::Object(aviso_de_turno_apagado("b").parche), json!({ "avisoDeTurno": false }));
+    }
+
+    #[test]
+    fn los_limites_de_codex_piden_un_id_valido_y_una_cuenta_que_falta_no_es_error() {
+        let cuentas = [json!({ "id": "a" })];
+        assert_eq!(pedido_limites_codex(&cuentas, &json!("")), Err(PEDIDO_INVALIDO.into()));
+        assert_eq!(pedido_limites_codex(&cuentas, &json!("a")), Ok(Some(&cuentas[0])));
+        assert_eq!(pedido_limites_codex(&cuentas, &json!("z")), Ok(None));
     }
 
     #[test]

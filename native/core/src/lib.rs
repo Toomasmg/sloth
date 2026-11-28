@@ -1,10 +1,13 @@
 //! Sloth sin Node: el núcleo que reemplaza, módulo a módulo, a `src/main` (ver docs/migracion-rust.md).
 pub mod acotar;
+pub mod agentes;
 pub mod app_state;
 pub mod agent_machine;
 pub mod agente_exe;
 pub mod avisos;
 pub mod candado;
+pub mod codex_limites;
+pub mod codex_notify;
 pub mod cuentas;
 pub mod cupo;
 pub mod daemon_cliente;

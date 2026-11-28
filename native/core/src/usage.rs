@@ -2,8 +2,10 @@
 //! Lo puro (`parse_line`, `acumular`, `medianoche_local`) no toca disco; `EscanerUso` lee de a bloques y solo lo que se agregó.
 //! Los escaneos son síncronos: no hace falta el «ya hay uno en curso» del original, quien llame serializa.
 use crate::cupo::{tokens_cupo, ventana_activa, EventoUso, VentanaUso};
+use crate::features::celular::tipos::numero_js;
 use crate::proveedores::{proveedor_id_de, ProveedorId};
 use crate::proveedores_fs::carpeta_historial;
+use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs::{self, File};
@@ -27,11 +29,16 @@ pub struct Entrada {
     pub cache_read: f64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Totales {
+    #[serde(serialize_with = "numero_js")]
     pub input: f64,
+    #[serde(serialize_with = "numero_js")]
     pub output: f64,
+    #[serde(serialize_with = "numero_js")]
     pub cache_write: f64,
+    #[serde(serialize_with = "numero_js")]
     pub cache_read: f64,
     pub messages: u64,
 }
@@ -46,13 +53,17 @@ impl Totales {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+/// Se serializa como el `AccountUsage` que espera la interfaz (`accounts:usage`).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UsoCuenta {
     pub last5h: Totales,
     pub today: Totales,
     pub last7d: Totales,
     pub scanned_at: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub window_start: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ventana: Option<VentanaUso>,
 }
 
@@ -236,6 +247,11 @@ fn listar_jsonl(dir: &Path, profundidad: usize, salida: &mut Vec<PathBuf>) {
             salida.push(ruta);
         }
     }
+}
+
+/// Las cuentas del store que se pueden escanear (las que no tienen id o carpeta no se cuentan).
+pub fn cuentas_de_uso(cuentas: &[Value]) -> Vec<CuentaUso> {
+    cuentas.iter().filter_map(CuentaUso::desde_cuenta).collect()
 }
 
 pub fn buscar_jsonl(dir: &Path) -> Vec<PathBuf> {

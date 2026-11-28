@@ -23,10 +23,13 @@ pub struct EventoUso {
     pub tokens: f64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub struct VentanaUso {
+    #[serde(serialize_with = "crate::features::celular::tipos::numero_js")]
     pub inicio: f64,
+    #[serde(serialize_with = "crate::features::celular::tipos::numero_js")]
     pub fin: f64,
+    #[serde(serialize_with = "crate::features::celular::tipos::numero_js")]
     pub tokens: f64,
 }
 
