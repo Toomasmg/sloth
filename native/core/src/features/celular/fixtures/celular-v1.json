@@ -1,0 +1,18 @@
+{
+  "encendido": true,
+  "puerto": 47321,
+  "clave": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc",
+  "aprobar": true,
+  "terminal": false,
+  "ntfy": {
+    "encendido": false,
+    "tema": "sloth-abcdefabcdefabcdefabcdef",
+    "servidor": "https://ntfy.sh"
+  },
+  "remoto": {
+    "encendido": false,
+    "aprobar": false,
+    "secreto": "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg"
+  },
+  "campoQueNoConozco": 1
+}

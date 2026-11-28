@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#08090B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sloth">
+<title>Sloth</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icono.png">
+<link rel="icon" href="/icono.png">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<main class="app" id="app">
+  <header class="top">
+    <h1 class="marca">Sloth</h1>
+    <div class="cuentas" role="group" aria-label="Cuenta" id="cuentas"></div>
+    <span class="conexion" id="conexion" role="status"><span class="punto"></span><span id="conexion-texto">Conectando…</span></span>
+    <button type="button" class="completa" id="completa" aria-label="Pantalla completa" title="Pantalla completa" hidden><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg></button>
+  </header>
+  <div class="pista" id="pista-ios" role="note" hidden>
+    <span>Para verlo sin la barra del navegador: tocá Compartir y «Agregar a inicio», y abrilo desde ese ícono.</span>
+    <button type="button" id="pista-ok">Entendido</button>
+  </div>
+  <section class="atencion" id="atencion" aria-label="Lo que te espera">
+    <ul class="pedidos" id="pedidos" aria-label="Pedidos de permiso"></ul>
+    <ul class="esperan" id="esperan"></ul>
+    <div class="calma" id="calma"><span class="calma-t">Nada te espera</span><span class="calma-s" id="calma-s">Ningún permiso ni pregunta pendiente.</span></div>
+    <ul class="respondidos" id="respondidos" aria-label="Respondidos desde este celu"></ul>
+    <div class="solo-lector" id="aviso-nuevo" aria-live="assertive" aria-atomic="true"></div>
+  </section>
+  <div class="relojes">
+    <section class="reloj" id="g5" aria-label="Límite de 5 horas"></section>
+    <section class="reloj" id="g7" aria-label="Límite semanal"></section>
+    <section class="limites" id="limites" aria-label="Límites"></section>
+  </div>
+  <section class="centro">
+    <div class="contadores" role="group" aria-label="Filtrar las sesiones por estado">
+      <button type="button" class="contador c-espera" id="f-waiting" aria-pressed="false"><span class="num" id="n-espera">0</span><span class="etq">Te necesita</span></button>
+      <button type="button" class="contador c-listo" id="f-done" aria-pressed="false"><span class="num" id="n-listo">0</span><span class="etq">Terminaron</span></button>
+      <button type="button" class="contador c-trabaja" id="f-working" aria-pressed="false"><span class="num" id="n-trabaja">0</span><span class="etq">Trabajando</span></button>
+    </div>
+    <h2 class="titulo-lista"><span id="titulo-lista">Sesiones</span> <span class="resumen" id="resumen"></span></h2>
+    <p class="term-nota" id="term-nota" hidden>La terminal de cada sesión no se abre desde «Desde cualquier red». Escaneá el QR del Wi-Fi de casa (en Sloth, panel Celular, el de arriba) con el celu conectado a ese Wi-Fi.</p>
+    <ul class="lista" id="lista"></ul>
+    <p class="lista-mas" id="lista-mas" hidden></p>
+    <p class="hoy" id="hoy">Hoy: sin datos</p>
+  </section>
+</main>
+<section class="term" id="term" role="dialog" aria-modal="true" aria-labelledby="term-nombre" hidden>
+  <header class="term-top">
+    <button type="button" class="term-volver" id="term-volver" aria-label="Volver a las sesiones"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></button>
+    <span class="term-nombre" id="term-nombre"></span>
+    <button type="button" class="term-vista" id="term-vista">Vista PC</button>
+  </header>
+  <div class="term-aviso" id="term-aviso" role="status" hidden></div>
+  <div class="term-pantalla" id="term-pantalla"></div>
+  <div class="term-cola" id="term-cola" role="status" hidden><span class="term-cola-texto" id="term-cola-texto"></span><button type="button" id="term-descartar">Descartar</button></div>
+  <form class="term-escribir" id="term-escribir" autocomplete="off">
+    <input id="term-texto" type="text" enterkeyhint="send" maxlength="4000" placeholder="Escribí o dictá un mensaje" aria-label="Mensaje para la terminal">
+    <button type="button" class="term-hist" id="term-hist" aria-label="Lo último que mandaste" disabled>↺</button>
+    <button type="submit" class="term-mandar" id="term-mandar">Mandar</button>
+  </form>
+  <div class="term-teclas" role="group" aria-label="Teclas">
+    <button type="button" class="term-a-texto" id="term-a-texto" aria-label="Escribir un mensaje">Aa</button>
+    <button type="button" data-tecla="esc">Esc</button>
+    <button type="button" data-tecla="arriba" aria-label="Flecha arriba">↑</button>
+    <button type="button" data-tecla="abajo" aria-label="Flecha abajo">↓</button>
+    <button type="button" data-tecla="enter" aria-label="Enter">⏎</button>
+    <button type="button" data-tecla="ctrlc" aria-label="Control C">Ctrl C</button>
+    <button type="button" data-tecla="tab">Tab</button>
+    <button type="button" data-tecla="shifttab" aria-label="Shift Tab">⇧Tab</button>
+    <button type="button" data-tecla="escesc" aria-label="Doble Esc">Esc Esc</button>
+    <button type="button" data-tecla="barra" aria-label="Barra">/</button>
+    <button type="button" data-tecla="izq" aria-label="Flecha izquierda">←</button>
+    <button type="button" data-tecla="der" aria-label="Flecha derecha">→</button>
+    <button type="button" data-tecla="inicio" aria-label="Inicio">Inicio</button>
+    <button type="button" data-tecla="fin" aria-label="Fin">Fin</button>
+    <button type="button" data-tecla="repag" aria-label="Página arriba">RePág</button>
+    <button type="button" data-tecla="avpag" aria-label="Página abajo">AvPág</button>
+    <button type="button" data-tecla="ctrld" aria-label="Control D">Ctrl D</button>
+  </div>
+</section>
+<section class="aviso-pantalla" id="emparejando" hidden>
+  <h1>Confirmá en la PC</h1>
+  <p>En Sloth, en el panel «Celular», tocá «Dejar entrar» si ves este código:</p>
+  <p class="par-codigo" id="par-codigo"></p>
+  <p id="par-estado" role="status">Esperando la respuesta de la PC…</p>
+</section>
+<section class="aviso-pantalla" id="sin-token" hidden>
+  <h1 id="sin-token-titulo">Conectá este celu</h1>
+  <p id="sin-token-texto">Escaneá el QR de Sloth con la cámara.</p>
+  <ol class="pasos">
+    <li>En la PC, abrí Sloth y buscá «Celular» con Ctrl K.</li>
+    <li>Prendé «Ver Sloth en el celu» (o «Desde cualquier red»).</li>
+    <li>Escaneá el QR con la cámara de este celu. Para el de «En tu Wi-Fi», el celu tiene que estar en el mismo Wi-Fi que la PC.</li>
+  </ol>
+</section>
+<script src="/app.js"></script>
+</body>
+</html>

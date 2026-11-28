@@ -8,6 +8,7 @@ pub mod export_crypto;
 pub mod export_import;
 pub mod export_import_logic;
 pub mod export_regla;
+pub mod celular;
 pub mod help;
 pub mod move_account;
 pub mod onboarding;
