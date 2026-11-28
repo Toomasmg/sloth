@@ -7,16 +7,19 @@ App de escritorio (Electron + React + TypeScript, Windows primero) para usar var
 - `src/main/features/<nombre>.ts`: cada función del lado main. Se suma en `features/index.ts` (`FEATURES`). Registra canales con `ctx.handle('op', fn)`, que responde a `feat:<nombre>:<op>`, y avisa a la UI con `ctx.emit`. Los argumentos que llegan por IPC no vienen validados: validalos.
 - `src/renderer/src/features/<nombre>/`: la parte visual de cada función. Se suma en `features/registry.ts` (`FEATURE_UIS`).
 - `src/shared/`: tipos y lógica que usan main y renderer.
-- `src/daemon/`: el daemon de terminales (lo arma `scripts/build-daemon.mjs`).
+- `src/daemon/`: el daemon de terminales en Node (lo arma `scripts/build-daemon.mjs`). `native/daemon/` es el mismo daemon en Rust (`scripts/build-daemon-rs.mjs`): se usa si está compilado.
+- `src-tauri/`: la cáscara de Tauri (ventana, bandeja, updater, lo nativo). La lógica de `src/main` corre en un proceso Node de apoyo que `src/sidecar/` arma con un shim de `electron` (`npm run build:sidecar`). El plan y el estado están en `docs/migracion-tauri.md`.
 - `src/preload/index.ts`: el puente. Expone la API del núcleo (estado, cuentas, espacios) y, para las funciones, solo los canales que pasan `isFeatChannel` (`src/shared/features.ts`).
 - `e2e/`: pruebas visuales con Playwright sobre el build de `out/`.
 
 ## Comandos
 - `npm run typecheck`: tsc sin emitir.
 - `npm test`: tests unitarios de módulos puros con `node --test`, usando el type stripping de Node (necesita Node ≥ 22.18).
-- `npm run build`: electron-vite más el daemon.
+- `npm run build`: electron-vite más los daemons. `npm run build:sidecar` arma el proceso de apoyo.
+- `npm run release:tauri`: instalador de Tauri firmado y publicación en GitHub (`TAURI_SIGNING_PRIVATE_KEY`; `--sin-subir` solo arma `dist-tauri/`). `npm run release` sigue siendo el flujo de Electron hasta que Tauri sea la versión publicada.
 - `npm run test:e2e`: build más Playwright. Nunca uses `test:e2e:update` para que un test pase: si cambia una captura, explicá por qué.
-- `npm run dev`. Para una instancia de prueba al lado de la instalada: `SLOTH_USER_DATA=<carpeta> npm run dev`.
+- `npm run test:e2e:tauri`: los e2e sobre el ejecutable de Tauri (las capturas de referencia son de Electron: los specs con `toHaveScreenshot` no se comparan hasta rehacerlas).
+- `npm run dev` (Electron, para trabajar la interfaz). Para una instancia de prueba al lado de la instalada: `SLOTH_USER_DATA=<carpeta> npm run dev`.
 
 ## Estilo
 - Sin punto y coma, comillas simples y 2 espacios. Mirá el archivo vecino antes de escribir.

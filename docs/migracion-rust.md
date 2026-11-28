@@ -48,3 +48,38 @@ también Rust, así las dos implementaciones se prueban contra el mismo archivo.
 - Cada archivo del TypeScript que se porta se borra en la misma rama, junto con su test, cuando su reemplazo en
   Rust ya está conectado.
 - Lo que se escribe en `userData` sigue yendo con tmp + rename y respaldo.
+
+## Router híbrido (`src-tauri`)
+
+`ipc_invoke(canal, args)` pasa por `Router` (`src-tauri/src/router.rs`): si el canal tiene handler en Rust lo atiende
+ahí (en un hilo aparte, sin trabar la ventana) y si no lo reenvía al proceso de apoyo, igual que antes. `src-tauri`
+depende de `sloth-core` por path; con el mismo `CARGO_TARGET_DIR` las dependencias comunes se compilan una vez.
+
+- **Plataforma:** `plataforma.rs` implementa `sloth_core::app_state::Plataforma` sobre Tauri (eventos a la UI por
+  `sloth://event`, abrir enlace o carpeta, elegir carpeta, error, portapapeles, zoom, ventana). La carpeta de datos es
+  `%APPDATA%\Sloth`, la de Electron; `SLOTH_USER_DATA` la cambia en pruebas. Sin `safeStorage` en Rust todavía: ningún
+  handler lo necesita (chat y tickets lo van a pedir).
+- **Una función a la vez:** cada archivo de `src-tauri/src/handlers/` registra sus canales `feat:<nombre>:<op>` y se anota
+  en `FUNCIONES_EN_RUST`. La cáscara le pasa esa lista al proceso de apoyo (`SLOTH_RUST_FEATURES`) y este no registra la
+  función (`src/main/rust-features.ts`); en Electron no hay lista y todo sigue igual.
+- **Perfil y estado:** el proceso de apoyo sigue siendo el dueño de `sloth-state.json` y elige el perfil activo (con sus
+  migraciones). Cuando termina de arrancar le avisa a Rust la carpeta del perfil (`rust.perfil`); hasta entonces los
+  handlers de Rust responden «Sloth todavía está arrancando.». Rust lee el estado solo para consultar (sin migrar ni
+  reescribir). Los hooks de Claude llegan a las funciones de Rust reenviados por el puente (`rust.hook`).
+
+Conectado: `git` (26 canales). Por qué el resto sigue en el proceso de apoyo:
+
+- `state:get`, cuentas y espacios (`accounts:*`, `workspaces:*`): mutan el store y arman el estado con los agentes, que
+  dependen de las terminales y del servidor de hooks. Pasan a Rust con ptys y hooks; antes habría dos dueños del
+  `sloth-state.json`.
+- `settings`: el main de Node la lee en memoria en ~12 módulos (tray, updater, sleep, chat...); si Rust la escribiera,
+  esas copias quedarían viejas. Pasa junto con ellos.
+- `worktrees`, `history`, `templates`, `move-account`: escriben o dependen del store (alta y baja de espacios, cuentas) o de
+  las terminales.
+- `help`: necesita el changelog (`src/shared/changelog.ts`) como dato para Rust; falta definir de dónde sale sin duplicarlo.
+- `sleep`, `rendimiento`, `onboarding`, `report`, `diagnostico`, `permissions`, `broadcast`, `export-import`, `dictado`,
+  `prs`, `team`: el port de `native/core` es de piezas puras sin la función completa armada (falta el contexto con su
+  estado y E/S); se conectan de a una en PRs siguientes.
+
+El TS de `git` (`src/main/features/git.ts`, `git-ops`, `git-run`) queda como respaldo: Electron lo sigue usando y worktrees,
+prs y otros lo importan. Se borra cuando Electron se retire.

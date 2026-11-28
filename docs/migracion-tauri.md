@@ -37,3 +37,54 @@ y se pasa a Rust feature por feature. Sloth anda y se publica en cada hito.
 ## Entorno de build (esta PC)
 
 Rust (MSVC) con Build Tools en `D:\VS\BuildTools`; `CARGO_HOME`/`RUSTUP_HOME` en `D:\rust`.
+
+## Estado (hitos 1, 2 y 3 hechos; falta probar la migración sobre una instalación real)
+
+Hito 3: `npm run release:tauri` arma el instalador NSIS firmado (28 MB, con Node, el proceso de apoyo, los daemons y
+node-pty), `latest.json` para el updater de Tauri y `latest.yml` para que las instalaciones de Electron se actualicen
+con electron-updater al mismo instalador (nombre `Sloth-Setup-<versión>.exe`). El instalador desinstala el Sloth de
+Electron (clave `0169b5fe-...` en HKCU) sin tocar `%APPDATA%\Sloth` y se vuelve a abrir con `--force-run`.
+La clave de firma está en `D:\sloth-keys\updater.key` (fuera del repo): hay que guardarla y pasarla en
+`TAURI_SIGNING_PRIVATE_KEY` al publicar; la pública va en `tauri.conf.json`.
+
+Probado: build del instalador y ejecutable de release con recursos en otra carpeta (UI embebida, node propio, daemon Rust).
+No probado: instalar encima de una instalación de Electron, el relanzado y la actualización por el updater de Tauri.
+Hacerlo en una PC o VM de prueba antes de publicar una release. El canal beta no existe: el updater de Tauri solo mira
+el `latest.json` estable.
+
+Hito 2 (ventana y bandeja):
+
+Hito 2: ventana sin marco con botones propios (`layout/WindowControls.tsx`) y arrastre por `-webkit-app-region`,
+eventos de ventana (foco, mover, tamaño, maximizar) hacia el main con el rectángulo en DIP, cierre cancelable
+(`close` -> confirmación o bandeja -> `before-quit` -> `app.exit`) y bandeja del sistema con menú dinámico.
+
+## Detalle del hito 1
+
+La ventana de Tauri carga el renderer y `window.sloth` funciona sobre `ipc_invoke` / `ipc_send` / `sloth://event`.
+El main corre sin Electron en `out/sidecar/sloth-sidecar.cjs` (`npm run build:sidecar`, shim en `src/sidecar`).
+Probado: arranca, responde `state:get` y la interfaz se pinta con los datos reales.
+
+Se prueba a mano con `npx electron-vite build && npm run build:daemon && npm run build:sidecar` y
+`npx tauri build --debug --no-bundle`; el ejecutable queda en `src-tauri/target/debug/sloth.exe`.
+
+### Resuelto después del hito 3
+
+- `safeStorage` compatible con Electron (`src/sidecar/safe-storage.ts`): clave AES en `Local State` protegida con DPAPI
+  (vía PowerShell, una vez por arranque) y formato `v10`; lo que guardó Electron se sigue leyendo.
+- Arrastrar archivos y carpetas: `tauri-archivos.ts` convierte el evento de Tauri en eventos DOM con `File` que
+  recuerdan su ruta (`api.pathForFile`).
+- Portapapeles con imagen (`clipboard.read`), papelera (`shell.trashItem`), color de fondo, tema del sistema,
+  pantallas, batería (`powerMonitor`), inicio con Windows e instancia única.
+- Micrófono del dictado: WebView2 lo concede sin preguntar (`permisos.rs`), como hacía `session` en Electron.
+- Zoom con Ctrl + / - / 0 (`zoom-keys.ts` compartido con el main).
+- e2e sobre Tauri: `SLOTH_E2E_RUNTIME=tauri npx playwright test ...` lanza `src-tauri/target/release/sloth.exe`
+  (compilar con `node scripts/prepare-tauri.mjs && npx tauri build --no-bundle`) y se conecta por CDP. El proceso de
+  apoyo ejecuta lo que los specs hacían con `app.evaluate` (solo con `SLOTH_E2E=1`). Las capturas de referencia son de
+  Electron: los specs con `toHaveScreenshot` no se comparan hasta rehacerlas con autorización.
+- CI: job `tauri` (daemon Rust con sus tests y `cargo check` de la cáscara).
+
+### Brechas que quedan
+
+- Menú de aplicación, `setOverlayIcon` y clics en notificaciones (el plugin de Tauri no los da en escritorio).
+- Canal beta del updater.
+- Bandeja: se verificó el pedido al main y a Rust, no el icono en la bandeja de Windows.
