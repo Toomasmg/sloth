@@ -53,6 +53,11 @@ fn limites(v: &Window) -> Option<Value> {
 }
 
 fn avisar_ventana(v: &Window, evento: &WindowEvent) {
+    if let (WindowEvent::Focused(true), Some(h)) = (evento, v.app_handle().try_state::<puente::Hooks>()) {
+        for f in &h.0 {
+            f.al_enfocar();
+        }
+    }
     let Some(a) = v.app_handle().try_state::<Apoyo>() else { return };
     let apoyo = &a.0;
     match evento {
