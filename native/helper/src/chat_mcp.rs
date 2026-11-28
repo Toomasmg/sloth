@@ -189,7 +189,17 @@ impl<T: Read + Write + Send> ReadWrite for T {}
 
 #[cfg(windows)]
 fn conectar_pipe(pipe: &str) -> std::io::Result<Box<dyn ReadWrite>> {
-    Ok(Box::new(std::fs::OpenOptions::new().read(true).write(true).open(pipe)?))
+    // ERROR_PIPE_BUSY (231): Sloth está atendiendo a otros y todavía no abrió otra instancia; se reintenta un momento.
+    let mut intentos = 0;
+    loop {
+        match std::fs::OpenOptions::new().read(true).write(true).open(pipe) {
+            Err(e) if e.raw_os_error() == Some(231) && intentos < 50 => {
+                intentos += 1;
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            r => return Ok(Box::new(r?)),
+        }
+    }
 }
 
 #[cfg(unix)]
