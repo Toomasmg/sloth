@@ -16,8 +16,10 @@ pub mod history;
 pub mod onboarding;
 pub mod prs;
 pub mod report;
+pub mod team;
 pub mod team_config;
 pub mod templates;
+pub mod tickets;
 pub mod worktrees;
 
 static NULO: Value = Value::Null;
@@ -32,7 +34,7 @@ pub fn a_json<T: Serialize>(r: Result<T, String>) -> Respuesta {
 }
 
 /// Las funciones del lado main que atiende Rust. El proceso de apoyo no las registra ni las corre.
-pub const FUNCIONES_EN_RUST: &[&str] = &[git::NOMBRE, help::NOMBRE, report::NOMBRE, team_config::NOMBRE, prs::NOMBRE, chat::NOMBRE, history::NOMBRE, templates::NOMBRE, worktrees::NOMBRE, dictado::NOMBRE, export_import::NOMBRE, onboarding::NOMBRE];
+pub const FUNCIONES_EN_RUST: &[&str] = &[git::NOMBRE, help::NOMBRE, report::NOMBRE, team_config::NOMBRE, prs::NOMBRE, chat::NOMBRE, history::NOMBRE, templates::NOMBRE, worktrees::NOMBRE, dictado::NOMBRE, export_import::NOMBRE, onboarding::NOMBRE, tickets::NOMBRE, team::NOMBRE];
 
 pub fn funciones_en_rust() -> String {
     FUNCIONES_EN_RUST.join(",")
@@ -48,7 +50,10 @@ pub fn registrar_todo(router: &mut Router, entorno: &Arc<Entorno>) -> Vec<Arc<dy
     dictado::registrar(router, entorno.clone());
     export_import::registrar(router, entorno.clone());
     onboarding::registrar(router, entorno.clone());
-    vec![git::registrar(router, entorno.clone()), prs::registrar(router, entorno.clone()), chat::registrar(router, entorno.clone())]
+    // Equipo arma su vista con lo que Tickets tiene en memoria: van juntas.
+    let t = tickets::registrar(router, entorno.clone());
+    team::registrar(router, entorno.clone(), t.clone());
+    vec![git::registrar(router, entorno.clone()), prs::registrar(router, entorno.clone()), chat::registrar(router, entorno.clone()), t as Arc<dyn AlHook>]
 }
 
 /// Lo que el proceso de apoyo reenvía de sus hooks de Claude a las funciones que pasaron a Rust.
@@ -69,4 +74,8 @@ pub trait AlHook: Send + Sync {
 
     /// Al salir de la app.
     fn al_salir(&self) {}
+
+    /// El proceso de apoyo avisó la carpeta del perfil: lo que la UI pidió antes recibió «Sloth todavía está arrancando.»
+    /// y una función que la UI carga una sola vez al abrir le manda ahora su estado.
+    fn al_perfil(&self) {}
 }

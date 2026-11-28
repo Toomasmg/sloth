@@ -161,6 +161,10 @@ impl Entorno {
     pub fn registrar_pr(&self, pr: &str, ahora_ms: u64) -> Result<(), String> {
         agregar_actividad_pr(&self.perfil()?.join("actividad"), pr, ahora_ms)
     }
+
+    pub fn registrar_ticket(&self, ticket: &str, espacio: &str, ahora_ms: u64) -> Result<(), String> {
+        agregar_actividad_ticket(&self.perfil()?.join("actividad"), ticket, espacio, ahora_ms)
+    }
 }
 
 /// Lee, sin migrar ni reescribir, la carpeta de un espacio del `sloth-state.json` que escribe el proceso de apoyo.
@@ -183,10 +187,33 @@ fn campo_limpio(s: &str) -> String {
     sin_control.trim().chars().take(120).collect::<String>().trim().to_string()
 }
 
-/// Misma entrada y misma rotación que `agregarActividad` de src/main/perfiles-actividad.ts.
 pub fn agregar_actividad_pr(dir: &Path, pr: &str, ahora_ms: u64) -> Result<(), String> {
     let pr = campo_limpio(pr);
-    if pr.is_empty() || ahora_ms == 0 {
+    if pr.is_empty() {
+        return Err("actividad inválida".into());
+    }
+    agregar_actividad(dir, ahora_ms, serde_json::json!({ "t": ahora_ms, "tipo": "pr", "pr": pr }))
+}
+
+/// «Empezar en Sloth» de un ticket: `{ t, tipo: 'ticket', espacio, ticket }`, en el orden de `limpiarEntrada`.
+pub fn agregar_actividad_ticket(dir: &Path, ticket: &str, espacio: &str, ahora_ms: u64) -> Result<(), String> {
+    let (ticket, espacio) = (campo_limpio(ticket), campo_limpio(espacio));
+    if ticket.is_empty() {
+        return Err("actividad inválida".into());
+    }
+    let mut linea = serde_json::Map::new();
+    linea.insert("t".into(), ahora_ms.into());
+    linea.insert("tipo".into(), "ticket".into());
+    if !espacio.is_empty() {
+        linea.insert("espacio".into(), espacio.into());
+    }
+    linea.insert("ticket".into(), ticket.into());
+    agregar_actividad(dir, ahora_ms, Value::Object(linea))
+}
+
+/// Misma rotación que `agregarActividad` de src/main/perfiles-actividad.ts.
+fn agregar_actividad(dir: &Path, ahora_ms: u64, linea: Value) -> Result<(), String> {
+    if ahora_ms == 0 {
         return Err("actividad inválida".into());
     }
     fs::create_dir_all(dir).map_err(|e| e.to_string())?;
@@ -200,7 +227,6 @@ pub fn agregar_actividad_pr(dir: &Path, pr: &str, ahora_ms: u64) -> Result<(), S
             }
         }
     }
-    let linea = serde_json::json!({ "t": ahora_ms, "tipo": "pr", "pr": pr });
     let mut f = OpenOptions::new().create(true).append(true).open(&actual).map_err(|e| e.to_string())?;
     writeln!(f, "{linea}").map_err(|e| e.to_string())
 }

@@ -67,7 +67,7 @@ depende de `sloth-core` por path; con el mismo `CARGO_TARGET_DIR` las dependenci
   handlers de Rust responden «Sloth todavía está arrancando.». Rust lee el estado solo para consultar (sin migrar ni
   reescribir). Los hooks de Claude llegan a las funciones de Rust reenviados por el puente (`rust.hook`).
 
-Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `prs` (9), `chat` (42), `history` (9), `templates` (10), `worktrees` (7), `dictado` (2), `export-import` (10) y `onboarding` (6).
+Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `prs` (9), `chat` (42), `history` (9), `templates` (10), `worktrees` (7), `dictado` (2), `export-import` (10), `onboarding` (6), `tickets` (20) y `team` (4).
 
 - `chat`: config y login (`principal`), datos y Realtime (`datos`) y el lado main del MCP (`mcp_main`), con la sesión cifrada
   como en Electron. Cuentas, espacios y `settings.json` se leen sin escribirlos. Lo que es de otro dueño va por el puente o
@@ -87,6 +87,11 @@ Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `pr
 - `prs`: abrir la rama de un PR puede crear un espacio; eso lo hace el dueño del store, pedido por el router
   (`Entorno::pedir("workspaces:add")`, mismas validaciones que «Nuevo espacio»). Cuando el store pase a Rust, el pedido
   sigue andando sin cambios porque va por el router.
+- `tickets`: el `Entorno` de `servicio.rs` está en `handlers/tickets.rs` (cuentas y espacios de `Entorno::estado`, consumo
+  de 5 h con `usage::EscanerUso`). Corre `claude -p`, `codex exec` y `gh` con `claude_run::ProcesoRun` y el entorno de la
+  cuenta (`proveedores_fs::env_cuenta`, `ptys_core::entorno_limpio`). «Empezar» pide `workspaces:add` al dueño del store.
+  La UI pide su estado una sola vez al arrancar: cuando el perfil queda listo se le manda (`AlHook::al_perfil`).
+- `team`: lee en memoria lo que trae Tickets (`Tickets::para_equipo`) y se entera de cada cambio (`Tickets::al_cambiar`).
 - Las funciones de Rust leen cuentas y espacios sin escribirlos (`Entorno::estado`).
 - `history`: borrar manda el `.jsonl` a la Papelera (crate `trash`) y retomar crea el espacio con `workspaces:add`. Las
   terminales siguen siendo del proceso de apoyo: Rust pregunta si una está viva (`pty:running`), pide que la próxima
@@ -120,8 +125,6 @@ Por qué el resto sigue en el proceso de apoyo:
   Pasa cuando el store sea de Rust o el dueño exponga ese cambio.
 - `rendimiento`: vive de eventos del proceso de apoyo que Rust no recibe: cambios de ajustes (`onSettingsChanged`), salida de
   las terminales sin daemon (`onPtyData`), reconexión del daemon y la energía (`powerMonitor`). Pasa con ptys y ajustes.
-- `team`: arma su vista con lo que trae el conector de Tickets (`ticketsParaEquipo` y `alCambiarTickets`, en memoria del
-  proceso de apoyo). Pasa junto con `tickets`; antes haría falta un puente nuevo de ida y vuelta solo para esto.
 - `diagnostico`: su texto sale del log en memoria del main de Node (`logger.recientes`, `logger.fallo`), de la marca de
   cierre inesperado que calcula ese proceso al arrancar y de los ajustes que tiene en memoria; `errorRenderer` escribe en ese
   mismo log. En Rust mostraría un log casi vacío. Pasa cuando el logger y el arranque sean de Rust.
