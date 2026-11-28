@@ -100,11 +100,13 @@ const instanciaUnica = app.requestSingleInstanceLock()
 if (!instanciaUnica) app.quit()
 
 // Antes de whenReady para que queden registrados también los errores de arranque. La segunda instancia
-// (la que cierra enseguida) no toca el log ni el marcador: son de la primera.
+// (la que cierra enseguida) no toca el log ni el marcador: son de la primera. Con Rust como dueño, el marcador y la
+// línea de arranque son de Rust (src-tauri/src/nucleo/arranque.rs).
 const logsDir = join(raizDatos(), 'logs')
+const marcadorPropio = instanciaUnica && !enRust
 let inicioSesion = Date.now()
-if (instanciaUnica) {
-  iniciarLogger(logsDir)
+if (instanciaUnica) iniciarLogger(logsDir)
+if (marcadorPropio) {
   const sesion = iniciarSesion(logsDir)
   inicioSesion = sesion.inicio
   marcarCrashPrevio(sesion.crashPrevio)
@@ -182,7 +184,7 @@ app.whenReady().then(async () => {
   // Con perfiles ya creados que no se pueden usar no hay un lugar seguro donde trabajar (la raíz quedó congelada): se avisa y no se toca nada.
   const arranque = iniciarPerfiles()
   if (arranque.bloqueado) {
-    cerrarSesion(logsDir, inicioSesion)
+    if (marcadorPropio) cerrarSesion(logsDir, inicioSesion)
     dialog.showErrorBox('Sloth no puede abrir tus perfiles', `${arranque.bloqueado}
 
 No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningún antivirus tenga esos archivos y volvé a abrir Sloth.`)
@@ -959,7 +961,7 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
   // El proceso de apoyo de Tauri retiene los pedidos de la UI que llegaron antes de que se registraran los canales, y
   // Rust espera a que las funciones fijen su estado inicial antes de entregar `state:get`.
   app.emit('main-listo')
-  if (enRust) pedirAlNucleo('listo').catch((e: unknown) => logger.error('rust', e))
+  if (enRust) pedirAlNucleo('listo', FEATURES.filter((f) => !atiendeRust(f.name)).map((f) => f.name)).catch((e: unknown) => logger.error('rust', e))
 
   /** De a una: node-pty en Windows no soporta cerrar varias a la vez (ver daemon/shutdown.ts). */
   async function cerrarTerminalesPropias(b: TerminalBackend): Promise<void> {
@@ -979,7 +981,7 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
   // Se marca limpio apenas se decide cerrar: el instalador del updater o el apagado de Windows pueden matar
   // el proceso durante la espera del shutdown, y eso no es un cierre inesperado.
   const marcarCierreLimpio = (): void => {
-    if (instanciaUnica) cerrarSesion(logsDir, inicioSesion)
+    if (marcadorPropio) cerrarSesion(logsDir, inicioSesion)
   }
   // Windows no emite before-quit al apagar, reiniciar o cerrar sesión: solo estos dos avisos.
   powerMonitor.on('shutdown', marcarCierreLimpio)
@@ -1090,7 +1092,9 @@ function createWindow(onShown?: () => void): void {
   })
   trackWindowState(win)
 
-  win.on('session-end', () => cerrarSesion(logsDir, inicioSesion))
+  win.on('session-end', () => {
+    if (marcadorPropio) cerrarSesion(logsDir, inicioSesion)
+  })
   win.on('closed', () => (win = null))
   for (const cb of windowListeners) {
     try {

@@ -2,10 +2,12 @@
 //! ruta del perfil con la que corre toda la sesión. Equivale a src/main/perfil.ts y al principio de src/main/index.ts.
 use serde_json::{json, Value};
 use sloth_core::avisos::Avisos;
+use sloth_core::features::diagnostico::{hubo_cierre_inesperado, leer_sesion};
 use sloth_core::features::redactar::{redactar, ContextoRedaccion};
 use sloth_core::logger_global as log;
 use sloth_core::perfiles_core::{IndicePerfiles, PERFIL_INICIAL_ID};
 use sloth_core::perfiles_fs::{iniciar_perfiles_fs, rutas_perfiles};
+use sloth_core::persistencia::escribir_json_atomico;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -30,6 +32,43 @@ impl Arranque {
     /// Lo que el proceso de apoyo necesita para no repetir el arranque (ver `SLOTH_PERFIL_RUST` en src/main/perfil.ts).
     pub fn para_el_apoyo(&self) -> Value {
         json!({ "id": self.id_perfil, "carpeta": self.perfil.to_string_lossy(), "modoRaiz": self.modo_raiz, "indice": self.indice })
+    }
+}
+
+/// `logs/sesion.json`, como src/main/sesion-marcador.ts: al arrancar se lee cómo terminó la sesión anterior y la actual
+/// queda en curso hasta que la app cierra bien.
+pub struct MarcaDeSesion {
+    archivo: PathBuf,
+    inicio: u64,
+}
+
+impl MarcaDeSesion {
+    /// La marca de esta sesión y si la anterior terminó de forma inesperada.
+    pub fn iniciar(raiz: &Path) -> (MarcaDeSesion, bool) {
+        let archivo = raiz.join("logs").join("sesion.json");
+        let previa = match fs::read_to_string(&archivo) {
+            Ok(t) => Some(t),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
+            Err(e) => {
+                log::error("sesion", e);
+                None
+            }
+        };
+        let marca = MarcaDeSesion { archivo, inicio: ahora_ms() };
+        marca.escribir(false);
+        (marca, hubo_cierre_inesperado(leer_sesion(previa.as_deref())))
+    }
+
+    /// Se marca apenas se decide cerrar: el instalador del updater o el apagado de Windows pueden matar el proceso
+    /// mientras se cierran las terminales, y eso no es un cierre inesperado.
+    pub fn cerrar(&self) {
+        self.escribir(true);
+    }
+
+    fn escribir(&self, limpia: bool) {
+        if let Err(e) = escribir_json_atomico(&self.archivo, &json!({ "inicio": self.inicio, "limpia": limpia })) {
+            log::error("sesion", e);
+        }
     }
 }
 
@@ -114,6 +153,22 @@ mod tests {
         let d = std::env::temp_dir().join(format!("sloth-arranque-{n}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&d);
         d
+    }
+
+    #[test]
+    fn la_sesion_que_no_cerro_bien_se_ve_al_arrancar_la_siguiente() {
+        let raiz = carpeta("sesion");
+        let (primera, crash) = MarcaDeSesion::iniciar(&raiz);
+        assert!(!crash, "sin sesión anterior no hay cierre inesperado");
+        let (segunda, crash) = MarcaDeSesion::iniciar(&raiz);
+        assert!(crash, "la primera quedó en curso");
+        segunda.cerrar();
+        let (_, crash) = MarcaDeSesion::iniciar(&raiz);
+        assert!(!crash, "la segunda cerró bien");
+        let guardada: Value = serde_json::from_str(&fs::read_to_string(raiz.join("logs").join("sesion.json")).unwrap()).unwrap();
+        assert_eq!(guardada["limpia"], false);
+        assert!(guardada["inicio"].as_u64().unwrap() >= primera.inicio);
+        let _ = fs::remove_dir_all(&raiz);
     }
 
     #[test]

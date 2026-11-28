@@ -88,11 +88,13 @@ fn arrancar(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     }));
     let raiz = plataforma.carpeta_de_datos();
     nucleo::arranque::iniciar_logger(&raiz);
-    sloth_core::logger_global::info("main", &format!("Sloth {} arrancó", app.package_info().version));
+    let (marca, crash_previo) = nucleo::arranque::MarcaDeSesion::iniciar(&raiz);
+    sloth_core::logger_global::info("main", &sloth_core::app_state::linea_de_arranque(&app.package_info().version.to_string(), crash_previo));
     let prueba = std::env::var("SLOTH_USER_DATA").is_ok_and(|v| !v.is_empty());
     let antirea = if prueba { None } else { app.path().data_dir().ok().map(|d| d.join("AntiRea")) };
     let arranque = nucleo::arranque::arrancar(&raiz, antirea.as_deref(), sloth_core::avisos::Avisos::global());
     if let Some(motivo) = &arranque.bloqueado {
+        marca.cerrar();
         // Con perfiles que no se pueden usar no hay un lugar seguro donde trabajar: se avisa y no se toca nada.
         plataforma.mostrar_error(TITULO_PERFILES_BLOQUEADOS, &texto_perfiles_bloqueados(motivo));
         std::process::exit(1);
@@ -102,6 +104,7 @@ fn arrancar(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let conf = nucleo::terminales::ConfDaemon { raiz: raiz.clone(), version: app.package_info().version.to_string(), exe: exe_del_daemon(app.handle(), &raiz) };
     let puente_apoyo = Arc::new(ApoyoDelNucleo::default());
     let nucleo = nucleo::Nucleo::nuevo(plataforma.clone(), arranque, puente_apoyo.clone(), conf);
+    nucleo.fijar_sesion(marca, crash_previo);
     let n = nucleo.clone();
     entorno.fijar_fuente_del_estado(move || n.store().instantanea());
     if plataforma.empaquetada() {
@@ -118,8 +121,7 @@ fn arrancar(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     }
     app.manage(nucleo.clone());
 
-    let funciones = format!("{},{}", handlers::funciones_en_rust(), handlers_estado::NOMBRE_SETTINGS);
-    let extra = [("SLOTH_PERFIL_RUST", para_apoyo), ("SLOTH_RUST_FEATURES", funciones.trim_start_matches(',').to_string())];
+    let extra = [("SLOTH_PERFIL_RUST", para_apoyo)];
     let apoyo = sidecar::lanzar(app.handle().clone(), nativo::atender, &extra).map_err(|e| format!("Sloth no pudo arrancar: {e}"))?;
     let _ = puente_apoyo.0.set(apoyo.clone());
     let apoyo_e = apoyo.clone();
@@ -135,6 +137,7 @@ fn arrancar(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     nucleo.avisar_perfil_listo();
     let app_imagen = app.handle().clone();
     handlers_estado::registrar(&mut router, &nucleo, Arc::new(move || nativo::imagen_del_portapapeles(&app_imagen)));
+    handlers::diagnostico::registrar(&mut router, &nucleo, tauri::webview_version().unwrap_or_default());
     app.manage(router);
     // Los handlers piden por el router lo que atiende otro (p. ej. `workspaces:add`, que es del núcleo).
     let app_h = app.handle().clone();

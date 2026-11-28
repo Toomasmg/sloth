@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 pub mod chat;
 pub mod comun;
+pub mod diagnostico;
 pub mod dictado;
 pub mod export_import;
 pub mod git;
@@ -36,8 +37,16 @@ pub fn a_json<T: Serialize>(r: Result<T, String>) -> Respuesta {
 /// Las funciones del lado main que atiende Rust. El proceso de apoyo no las registra ni las corre.
 pub const FUNCIONES_EN_RUST: &[&str] = &[git::NOMBRE, help::NOMBRE, report::NOMBRE, team_config::NOMBRE, prs::NOMBRE, chat::NOMBRE, history::NOMBRE, templates::NOMBRE, worktrees::NOMBRE, dictado::NOMBRE, export_import::NOMBRE, onboarding::NOMBRE, tickets::NOMBRE, team::NOMBRE];
 
+/// Las que atiende el núcleo porque viven de su estado (`handlers_estado.rs` y `diagnostico.rs`).
+pub const FUNCIONES_DEL_NUCLEO: &[&str] = &[crate::handlers_estado::NOMBRE_SETTINGS, diagnostico::NOMBRE];
+
+/// Todas las funciones que atiende Rust: las de los handlers y las del núcleo.
+pub fn nombres_en_rust() -> impl Iterator<Item = &'static str> {
+    FUNCIONES_EN_RUST.iter().chain(FUNCIONES_DEL_NUCLEO).copied()
+}
+
 pub fn funciones_en_rust() -> String {
-    FUNCIONES_EN_RUST.join(",")
+    nombres_en_rust().collect::<Vec<_>>().join(",")
 }
 
 pub fn registrar_todo(router: &mut Router, entorno: &Arc<Entorno>) -> Vec<Arc<dyn AlHook>> {

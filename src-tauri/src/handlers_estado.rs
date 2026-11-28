@@ -357,6 +357,12 @@ pub fn registrar(router: &mut Router, n: &Arc<Nucleo>, imagen: LeerImagen) {
     });
 }
 
+/// Los nombres de las funciones del apoyo: solo se muestran en el diagnóstico, pero igual se acotan.
+fn nombres_de_funciones(v: &Value) -> Vec<String> {
+    let lista = v.as_array().map(Vec::as_slice).unwrap_or_default();
+    lista.iter().filter_map(Value::as_str).filter(|s| !s.is_empty() && s.len() <= 64).take(100).map(str::to_owned).collect()
+}
+
 /// Lo que el proceso de apoyo le pide al dueño del estado (`rust.*` del puente nativo).
 pub fn atender_apoyo(n: &Nucleo, op: &str, args: &[Value]) -> Respuesta {
     let a = |i: usize| arg(args, i);
@@ -453,7 +459,7 @@ pub fn atender_apoyo(n: &Nucleo, op: &str, args: &[Value]) -> Respuesta {
                     Ok(Value::Null)
                 }
                 "listo" => {
-                    n.marcar_apoyo_listo();
+                    n.marcar_apoyo_listo(nombres_de_funciones(a(1)));
                     Ok(Value::Null)
                 }
                 "cerrar" => {
@@ -544,7 +550,7 @@ mod tests {
         let nucleo = Nucleo::nuevo(plataforma.clone(), arranque, apoyo.clone(), conf);
         let mut router = Router::nuevo(Arc::new(ReenvioSimulado(apoyo.clone())));
         registrar(&mut router, &nucleo, Arc::new(|| None));
-        nucleo.marcar_apoyo_listo();
+        nucleo.marcar_apoyo_listo(vec![]);
         Armado { router, nucleo, apoyo, plataforma, raiz }
     }
 
@@ -733,5 +739,40 @@ mod tests {
         assert!(a.nucleo.terminales_si_hay().is_none());
         drop(a);
         let _ = std::fs::remove_dir_all(&carpeta);
+    }
+
+    #[test]
+    fn diagnostico_lista_las_funciones_de_rust_y_del_apoyo_y_avisa_el_cierre_inesperado_una_vez() {
+        let mut a = armar("diagnostico", None, None);
+        crate::handlers::diagnostico::registrar(&mut a.router, &a.nucleo, "142.0.3595.53".into());
+        a.nucleo.marcar_apoyo_listo(nombres_de_funciones(&json!(["sleep", "", 7, "x".repeat(65), "celular"])));
+        let (_, _) = crate::nucleo::arranque::MarcaDeSesion::iniciar(&a.raiz);
+        let (marca, crash) = crate::nucleo::arranque::MarcaDeSesion::iniciar(&a.raiz);
+        assert!(crash);
+        a.nucleo.fijar_sesion(marca, crash);
+
+        let texto = invocar(&a, "feat:diagnostico:texto", vec![]).unwrap();
+        let texto = texto.as_str().unwrap();
+        assert!(texto.contains("WebView2 142.0.3595.53") && !texto.contains("Electron"), "{texto}");
+        assert!(texto.contains("settings, diagnostico, sleep, celular
+"), "{texto}");
+        assert!(texto.contains("Funciones activas: git, "), "{texto}");
+        assert!(texto.contains("La sesión anterior terminó de forma inesperada."));
+
+        assert_eq!(invocar(&a, "feat:diagnostico:crashPrevio", vec![]).unwrap(), json!(true));
+        assert_eq!(invocar(&a, "feat:diagnostico:crashPrevio", vec![]).unwrap(), json!(false));
+        for p in [json!(null), json!({ "mensaje": "" }), json!({ "mensaje": "roto", "stack": "at a" })] {
+            assert_eq!(invocar(&a, "feat:diagnostico:errorRenderer", vec![p]).unwrap(), Value::Null);
+        }
+    }
+
+    #[test]
+    fn al_salir_la_sesion_queda_limpia() {
+        let a = armar("sesion-limpia", None, None);
+        let (marca, _) = crate::nucleo::arranque::MarcaDeSesion::iniciar(&a.raiz);
+        a.nucleo.fijar_sesion(marca, false);
+        a.nucleo.al_salir();
+        let (_, crash) = crate::nucleo::arranque::MarcaDeSesion::iniciar(&a.raiz);
+        assert!(!crash);
     }
 }

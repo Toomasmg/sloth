@@ -1,6 +1,7 @@
-//! Diagnóstico para pegar en un reporte. Equivale a src/main/diag/{diagnostico-texto,limite,error-renderer,estado}.ts y
-//! a las partes puras de features/diagnostico.ts. El logger, las versiones y el SO los aporta quien llama.
+//! Diagnóstico para pegar en un reporte. Equivale a src/main/diag/{diagnostico-texto,limite,error-renderer,estado,sesion}.ts
+//! y a las partes puras de features/diagnostico.ts. El logger, las versiones y el SO los aporta quien llama.
 use super::redactar::acotar;
+pub use crate::logger::{EntradaLog, Nivel};
 use serde_json::Value;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -10,27 +11,14 @@ const MAX_ENTRADA: usize = 600;
 pub const MAX_ENTRADAS: usize = 30;
 const MAX_CRUDO: usize = 20_000;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Nivel {
-    Error,
-    Aviso,
-    Info,
-}
-
-#[derive(Debug, Clone)]
-pub struct EntradaLog {
-    pub t: f64,
-    pub nivel: Nivel,
-    pub origen: String,
-    pub msg: String,
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct DatosDiagnostico {
     pub sloth: String,
     pub electron: String,
     pub node: String,
     pub chrome: String,
+    /// En la versión Tauri: la de WebView2 (Electron, Node y Chrome quedan vacíos y no se muestran).
+    pub webview: String,
     pub so: String,
     pub features: Vec<String>,
     pub cuentas: usize,
@@ -64,7 +52,12 @@ pub fn texto_diagnostico(d: &DatosDiagnostico, ahora: f64) -> String {
         "Diagnóstico de Sloth".into(),
         iso(ahora),
         String::new(),
-        format!("Sloth {} · Electron {} · Node {} · Chrome {}", d.sloth, d.electron, d.node, d.chrome),
+        [("Sloth", &d.sloth), ("Electron", &d.electron), ("Node", &d.node), ("Chrome", &d.chrome), ("WebView2", &d.webview)]
+            .iter()
+            .filter(|(_, v)| !v.is_empty())
+            .map(|(k, v)| format!("{k} {v}"))
+            .collect::<Vec<_>>()
+            .join(" · "),
         format!("Sistema: {}", d.so),
         String::new(),
         format!("Funciones activas: {}", if d.features.is_empty() { "(ninguna)".to_string() } else { d.features.join(", ") }),
@@ -82,7 +75,7 @@ pub fn texto_diagnostico(d: &DatosDiagnostico, ahora: f64) -> String {
     if errores.is_empty() {
         l.push("(sin errores)".into());
     } else {
-        l.extend(errores.iter().map(|e| format!("[{}] {}: {}", iso(e.t), e.origen, acotar(&e.msg, MAX_ENTRADA))));
+        l.extend(errores.iter().map(|e| format!("[{}] {}: {}", iso(e.t as f64), e.origen, acotar(&e.msg, MAX_ENTRADA))));
     }
     if avisos.is_empty() {
         l.push("(sin avisos)".into());
@@ -169,6 +162,25 @@ pub fn leer_error_renderer(payload: &Value) -> Option<String> {
     })
 }
 
+/// Cómo quedó `logs/sesion.json`: la app lo marca en curso al arrancar y limpia al cerrar bien.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Sesion {
+    pub inicio: f64,
+    pub limpia: bool,
+}
+
+/// Lo que no tiene la forma esperada cuenta como que no había sesión anterior (no es un cierre inesperado).
+pub fn leer_sesion(raw: Option<&str>) -> Option<Sesion> {
+    let v: Value = serde_json::from_str(raw?).ok()?;
+    let inicio = v.get("inicio")?.as_f64().filter(|n| n.is_finite())?;
+    let limpia = v.get("limpia")?.as_bool()?;
+    Some(Sesion { inicio, limpia })
+}
+
+pub fn hubo_cierre_inesperado(prev: Option<Sesion>) -> bool {
+    prev.is_some_and(|s| !s.limpia)
+}
+
 /// True solo la primera vez que se pregunta: el aviso al arrancar se muestra una vez por sesión.
 #[derive(Default)]
 pub struct EstadoCrash {
@@ -216,13 +228,13 @@ mod tests {
     }
 
     fn entrada(i: usize) -> EntradaLog {
-        EntradaLog { t: AHORA - (100.0 - i as f64) * 1000.0, nivel: Nivel::Error, origen: "main".into(), msg: format!("falla {i}") }
+        EntradaLog { t: AHORA as i64 - (100 - i as i64) * 1000, nivel: Nivel::Error, origen: "main".into(), msg: format!("falla {i}") }
     }
 
     #[test]
     fn trae_todas_las_secciones() {
         let d = DatosDiagnostico {
-            errores: vec![EntradaLog { t: AHORA - 5000.0, nivel: Nivel::Error, origen: "renderer".into(), msg: "TypeError: x es undefined".into() }],
+            errores: vec![EntradaLog { t: AHORA as i64 - 5000, nivel: Nivel::Error, origen: "renderer".into(), msg: "TypeError: x es undefined".into() }],
             avisos: vec!["Encontré un archivo dañado".into()],
             ..base()
         };
@@ -241,6 +253,24 @@ mod tests {
             assert!(t.contains(s), "falta {s}");
         }
         assert!(t.ends_with("Este texto no se envió a ningún lado: se copió a tu portapapeles. Revisalo antes de compartirlo."));
+    }
+
+    #[test]
+    fn en_tauri_muestra_webview2_y_no_las_versiones_vacias() {
+        let d = DatosDiagnostico { electron: String::new(), node: String::new(), chrome: String::new(), webview: "142.0.3595.53".into(), ..base() };
+        assert!(texto_diagnostico(&d, AHORA).contains("
+Sloth 0.6.28 · WebView2 142.0.3595.53
+"));
+    }
+
+    #[test]
+    fn la_sesion_anterior_sin_cerrar_limpia_es_un_cierre_inesperado() {
+        assert!(hubo_cierre_inesperado(leer_sesion(Some(r#"{"inicio":1,"limpia":false}"#))));
+        assert!(!hubo_cierre_inesperado(leer_sesion(Some(r#"{"inicio":1,"limpia":true}"#))));
+        for raw in [None, Some(""), Some("{"), Some("[]"), Some("null"), Some(r#"{"limpia":false}"#), Some(r#"{"inicio":"1","limpia":false}"#), Some(r#"{"inicio":1,"limpia":"no"}"#)] {
+            assert_eq!(leer_sesion(raw), None, "{raw:?}");
+            assert!(!hubo_cierre_inesperado(leer_sesion(raw)));
+        }
     }
 
     #[test]
@@ -269,13 +299,13 @@ mod tests {
 
     #[test]
     fn una_fecha_invalida_no_tira_el_diagnostico() {
-        let d = DatosDiagnostico { errores: vec![EntradaLog { t: f64::NAN, nivel: Nivel::Error, origen: "main".into(), msg: "x".into() }], ..base() };
+        let d = DatosDiagnostico { errores: vec![EntradaLog { t: i64::MAX, nivel: Nivel::Error, origen: "main".into(), msg: "x".into() }], ..base() };
         assert!(texto_diagnostico(&d, AHORA).contains("[fecha desconocida] main: x"));
     }
 
     #[test]
     fn el_mensaje_largo_se_acota() {
-        let d = DatosDiagnostico { errores: vec![EntradaLog { t: 0.0, nivel: Nivel::Info, origen: "m".into(), msg: "a".repeat(5000) }], ..base() };
+        let d = DatosDiagnostico { errores: vec![EntradaLog { t: 0, nivel: Nivel::Info, origen: "m".into(), msg: "a".repeat(5000) }], ..base() };
         assert!(texto_diagnostico(&d, AHORA).contains(&format!("{}…[cortado]", "a".repeat(600))));
     }
 

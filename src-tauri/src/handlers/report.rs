@@ -35,7 +35,7 @@ impl Maquina {
 }
 
 /// `process.arch` de Node, que es lo que mostraba el reporte.
-fn arquitectura() -> &'static str {
+pub(crate) fn arquitectura() -> &'static str {
     match std::env::consts::ARCH {
         "x86_64" => "x64",
         "aarch64" => "arm64",
@@ -44,8 +44,9 @@ fn arquitectura() -> &'static str {
     }
 }
 
+/// Como os.version() y os.release() de Node: nombre del producto y mayor.menor.build.
 #[cfg(windows)]
-fn version_de_windows() -> String {
+pub(crate) fn producto_y_release() -> (String, String) {
     use windows_sys::Win32::System::Registry::{RegGetValueW, HKEY_LOCAL_MACHINE, RRF_RT_REG_DWORD, RRF_RT_REG_SZ};
     let w = |s: &str| s.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
     let clave = w(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion");
@@ -65,15 +66,19 @@ fn version_de_windows() -> String {
         let r = unsafe { RegGetValueW(HKEY_LOCAL_MACHINE, clave.as_ptr(), n.as_ptr(), RRF_RT_REG_DWORD, std::ptr::null_mut(), (&mut v as *mut u32).cast(), &mut tam) };
         (r == 0).then_some(v)
     };
-    // Como os.version() · os.release() de Node: nombre del producto y mayor.menor.build.
     let producto = texto("ProductName").unwrap_or_default();
     let release = format!("{}.{}.{}", numero("CurrentMajorVersionNumber").unwrap_or(10), numero("CurrentMinorVersionNumber").unwrap_or(0), texto("CurrentBuildNumber").unwrap_or_default());
-    format!("{producto} · {release}")
+    (producto, release)
 }
 
 #[cfg(not(windows))]
+pub(crate) fn producto_y_release() -> (String, String) {
+    (std::env::consts::OS.to_string(), String::new())
+}
+
 fn version_de_windows() -> String {
-    format!("{} · ", std::env::consts::OS)
+    let (producto, release) = producto_y_release();
+    format!("{producto} · {release}")
 }
 
 /// Como `daemonLine` de report.ts. Las terminales siguen en el proceso de apoyo: se le pregunta sin esperar de más.

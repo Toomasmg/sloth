@@ -69,8 +69,14 @@ Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `pr
 `team` (4) y el núcleo
 (`src-tauri/src/handlers_estado.rs`): `state:get`, `permission:pending`, `daemon:info`, `daemon:shutdown`, `accounts:add`,
 `accounts:setShareSetup`, `accounts:remove`, `accounts:statuses`, `workspaces:add|remove|update|reveal`, `ui:openPanes`,
-`dialog:pickFolder`, `pty:start|write|resize|kill|cuentaOcupada|running|resumeOnce`, `clipboard:read|write` y
-`feat:settings:get|set|reset|pickProjectsDir`.
+`dialog:pickFolder`, `pty:start|write|resize|kill|cuentaOcupada|running|resumeOnce`, `clipboard:read|write`,
+`feat:settings:get|set|reset|pickProjectsDir` y `feat:diagnostico:texto|crashPrevio|errorRenderer`
+(`src-tauri/src/handlers/diagnostico.rs`, del núcleo porque vive de su estado: ver `FUNCIONES_DEL_NUCLEO`).
+
+- `diagnostico`: el texto sale del log en memoria de Rust, de la marca de cierre inesperado (`logs/sesion.json`, que Rust
+  toma al arrancar y deja limpia en `al_salir`; `MarcaDeSesion` en `nucleo/arranque.rs`) y de los ajustes del núcleo. Las
+  funciones activas son las de Rust más las que el apoyo registró (las manda con `rust.nucleo listo`). En lugar de
+  Electron, Node y Chrome muestra la versión de WebView2. `errorRenderer` escribe en el log de Rust.
 
 - `chat`: config y login (`principal`), datos y Realtime (`datos`) y el lado main del MCP (`mcp_main`), con la sesión cifrada
   como en Electron. Si una cuenta tiene terminales abiertas se pregunta con `pty:cuentaOcupada`; `cuentaPreparada`,
@@ -125,9 +131,6 @@ Por qué el resto sigue en el proceso de apoyo:
   resumen, que necesita los hooks que ya tiene el núcleo.
 - `rendimiento`: vive de eventos del proceso de apoyo que Rust no recibe: cambios de ajustes (`onSettingsChanged`), salida de
   las terminales sin daemon (`onPtyData`), reconexión del daemon y la energía (`powerMonitor`). Ptys y ajustes ya son del núcleo; falta mover la energía.
-- `diagnostico`: su texto sale del log en memoria del main de Node (`logger.recientes`, `logger.fallo`), de la marca de
-  cierre inesperado que calcula ese proceso al arrancar y de los ajustes que tiene en memoria; `errorRenderer` escribe en ese
-  mismo log. En Rust mostraría un log casi vacío. Pasa cuando el logger y el arranque sean de Rust.
 - `sleep`, `permissions`, `broadcast`: el port de `native/core` es de piezas puras sin la función completa armada (falta el contexto con su
   estado y E/S); se conectan de a una en PRs siguientes.
 
@@ -160,12 +163,12 @@ de los agentes: `src-tauri/src/nucleo` (`Nucleo`). Electron no cambia (no hay pu
   cuando una función lo reemplaza (`nucleo:comando`, retomar tras mover de cuenta) y el aviso antes de borrar una cuenta
   (`nucleo:cuentaBorrada`). Al preparar una cuenta Rust instala hooks y setup compartido y avisa `rust.cuentaPreparada`:
   el apoyo pone el aviso de turno de Codex y corre las funciones que escuchan.
-- **Logger:** el archivo es de Rust. El apoyo guarda en memoria (lo usa el diagnóstico) y manda cada línea a Rust.
+- **Logger:** el archivo, el log en memoria y la marca de sesión son de Rust. El apoyo manda cada línea a Rust.
 - **Terminales:** Rust se conecta al daemon de Rust (`native/daemon`) con E/S superpuesta (tokio), lo lanza suelto si no
   está y reconecta con `daemon_cliente`. No hay terminales en proceso ni daemon de Node: si el daemon no arranca,
   `pty:start` devuelve el error. Con `SLOTH_INPROCESS=1` (pruebas) el daemon se apaga al salir, como pasaba con las
   terminales en proceso de Electron. Al cerrar decide con `decidir_cierre_terminales` («Terminales vivas», cambio de
   perfil, terminales de otros perfiles).
-- **Sigue en el apoyo y escribe en userData sin ser estado:** los scripts de hooks (`writeHookScript`), el marcador de
-  sesión de los logs y los archivos de cada función que no pasó. `perfiles.json` lo reescribe la función `perfiles`
+- **Sigue en el apoyo y escribe en userData sin ser estado:** los scripts de hooks (`writeHookScript`) y los archivos
+  de cada función que no pasó. `perfiles.json` lo reescribe la función `perfiles`
   (crear, renombrar, cambiar); Rust solo lo lee y migra al arrancar.

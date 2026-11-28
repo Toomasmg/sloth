@@ -24,7 +24,7 @@ use sloth_core::store::Store;
 use sloth_core::versionado::Objeto;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, RwLock, Weak};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, RwLock, Weak};
 use terminales::{ConfDaemon, Terminales};
 
 /// Lo que Rust le dice y le pide al proceso de apoyo mientras convivan. En los tests, uno simulado.
@@ -80,6 +80,11 @@ pub struct Nucleo {
     pub terminales_efimeras: bool,
     /// Las funciones del apoyo terminaron de registrarse (algunas fijan estado al arrancar, como los espacios dormidos).
     apoyo_listo: (Mutex<bool>, Condvar),
+    /// Las funciones que registró el proceso de apoyo (las que todavía no son de Rust), para el diagnóstico.
+    funciones_del_apoyo: Mutex<Vec<String>>,
+    marca_de_sesion: OnceLock<arranque::MarcaDeSesion>,
+    /// La sesión anterior no cerró limpia (`feat:diagnostico:crashPrevio` lo avisa una sola vez).
+    pub crash: sloth_core::features::diagnostico::EstadoCrash,
     yo: Weak<Nucleo>,
 }
 
@@ -118,6 +123,9 @@ impl Nucleo {
                 oscuro_previo: Mutex::new(None),
                 terminales_efimeras: std::env::var("SLOTH_INPROCESS").as_deref() == Ok("1"),
                 apoyo_listo: (Mutex::new(false), Condvar::new()),
+                funciones_del_apoyo: Mutex::default(),
+                marca_de_sesion: OnceLock::new(),
+                crash: Default::default(),
                 yo: yo.clone(),
             }
         })
@@ -279,7 +287,19 @@ impl Nucleo {
         Some(nuevo)
     }
 
-    pub fn marcar_apoyo_listo(&self) {
+    /// La marca de esta sesión (la deja `arrancar` antes de crear el núcleo): se cierra limpia en `al_salir`.
+    pub fn fijar_sesion(&self, marca: arranque::MarcaDeSesion, crash_previo: bool) {
+        self.crash.marcar(crash_previo);
+        let _ = self.marca_de_sesion.set(marca);
+    }
+
+    pub fn funciones_del_apoyo(&self) -> Vec<String> {
+        bloquear(&self.funciones_del_apoyo).clone()
+    }
+
+    /// `funciones`: los nombres que registró el apoyo (solo texto, para el diagnóstico).
+    pub fn marcar_apoyo_listo(&self, funciones: Vec<String>) {
+        *bloquear(&self.funciones_del_apoyo) = funciones;
         *bloquear(&self.apoyo_listo.0) = true;
         self.apoyo_listo.1.notify_all();
     }
@@ -560,6 +580,9 @@ impl Nucleo {
 
     /// Al salir: con «Terminales vivas» la conexión se suelta y el daemon sigue; apagado, se cierran sus terminales.
     pub fn al_salir(&self) {
+        if let Some(m) = self.marca_de_sesion.get() {
+            m.cerrar();
+        }
         for h in self.al_hook.read().unwrap_or_else(|e| e.into_inner()).iter() {
             h.al_salir();
         }
