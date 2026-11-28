@@ -19,6 +19,7 @@ pub mod report;
 pub mod rendimiento;
 pub mod sleep;
 pub mod templates;
+pub mod tickets;
 pub mod url_lite;
 
 /// Fecha civil (año, mes 1-12, día) de los días desde 1970-01-01 (algoritmo de Howard Hinnant).
