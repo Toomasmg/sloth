@@ -57,8 +57,8 @@ depende de `sloth-core` por path; con el mismo `CARGO_TARGET_DIR` las dependenci
 
 - **Plataforma:** `plataforma.rs` implementa `sloth_core::app_state::Plataforma` sobre Tauri (eventos a la UI por
   `sloth://event`, abrir enlace o carpeta, elegir carpeta, error, portapapeles, zoom, ventana). La carpeta de datos es
-  `%APPDATA%\Sloth`, la de Electron; `SLOTH_USER_DATA` la cambia en pruebas. Sin `safeStorage` en Rust todavía: ningún
-  handler lo necesita (chat y tickets lo van a pedir).
+  `%APPDATA%\Sloth`, la de Electron; `SLOTH_USER_DATA` la cambia en pruebas. El `safeStorage` de Electron lo replica
+  `sloth_core::features::chat::safestorage` (mismo `Local State`); por ahora lo usa el chat.
 - **Una función a la vez:** cada archivo de `src-tauri/src/handlers/` registra sus canales `feat:<nombre>:<op>` y se anota
   en `FUNCIONES_EN_RUST`. La cáscara le pasa esa lista al proceso de apoyo (`SLOTH_RUST_FEATURES`) y este no registra la
   función (`src/main/rust-features.ts`); en Electron no hay lista y todo sigue igual.
@@ -67,7 +67,18 @@ depende de `sloth-core` por path; con el mismo `CARGO_TARGET_DIR` las dependenci
   handlers de Rust responden «Sloth todavía está arrancando.». Rust lee el estado solo para consultar (sin migrar ni
   reescribir). Los hooks de Claude llegan a las funciones de Rust reenviados por el puente (`rust.hook`).
 
-Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11) y `prs` (9).
+Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `prs` (9) y `chat` (42).
+
+- `chat`: config y login (`principal`), datos y Realtime (`datos`) y el lado main del MCP (`mcp_main`), con la sesión cifrada
+  como en Electron. Cuentas, espacios y `settings.json` se leen sin escribirlos. Lo que es de otro dueño va por el puente o
+  el router, así anda con cualquier dueño del estado: si una cuenta tiene terminales abiertas se pregunta con
+  `pty:cuentaOcupada`, y `cuentaPreparada`, `cuentaBorrada` y `terminalCerrada` llegan como `rust.evento` (quien sea dueño de
+  cuentas y terminales los tiene que mandar). Los avisos a la persona se muestran con la función `avisos` del proceso de
+  apoyo (evento nativo `aviso`). «celular» sigue en Node y usa la sesión del chat para su canal remoto: Rust le avisa URL,
+  clave pública y usuario (`chat:sesion`, nunca tokens) y el cliente de Node pide el token con `rust.chat token` en cada uso;
+  así hay un solo dueño del refresh token. El aviso del sistema de un mensaje no abre la conversación al hacer clic: el
+  aviso de Tauri en Windows no avisa el clic. El TS de chat (`src/main/features/chat*.ts`) queda como respaldo, igual que
+  el de git: Electron lo sigue usando.
 
 - `help`: el changelog lo genera `src-tauri/build.rs` desde `src/shared/changelog.ts` (`scripts/changelog-json.mjs`, con
   Node) y entra con `include_str!`; no hay copia a mano.

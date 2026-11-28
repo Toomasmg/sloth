@@ -53,6 +53,9 @@ fn limites(v: &Window) -> Option<Value> {
 }
 
 fn avisar_ventana(v: &Window, evento: &WindowEvent) {
+    if let (WindowEvent::Focused(f), Some(e)) = (evento, v.app_handle().try_state::<Arc<entorno::Entorno>>()) {
+        e.fijar_foco(*f);
+    }
     if let (WindowEvent::Focused(true), Some(h)) = (evento, v.app_handle().try_state::<puente::Hooks>()) {
         for f in &h.0 {
             f.al_enfocar();
@@ -115,7 +118,17 @@ pub fn run() {
         .setup(|app| {
             let entorno = entorno::Entorno::nuevo(Arc::new(plataforma::PlataformaTauri::nueva(app.handle().clone())));
             app.manage(entorno.clone());
+            entorno.fijar_runtime(tauri::async_runtime::handle().inner().clone());
+            let app_n = app.handle().clone();
+            entorno.fijar_notificador(Arc::new(move |titulo, cuerpo| {
+                use tauri_plugin_notification::NotificationExt;
+                if let Err(e) = app_n.notification().builder().title(titulo).body(cuerpo).show() {
+                    sloth_core::logger_global::aviso("notificaciones", &format!("no se pudo mostrar el aviso del sistema: {e}"));
+                }
+            }));
             let apoyo = sidecar::lanzar(app.handle().clone(), nativo::atender).map_err(|e| format!("Sloth no pudo arrancar: {e}"))?;
+            let apoyo_e = apoyo.clone();
+            entorno.fijar_eventos_al_apoyo(Arc::new(move |nombre, args| apoyo_e.evento_nativo(nombre, args)));
             let mut router = Router::nuevo(Arc::new(ReenvioApoyo(apoyo.clone())));
             let hooks = handlers::registrar_todo(&mut router, &entorno);
             app.manage(router);
@@ -142,6 +155,11 @@ pub fn run() {
         .expect("no se pudo iniciar Sloth")
         .run(|app, evento| {
             if let tauri::RunEvent::Exit = evento {
+                if let Some(h) = app.try_state::<puente::Hooks>() {
+                    for f in &h.0 {
+                        f.al_salir();
+                    }
+                }
                 if let Some(a) = app.try_state::<Apoyo>() {
                     a.0.cerrar();
                 }

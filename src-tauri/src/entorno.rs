@@ -6,6 +6,7 @@ use sloth_core::app_state::Plataforma;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, RwLock};
 use std::time::Duration;
 
@@ -18,26 +19,82 @@ impl<T: Plataforma + Send + Sync> PlataformaCompartida for T {}
 /// Invoca un canal por el router, como si lo pidiera la UI: lo atiende quien sea su dueño (Rust o el proceso de apoyo).
 pub type Pedidos = Arc<dyn Fn(String, Vec<Value>) -> Futuro<Respuesta> + Send + Sync>;
 
+/// Aviso del sistema (título, cuerpo).
+pub type Notificador = Arc<dyn Fn(&str, &str) + Send + Sync>;
+
+/// Evento nativo hacia el proceso de apoyo (nombre, argumentos).
+pub type EventosAlApoyo = Arc<dyn Fn(&str, Value) + Send + Sync>;
+
 pub struct Entorno {
     pub plataforma: Arc<dyn PlataformaCompartida>,
     perfil: RwLock<Option<PathBuf>>,
     pedidos: RwLock<Option<Pedidos>>,
+    runtime: RwLock<Option<tokio::runtime::Handle>>,
+    foco: AtomicBool,
+    notificador: RwLock<Option<Notificador>>,
+    al_apoyo: RwLock<Option<EventosAlApoyo>>,
 }
 
 impl Entorno {
     pub fn nuevo(plataforma: Arc<dyn PlataformaCompartida>) -> Arc<Entorno> {
-        Arc::new(Entorno { plataforma, perfil: RwLock::new(None), pedidos: RwLock::new(None) })
+        Arc::new(Entorno {
+            plataforma,
+            perfil: RwLock::new(None),
+            pedidos: RwLock::new(None),
+            runtime: RwLock::new(None),
+            foco: AtomicBool::new(false),
+            notificador: RwLock::new(None),
+            al_apoyo: RwLock::new(None),
+        })
+    }
+
+    /// Para pedir desde hilos propios de una función (fuera del runtime), como los del MCP del chat.
+    pub fn fijar_runtime(&self, h: tokio::runtime::Handle) {
+        *self.runtime.write().unwrap_or_else(|e| e.into_inner()) = Some(h);
+    }
+
+    pub fn fijar_foco(&self, enfocada: bool) {
+        self.foco.store(enfocada, Ordering::SeqCst);
+    }
+
+    pub fn con_foco(&self) -> bool {
+        self.foco.load(Ordering::SeqCst)
+    }
+
+    pub fn fijar_notificador(&self, n: Notificador) {
+        *self.notificador.write().unwrap_or_else(|e| e.into_inner()) = Some(n);
+    }
+
+    pub fn notificar(&self, titulo: &str, cuerpo: &str) {
+        let n = self.notificador.read().unwrap_or_else(|e| e.into_inner()).clone();
+        if let Some(n) = n {
+            n(titulo, cuerpo);
+        }
+    }
+
+    pub fn fijar_eventos_al_apoyo(&self, f: EventosAlApoyo) {
+        *self.al_apoyo.write().unwrap_or_else(|e| e.into_inner()) = Some(f);
+    }
+
+    /// Lo que el proceso de apoyo necesita saber de una función de Rust (la sesión del chat para «celular», un aviso).
+    pub fn al_apoyo(&self, nombre: &str, args: Value) {
+        let f = self.al_apoyo.read().unwrap_or_else(|e| e.into_inner()).clone();
+        if let Some(f) = f {
+            f(nombre, args);
+        }
     }
 
     pub fn fijar_pedidos(&self, p: Pedidos) {
         *self.pedidos.write().unwrap_or_else(|e| e.into_inner()) = Some(p);
     }
 
-    /// Pide un canal al router y espera la respuesta. Solo desde un handler (corre en un hilo bloqueante del runtime).
+    /// Pide un canal al router y espera la respuesta. Desde un handler (hilo bloqueante del runtime) o desde un hilo propio
+    /// si se fijó el runtime; nunca desde una tarea async.
     /// Sirve para lo que todavía tiene otro dueño, como dar de alta un espacio: así el store sigue con uno solo.
     pub fn pedir(&self, canal: &str, args: Vec<Value>, espera: Duration) -> Respuesta {
         let p = self.pedidos.read().unwrap_or_else(|e| e.into_inner()).clone().ok_or_else(|| "Sloth todavía está arrancando.".to_string())?;
-        let rt = tokio::runtime::Handle::try_current().map_err(|_| format!("No se pudo pedir {canal}."))?;
+        let guardado = self.runtime.read().unwrap_or_else(|e| e.into_inner()).clone();
+        let rt = tokio::runtime::Handle::try_current().ok().or(guardado).ok_or_else(|| format!("No se pudo pedir {canal}."))?;
         let (tx, rx) = mpsc::channel();
         let futuro = p(canal.to_string(), args);
         rt.spawn(async move {

@@ -821,8 +821,8 @@ const feature: Feature = {
       if (!cerrarOtras) return v
       const s = sesionChat()
       if (!s) throw new Error('El código es nuevo, pero sin sesión en el chat no pude cerrar las sesiones de los otros dispositivos.')
-      const { error } = await s.client.auth.signOut({ scope: 'others' })
-      if (error) throw new Error(`El código es nuevo, pero no pude cerrar las sesiones de los otros dispositivos: ${error.message}`)
+      const error = await s.cerrarOtras()
+      if (error) throw new Error(`El código es nuevo, pero no pude cerrar las sesiones de los otros dispositivos: ${error}`)
       ctx.log('sesiones del chat de los otros dispositivos cerradas')
       return v
     })

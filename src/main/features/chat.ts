@@ -16,6 +16,7 @@ import { escribirJsonAtomico, leerJson, respaldar } from '../json-file'
 import { avisar } from '../avisos'
 import { registerChatMcp } from './chat-mcp'
 import { carpetaFeatures } from '../perfil'
+import { alEventoDeRust, pedirARust } from '../rust-features'
 
 /**
  * Función «chat» (lado main): config de Supabase, login con GitHub (PKCE) y sesión cifrada.
@@ -47,13 +48,55 @@ export interface SesionChat {
   userId: string
   supabaseUrl: string
   anonKey: string
+  /** Cierra las sesiones del chat de los otros dispositivos. Devuelve el error o null. */
+  cerrarOtras(): Promise<string | null>
 }
 
 let leerSesion: (() => SesionChat | null) | null = null
 
-/** Se lee en cada uso porque la sesión cambia sin aviso (login, logout, otra config). */
+/** Se lee en cada uso porque la sesión cambia sin aviso (login, logout, otra config). En Tauri la da el chat de Rust. */
 export function sesionChat(): SesionChat | null {
-  return leerSesion?.() ?? null
+  return leerSesion?.() ?? sesionDeRust
+}
+
+/**
+ * En Tauri el chat corre en Rust y «celular» sigue acá: Rust avisa URL, clave pública y usuario (nunca tokens) cada vez
+ * que cambia la sesión, y este cliente pide el token a Rust en cada uso. Así hay un solo dueño del refresh token: si los
+ * dos lo renovaran, el que llega segundo dejaría al otro sin sesión.
+ */
+let sesionDeRust: SesionChat | null = null
+
+function fijarSesionDeRust(raw: unknown): void {
+  const o = isObj(raw) ? raw : {}
+  const txt = (v: unknown, max: number): string | undefined => (typeof v === 'string' && v.length > 0 && v.length <= max ? v : undefined)
+  const supabaseUrl = txt(o.supabaseUrl, 300)
+  const anonKey = txt(o.anonKey, 2000)
+  const userId = txt(o.userId, 64)
+  if (!supabaseUrl?.startsWith('https://') || !anonKey || !userId) {
+    sesionDeRust = null
+    return
+  }
+  const s = sesionDeRust
+  if (s && s.supabaseUrl === supabaseUrl && s.anonKey === anonKey && s.userId === userId) return
+  const client = createClient(supabaseUrl, anonKey, {
+    accessToken: async () => {
+      const t = await pedirARust('rust.chat', 'token')
+      return typeof t === 'string' ? t : null
+    }
+  })
+  sesionDeRust = {
+    client,
+    supabaseUrl,
+    anonKey,
+    userId,
+    cerrarOtras: () => pedirARust('rust.chat', 'cerrarOtras').then(() => null, (e: unknown) => msg(e))
+  }
+}
+
+/** Desde el arranque: la sesión que ya tenía Rust y las que vengan. */
+export function escucharSesionDeRust(falla: (e: unknown) => void): void {
+  alEventoDeRust('chat:sesion', fijarSesionDeRust)
+  pedirARust('rust.chat', 'sesion').then(fijarSesionDeRust, falla)
 }
 
 interface SavedFile {
@@ -600,10 +643,20 @@ const feature: Feature = {
     ctx.handle('cancelSignIn', (): void => cancelSignIn())
     ctx.handle('signOut', (): Promise<void> => signOut())
 
-    leerSesion = () =>
-      client && active && auth.status === 'signedIn' && me
-        ? { client, userId: me.id, supabaseUrl: active.cfg.supabaseUrl, anonKey: active.cfg.anonKey }
-        : null
+    leerSesion = () => {
+      const c = client
+      if (!c || !active || auth.status !== 'signedIn' || !me) return null
+      return {
+        client: c,
+        userId: me.id,
+        supabaseUrl: active.cfg.supabaseUrl,
+        anonKey: active.cfg.anonKey,
+        cerrarOtras: async () => {
+          const { error } = await c.auth.signOut({ scope: 'others' })
+          return error ? error.message : null
+        }
+      }
+    }
 
     refresh()
 
