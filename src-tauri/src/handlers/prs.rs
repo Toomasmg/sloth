@@ -3,6 +3,7 @@
 //! el refresco (con la vista abierta, al enfocar la ventana) y los eventos `feat:prs:updated`.
 //!
 //! Abrir la rama de un PR puede crear un espacio: eso lo sigue haciendo el dueño del store, por `workspaces:add`.
+use super::comun::{ahora_ms, es_dir, texto};
 use super::{a_json, arg, AlHook};
 use crate::entorno::Entorno;
 use crate::router::Router;
@@ -17,24 +18,11 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 pub const NOMBRE: &str = "prs";
 
 const ALTA_DE_ESPACIO: Duration = Duration::from_secs(180);
-
-fn ahora_ms() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
-}
-
-/// Como `isDir` de git-run.ts: ruta absoluta, razonable y que exista como carpeta.
-fn es_dir(p: &str) -> bool {
-    !p.is_empty() && p.chars().count() <= 1024 && Path::new(p).is_absolute() && Path::new(p).is_dir()
-}
-
-fn texto(v: &Value, k: &str) -> Option<String> {
-    v.get(k).and_then(Value::as_str).map(String::from)
-}
 
 struct Datos {
     archivo: PathBuf,
