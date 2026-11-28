@@ -13,6 +13,10 @@ pub fn atender(app: &AppHandle, op: &str, args: &[Value]) -> Result<Value, Strin
         "rust.perfil" => {
             let entorno = app.try_state::<Arc<Entorno>>().ok_or("el entorno de Rust no está listo")?;
             let carpeta = fijar_perfil(&entorno, args.first())?;
+            if let Some(h) = app.try_state::<Hooks>() {
+                let hooks = h.0.clone();
+                std::thread::spawn(move || hooks.iter().for_each(|f| f.al_perfil()));
+            }
             Ok(Value::String(carpeta.to_string_lossy().into_owned()))
         }
         "rust.hook" => {
