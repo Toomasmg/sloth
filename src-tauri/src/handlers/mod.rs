@@ -15,6 +15,7 @@ pub mod prs;
 pub mod report;
 pub mod team_config;
 pub mod templates;
+pub mod worktrees;
 
 static NULO: Value = Value::Null;
 
@@ -28,7 +29,7 @@ pub fn a_json<T: Serialize>(r: Result<T, String>) -> Respuesta {
 }
 
 /// Las funciones del lado main que atiende Rust. El proceso de apoyo no las registra ni las corre.
-pub const FUNCIONES_EN_RUST: &[&str] = &[git::NOMBRE, help::NOMBRE, report::NOMBRE, team_config::NOMBRE, prs::NOMBRE, chat::NOMBRE, history::NOMBRE, templates::NOMBRE];
+pub const FUNCIONES_EN_RUST: &[&str] = &[git::NOMBRE, help::NOMBRE, report::NOMBRE, team_config::NOMBRE, prs::NOMBRE, chat::NOMBRE, history::NOMBRE, templates::NOMBRE, worktrees::NOMBRE];
 
 pub fn funciones_en_rust() -> String {
     FUNCIONES_EN_RUST.join(",")
@@ -40,6 +41,7 @@ pub fn registrar_todo(router: &mut Router, entorno: &Arc<Entorno>) -> Vec<Arc<dy
     team_config::registrar(router, entorno.clone());
     history::registrar(router, entorno.clone());
     templates::registrar(router, entorno.clone());
+    worktrees::registrar(router, entorno.clone());
     vec![git::registrar(router, entorno.clone()), prs::registrar(router, entorno.clone()), chat::registrar(router, entorno.clone())]
 }
 

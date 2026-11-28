@@ -67,7 +67,7 @@ depende de `sloth-core` por path; con el mismo `CARGO_TARGET_DIR` las dependenci
   handlers de Rust responden «Sloth todavía está arrancando.». Rust lee el estado solo para consultar (sin migrar ni
   reescribir). Los hooks de Claude llegan a las funciones de Rust reenviados por el puente (`rust.hook`).
 
-Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `prs` (9), `chat` (42), `history` (9) y `templates` (10).
+Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `prs` (9), `chat` (42), `history` (9), `templates` (10) y `worktrees` (7).
 
 - `chat`: config y login (`principal`), datos y Realtime (`datos`) y el lado main del MCP (`mcp_main`), con la sesión cifrada
   como en Electron. Cuentas, espacios y `settings.json` se leen sin escribirlos. Lo que es de otro dueño va por el puente o
@@ -94,6 +94,10 @@ Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `pr
   `pty:kill` más `ui:command` `restart-pane`, como `restartTerminal`. El modo liviano se lee de `feat:settings:get`.
 - `templates`: `templates.json` lo escribe solo Rust (versionado y tmp + rename de `ArchivoPlantillas`). Crear un espacio
   desde una plantilla va por `workspaces:add`; la cuenta sugerida usa `accounts:usage` y `accounts:statuses` del dueño.
+- `worktrees`: el contexto de `worktrees_feature` pide al dueño la baja de espacios (`workspaces:remove`), cerrar terminales
+  (`pty:kill`), el modo solo lectura y la actividad de los agentes (`state:get`). El espacio de una rama nueva se da de alta
+  con `workspaces:add` y la carpeta de la rama como repo (como «Abrir rama» de prs): con la rama, ese canal crearía otro
+  worktree. Queda sin `branch` guardado; la rama se lee de git.
 
 Por qué el resto sigue en el proceso de apoyo:
 
@@ -102,7 +106,7 @@ Por qué el resto sigue en el proceso de apoyo:
   `sloth-state.json`.
 - `settings`: el main de Node la lee en memoria en ~12 módulos (tray, updater, sleep, chat...); si Rust la escribiera,
   esas copias quedarían viejas. Pasa junto con ellos.
-- `worktrees`, `move-account`: escriben o dependen del store (alta y baja de espacios, cuentas) o de
+- `move-account`: escriben o dependen del store (alta y baja de espacios, cuentas) o de
   las terminales.
 - `team`: arma su vista con lo que trae el conector de Tickets (`ticketsParaEquipo` y `alCambiarTickets`, en memoria del
   proceso de apoyo). Pasa junto con `tickets`; antes haría falta un puente nuevo de ida y vuelta solo para esto.
