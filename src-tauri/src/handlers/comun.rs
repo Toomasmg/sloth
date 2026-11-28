@@ -73,7 +73,28 @@ pub fn espacios(e: &Entorno) -> Vec<Value> {
 
 /// Un ajuste de la Configuración, pedido a su dueño (Node o Rust): así se ve con sus valores por defecto y migraciones.
 pub fn ajuste(e: &Entorno, clave: &str) -> Option<Value> {
-    e.pedir("feat:settings:get", vec![], Duration::from_secs(5)).ok()?.get("settings")?.get(clave).cloned()
+    ajustes(e)?.get(clave).cloned()
+}
+
+/// Toda la Configuración ya saneada, como la ve la UI.
+pub fn ajustes(e: &Entorno) -> Option<Value> {
+    e.pedir("feat:settings:get", vec![], Duration::from_secs(5)).ok()?.get("settings").cloned()
+}
+
+/// Estado del dueño del store (con los agentes y el modo solo lectura), o `null` si no responde.
+pub fn estado_del_dueno(e: &Entorno) -> Value {
+    e.pedir("state:get", vec![], Duration::from_secs(20)).unwrap_or(Value::Null)
+}
+
+/// Como `exigirEscritura` del store, con el mismo texto: sin poder guardar no se empieza algo que lo cambie.
+pub fn exigir_escritura(e: &Entorno) -> Result<(), String> {
+    let Some(motivo) = estado_del_dueno(e).get("soloLectura").filter(|s| !s.is_null()).cloned() else { return Ok(()) };
+    let consejo = if motivo.get("causa").and_then(Value::as_str) == Some("version-futura") {
+        "Actualizá Sloth: esta versión es más vieja que tus datos."
+    } else {
+        "Reiniciá Sloth cuando sloth-state.json se pueda leer."
+    };
+    Err(format!("No se va a guardar: {}. {consejo}", texto(&motivo, "motivo").unwrap_or_default()))
 }
 
 /// La terminal de ese espacio está viva (el dueño de las terminales lo sabe; acá no se habla con el daemon).

@@ -9,6 +9,7 @@ use std::sync::Arc;
 pub mod chat;
 pub mod comun;
 pub mod dictado;
+pub mod export_import;
 pub mod git;
 pub mod help;
 pub mod history;
@@ -30,7 +31,7 @@ pub fn a_json<T: Serialize>(r: Result<T, String>) -> Respuesta {
 }
 
 /// Las funciones del lado main que atiende Rust. El proceso de apoyo no las registra ni las corre.
-pub const FUNCIONES_EN_RUST: &[&str] = &[git::NOMBRE, help::NOMBRE, report::NOMBRE, team_config::NOMBRE, prs::NOMBRE, chat::NOMBRE, history::NOMBRE, templates::NOMBRE, worktrees::NOMBRE, dictado::NOMBRE];
+pub const FUNCIONES_EN_RUST: &[&str] = &[git::NOMBRE, help::NOMBRE, report::NOMBRE, team_config::NOMBRE, prs::NOMBRE, chat::NOMBRE, history::NOMBRE, templates::NOMBRE, worktrees::NOMBRE, dictado::NOMBRE, export_import::NOMBRE];
 
 pub fn funciones_en_rust() -> String {
     FUNCIONES_EN_RUST.join(",")
@@ -44,6 +45,7 @@ pub fn registrar_todo(router: &mut Router, entorno: &Arc<Entorno>) -> Vec<Arc<dy
     templates::registrar(router, entorno.clone());
     worktrees::registrar(router, entorno.clone());
     dictado::registrar(router, entorno.clone());
+    export_import::registrar(router, entorno.clone());
     vec![git::registrar(router, entorno.clone()), prs::registrar(router, entorno.clone()), chat::registrar(router, entorno.clone())]
 }
 

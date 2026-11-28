@@ -183,6 +183,10 @@ impl PlataformaCompartida for PlataformaTauri {
         trash::delete(ruta).map_err(|e| e.to_string())
     }
 
+    fn mostrar_en_carpeta(&self, ruta: &Path) -> Result<(), String> {
+        self.app.opener().reveal_item_in_dir(ruta).map_err(|e| e.to_string())
+    }
+
     fn carpeta_documentos(&self) -> PathBuf {
         self.app.path().document_dir().unwrap_or_else(|_| self.carpeta_de_datos())
     }

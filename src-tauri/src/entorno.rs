@@ -26,6 +26,8 @@ pub trait PlataformaCompartida: Plataforma + Send + Sync {
     fn guardar_como(&self, d: &DialogoArchivo) -> Option<PathBuf>;
     fn elegir_archivo(&self, d: &DialogoArchivo) -> Option<PathBuf>;
     fn a_la_papelera(&self, ruta: &Path) -> Result<(), String>;
+    /// Abre el Explorador con el archivo seleccionado (`showItemInFolder`).
+    fn mostrar_en_carpeta(&self, ruta: &Path) -> Result<(), String>;
     fn carpeta_documentos(&self) -> PathBuf;
     /// Donde está whisper-cli: los recursos instalados o `vendor/whisper` del proyecto, como en Electron.
     fn carpeta_whisper(&self) -> PathBuf;

@@ -67,7 +67,7 @@ depende de `sloth-core` por path; con el mismo `CARGO_TARGET_DIR` las dependenci
   handlers de Rust responden «Sloth todavía está arrancando.». Rust lee el estado solo para consultar (sin migrar ni
   reescribir). Los hooks de Claude llegan a las funciones de Rust reenviados por el puente (`rust.hook`).
 
-Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `prs` (9), `chat` (42), `history` (9), `templates` (10), `worktrees` (7) y `dictado` (2).
+Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `prs` (9), `chat` (42), `history` (9), `templates` (10), `worktrees` (7), `dictado` (2) y `export-import` (10).
 
 - `chat`: config y login (`principal`), datos y Realtime (`datos`) y el lado main del MCP (`mcp_main`), con la sesión cifrada
   como en Electron. Cuentas, espacios y `settings.json` se leen sin escribirlos. Lo que es de otro dueño va por el puente o
@@ -103,6 +103,10 @@ Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `pr
   ureq sin seguir redirecciones (el núcleo revisa el host de cada salto y el SHA-256). El WAV llega por el puente de Tauri
   como arreglo u objeto con índices (un `Uint8Array` pasado por JSON); el proceso de apoyo lo rechazaba.
   `dictadoPreciso` se lee de `feat:settings:get`.
+- `export-import`: arma y lee el `.sloth` con `export_import*` y `export_crypto` (cifrado compatible con Node). Los ajustes
+  saneados salen de `feat:settings:get`; plantillas, reglas y equipo se leen de sus archivos sin escribirlos. Importar pide
+  al dueño `accounts:add` (y `accounts:setShareSetup` si el archivo lo apaga), `workspaces:remove` y `workspaces:add`;
+  plantillas, ajustes y reglas los sigue guardando la UI con sus canales.
 
 Por qué el resto sigue en el proceso de apoyo:
 
@@ -118,7 +122,7 @@ Por qué el resto sigue en el proceso de apoyo:
 - `diagnostico`: su texto sale del log en memoria del main de Node (`logger.recientes`, `logger.fallo`), de la marca de
   cierre inesperado que calcula ese proceso al arrancar y de los ajustes que tiene en memoria; `errorRenderer` escribe en ese
   mismo log. En Rust mostraría un log casi vacío. Pasa cuando el logger y el arranque sean de Rust.
-- `sleep`, `rendimiento`, `onboarding`, `permissions`, `broadcast`, `export-import`: el port de `native/core` es de piezas puras sin la función completa armada (falta el contexto con su
+- `sleep`, `rendimiento`, `onboarding`, `permissions`, `broadcast`: el port de `native/core` es de piezas puras sin la función completa armada (falta el contexto con su
   estado y E/S); se conectan de a una en PRs siguientes.
 
 El TS de `git` (`src/main/features/git.ts`, `git-ops`, `git-run`) queda como respaldo: Electron lo sigue usando y worktrees,

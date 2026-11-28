@@ -87,6 +87,10 @@ impl PlataformaCompartida for PlataformaSimulada {
         self.papelera.lock().unwrap().push(ruta.to_path_buf());
         if ruta.is_dir() { fs::remove_dir_all(ruta) } else { fs::remove_file(ruta) }.map_err(|e| e.to_string())
     }
+    fn mostrar_en_carpeta(&self, ruta: &Path) -> Result<(), String> {
+        self.abiertos.lock().unwrap().push(ruta.to_string_lossy().into_owned());
+        Ok(())
+    }
     fn carpeta_documentos(&self) -> PathBuf {
         self.carpeta_de_datos()
     }

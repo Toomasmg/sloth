@@ -33,11 +33,6 @@ fn real(altas: &Altas, pedido: &str) -> Option<Result<String, String>> {
     altas.lock().unwrap_or_else(|e| e.into_inner()).get(pedido).cloned()
 }
 
-impl Contexto {
-    fn estado_del_dueno(&self) -> Value {
-        self.entorno.pedir("state:get", vec![], PEDIDO).unwrap_or(Value::Null)
-    }
-}
 
 impl ContextoWorktrees for Contexto {
     fn espacios(&self) -> Vec<WsRef> {
@@ -63,14 +58,7 @@ impl ContextoWorktrees for Contexto {
     }
 
     fn exigir_escritura(&self) -> Result<(), String> {
-        let Some(motivo) = self.estado_del_dueno().get("soloLectura").filter(|s| !s.is_null()).cloned() else { return Ok(()) };
-        // Mismo texto que `exigirEscritura` del store.
-        let consejo = if motivo.get("causa").and_then(Value::as_str) == Some("version-futura") {
-            "Actualizá Sloth: esta versión es más vieja que tus datos."
-        } else {
-            "Reiniciá Sloth cuando sloth-state.json se pueda leer."
-        };
-        Err(format!("No se va a guardar: {}. {consejo}", texto(&motivo, "motivo").unwrap_or_default()))
+        comun::exigir_escritura(&self.entorno)
     }
 
     fn cerrar_terminal(&self, id: &str) -> Result<(), String> {
@@ -105,7 +93,7 @@ impl ContextoWorktrees for Contexto {
 
     fn actividad_agente(&self, id: &str) -> u64 {
         // Se pide una vez por escaneo a lo sumo por espacio con rama; el estado de los agentes es del dueño de las terminales.
-        self.estado_del_dueno()["agents"][id]["at"].as_u64().unwrap_or(0)
+        comun::estado_del_dueno(&self.entorno)["agents"][id]["at"].as_u64().unwrap_or(0)
     }
 
     fn emitir_tamano(&self, path: &str, bytes: Option<u64>, partial: bool) {
