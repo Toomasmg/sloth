@@ -73,11 +73,11 @@ impl FsTickets for FsReal {
 }
 
 pub struct OpcionesAlmacen {
-    pub fs: Box<dyn FsTickets>,
+    pub fs: Box<dyn FsTickets + Send>,
     /// Donde están tickets.json y gruv.json.
     pub carpeta: PathBuf,
-    pub log: Box<dyn Fn(&str)>,
-    pub ahora: Box<dyn Fn() -> f64>,
+    pub log: Box<dyn Fn(&str) + Send>,
+    pub ahora: Box<dyn Fn() -> f64 + Send>,
 }
 
 /// Los repos de tickets.json, sin escribir ni migrar nada: para buscar conectores del equipo antes de cargar.
@@ -254,9 +254,8 @@ mod tests {
     use super::*;
     use crate::features::tickets::conectores::conector_por_id;
     use serde_json::json;
-    use std::cell::RefCell;
     use std::collections::HashMap;
-    use std::rc::Rc;
+    use std::sync::{Arc, Mutex, MutexGuard};
 
     const AHORA: f64 = 1_700_000_000_000.0;
 
@@ -291,7 +290,20 @@ mod tests {
         escribir_falla: Option<String>,
     }
 
-    type Falso = Rc<RefCell<Estado>>;
+    /// El almacén vive en un hilo cualquiera de la app: su fs tiene que poder mandarse entre hilos, también el de prueba.
+    #[derive(Default)]
+    struct Celda(Mutex<Estado>);
+
+    impl Celda {
+        fn borrow(&self) -> MutexGuard<'_, Estado> {
+            self.0.lock().unwrap()
+        }
+        fn borrow_mut(&self) -> MutexGuard<'_, Estado> {
+            self.0.lock().unwrap()
+        }
+    }
+
+    type Falso = Arc<Celda>;
 
     struct FsFalso(Falso);
 
@@ -345,7 +357,7 @@ mod tests {
     }
 
     fn falso(inicial: &[(PathBuf, &str, f64)]) -> Falso {
-        let f: Falso = Rc::default();
+        let f: Falso = Arc::default();
         for (p, t, m) in inicial {
             f.borrow_mut().archivos.insert(p.clone(), (t.to_string(), *m));
         }

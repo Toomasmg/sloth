@@ -241,23 +241,24 @@ pub fn gh_accion(run: &dyn GhRun, def: &ConectorGh, proyecto: Option<&str>, a: A
     }
 }
 
-/// `gh` sobre el `ProcesoRun` común: oculto en Windows, con timeout y con el cuerpo por stdin.
+/// `gh` sobre el `ProcesoRun` común: oculto en Windows, con timeout, con el cuerpo por stdin y, si hay, la cancelación de
+/// «Actualizar».
 pub struct GhConProceso<'a> {
     pub proceso: &'a dyn ProcesoRun,
     pub cwd: PathBuf,
     pub env: BTreeMap<String, String>,
     pub timeout: Duration,
+    pub cancelado: Option<&'a AtomicBool>,
 }
 
 impl GhRun for GhConProceso<'_> {
     fn run(&self, args: &[String], input: Option<&str>) -> GhOut {
         let p = Peticion { exe: "gh".into(), args: args.to_vec(), prompt: input.unwrap_or("").to_string(), cwd: self.cwd.clone(), env: self.env.clone(), timeout: self.timeout, verbatim: false, arbol: false };
-        let sin_cancelar: Option<&AtomicBool> = None;
-        match self.proceso.correr(&p, sin_cancelar, &mut |_| Mirada::Seguir) {
+        match self.proceso.correr(&p, self.cancelado, &mut |_| Mirada::Seguir) {
             SalidaRun::Termino { code, stdout, stderr } => GhOut { code: code.unwrap_or(-1), stdout, stderr, ..GhOut::default() },
             SalidaRun::Plazo => GhOut { code: -1, timed_out: true, ..GhOut::default() },
             SalidaRun::NoAbrio(_) => GhOut { code: -1, missing: true, ..GhOut::default() },
-            SalidaRun::Cortada | SalidaRun::Cancelada => GhOut { code: -1, ..GhOut::default() },
+            SalidaRun::Cortada | SalidaRun::Cancelada => GhOut { code: -1, stderr: "Consulta cancelada.".into(), ..GhOut::default() },
         }
     }
 }
