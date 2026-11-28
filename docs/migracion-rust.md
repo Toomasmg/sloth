@@ -36,7 +36,7 @@ también Rust, así las dos implementaciones se prueban contra el mismo archivo.
    templates, report, permissions, broadcast.
 4. **Features medianas**: history, git, worktrees, prs, team-config, team, perfiles, export-import, tickets, dictado.
 5. **Features grandes**: chat (`chat`, `chat-data`, `chat-mcp`, `chat-auth`...), celular (servidor, remoto, terminal,
-   página web), updater (ya resuelto en Rust: `updater.rs` pasa a ser el dueño), tray.
+   página web), updater y tray (conectados en Rust: `handlers/updater.rs` y `handlers/tray.rs`).
 6. **Retiro de Node**: quitar el proceso de apoyo, el shim, `node.exe`, `build-sidecar` y dejar los e2e hablando con
    Rust (hoy usan `e2e:evaluate` del proceso de apoyo).
 
@@ -66,7 +66,7 @@ depende de `sloth-core` por path; con el mismo `CARGO_TARGET_DIR` las dependenci
 
 Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `prs` (9), `chat` (42), `history` (9),
 `templates` (10), `worktrees` (7), `dictado` (2), `export-import` (10), `onboarding` (6), `tickets` (20),
-`team` (4) y el núcleo
+`team` (4), `tray` (2), `updater` (7) y el núcleo
 (`src-tauri/src/handlers_estado.rs`): `state:get`, `permission:pending`, `daemon:info`, `daemon:shutdown`, `accounts:add`,
 `accounts:setShareSetup`, `accounts:remove`, `accounts:statuses`, `accounts:agentes`, `accounts:usage`,
 `accounts:limitesCodex`, `accounts:setLimitesExperimentales`, `accounts:setAvisoDeTurno`, `workspaces:add|remove|update|reveal`, `ui:openPanes`,

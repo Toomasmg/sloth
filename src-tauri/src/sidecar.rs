@@ -133,6 +133,7 @@ pub fn lanzar(app: AppHandle, nativo: fn(&AppHandle, &str, Vec<Value>) -> Result
                     }
                 }
                 Some("event") => {
+                    crate::puente::al_evento_ui(&app, m["channel"].as_str().unwrap_or(""));
                     let _ = app.emit("sloth://event", json!({ "channel": m["channel"], "args": m["args"] }));
                 }
                 Some("native") => {

@@ -5,8 +5,6 @@
  */
 import { EventEmitter } from 'node:events'
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
-import { crc32, deflateSync } from 'node:zlib'
 import { connect as netConnect } from 'node:net'
 import { pathToFileURL } from 'node:url'
 import { homedir, tmpdir } from 'node:os'
@@ -61,10 +59,6 @@ export function iniciar(r: Rpc): void {
     }
   })
   rpc.alEventoNativo('notification:click', (id) => Notification.clics.get(id as number)?.emit('click'))
-  rpc.alEventoNativo('tray', (que, id) => {
-    if (que === 'activate') Tray.activo?.emit('click')
-    else if (que === 'menu' && typeof id === 'number') Tray.activo?.clic(id)
-  })
   // La interfaz pide abrir un enlace con window.open (links de la terminal); antes lo hacía setWindowOpenHandler.
   rpc.on('tauri:open-external', (_e, url) => {
     if (typeof url === 'string' && /^https?:\/\//i.test(url)) ignorar(shell.openExternal(url))
@@ -87,12 +81,6 @@ interface Display {
   workArea: Rectangle
   bounds: Rectangle
   scaleFactor: number
-}
-
-/** Lo usa el shim del updater, que vive en otro módulo. */
-export const puente = {
-  nativo: <T = unknown>(op: string, ...args: unknown[]): Promise<T> => rpc.nativo<T>(op, ...args),
-  alEvento: (nombre: string, fn: (...args: unknown[]) => void): void => rpc.alEventoNativo(nombre, fn)
 }
 
 const nativo = <T = unknown>(op: string, ...args: unknown[]): Promise<T> => rpc.nativo<T>(op, ...args)
@@ -324,9 +312,9 @@ export class BrowserWindow extends EventEmitter {
   getSize(): [number, number] {
     return [this.bounds.width, this.bounds.height]
   }
-  /** Como `close()` de Electron: los oyentes de `close` pueden frenarlo con preventDefault(). */
+  /** Como tocar la X: decide la bandeja de Rust (ocultar, preguntar o cerrar) y, si cierra, llega `pedirCierre`. */
   close(): void {
-    this.pedirCierre()
+    ignorar(nativo('window.close'))
   }
   pedirCierre(): void {
     let frenado = false
@@ -510,161 +498,18 @@ export const session = {
   }
 }
 
-/** Imagen en PNG: lo que la bandeja le pasa a Rust. El resto de las operaciones de NativeImage no se usan. */
-class NativeImage {
-  png: Buffer
-  constructor(png: Buffer) {
-    this.png = png
-  }
-  isEmpty(): boolean {
-    return this.png.length === 0
-  }
-  resize(): NativeImage {
-    return this
-  }
-  addRepresentation(r: { buffer?: Buffer }): void {
-    if (r.buffer?.length) this.png = r.buffer
-  }
-  setTemplateImage(): void {}
-  getSize(): { width: number; height: number } {
-    return { width: 0, height: 0 }
-  }
-  toPNG(): Buffer {
-    return this.png
-  }
-  toDataURL(): string {
-    return `data:image/png;base64,${this.png.toString('base64')}`
-  }
-}
-
-function crc(tipo: string, datos: Buffer): Buffer {
-  const cuerpo = Buffer.concat([Buffer.from(tipo, 'latin1'), datos])
-  const sal = Buffer.alloc(8)
-  sal.writeUInt32BE(datos.length, 0)
-  sal.write(tipo, 4, 'latin1')
-  const fin = Buffer.alloc(4)
-  fin.writeUInt32BE(crc32(cuerpo) >>> 0, 0)
-  return Buffer.concat([sal, datos, fin])
-}
-
-/** PNG RGBA a partir de un bitmap BGRA (el formato de Electron). */
-function pngDeBitmap(bgra: Buffer, ancho: number, alto: number): Buffer {
-  const filas = Buffer.alloc((ancho * 4 + 1) * alto)
-  for (let y = 0; y < alto; y++) {
-    const o = y * (ancho * 4 + 1)
-    for (let x = 0; x < ancho; x++) {
-      const i = (y * ancho + x) * 4
-      const d = o + 1 + x * 4
-      filas[d] = bgra[i + 2]
-      filas[d + 1] = bgra[i + 1]
-      filas[d + 2] = bgra[i]
-      filas[d + 3] = bgra[i + 3]
-    }
-  }
-  const cab = Buffer.alloc(13)
-  cab.writeUInt32BE(ancho, 0)
-  cab.writeUInt32BE(alto, 4)
-  cab[8] = 8
-  cab[9] = 6
-  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), crc('IHDR', cab), crc('IDAT', deflateSync(filas)), crc('IEND', Buffer.alloc(0))])
-}
-
-export const nativeImage = {
-  createEmpty: (): NativeImage => new NativeImage(Buffer.alloc(0)),
-  createFromPath: (ruta: string): NativeImage => {
-    try {
-      return new NativeImage(readFileSync(ruta))
-    } catch {
-      return new NativeImage(Buffer.alloc(0))
-    }
-  },
-  createFromBitmap: (bitmap: Buffer, o: { width: number; height: number }): NativeImage => new NativeImage(pngDeBitmap(bitmap, o.width, o.height))
-}
-
-interface ItemMenu {
-  label?: string
-  type?: string
-  enabled?: boolean
-  click?: () => void
-  submenu?: ItemMenu[]
-}
-
-export class Menu {
-  readonly plantilla: ItemMenu[]
-  constructor(plantilla: ItemMenu[] = []) {
-    this.plantilla = plantilla
-  }
-  static buildFromTemplate(plantilla: ItemMenu[]): Menu {
-    return new Menu(plantilla)
-  }
-  static setApplicationMenu(): void {}
-}
-
-interface ItemPlano {
-  id?: number
-  label?: string
-  separator?: boolean
-  enabled?: boolean
-  items?: ItemPlano[]
-}
-
+// En Tauri la bandeja, su menú y el punto de la barra de tareas son de Rust (src-tauri/src/handlers/tray.rs): tray.ts y
+// tray-dot.ts no se registran y esto solo deja compilar sus imports.
+const imagenVacia = { isEmpty: (): boolean => true, toPNG: (): Buffer => Buffer.alloc(0) }
+export const nativeImage = { createEmpty: () => imagenVacia, createFromPath: () => imagenVacia, createFromBitmap: () => imagenVacia }
+export const Menu = { buildFromTemplate: (): null => null, setApplicationMenu: (): void => {} }
 export class Tray extends EventEmitter {
-  static activo: Tray | null = null
-  private readonly clics = new Map<number, () => void>()
-  private imagen: NativeImage
-  private tip = ''
-  private menu: Menu | null = null
-  private destruida = false
-  private iconoEnviado: Buffer | null = null
-
-  constructor(imagen: NativeImage) {
-    super()
-    this.imagen = imagen
-    Tray.activo = this
-    this.enviar()
-  }
   isDestroyed(): boolean {
-    return this.destruida
+    return true
   }
-  setToolTip(t: string): void {
-    this.tip = t
-    this.enviar()
-  }
-  setImage(i: NativeImage): void {
-    this.imagen = i
-    this.enviar()
-  }
-  setContextMenu(m: Menu | null): void {
-    this.menu = m
-    this.enviar()
-  }
-  clic(id: number): void {
-    this.clics.get(id)?.()
-  }
-  destroy(): void {
-    if (this.destruida) return
-    this.destruida = true
-    if (Tray.activo === this) Tray.activo = null
-    ignorar(nativo('tray.destroy'))
-  }
-  private plano(items: ItemMenu[]): ItemPlano[] {
-    return items.map((it) => {
-      if (it.type === 'separator') return { separator: true }
-      if (it.submenu) return { label: it.label, enabled: it.enabled !== false, items: this.plano(it.submenu) }
-      const id = this.clics.size + 1
-      if (it.click) this.clics.set(id, it.click)
-      return { id, label: it.label, enabled: it.enabled !== false && !!it.click }
-    })
-  }
-  private enviar(): void {
-    if (this.destruida) return
-    this.clics.clear()
-    const items = this.menu ? this.plano(this.menu.plantilla) : []
-    // El PNG pesa: solo viaja cuando cambió la imagen.
-    const icon = this.iconoEnviado === this.imagen.png ? '' : this.imagen.png.toString('base64')
-    this.iconoEnviado = this.imagen.png
-    ignorar(nativo('tray.set', { tooltip: this.tip, icon, items }))
-  }
+  setToolTip(): void {}
+  setContextMenu(): void {}
+  destroy(): void {}
 }
 
 export default { app, ipcMain, BrowserWindow, shell, dialog, clipboard, nativeTheme, powerMonitor, screen, net, Notification, safeStorage, protocol, session, nativeImage, Menu, Tray }

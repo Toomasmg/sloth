@@ -30,16 +30,7 @@ pub mod validar;
 /// Los errores de esta función son el texto que se le muestra a la persona.
 pub type Res<T> = Result<T, String>;
 
-/// Primeros `n` caracteres (unidades UTF-16) como `s.slice(0, n)`; un par partido por la mitad se descarta.
-pub(crate) fn cortar_utf16(s: &str, n: usize) -> String {
-    let mut u = 0;
-    s.chars()
-        .take_while(|c| {
-            u += c.len_utf16();
-            u <= n
-        })
-        .collect()
-}
+pub(crate) use super::cortar_utf16;
 
 /// `String(error.message).slice(0, 300)` de los `msgOf` del TypeScript.
 pub(crate) fn mensaje_corto(m: &str) -> String {

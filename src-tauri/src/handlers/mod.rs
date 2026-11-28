@@ -20,6 +20,8 @@ pub mod team;
 pub mod team_config;
 pub mod templates;
 pub mod tickets;
+pub mod tray;
+pub mod updater;
 pub mod worktrees;
 
 static NULO: Value = Value::Null;
@@ -34,7 +36,7 @@ pub fn a_json<T: Serialize>(r: Result<T, String>) -> Respuesta {
 }
 
 /// Las funciones del lado main que atiende Rust. El proceso de apoyo no las registra ni las corre.
-pub const FUNCIONES_EN_RUST: &[&str] = &[git::NOMBRE, help::NOMBRE, report::NOMBRE, team_config::NOMBRE, prs::NOMBRE, chat::NOMBRE, history::NOMBRE, templates::NOMBRE, worktrees::NOMBRE, dictado::NOMBRE, export_import::NOMBRE, onboarding::NOMBRE, tickets::NOMBRE, team::NOMBRE];
+pub const FUNCIONES_EN_RUST: &[&str] = &[git::NOMBRE, help::NOMBRE, report::NOMBRE, team_config::NOMBRE, prs::NOMBRE, chat::NOMBRE, history::NOMBRE, templates::NOMBRE, worktrees::NOMBRE, dictado::NOMBRE, export_import::NOMBRE, onboarding::NOMBRE, tickets::NOMBRE, team::NOMBRE, tray::NOMBRE, updater::NOMBRE];
 
 pub fn funciones_en_rust() -> String {
     FUNCIONES_EN_RUST.join(",")
@@ -66,6 +68,9 @@ pub trait AlHook: Send + Sync {
     /// Lo que pasa con cuentas y terminales, que son del núcleo: `cuentaPreparada` y `cuentaBorrada` (con la cuenta) y
     /// `terminalCerrada`.
     fn al_evento(&self, _evento: &str, _datos: &Value) {}
+
+    /// Pasó un evento hacia la UI (`agent:status`, `permission:new`...), venga de Rust o del proceso de apoyo.
+    fn al_evento_ui(&self, _canal: &str) {}
 
     /// Un pedido `rust.<algo>` del proceso de apoyo para esta función; `None` si no es suyo.
     fn nativo(&self, _op: &str, _args: &[Value]) -> Option<Respuesta> {

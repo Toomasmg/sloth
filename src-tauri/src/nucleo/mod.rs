@@ -147,6 +147,13 @@ impl Nucleo {
         }
     }
 
+    /// Pasó un evento hacia la UI: las funciones de Rust que dependen de otro dueño (la bandeja) se enteran.
+    pub fn avisar_evento_ui(&self, canal: &str) {
+        for h in self.al_hook.read().unwrap_or_else(|e| e.into_inner()).iter() {
+            h.al_evento_ui(canal);
+        }
+    }
+
     /// Un pedido `rust.<función>` del proceso de apoyo para una función de Rust.
     pub fn nativo_de_funciones(&self, op: &str, args: &[Value]) -> Result<Value, String> {
         let hooks = self.al_hook.read().unwrap_or_else(|e| e.into_inner()).clone();

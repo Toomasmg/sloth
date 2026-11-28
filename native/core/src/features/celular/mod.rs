@@ -29,16 +29,7 @@ pub(crate) fn largo_utf16(s: &str) -> usize {
     s.encode_utf16().count()
 }
 
-/// `s.slice(0, n)` en unidades UTF-16; un par de sustitutos partido por la mitad se descarta.
-pub(crate) fn cortar_utf16(s: &str, n: usize) -> String {
-    let mut u = 0;
-    s.chars()
-        .take_while(|c| {
-            u += c.len_utf16();
-            u <= n
-        })
-        .collect()
-}
+pub(crate) use super::cortar_utf16;
 
 #[cfg(test)]
 pub(crate) mod pruebas {
