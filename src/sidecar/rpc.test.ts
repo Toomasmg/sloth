@@ -91,3 +91,23 @@ test('emitir manda un evento a la UI y native-event llega a quien lo espera', ()
   rpc.recibir(JSON.stringify({ k: 'native-event', name: 'window:focus', args: [true] }) + '\n')
   assert.deepEqual(vistos, [[true]])
 })
+
+test('mientras arranca el main, un pedido a un canal sin registrar espera y se atiende al soltar', async () => {
+  const { rpc, salidas } = armar()
+  rpc.retener()
+  rpc.recibir(JSON.stringify({ k: 'invoke', id: 1, channel: 'tarde', args: [4] }) + '\n')
+  const vistos: unknown[] = []
+  rpc.recibir(JSON.stringify({ k: 'send', channel: 'oido', args: ['a'] }) + '\n')
+  await esperar()
+  assert.deepEqual(salidas, [])
+  rpc.handle('tarde', (_e, n) => (n as number) * 2)
+  rpc.on('oido', (_e, x) => vistos.push(x))
+  rpc.soltar()
+  await esperar()
+  assert.deepEqual(salidas, [{ k: 'result', id: 1, ok: true, result: 8 }])
+  assert.deepEqual(vistos, ['a'])
+  rpc.recibir(JSON.stringify({ k: 'invoke', id: 2, channel: 'nada', args: [] }) + '\n')
+  await esperar()
+  const ultima = salidas[salidas.length - 1] as Salida
+  assert.ok(ultima.k === 'result' && !ultima.ok)
+})

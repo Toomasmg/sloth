@@ -23,7 +23,8 @@ import { lectorLimites, limitesDeCuenta } from './codex-limites'
 import type { LecturaLimitesCodex } from '../shared/celular'
 import { avisarNotify, desinstalarNotify, prepararNotify } from './codex-notify'
 import { entornoDeTerminal } from './hook-env-core'
-import { alEventoDeRust, anunciarPerfil, atiendeRust, hayFuncionesEnRust, reenviarEvento, reenviarHook } from './rust-features'
+import { alEventoDeRust, atiendeRust, CANALES_DEL_NUCLEO_EN_RUST, pedirAlNucleo, rustEsDueno } from './rust-features'
+import { agentesRust, terminalRemota, terminalesRust } from './nucleo-rust'
 import { escucharSesionDeRust } from './features/chat'
 import { detectarAgentes, powerShell7Disponible } from './agentes'
 import { AVISO_POWERSHELL_7 } from './copilot-exe'
@@ -65,7 +66,10 @@ import { decidirCierreTerminales, esTerminalPropia, terminalesAjenas } from './p
 
 let win: BrowserWindow | null = null
 const windowListeners: ((w: BrowserWindow) => void)[] = []
-const agents = new Map<string, AgentStatus>()
+// Con Rust como dueño del estado (cáscara de Tauri) este proceso no lleva el estado de los agentes ni las terminales:
+// los ve en la copia que empuja Rust y le pide los cambios (ver src/main/rust-features.ts).
+const enRust = rustEsDueno()
+const agents = enRust ? agentesRust : new Map<string, AgentStatus>()
 
 function send(channel: string, ...args: unknown[]): void {
   if (win && !win.isDestroyed()) win.webContents.send(channel, ...args)
@@ -197,6 +201,8 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
   // Trabajo que no hace falta para pintar (setup de cada cuenta, daemon de terminales) va después de mostrar.
   createWindow(() =>
     setTimeout(() => {
+      // Con Rust como dueño, Rust prepara las cuentas y se conecta al daemon por su cuenta.
+      if (enRust) return void backend()
       for (const acc of store.accounts) safe('preparar cuenta', () => prepareAccount(acc))
       void backend()
     }, 1500).unref()
@@ -285,6 +291,24 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
   let term: TerminalBackend | undefined
   let termPromise: Promise<TerminalBackend> | undefined
   function backend(): Promise<TerminalBackend> {
+    if (enRust && !termPromise) {
+      // Lo que pasa en las terminales ya lo atendió Rust (UI, agentes, permisos): acá solo llega a las funciones.
+      const b = terminalRemota
+      term = b
+      b.on('data', (id: string, chunks: PtyChunk[]) => {
+        for (const l of dataListeners) safe('pty-data', () => l(id, chunks))
+      })
+      b.on('exit', (id: string, code: number) => {
+        for (const l of exitListeners) safe('pty-exit', () => l(id, code))
+      })
+      b.on('hook', (p: HookEventPayload) => {
+        for (const l of hookListeners) safe('hook', () => l(p))
+      })
+      b.on('write', (id: string, data: string) => {
+        for (const l of writeListeners) safe('pty-write', () => l(id, data))
+      })
+      termPromise = Promise.resolve(b)
+    }
     if (!termPromise) {
       termPromise = createTerminalBackend({
         userDataDir: raizDatos(),
@@ -376,6 +400,10 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
 
   /** Deja la cuenta lista antes de abrir Claude: settings + hooks y tu setup compartido. */
   function prepareAccount(acc: Account): void {
+    if (enRust) {
+      pedirAlNucleo('prepareAccount', acc.id).catch((e: unknown) => logger.error('preparar cuenta', e))
+      return
+    }
     // Una cuenta de un agente que esta versión no conoce no se toca: ni hooks ni setup de Claude en su carpeta.
     const p = proveedorDe(acc)
     if (!p) return
@@ -398,6 +426,15 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
     }
     for (const l of prepareListeners) safe('preparar cuenta', () => l(acc))
   }
+
+  if (enRust)
+    alEventoDeRust('rust.cuentaPreparada', (a) => {
+      const acc = typeof a === 'object' && a !== null ? store.account((a as Account).id) : undefined
+      const p = acc && proveedorDe(acc)
+      if (!acc || !p) return
+      if (p.id === 'codex' && p.capacidades.avisoTurno) safe('notify', () => ajustarNotify(acc))
+      for (const l of prepareListeners) safe('preparar cuenta', () => l(acc))
+    })
 
   /** Con el aviso activado deja el `notify` de Sloth en la cuenta; apagado, saca el que puso Sloth. Devuelve el motivo si no quedó como se pidió. */
   function ajustarNotify(acc: Account): string | undefined {
@@ -482,12 +519,14 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
   // Un iframe o una página que se cuele en la ventana no puede mandar pedidos al núcleo: solo vale el origen de la app.
   const desdeLaApp = (e: { senderFrame?: { url: string } | null }): boolean => origenConfiable(e.senderFrame?.url, devUrl)
   function handle<A extends unknown[]>(canal: string, fn: (e: IpcMainInvokeEvent, ...args: A) => unknown): void {
+    if (enRust && CANALES_DEL_NUCLEO_EN_RUST.has(canal)) return
     ipcMain.handle(canal, (e, ...args) => {
       if (!desdeLaApp(e)) throw new Error('Pedido de un origen no permitido.')
       return fn(e, ...(args as A))
     })
   }
   function on<A extends unknown[]>(canal: string, fn: (e: IpcMainEvent, ...args: A) => void): void {
+    if (enRust && CANALES_DEL_NUCLEO_EN_RUST.has(canal)) return
     ipcMain.on(canal, (e, ...args) => {
       if (desdeLaApp(e)) fn(e, ...(args as A))
     })
@@ -810,6 +849,7 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
 
   // Como el cierre que conserva las terminales, pero sin pasar por el cierre de ventana (bandeja, confirmaciones).
   async function reiniciarPorPerfil(): Promise<void> {
+    if (enRust) await pedirAlNucleo('cambioDePerfil')
     marcarCambioDePerfil()
     marcarCierreLimpio()
     quitPrepared = true
@@ -821,17 +861,34 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
   }
 
   // Funciones (features): cada una con sus canales feat:<nombre>:<op>.
-  if (hayFuncionesEnRust()) safe('perfil para Rust', () => anunciarPerfil(rutaPerfil(), (e) => logger.error('rust', e)))
-  if (hayFuncionesEnRust()) hookListeners.push((p) => reenviarHook(p.event, p.ws, (e) => logger.error('rust', e)))
-  if (hayFuncionesEnRust() && atiendeRust('chat')) {
-    const falla = (e: unknown): void => logger.error('rust', e)
-    prepareListeners.push((acc) => reenviarEvento('cuentaPreparada', acc, falla))
-    removeListeners.push((acc) => reenviarEvento('cuentaBorrada', acc, falla))
-    exitListeners.push(() => reenviarEvento('terminalCerrada', null, falla))
+  if (atiendeRust('chat')) {
     alEventoDeRust('aviso', (texto) => {
       if (typeof texto === 'string' && texto.length > 0 && texto.length <= 2000) avisar(texto)
     })
     safe('sesión del chat de Rust', () => escucharSesionDeRust((e) => logger.error('rust', e)))
+  }
+  if (enRust) {
+    // Canales internos (la interfaz no los alcanza): Rust pregunta el comando de un espacio y avisa antes de borrar una cuenta.
+    ipcMain.handle('nucleo:comando', (_e, ws: Workspace, acc: Account) => {
+      for (const o of commandOverrides) {
+        let cmd: string | undefined
+        safe('override', () => (cmd = o(ws, acc)))
+        if (cmd) return cmd
+      }
+      return null
+    })
+    ipcMain.handle('nucleo:cuentaBorrada', (_e, acc: Account) => {
+      for (const l of removeListeners) safe('borrar cuenta', () => l(acc))
+    })
+  }
+  const ctxRust = {
+    writePty: (id: string, data: string): void => void pedirAlNucleo('write', id, data).catch((e: unknown) => logger.error('pty-write', e)),
+    resizePty: (id: string, cols: number, rows: number): void => void pedirAlNucleo('resize', id, cols, rows).catch((e: unknown) => logger.error('pty-resize', e)),
+    setAgent: (id: string, st: AgentStatus): void => {
+      // Quien lo fija lo lee enseguida (dormir y despertar): queda ya en la copia y Rust lo confirma.
+      agentesRust.set(id, st)
+      pedirAlNucleo('setAgent', id, st).catch((e: unknown) => logger.error('agentes', e))
+    }
   }
   for (const f of FEATURES) {
     if (atiendeRust(f.name)) continue
@@ -856,16 +913,19 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
       onPtyExit: (cb) => exitListeners.push(cb),
       onPtyWrite: (cb) => writeListeners.push(cb),
       writePty: (id, data) => {
+        if (enRust) return ctxRust.writePty(id, data)
         if (!esAjena(id)) escribirPty(id, data)
       },
-      ptySize: (id) => tamPc.get(id) ?? null,
+      ptySize: (id) => (enRust ? terminalesRust.tam.get(id) : tamPc.get(id)) ?? null,
       resizePty: (id, cols, rows) => {
+        if (enRust) return ctxRust.resizePty(id, cols, rows)
         if (!esAjena(id)) term?.resize(id, cols, rows)
       },
       agents: () => agents,
-      setAgent,
-      addWorkspace,
+      setAgent: enRust ? ctxRust.setAgent : setAgent,
+      addWorkspace: enRust ? (input) => pedirAlNucleo<Workspace>('addWorkspace', input) : addWorkspace,
       removeWorkspace: async (id) => {
+        if (enRust) return void (await pedirAlNucleo('removeWorkspace', id))
         store.exigirEscritura()
         await (await backend()).kill(id)
         agents.delete(id)
@@ -873,8 +933,8 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
       },
       prepareAccount,
       accountBusy,
-      terminalesAjenas: () => [...ajenas],
-      cerrarTerminalesAjenas,
+      terminalesAjenas: () => (enRust ? [...terminalesRust.ajenas] : [...ajenas]),
+      cerrarTerminalesAjenas: enRust ? () => pedirAlNucleo<number>('cerrarAjenas') : cerrarTerminalesAjenas,
       reiniciarPorPerfil,
       onPrepareAccount: (cb) => prepareListeners.push(cb),
       onRemoveAccount: (cb) => removeListeners.push(cb),
@@ -895,6 +955,11 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
       logger.error(f.name, e)
     }
   }
+
+  // El proceso de apoyo de Tauri retiene los pedidos de la UI que llegaron antes de que se registraran los canales, y
+  // Rust espera a que las funciones fijen su estado inicial antes de entregar `state:get`.
+  app.emit('main-listo')
+  if (enRust) pedirAlNucleo('listo').catch((e: unknown) => logger.error('rust', e))
 
   /** De a una: node-pty en Windows no soporta cerrar varias a la vez (ver daemon/shutdown.ts). */
   async function cerrarTerminalesPropias(b: TerminalBackend): Promise<void> {
@@ -921,6 +986,18 @@ No toqué ninguno de tus datos. Cerrá otras copias de Sloth, revisá que ningú
   app.on('before-quit', (e) => {
     if (quitPrepared) return
     marcarCierreLimpio()
+    if (enRust) {
+      // Rust decide qué pasa con las terminales (conservarlas, cerrar las de este perfil o apagar el daemon).
+      e.preventDefault()
+      quitPrepared = true
+      void Promise.race([pedirAlNucleo('cerrar'), new Promise((r) => setTimeout(r, 5000))])
+        .catch((err: unknown) => logger.error('cierre', err))
+        .finally(() => {
+          finishQuit(undefined)
+          app.quit()
+        })
+      return
+    }
     const b = term
     // En proceso no hay daemon que las conserve: se espera el cierre ordenado igual (ver daemon/shutdown.ts).
     // Al cambiar de perfil el daemon las conserva para cuando se vuelva. Con terminales de otros perfiles

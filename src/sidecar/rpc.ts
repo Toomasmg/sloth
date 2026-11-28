@@ -41,6 +41,8 @@ export class Rpc {
   private readonly nativos = new Map<string, ((...args: unknown[]) => void)[]>()
   private siguiente = 1
   private buf = ''
+  /** Pedidos de la UI a canales que todavía no se registraron, mientras el main arranca (ver `retener`). */
+  private retenidos: Entrada[] | null = null
   private readonly escribir: (linea: string) => void
 
   constructor(escribir: (linea: string) => void) {
@@ -78,6 +80,20 @@ export class Rpc {
     this.nativos.set(name, [...(this.nativos.get(name) ?? []), fn])
   }
 
+  /**
+   * Hasta `soltar`, un pedido a un canal sin handler espera en vez de fallar. Con Rust como dueño del estado el main
+   * registra sus canales recién cuando llega la copia, y la UI puede pedir antes.
+   */
+  retener(): void {
+    if (this.retenidos === null) this.retenidos = []
+  }
+
+  soltar(): void {
+    const r = this.retenidos ?? []
+    this.retenidos = null
+    for (const m of r) this.atender(m)
+  }
+
   /** Alimenta con lo que llega por stdin (trozos de cualquier tamaño). */
   recibir(trozo: string): void {
     this.buf += trozo
@@ -106,10 +122,18 @@ export class Rpc {
       return
     }
     if (!m || typeof m !== 'object') return
+    this.atender(m)
+  }
+
+  private atender(m: Entrada): void {
     switch (m.k) {
       case 'invoke': {
         const args = Array.isArray(m.args) ? m.args : []
         const fn = this.handlers.get(m.channel)
+        if (!fn && this.retenidos) {
+          this.retenidos.push(m)
+          return
+        }
         if (!fn) {
           this.salir({ k: 'result', id: m.id, ok: false, error: `Sin handler para ${m.channel}` })
           return
@@ -124,6 +148,10 @@ export class Rpc {
       }
       case 'send': {
         const args = Array.isArray(m.args) ? m.args : []
+        if (this.retenidos && !this.oyentes.has(m.channel)) {
+          this.retenidos.push(m)
+          return
+        }
         for (const fn of this.oyentes.get(m.channel) ?? []) fn(this.evento(), ...args)
         return
       }

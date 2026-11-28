@@ -1,4 +1,4 @@
-import { app, dialog, nativeTheme, type BrowserWindow } from 'electron'
+import { app, BrowserWindow, dialog, nativeTheme } from 'electron'
 import { join } from 'node:path'
 import { escribirJsonAtomico, leerJson, respaldar } from '../json-file'
 import { avisar, avisoVersionFutura } from '../avisos'
@@ -16,6 +16,8 @@ import {
 } from '../../shared/settings-model'
 import { SURFACE } from '../../shared/surfaces'
 import { carpetaFeatures } from '../perfil'
+import { pedirAjustes, rustEsDueno } from '../rust-features'
+import { ajustesDeRust, alCambiarAjustes } from '../nucleo-rust'
 
 /**
  * Función «settings» (lado main): guarda la Configuración en userData/features/settings.json,
@@ -105,6 +107,7 @@ let ctxRef: FeatureContext | null = null
 
 /** Ajustes vigentes (los lee también la función «permissions» para avisos y «No molestar»). */
 export function currentSettings(): SlothSettings {
+  if (!settings && rustEsDueno()) settings = normalize(ajustesDeRust())
   return settings ?? read()
 }
 let lastDark: boolean | null = null
@@ -135,7 +138,7 @@ function applyNative(): void {
   nativeTheme.themeSource = themeSource(settings.theme)
   const dark = resolveDark(settings.theme, nativeTheme.shouldUseDarkColors)
   lastDark = dark
-  paintWindow(ctxRef?.window() ?? null, dark)
+  paintWindow(ctxRef?.window() ?? BrowserWindow.getAllWindows()[0] ?? null, dark)
 }
 
 function applyLoginItem(): void {
@@ -175,7 +178,30 @@ function commit(next: SlothSettings): SettingsPayload {
 
 /** Cambia la configuración desde main (mismas validaciones que la UI) y avisa a la ventana. */
 export function patchSettings(patch: Partial<SlothSettings>): void {
+  if (rustEsDueno()) {
+    // Rust la guarda, avisa a la ventana y devuelve la copia nueva (alCambiarAjustes). Acá ya queda aplicada.
+    settings = applyPatch(currentSettings(), patch)
+    pedirAjustes(patch).catch((e: unknown) => ctxRef?.log('[settings] Rust no guardó el cambio', e))
+    return
+  }
   commit(applyPatch(settings, patch))
+}
+
+// Con Rust como dueño la Configuración llega como copia: acá solo se aplica lo nativo y se avisa a las funciones.
+if (rustEsDueno()) {
+  alCambiarAjustes((v) => {
+    const previa = settings
+    settings = normalize(v)
+    applyNative()
+    if (previa && previa.openAtLogin !== settings.openAtLogin) applyLoginItem()
+    for (const cb of alCambiar) {
+      try {
+        cb(settings)
+      } catch (e) {
+        console.warn('[settings] onSettingsChanged', e)
+      }
+    }
+  })
 }
 
 const feature: Feature = {

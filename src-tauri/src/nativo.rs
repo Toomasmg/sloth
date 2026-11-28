@@ -209,6 +209,23 @@ fn bandeja(app: &AppHandle, o: &Value) -> Result<Value, String> {
     Ok(Value::Null)
 }
 
+fn png_del_portapapeles(app: &AppHandle) -> Result<Vec<u8>, String> {
+    let img = app.clipboard().read_image().map_err(|e| e.to_string())?;
+    let mut png_bytes = Vec::new();
+    {
+        let mut enc = png::Encoder::new(&mut png_bytes, img.width(), img.height());
+        enc.set_color(png::ColorType::Rgba);
+        enc.set_depth(png::BitDepth::Eight);
+        let mut w = enc.write_header().map_err(|e| e.to_string())?;
+        w.write_image_data(img.rgba()).map_err(|e| e.to_string())?;
+    }
+    Ok(png_bytes)
+}
+
+pub fn imagen_del_portapapeles(app: &AppHandle) -> Option<Vec<u8>> {
+    png_del_portapapeles(app).ok()
+}
+
 pub fn atender(app: &AppHandle, op: &str, args: Vec<Value>) -> Result<Value, String> {
     let nulo = Ok(Value::Null);
     match op {
@@ -296,18 +313,7 @@ pub fn atender(app: &AppHandle, op: &str, args: Vec<Value>) -> Result<Value, Str
         "updater.check" => buscar_actualizacion(app),
         "updater.download" => bajar_actualizacion(app),
         "updater.install" => instalar_actualizacion(),
-        "clipboard.readImage" => {
-            let img = app.clipboard().read_image().map_err(|e| e.to_string())?;
-            let mut png_bytes = Vec::new();
-            {
-                let mut enc = png::Encoder::new(&mut png_bytes, img.width(), img.height());
-                enc.set_color(png::ColorType::Rgba);
-                enc.set_depth(png::BitDepth::Eight);
-                let mut w = enc.write_header().map_err(|e| e.to_string())?;
-                w.write_image_data(img.rgba()).map_err(|e| e.to_string())?;
-            }
-            Ok(Value::String(base64::engine::general_purpose::STANDARD.encode(png_bytes)))
-        }
+        "clipboard.readImage" => Ok(Value::String(base64::engine::general_purpose::STANDARD.encode(png_del_portapapeles(app)?))),
         "clipboard.readFiles" => {
             // Archivos copiados en el Explorador (CF_HDROP): el plugin del portapapeles no los lee.
             let archivos: Vec<String> = clipboard_win::get_clipboard(clipboard_win::formats::FileList).map_err(|e| e.to_string())?;
@@ -362,7 +368,13 @@ pub fn atender(app: &AppHandle, op: &str, args: Vec<Value>) -> Result<Value, Str
             app.exit(args.first().and_then(Value::as_i64).unwrap_or(0) as i32);
             nulo
         }
-        "app.relaunch" => app.restart(),
+        "app.relaunch" => {
+            // `restart` no pasa por RunEvent::Exit: las terminales se dejan como corresponde antes.
+            if let Some(n) = app.try_state::<std::sync::Arc<crate::nucleo::Nucleo>>() {
+                n.al_salir();
+            }
+            app.restart()
+        }
         otro => Err(format!("operación nativa no disponible todavía: {otro}")),
     }
 }

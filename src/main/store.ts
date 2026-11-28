@@ -6,6 +6,10 @@ import { avisar } from './avisos'
 import { escribirJsonAtomico, leerJson, respaldar } from './json-file'
 import { iniciarPerfiles, raizDatos, rutaPerfil } from './perfil'
 import { corregirRutasViejas, decidirCarga, estadoVacio, validarEstado, type PersistedState } from './store-core'
+import { pedirAlStore, rustEsDueno } from './rust-features'
+import { alCambiarCopia, copiaDeRust } from './nucleo-rust'
+import { aplicarParche, camposQuitados, type CopiaEstado } from './espejo-rust'
+import { logger } from './logger-global'
 
 export interface SoloLecturaStore {
   motivo: string
@@ -22,12 +26,32 @@ export class Store {
   private soloLecturaMotivo: string | undefined
   private soloLecturaCausa: SoloLecturaStore['causa'] = 'io'
   private cargaConfiable = false
+  /** Con Rust como dueño: este store es una copia de solo lectura y cada cambio se le pide a Rust. */
+  private readonly espejo = rustEsDueno()
 
   constructor() {
     iniciarPerfiles()
-    mkdirSync(rutaPerfil(), { recursive: true })
     this.file = rutaPerfil('sloth-state.json')
+    if (this.espejo) {
+      const c = copiaDeRust()
+      if (c) this.recibir(c)
+      alCambiarCopia((x) => this.recibir(x))
+      return
+    }
+    mkdirSync(rutaPerfil(), { recursive: true })
     this.state = this.load()
+  }
+
+  private recibir(c: CopiaEstado): void {
+    this.state = c.estado as unknown as PersistedState
+    this.cargaConfiable = c.confiable
+    this.soloLecturaMotivo = c.soloLectura?.motivo
+    this.soloLecturaCausa = c.soloLectura?.causa ?? 'io'
+  }
+
+  /** Lo aplica ya en la copia (quien llama lo lee enseguida) y se lo pide a Rust, que contesta con la copia nueva. */
+  private aRust(op: string, ...args: unknown[]): void {
+    pedirAlStore(op, ...args).catch((e: unknown) => logger.error('store', `Rust no guardó ${op}: ${e instanceof Error ? e.message : String(e)}`))
   }
 
   /** Si no se pudo leer, respaldar o guardar sloth-state.json: los cambios de esta sesión no se guardan. */
@@ -111,11 +135,17 @@ export class Store {
   addAccount(account: Account): void {
     this.exigirEscritura()
     this.state.accounts.push(account)
+    if (this.espejo) return this.aRust('addAccount', account)
     this.save()
   }
   updateAccount(id: string, patch: Partial<Omit<Account, 'id' | 'configDir'>>): Account | undefined {
     const acc = this.account(id)
     if (!acc) return undefined
+    if (this.espejo) {
+      aplicarParche(acc, patch)
+      this.aRust('updateAccount', id, patch)
+      return acc
+    }
     Object.assign(acc, patch)
     this.save()
     return acc
@@ -123,6 +153,11 @@ export class Store {
   updateWorkspace(id: string, patch: Partial<Omit<Workspace, 'id'>>): Workspace | undefined {
     const ws = this.workspace(id)
     if (!ws) return undefined
+    if (this.espejo) {
+      aplicarParche(ws, patch)
+      this.aRust('updateWorkspace', id, patch, camposQuitados(patch))
+      return ws
+    }
     Object.assign(ws, patch)
     this.save()
     return ws
@@ -130,21 +165,25 @@ export class Store {
   removeAccount(id: string): void {
     this.exigirEscritura()
     this.state.accounts = this.state.accounts.filter((a) => a.id !== id)
+    if (this.espejo) return this.aRust('removeAccount', id)
     this.save()
   }
   addWorkspace(ws: Workspace): void {
     this.exigirEscritura()
     this.state.workspaces.push(ws)
+    if (this.espejo) return this.aRust('addWorkspace', ws)
     this.save()
   }
   removeWorkspace(id: string): void {
     this.exigirEscritura()
     this.state.workspaces = this.state.workspaces.filter((w) => w.id !== id)
     this.state.openPanes = this.state.openPanes.filter((p) => p !== id)
+    if (this.espejo) return this.aRust('removeWorkspace', id)
     this.save()
   }
   setOpenPanes(ids: string[]): void {
     this.state.openPanes = ids
+    if (this.espejo) return this.aRust('setOpenPanes', ids)
     this.save()
   }
 }

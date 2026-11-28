@@ -16,10 +16,18 @@ import { cifrar, claveDeUserData, descifrar } from './safe-storage'
 
 let rpc!: Rpc
 let ventanaVisible = false
+// Rust es el dueño del estado: el main arranca cuando llegó la primera copia (perfil, store y Configuración).
+let estadoListo: Promise<void> = Promise.resolve()
 
 /** Lo primero que hace el punto de entrada: conectar el shim con el puente. */
 export function iniciar(r: Rpc): void {
   rpc = r
+  estadoListo = new Promise((listo) => rpc.alEventoNativo('rust.estado', () => listo()))
+  // Los pedidos de la UI que lleguen antes de que el main registre sus canales esperan (main-listo, o 20 s).
+  rpc.retener()
+  const soltar = (): void => rpc.soltar()
+  app.once('main-listo', soltar)
+  setTimeout(soltar, 20_000).unref()
   rpc.alEventoNativo('theme', (dark) => {
     nativeTheme.dark = dark === true
     nativeTheme.emit('updated')
@@ -153,7 +161,7 @@ class App extends EventEmitter {
     }
   }
   whenReady(): Promise<void> {
-    return Promise.resolve()
+    return estadoListo
   }
   isReady(): boolean {
     return true

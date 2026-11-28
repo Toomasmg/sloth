@@ -162,12 +162,26 @@ impl Store {
         self.actualizar("workspaces", id, parche, &["id"])
     }
 
+    /// Como `update_workspace`, y además saca los campos de `quitar` (en el TypeScript, los que quedaban en `undefined`).
+    pub fn update_workspace_quitando(&mut self, id: &str, parche: &Objeto, quitar: &[String]) -> Result<Option<Value>, String> {
+        self.actualizar_quitando("workspaces", id, parche, &["id"], quitar)
+    }
+
     fn actualizar(&mut self, lista: &str, id: &str, parche: &Objeto, protegidos: &[&str]) -> Result<Option<Value>, String> {
+        self.actualizar_quitando(lista, id, parche, protegidos, &[])
+    }
+
+    fn actualizar_quitando(&mut self, lista: &str, id: &str, parche: &Objeto, protegidos: &[&str], quitar: &[String]) -> Result<Option<Value>, String> {
         let Some(item) = self.lista_mut(lista).iter_mut().find(|x| x["id"] == id) else { return Ok(None) };
         let o = item.as_object_mut().ok_or("entrada dañada")?;
         for (k, v) in parche {
             if !protegidos.contains(&k.as_str()) {
                 o.insert(k.clone(), v.clone());
+            }
+        }
+        for k in quitar {
+            if !protegidos.contains(&k.as_str()) {
+                o.shift_remove(k);
             }
         }
         let copia = item.clone();
@@ -254,6 +268,23 @@ mod tests {
         assert!(s.solo_lectura().is_none());
         assert!(av.tomar().is_empty());
         assert!(!d.join("sloth-state.json").exists(), "no escribe hasta que haya algo que guardar");
+    }
+
+    #[test]
+    fn actualizar_quitando_saca_campos_sin_mover_el_espacio_ni_tocar_el_id() {
+        let (d, av) = (carpeta(), Avisos::nuevo());
+        let f = d.join("sloth-state.json");
+        let mut s = Store::cargar(&f, VIEJA, NUEVA, &av);
+        s.add_workspace(json!({ "id": "w1", "name": "a", "icon": "x", "repoPath": "C:\\r", "cwd": "C:\\r", "accountId": "a1", "createdAt": 1 })).unwrap();
+        s.add_workspace(espacio("w2")).unwrap();
+        let parche = json!({ "name": "b" });
+        let w = s.update_workspace_quitando("w1", parche.as_object().unwrap(), &["icon".into(), "id".into()]).unwrap().unwrap();
+        assert_eq!(w["name"], "b");
+        assert!(w.get("icon").is_none());
+        assert_eq!(w["id"], "w1");
+        let otra = Store::cargar(&f, VIEJA, NUEVA, &av);
+        assert_eq!(otra.workspaces()[0]["id"], "w1");
+        assert!(otra.workspaces()[0].get("icon").is_none());
     }
 
     #[test]

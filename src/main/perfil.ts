@@ -53,9 +53,31 @@ function renombrarEstadoViejo(): void {
   }
 }
 
+/**
+ * En la cáscara de Tauri el arranque de los perfiles (con sus migraciones) lo hace Rust, que es el dueño del estado, y
+ * le pasa a este proceso el resultado en SLOTH_PERFIL_RUST: acá no se toca el disco.
+ */
+export function arranqueDeRust(env: string | undefined): { id: string; resultado: ResultadoArranque } | undefined {
+  if (!env) return undefined
+  try {
+    const v = JSON.parse(env) as { id?: unknown; modoRaiz?: unknown; indice?: unknown }
+    const indice = v.indice as IndicePerfiles | undefined
+    if (typeof v.id !== 'string' || !indice || typeof indice.activo !== 'string' || !Array.isArray(indice.perfiles)) return undefined
+    return { id: v.id, resultado: { indice, migrado: false, reconstruido: false, error: v.modoRaiz === true ? 'los perfiles no se pudieron preparar' : undefined } }
+  } catch {
+    return undefined
+  }
+}
+
 /** Idempotente: lo llama el store al arrancar o la primera función que pida una ruta del perfil. */
 export function iniciarPerfiles(): ResultadoArranque {
   if (resultado) return resultado
+  const deRust = arranqueDeRust(process.env.SLOTH_PERFIL_RUST)
+  if (deRust) {
+    resultado = deRust.resultado
+    activoSesion = deRust.id
+    return resultado
+  }
   traerDeAntiRea()
   renombrarEstadoViejo()
   resultado = iniciarPerfilesFs(raizDatos(), Date.now)

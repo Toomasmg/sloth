@@ -158,3 +158,13 @@ impl Reenvio for ReenvioNulo {
     }
     fn enviar(&self, _: String, _: Vec<Value>) {}
 }
+
+/// El daemon real compilado en el mismo target (`cargo build` de native/daemon) o `SLOTH_DAEMON_EXE`. Sin él, las pruebas
+/// que lo usan no corren y lo dicen.
+#[cfg(windows)]
+pub fn exe_del_daemon() -> Option<PathBuf> {
+    if let Some(p) = std::env::var_os("SLOTH_DAEMON_EXE") {
+        return Some(PathBuf::from(p));
+    }
+    std::env::current_exe().ok()?.ancestors().flat_map(|d| [d.join("debug").join("sloth-daemon.exe"), d.join("release").join("sloth-daemon.exe")]).find(|p| p.exists())
+}
