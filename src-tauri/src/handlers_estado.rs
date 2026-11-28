@@ -490,6 +490,7 @@ mod tests {
     use crate::nucleo::Apoyo;
     use crate::router::{Futuro, Reenvio};
     use crate::tests_comunes::PlataformaSimulada;
+    use sloth_core::agent_machine::EstadoAgente;
     use std::path::PathBuf;
     use std::sync::Mutex;
 
@@ -538,12 +539,18 @@ mod tests {
     }
 
     fn armar(nombre: &str, estado: Option<Value>, exe: Option<PathBuf>) -> Armado {
+        armar_con(nombre, estado, exe, |_| {})
+    }
+
+    /// `antes` recibe la carpeta del perfil para dejar archivos antes de crear el núcleo.
+    fn armar_con(nombre: &str, estado: Option<Value>, exe: Option<PathBuf>, antes: impl FnOnce(&Path)) -> Armado {
         let raiz = std::env::temp_dir().join(format!("sloth-nucleo-{nombre}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&raiz);
         let arranque = arrancar(&raiz, None, sloth_core::avisos::Avisos::global());
         if let Some(e) = estado {
             std::fs::write(arranque.perfil.join("sloth-state.json"), e.to_string()).unwrap();
         }
+        antes(&arranque.perfil);
         let plataforma = Arc::new(PlataformaSimulada::default());
         let apoyo = Arc::new(ApoyoSimulado::default());
         let conf = ConfDaemon { raiz: raiz.clone(), version: "0.0.0-prueba".into(), exe };
@@ -745,7 +752,7 @@ mod tests {
     fn diagnostico_lista_las_funciones_de_rust_y_del_apoyo_y_avisa_el_cierre_inesperado_una_vez() {
         let mut a = armar("diagnostico", None, None);
         crate::handlers::diagnostico::registrar(&mut a.router, &a.nucleo, "142.0.3595.53".into());
-        a.nucleo.marcar_apoyo_listo(nombres_de_funciones(&json!(["sleep", "", 7, "x".repeat(65), "celular"])));
+        a.nucleo.marcar_apoyo_listo(nombres_de_funciones(&json!(["permissions", "", 7, "x".repeat(65), "celular"])));
         let (_, _) = crate::nucleo::arranque::MarcaDeSesion::iniciar(&a.raiz);
         let (marca, crash) = crate::nucleo::arranque::MarcaDeSesion::iniciar(&a.raiz);
         assert!(crash);
@@ -754,7 +761,7 @@ mod tests {
         let texto = invocar(&a, "feat:diagnostico:texto", vec![]).unwrap();
         let texto = texto.as_str().unwrap();
         assert!(texto.contains("WebView2 142.0.3595.53") && !texto.contains("Electron"), "{texto}");
-        assert!(texto.contains("settings, diagnostico, sleep, celular
+        assert!(texto.contains("settings, diagnostico, sleep, permissions, celular
 "), "{texto}");
         assert!(texto.contains("Funciones activas: git, "), "{texto}");
         assert!(texto.contains("La sesión anterior terminó de forma inesperada."));
@@ -774,5 +781,29 @@ mod tests {
         a.nucleo.al_salir();
         let (_, crash) = crate::nucleo::arranque::MarcaDeSesion::iniciar(&a.raiz);
         assert!(!crash);
+    }
+
+    #[test]
+    fn un_dormido_arranca_dormido_y_al_despertarlo_se_reabre_con_continue() {
+        let repo = std::env::temp_dir().join(format!("sloth-repo-dormido-{}", std::process::id()));
+        std::fs::create_dir_all(&repo).unwrap();
+        let estado = estado_con_espacio(&repo.to_string_lossy());
+        let mut a = armar_con("dormido", Some(estado), None, |perfil| {
+            std::fs::create_dir_all(perfil.join("features")).unwrap();
+            std::fs::write(perfil.join("features").join("sleep.json"), r#"{"asleep":["w1"]}"#).unwrap();
+        });
+        crate::handlers::sleep::registrar(&mut a.router, &a.nucleo);
+        assert_eq!(a.nucleo.estado_de_agente("w1").map(|e| e.estado), Some(EstadoAgente::Sleeping));
+
+        assert_eq!(invocar(&a, "feat:sleep:wake", vec![json!("no-existe")]).unwrap_err(), "Ese espacio ya no existe.");
+        assert!(invocar(&a, "feat:sleep:wake", vec![json!(5)]).is_err());
+        assert_eq!(invocar(&a, "feat:sleep:wake", vec![json!("w1")]).unwrap(), Value::Null);
+        assert_eq!(a.nucleo.estado_de_agente("w1").map(|e| e.estado), Some(EstadoAgente::Idle));
+        let reinicio = a.plataforma.eventos.lock().unwrap().iter().any(|(c, args)| c == "ui:command" && args[0] == json!({ "type": "restart-pane", "id": "w1" }));
+        assert!(reinicio, "la UI reabre la terminal");
+        // Sin terminal viva la marca queda: la próxima terminal arranca con `claude --continue` y la gasta.
+        assert!(a.nucleo.dormir.tomar_para_retomar("w1"));
+        assert!(!a.nucleo.dormir.tomar_para_retomar("w1"));
+        let _ = std::fs::remove_dir_all(&repo);
     }
 }

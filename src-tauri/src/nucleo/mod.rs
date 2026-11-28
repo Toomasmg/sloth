@@ -5,6 +5,7 @@
 pub mod ajustes;
 pub mod arranque;
 pub mod cuentas;
+pub mod dormir;
 pub mod terminales;
 
 use crate::entorno::PlataformaCompartida;
@@ -85,6 +86,7 @@ pub struct Nucleo {
     marca_de_sesion: OnceLock<arranque::MarcaDeSesion>,
     /// La sesión anterior no cerró limpia (`feat:diagnostico:crashPrevio` lo avisa una sola vez).
     pub crash: sloth_core::features::diagnostico::EstadoCrash,
+    pub dormir: dormir::Dormir,
     yo: Weak<Nucleo>,
 }
 
@@ -93,6 +95,12 @@ impl Nucleo {
         let avisos = Avisos::global();
         let store = Store::cargar(&arranque.perfil.join("sloth-state.json"), &antirea_vieja(&arranque.raiz), &arranque.raiz.to_string_lossy(), avisos);
         let ajustes = ajustes::Ajustes::cargar(&arranque.perfil.join("features").join("settings.json"), avisos);
+        let dormir = dormir::Dormir::cargar(&arranque.perfil.join("features").join("sleep.json"), |id| store.workspace(id).is_some(), store.confiable(), avisos);
+        // Los dormidos se ven «Dormido» desde el primer `state:get`: su terminal no se abre hasta despertarlos.
+        let mut agentes = Agentes::default();
+        for id in dormir.dormidos() {
+            agentes.fijar(&id, EstadoDeAgente { estado: EstadoAgente::Sleeping, detalle: None, at: ahora_ms() });
+        }
         Arc::new_cyclic(|yo: &Weak<Nucleo>| {
             let debil = yo.clone();
             let terminales = Terminales::nuevas(
@@ -110,7 +118,7 @@ impl Nucleo {
                 apoyo,
                 store: Mutex::new(store),
                 ajustes: Mutex::new(ajustes),
-                agentes: Mutex::default(),
+                agentes: Mutex::new(agentes),
                 fondos: Mutex::default(),
                 pegados: Mutex::default(),
                 tam_pc: Mutex::default(),
@@ -126,6 +134,7 @@ impl Nucleo {
                 funciones_del_apoyo: Mutex::default(),
                 marca_de_sesion: OnceLock::new(),
                 crash: Default::default(),
+                dormir,
                 yo: yo.clone(),
             }
         })
@@ -359,7 +368,9 @@ impl Nucleo {
             terminales_ajenas(&propias, &|id| es_terminal_propia(id, &|x| st.workspace(x).is_some(), &|x| st.account(x).is_some()))
         };
         bloquear(&self.ajenas).extend(ajenas.iter().cloned());
-        for (ws, ev) in self.terminales.ultimos_hooks() {
+        let ultimos = self.terminales.ultimos_hooks();
+        self.dormir.partir_de(&ultimos, ahora_ms() as f64);
+        for (ws, ev) in ultimos {
             if self.espacio(&ws).is_none() || !corriendo.contains(&ws) {
                 continue;
             }
@@ -393,6 +404,7 @@ impl Nucleo {
                     return;
                 }
                 self.ui("pty:exit", &[json!(id), json!(code)]);
+                self.dormir.al_cerrar(&id);
                 self.apoyo.evento("rust.pty", json!(["exit", id, code]));
                 self.avisar_funciones("terminalCerrada", &Value::Null);
                 // Un espacio dormido sigue «Dormido» (su terminal se cerró a propósito).
@@ -418,6 +430,7 @@ impl Nucleo {
     /// Evento de hook de Claude → estado del espacio. Los avisos de Windows los manda la función «permissions».
     pub fn al_hook(&self, mut p: HookEventPayload) {
         let ahora = ahora_ms();
+        self.dormir.al_hook(&p, ahora as f64);
         let en_fondo = {
             let mut f = bloquear(&self.fondos);
             let e = EventoFondo { ws: &p.ws, evento: &p.event, notification_type: p.notification_type.as_deref(), en_segundo_plano: p.en_segundo_plano == Some(true), aviso_de_tarea: p.aviso_de_tarea == Some(true) };
@@ -512,6 +525,7 @@ impl Nucleo {
             return;
         }
         self.terminales.write(id, data);
+        self.dormir.al_escribir(id, data, ahora_ms() as f64);
         self.apoyo.evento("rust.pty", json!(["write", id, data]));
         // Un agente sin hooks (Codex) no avisa al empezar otro turno: lo que escribís lo saca de «terminó» a «idle».
         let Some(ws) = self.espacio(id) else { return };
@@ -598,6 +612,45 @@ impl Nucleo {
             _ => {
                 self.cerrar_terminales_propias(&t);
                 t.soltar();
+            }
+        }
+    }
+
+    /// Cada tanto se duermen los espacios inactivos (si «Dormir espacios inactivos» está prendido). El hilo termina
+    /// con el núcleo.
+    pub fn arrancar_dormir(&self) {
+        let env = std::env::var("SLOTH_SLEEP_AFTER_MS").ok();
+        let cada = std::time::Duration::from_millis(sloth_core::features::sleep::intervalo_del_tick_ms(env.as_deref()) as u64);
+        let yo = self.yo.clone();
+        std::thread::spawn(move || loop {
+            std::thread::sleep(cada);
+            let Some(n) = yo.upgrade() else { return };
+            n.dormir_inactivos(env.as_deref());
+        });
+    }
+
+    fn dormir_inactivos(&self, env: Option<&str>) {
+        let minutos = self.ajustes().get("sleepAfterMin").and_then(Value::as_f64).unwrap_or(0.0);
+        let Some(despues) = sloth_core::features::sleep::espera_para_dormir_ms(env, minutos) else { return };
+        let Some(t) = self.terminales_si_hay() else { return };
+        let con_permiso: HashSet<String> = t.permisos().into_iter().map(|r| r.ws).collect();
+        // Dormir se apoya en los hooks y en `claude --continue`: otro agente nunca se duerme.
+        let espacios: Vec<(String, String)> = {
+            let st = self.store();
+            st.workspaces()
+                .iter()
+                .filter(|w| w["accountId"].as_str().and_then(|a| st.account(a)).is_none_or(|a| sloth_core::proveedores::capacidades_de(a).is_none_or(|c| c.dormir)))
+                .filter_map(|w| Some((w["id"].as_str()?.to_string(), w["name"].as_str().unwrap_or_default().to_string())))
+                .collect()
+        };
+        let candidatos: Vec<dormir::Candidato> = espacios.iter().map(|(id, _)| dormir::Candidato { id, corriendo: t.esta_corriendo(id), permiso_pendiente: con_permiso.contains(id) }).collect();
+        for id in self.dormir.elegir(&candidatos, ahora_ms() as f64, despues) {
+            // Primero el estado: así la salida de la terminal no lo pisa con «Cerrado».
+            self.fijar_agente(&id, EstadoDeAgente { estado: EstadoAgente::Sleeping, detalle: None, at: ahora_ms() });
+            let nombre = espacios.iter().find(|(x, _)| *x == id).map(|(_, n)| n.as_str()).unwrap_or_default();
+            sloth_core::logger_global::info(dormir::NOMBRE, &format!("durmiendo «{nombre}» ({} min sin uso)", (despues / 60_000.0).round()));
+            if let Err(e) = t.kill(&id) {
+                sloth_core::logger_global::aviso(dormir::NOMBRE, &format!("no se pudo dormir: {e}"));
             }
         }
     }

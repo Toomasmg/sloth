@@ -70,8 +70,14 @@ Conectado: `git` (26 canales), `help` (2), `report` (4), `team-config` (11), `pr
 (`src-tauri/src/handlers_estado.rs`): `state:get`, `permission:pending`, `daemon:info`, `daemon:shutdown`, `accounts:add`,
 `accounts:setShareSetup`, `accounts:remove`, `accounts:statuses`, `workspaces:add|remove|update|reveal`, `ui:openPanes`,
 `dialog:pickFolder`, `pty:start|write|resize|kill|cuentaOcupada|running|resumeOnce`, `clipboard:read|write`,
-`feat:settings:get|set|reset|pickProjectsDir` y `feat:diagnostico:texto|crashPrevio|errorRenderer`
-(`src-tauri/src/handlers/diagnostico.rs`, del núcleo porque vive de su estado: ver `FUNCIONES_DEL_NUCLEO`).
+`feat:settings:get|set|reset|pickProjectsDir`, `feat:diagnostico:texto|crashPrevio|errorRenderer`
+(`src-tauri/src/handlers/diagnostico.rs`) y `feat:sleep:wake` (`handlers/sleep.rs`). Estas dos son del núcleo porque viven
+de su estado: ver `FUNCIONES_DEL_NUCLEO`.
+
+- `sleep`: lo decide `nucleo/dormir.rs`, que el núcleo alimenta con cada hook, escritura, salida de terminal y la
+  rehidratación del daemon. Un hilo revisa cada minuto (`SLOTH_SLEEP_AFTER_MS` para probar) y cierra la terminal de los
+  inactivos. El comando de un espacio dormido es `claude --continue` antes de preguntarle al apoyo (`nucleo:comando`).
+  Los dormidos se ven «Dormido» desde el primer `state:get`.
 
 - `diagnostico`: el texto sale del log en memoria de Rust, de la marca de cierre inesperado (`logs/sesion.json`, que Rust
   toma al arrancar y deja limpia en `al_salir`; `MarcaDeSesion` en `nucleo/arranque.rs`) y de los ajustes del núcleo. Las
@@ -131,7 +137,7 @@ Por qué el resto sigue en el proceso de apoyo:
   resumen, que necesita los hooks que ya tiene el núcleo.
 - `rendimiento`: vive de eventos del proceso de apoyo que Rust no recibe: cambios de ajustes (`onSettingsChanged`), salida de
   las terminales sin daemon (`onPtyData`), reconexión del daemon y la energía (`powerMonitor`). Ptys y ajustes ya son del núcleo; falta mover la energía.
-- `sleep`, `permissions`, `broadcast`: el port de `native/core` es de piezas puras sin la función completa armada (falta el contexto con su
+- `permissions`, `broadcast`: el port de `native/core` es de piezas puras sin la función completa armada (falta el contexto con su
   estado y E/S); se conectan de a una en PRs siguientes.
 
 El TS de `git` (`src/main/features/git.ts`, `git-ops`, `git-run`) queda como respaldo: Electron lo sigue usando y worktrees,

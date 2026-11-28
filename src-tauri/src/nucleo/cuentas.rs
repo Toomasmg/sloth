@@ -193,6 +193,10 @@ impl Cuentas {
             if let Some(sesion) = self.tomar_retomar(ws["id"].as_str().unwrap_or_default(), acc["id"].as_str().unwrap_or_default()) {
                 return Some(vec!["claude".into(), "--resume".into(), sesion]);
             }
+            // Un espacio dormido retoma su conversación al abrirse.
+            if n.dormir.tomar_para_retomar(ws["id"].as_str().unwrap_or_default()) {
+                return Some(sloth_core::features::sleep::COMANDO_AL_DESPERTAR.split(' ').map(str::to_owned).collect());
+            }
             match n.apoyo.pedir("nucleo:comando", vec![ws.clone(), acc.clone()]) {
                 Ok(Value::String(c)) if !c.trim().is_empty() => return Some(c.split_whitespace().map(str::to_owned).collect()),
                 Ok(_) => {}

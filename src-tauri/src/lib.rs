@@ -138,6 +138,8 @@ fn arrancar(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let app_imagen = app.handle().clone();
     handlers_estado::registrar(&mut router, &nucleo, Arc::new(move || nativo::imagen_del_portapapeles(&app_imagen)));
     handlers::diagnostico::registrar(&mut router, &nucleo, tauri::webview_version().unwrap_or_default());
+    handlers::sleep::registrar(&mut router, &nucleo);
+    nucleo.arrancar_dormir();
     app.manage(router);
     // Los handlers piden por el router lo que atiende otro (p. ej. `workspaces:add`, que es del núcleo).
     let app_h = app.handle().clone();
