@@ -140,11 +140,13 @@ pub struct OpcionesWifi {
     /// Cómo se muestra en la PC quien llega por este servidor, en vez de su IP (por `tailscale serve` todos llegan desde 127.0.0.1).
     pub etiqueta: Option<String>,
     pub log: Option<Arc<dyn Fn(&str) + Send + Sync>>,
+    /// Pedidos de terminal por cliente (200 en 5 s). Los tests ensanchan la ventana para no depender de la velocidad de la máquina.
+    pub limite: Option<Limite>,
 }
 
 impl OpcionesWifi {
     pub fn nuevas(host: &str, puerto: u16, proveedor: Arc<dyn ProveedorDeEstado>) -> Self {
-        OpcionesWifi { host: host.into(), puerto, proveedor, max_conexiones_por_ip: None, ocioso_ms: None, repetidos: None, etiqueta: None, log: None }
+        OpcionesWifi { host: host.into(), puerto, proveedor, max_conexiones_por_ip: None, ocioso_ms: None, repetidos: None, etiqueta: None, log: None, limite: None }
     }
 }
 
@@ -508,7 +510,7 @@ impl FuenteWifi {
         let compartido = Arc::new(Compartido {
             proveedor: o.proveedor,
             repetidos: o.repetidos.unwrap_or_default(),
-            limite: Limite::default(),
+            limite: o.limite.unwrap_or_default(),
             conexiones: o.max_conexiones_por_ip.map_or_else(Conexiones::default, Conexiones::nuevas),
             etiqueta: o.etiqueta,
             ocioso: Duration::from_millis(o.ocioso_ms.unwrap_or(40_000)),
@@ -733,6 +735,7 @@ mod tests {
         let mut o = OpcionesWifi::nuevas("127.0.0.1", 0, p.clone());
         // Cientos de pedidos seguidos desde la misma IP: el tope de 16 se prueba aparte, y el cierre de cada hilo no es instantáneo.
         o.max_conexiones_por_ip = Some(1000);
+        o.limite = Some(Limite::nuevo(200, 600_000, 256));
         ajustar(&mut o);
         let fuente = FuenteWifi::nueva(o);
         fuente.iniciar().unwrap();
