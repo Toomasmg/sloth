@@ -3,6 +3,7 @@
 pub mod auth;
 pub mod callback;
 pub mod config;
+pub mod datos;
 pub mod expulsar;
 pub mod fecha;
 pub mod fotos;
