@@ -180,16 +180,19 @@ impl Cuentas {
         self.retomar.lock().unwrap_or_else(|e| e.into_inner()).insert(ws.into(), (cuenta.into(), sesion.into()));
     }
 
+    /// La sesión a retomar si se pidió para ese espacio y esa cuenta; se gasta al usarla.
+    fn tomar_retomar(&self, ws: &str, cuenta: &str) -> Option<String> {
+        let mut r = self.retomar.lock().unwrap_or_else(|e| e.into_inner());
+        if r.get(ws).is_some_and(|(c, _)| c == cuenta) { r.remove(ws).map(|(_, s)| s) } else { None }
+    }
+
     /// argv del agente para la terminal del espacio. Los reemplazos de las funciones del apoyo (retomar tras mover de
     /// cuenta) escriben comandos de `claude`: con otro agente no corren.
     fn comando(&self, n: &Nucleo, ws: &Value, acc: &Value, id: ProveedorId) -> Option<Vec<String>> {
         if id.capacidades().override_claude {
-            let mut retomar = self.retomar.lock().unwrap_or_else(|e| e.into_inner());
-            if retomar.get(ws["id"].as_str().unwrap_or_default()).is_some_and(|(c, _)| acc["id"] == c.as_str()) {
-                let (_, sesion) = retomar.remove(ws["id"].as_str().unwrap_or_default()).unwrap_or_default();
+            if let Some(sesion) = self.tomar_retomar(ws["id"].as_str().unwrap_or_default(), acc["id"].as_str().unwrap_or_default()) {
                 return Some(vec!["claude".into(), "--resume".into(), sesion]);
             }
-            drop(retomar);
             match n.apoyo.pedir("nucleo:comando", vec![ws.clone(), acc.clone()]) {
                 Ok(Value::String(c)) if !c.trim().is_empty() => return Some(c.split_whitespace().map(str::to_owned).collect()),
                 Ok(_) => {}
@@ -243,6 +246,15 @@ impl Cuentas {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retomar_una_vez_vale_solo_para_esa_cuenta_y_se_gasta() {
+        let c = Cuentas::nuevas(Path::new("raiz"));
+        c.retomar_una_vez("w1", "a1", "s1");
+        assert_eq!(c.tomar_retomar("w1", "otra"), None);
+        assert_eq!(c.tomar_retomar("w1", "a1").as_deref(), Some("s1"));
+        assert_eq!(c.tomar_retomar("w1", "a1"), None);
+    }
 
     #[test]
     fn una_ruta_sin_espacios_queda_con_barras() {

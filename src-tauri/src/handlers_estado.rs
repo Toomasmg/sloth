@@ -597,6 +597,21 @@ mod tests {
     }
 
     #[test]
+    fn terminales_que_consultan_otras_funciones() {
+        let repo = std::env::temp_dir().to_string_lossy().into_owned();
+        let a = armar("consultas", Some(estado_con_espacio(&repo)), None);
+        // Sin daemon conectado no se sabe qué terminales hay: la cuenta se da por ocupada.
+        assert_eq!(invocar(&a, "pty:cuentaOcupada", vec![json!("a1")]).unwrap(), json!({ "conocidas": false, "ocupada": true }));
+        assert_eq!(invocar(&a, "pty:cuentaOcupada", vec![]).unwrap(), json!({ "conocidas": false, "ocupada": false }));
+        assert_eq!(invocar(&a, "pty:cuentaOcupada", vec![json!(7)]).unwrap_err(), PEDIDO_INVALIDO);
+        let uuid = "123e4567-e89b-12d3-a456-426614174000";
+        assert_eq!(invocar(&a, "pty:resumeOnce", vec![json!("w1"), json!("a1"), json!("no-uuid")]).unwrap_err(), PEDIDO_INVALIDO);
+        assert_eq!(invocar(&a, "pty:resumeOnce", vec![json!("nada"), json!("a1"), json!(uuid)]).unwrap_err(), e::ESPACIO_INEXISTENTE);
+        invocar(&a, "pty:resumeOnce", vec![json!("w1"), json!("a1"), json!(uuid)]).unwrap();
+        assert!(invocar(&a, "pty:running", vec![json!(1)]).is_err());
+    }
+
+    #[test]
     fn cambiar_un_espacio_valida_saca_el_icono_guarda_y_empuja_la_copia() {
         let repo = std::env::temp_dir().to_string_lossy().into_owned();
         let a = armar("cambiar", Some(estado_con_espacio(&repo)), None);
